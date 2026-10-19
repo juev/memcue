@@ -49,6 +49,29 @@ _spec.loader.exec_module(memcue_provider)
 BIN = os.environ.get("MEMCUE_BIN") or shutil.which("memcue")
 
 
+def _gives_a_fact_once(binary: str) -> bool:
+    """Whether the binary keeps a fact from coming twice in a session (memcue 0.1.5+). Answered by trying, so a
+    build from source, whose version is 'v0.1.5-dirty' or a bare hash, is judged like a release."""
+    tmp = tempfile.mkdtemp()
+    fact = "Проверка: проект demo слушает порт 55432."
+    env = dict(os.environ, MEMCUE_FACTS=os.path.join(tmp, "facts.db"), MEMCUE_EXTRACT="0",
+               XDG_STATE_HOME=os.path.join(tmp, "state"))
+    env.pop("MEMCUE_RECALL_LOG", None)
+    payload = json.dumps({"prompt": "на каком порту слушает проект demo?", "cwd": tmp, "session_id": "probe"})
+    try:
+        subprocess.run([binary, "add", "-origin", "test", "--", fact], env=env, check=True, capture_output=True)
+        runs = [subprocess.run([binary, "hook"], input=payload, env=env, capture_output=True, text=True).stdout
+                for _ in range(2)]
+        return bool(runs[0].strip()) and not runs[1].strip()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+ONCE_PER_SESSION = _gives_a_fact_once(BIN) if BIN else False
+
+
 @unittest.skipUnless(BIN, "memcue binary not found (set MEMCUE_BIN)")
 class ProviderTest(unittest.TestCase):
     def setUp(self):
@@ -89,6 +112,40 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("55433", facts[0])
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
         self.assertEqual(self.facts(), [])
+
+    def add_fact(self, content: str) -> None:
+        """A fact written by another program, not by the built-in memory tool."""
+        subprocess.run([str(BIN), "add", "-origin", "test", "--", content], check=True, capture_output=True,
+                       env=dict(os.environ, MEMCUE_FACTS=self.p._facts))
+
+    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
+    def test_a_fact_comes_once_per_session(self):
+        self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
+        query = "на каком порту слушает база postgres проекта demo?"
+        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
+        self.assertEqual(self.p.prefetch(query, session_id="s1"), "")  # the same fact once per session
+        self.assertIn("55432", self.p.prefetch(query, session_id="s2"))
+
+    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
+    def test_a_compressed_session_gets_the_fact_again(self):
+        self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
+        query = "на каком порту слушает база postgres проекта demo?"
+        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
+        self.p.on_pre_compress([])  # the context loses what it got
+        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
+
+    def test_a_cron_turn_gets_no_facts(self):
+        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        p.initialize("s3", hermes_home=self.home, agent_context="cron")
+        self.assertEqual(p.prefetch("на каком порту слушает база postgres проекта demo?"), "")
+
+    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
+    def test_a_session_id_outside_the_accepted_set_is_hashed(self):
+        self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
+        query = "на каком порту слушает база postgres проекта demo?"
+        self.assertIn("55432", self.p.prefetch(query, session_id="matrix:room/1"))
+        self.assertEqual(self.p.prefetch(query, session_id="matrix:room/1"), "")
 
     def test_replace_of_unknown_entry_adds(self):
         self.p.on_memory_write("replace", "user", "Пользователь пишет по-русски.", {"previous_content": "x"})

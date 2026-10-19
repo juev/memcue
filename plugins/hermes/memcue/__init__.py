@@ -1,9 +1,10 @@
 """memcue memory provider for Hermes Agent.
 
 Runs the ``memcue`` binary (github.com/juev/memcue): before each turn ``memcue hook`` returns at most two stored facts
-that share enough rare words with the user's message, or nothing; every write of the built-in memory tool is mirrored
-into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the model gets tools to
-search and fix facts. With an OpenAI-compatible endpoint configured, the new messages of a session go to
+that share enough rare words with the user's message, or nothing; each fact once per session (again after a
+compression), and none for a cron turn, which is a background task's notice; every write of the built-in memory tool
+is mirrored into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the model
+gets tools to search and fix facts. With an OpenAI-compatible endpoint configured, the new messages of a session go to
 ``memcue extract-messages`` in the background and the facts a model finds in them are added: once enough new text
 gathers, after a pause in the conversation, before the context is compressed and when the session ends. A chat of a
 messaging gateway can stay one session for days, so its end alone would come too late.
@@ -25,6 +26,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -99,6 +101,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._workspace = ""
         self._session_id = ""
         self._writes = True
+        self._context = "primary"
+        self._generation = 0  # grows with every compression: the facts of an earlier context may come again
         self._lock = threading.Lock()
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
@@ -133,6 +137,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._workspace = str(kwargs.get("agent_workspace") or "")
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
+        self._context = str(kwargs.get("agent_context") or "primary")
 
     def system_prompt_block(self) -> str:
         return ("# Long-term memory (memcue)\n"
@@ -158,11 +163,30 @@ class MemcueMemoryProvider(MemoryProvider):
             return False, (r.stderr or r.stdout).strip() or f"memcue exited {r.returncode}"
         return True, r.stdout.strip()
 
+    def _scope(self, session: str) -> str:
+        """The session memcue counts facts for: it gives a fact once per session. A gateway session can outlive
+        several compressions, and the compressed context no longer holds the facts it already got, so the scope gets
+        one generation per compression and those facts may come again, as they do in Claude Code. memcue takes a
+        session id of [A-Za-z0-9._-] up to 128 characters; anything else is hashed."""
+        if not session:
+            return ""
+        suffix = f".c{self._generation}" if self._generation else ""
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", session)
+        scope = safe + suffix
+        if safe != session or scope in (".", "..") or len(scope) > 128:
+            scope = hashlib.sha256(session.encode()).hexdigest()[:32] + suffix
+        return scope
+
     def prefetch(self, query: str, *, session_id: str = "") -> str:
+        if self._context == "cron":
+            return ""  # a cron turn is a background task's notice: its wrapper matches facts, not a request of a user
         if not query or not query.strip() or not Path(self._facts).exists():
             return ""
-        ok, out = self._run(["hook"], stdin=json.dumps({"prompt": query, "cwd": self._workspace}),
-                            timeout=_RECALL_TIMEOUT)
+        payload: dict[str, Any] = {"prompt": query, "cwd": self._workspace}
+        scope = self._scope((session_id or self._session_id).strip())
+        if scope:
+            payload["session_id"] = scope
+        ok, out = self._run(["hook"], stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
         if not ok or not out:
             if not ok:
                 logger.debug("memcue recall failed: %s", out)
@@ -307,6 +331,7 @@ class MemcueMemoryProvider(MemoryProvider):
     def on_pre_compress(self, messages: list[dict[str, Any]]) -> str:
         if self._extract_env() is not None:
             self._flush(self._session_id, "pre_compress", messages)
+        self._generation += 1  # the context loses the facts it got: they may come once more
         return ""
 
     def shutdown(self) -> None:
