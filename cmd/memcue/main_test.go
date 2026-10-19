@@ -295,3 +295,53 @@ func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestHookRecallsOnATwoWordPrompt(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	in := `{"prompt":"gradle jdk","cwd":"` + dir + `"}`
+	var out bytes.Buffer
+	if err := runHook(strings.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "openjdk@21") {
+		t.Errorf("two-word prompt got no fact: %q", out.String())
+	}
+}
+
+func TestSearchJSONCarriesIDAndContent(t *testing.T) {
+	env(t)
+	seed(t)
+	var out bytes.Buffer
+	if err := runSearch([]string{"-json", "gradle jdk"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var facts []searchFact
+	if err := json.Unmarshal(out.Bytes(), &facts); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if len(facts) != 1 || len(facts[0].ID) != 26 || !strings.Contains(facts[0].Content, "openjdk@21") {
+		t.Errorf("got %+v", facts)
+	}
+	if len(facts[0].Keywords) != 2 {
+		t.Errorf("keywords %v", facts[0].Keywords)
+	}
+}
+
+func TestAddExpiresAndFactsShowsIt(t *testing.T) {
+	env(t)
+	var out bytes.Buffer
+	if err := runAdd([]string{"-expires", "2026-10-21", "Проверить работу dream 21 октября."}, &out); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := runFacts(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "expires=2026-10-21") {
+		t.Errorf("facts output lacks the expiry: %q", out.String())
+	}
+	if err := runAdd([]string{"-expires", "21.10.2026", "Плохая дата."}, &out); err == nil {
+		t.Error("bad date accepted")
+	}
+}

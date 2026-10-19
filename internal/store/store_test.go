@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -170,5 +171,82 @@ func TestDocFreqCountsActiveFacts(t *testing.T) {
 	df, total, err := s.DocFreq(text.Terms("прокси"))
 	if err != nil || total != 2 || df[text.Terms("прокси")[0]] != 1 {
 		t.Errorf("df %v total %d err %v", df, total, err)
+	}
+}
+
+func TestExpiryIsStoredAndKeptByCorrection(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddExpiring("Крон memcue-dream-check придёт 21 октября.", []string{"dream"}, "hermes 2026-10-19",
+		"2026-10-21")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Expires != "2026-10-21" {
+		t.Errorf("expiry %q, want 2026-10-21", got.Expires)
+	}
+	kept, err := s.Correct(f.ID, "Крон memcue-dream-check перенесён на 22 октября.", []string{"dream"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kept.Expires != "2026-10-21" {
+		t.Errorf("correction dropped the expiry: %q", kept.Expires)
+	}
+	empty := ""
+	cleared, err := s.CorrectExpiring(f.ID, "Крон memcue-dream-check отменён.", []string{"dream"}, &empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Expires != "" {
+		t.Errorf("expiry not cleared: %q", cleared.Expires)
+	}
+}
+
+func TestBadExpiryIsRejected(t *testing.T) {
+	s, _ := open(t)
+	if _, err := s.AddExpiring("Срок задан неверно.", nil, "", "21.10.2026"); err == nil {
+		t.Error("21.10.2026 accepted, want an error: the date must be YYYY-MM-DD")
+	}
+	if _, err := s.AddExpiring("Срок задан неверно.", nil, "", "2026-13-45"); err == nil {
+		t.Error("impossible date accepted")
+	}
+}
+
+func TestBaseWithoutExpiresColumnStillOpens(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The base as a memcue before expiry wrote it: no expires column, schema version 1.
+	if _, err := db.Exec(`CREATE TABLE facts (
+		id TEXT NOT NULL, version INTEGER NOT NULL, content TEXT NOT NULL, keywords TEXT NOT NULL DEFAULT '',
+		origin TEXT NOT NULL DEFAULT '', created TEXT NOT NULL,
+		status TEXT NOT NULL CHECK (status IN ('active', 'retired')), author TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (id, version)) WITHOUT ROWID;
+		CREATE TABLE fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
+		CREATE VIRTUAL TABLE fact_fts USING fts5(stems, content='fact_index', content_rowid='rid');
+		PRAGMA user_version = 1;`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("opening an old base: %v", err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.AddExpiring("Старая база приняла факт со сроком.", nil, "", "2026-11-01")
+	if err != nil {
+		t.Fatalf("adding to a migrated base: %v", err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Expires != "2026-11-01" {
+		t.Errorf("expiry %q after migration", got.Expires)
 	}
 }

@@ -76,19 +76,27 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 ## Use
 
 Nothing to do in a session: facts arrive with prompts and are extracted at the end. A fact comes once per session
-(again after a compaction), and a background task's notice gets none. By hand (`add` without `-origin` names the
-repository of the working directory and today):
+(again after a compaction), and a background task's notice gets none. A prompt decides by the terms its facts know:
+a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
+for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
+and today):
 
 ```bash
-memcue search postgres port          # find facts and their IDs
+memcue search -json postgres port    # find facts and their IDs (a JSON array with -json)
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
+memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
+memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
-memcue facts                         # every active fact
+memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -since 2026-10-19 -dry-run
 ```
+
+An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
+skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
+a new one.
 
 Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it.
 `memcue dream` groups each fact written since the last dream with the stored facts close to it in words and asks
@@ -107,6 +115,7 @@ day; its first run on a machine only marks the start.
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
+| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day; turn it on on one machine of those sharing a base | off |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 

@@ -88,3 +88,46 @@ func TestAtMostMaxFacts(t *testing.T) {
 		t.Errorf("got %d %v", len(hs), err)
 	}
 }
+
+// A two-word prompt asks about two terms: the dev-set minimum of three matched terms silenced every fact about them.
+func TestShortPromptWithKnownTermsRecalls(t *testing.T) {
+	s := setup(t)
+	hs := recall(t, s, "прокси mihomo", "loadtest")
+	if len(hs) == 0 {
+		t.Fatalf(`"прокси mihomo" recalled nothing`)
+	}
+}
+
+func TestExpiredFactIsNotRecalled(t *testing.T) {
+	s := setup(t)
+	f, err := s.AddExpiring("Стенд нагрузки поднимается на порту 8443 в staging.", []string{"staging"},
+		"loadtest 2026-10-01", "2026-10-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := Default
+	p.Today = "2026-10-19"
+	hs, err := Recall(s, "на каком порту поднимается стенд нагрузки в staging", "loadtest", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range hs {
+		if h.ID == f.ID {
+			t.Error("expired fact recalled")
+		}
+	}
+	p.Today = "2026-10-05" // still inside its last day
+	hs, err = Recall(s, "на каком порту поднимается стенд нагрузки в staging", "loadtest", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, h := range hs {
+		if h.ID == f.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("fact not recalled before its expiry")
+	}
+}

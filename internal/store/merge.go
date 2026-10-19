@@ -71,9 +71,9 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		}
 		for i, f := range tail {
 			f.Version = common + i + 1
-			if _, err := tx.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version, f.Content, strings.Join(f.Keywords, ", "), f.Origin,
-				f.Created.Format(time.RFC3339Nano), f.Status, f.Author); err != nil {
+			if _, err := tx.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author, expires)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version, f.Content, strings.Join(f.Keywords, ", "), f.Origin,
+				f.Created.Format(time.RFC3339Nano), f.Status, f.Author, f.Expires); err != nil {
 				return st, err
 			}
 		}
@@ -94,7 +94,8 @@ func byID(rows []Fact) map[string][]Fact {
 
 func same(a, b Fact) bool {
 	return a.Content == b.Content && strings.Join(a.Keywords, ", ") == strings.Join(b.Keywords, ", ") &&
-		a.Origin == b.Origin && a.Created.Equal(b.Created) && a.Status == b.Status && a.Author == b.Author
+		a.Origin == b.Origin && a.Created.Equal(b.Created) && a.Status == b.Status && a.Author == b.Author &&
+		a.Expires == b.Expires
 }
 
 // Dump writes every version of every fact, one per line, for git diff.
@@ -104,8 +105,12 @@ func (s *Store) Dump(w io.Writer) error {
 		return err
 	}
 	for _, f := range rows {
+		created := f.Created.Format(time.RFC3339)
+		if f.Expires != "" {
+			created += " expires=" + f.Expires
+		}
 		if _, err := fmt.Fprintf(w, "%s v%d %s %s %s [%s] %s\n", f.ID, f.Version, f.Status,
-			f.Created.Format(time.RFC3339), f.Origin, strings.Join(f.Keywords, ", "),
+			created, f.Origin, strings.Join(f.Keywords, ", "),
 			strings.Join(strings.Fields(f.Content), " ")); err != nil {
 			return err
 		}

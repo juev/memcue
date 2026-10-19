@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,11 +41,11 @@ commands:
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin)
-  search    find facts by words, with their IDs: memcue search TEXT
+  search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
   recall    print what a prompt would recall: memcue recall [-cwd DIR] TEXT
   eval      measure recall and noise against labelled sets
-  add       store a fact: memcue add [-keywords K1,K2] [-origin O] TEXT
-  correct   new version of a fact: memcue correct [-keywords K] ID TEXT
+  add       store a fact: memcue add [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] TEXT
+  correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   facts     list the active facts
   dream     retire duplicate and contradicted facts written since the last dream: memcue dream [-since DATE|-all] [-dry-run] [-list]
@@ -62,6 +63,7 @@ environment:
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
+  MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
 `
 
@@ -154,6 +156,11 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]reca
 	}
 	p := recall.Default
 	p.Seen = seen
+	if v := os.Getenv("MEMCUE_MIN_COVERAGE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 && f <= 1 {
+			p.MinCoverage = f
+		}
+	}
 	return recall.Recall(s, prompt, tier.Of(cwd, claudeDir()), p)
 }
 
