@@ -59,7 +59,7 @@ environment:
   MEMCUE_MODEL    model of the extraction (default claude-opus-5-5)
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_EXTRACT  0 switches the extraction hook off
-  MEMCUE_RECALL_LOG 0 stops logging what each prompt got ($XDG_STATE_HOME/memcue/recall.log)
+  MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
 `
 
 func main() {
@@ -204,10 +204,10 @@ type recallFact struct {
 // logPrompt is how much of a prompt recall.log keeps: enough to judge what the prompt was about.
 const logPrompt = 500
 
-// logRecall appends what the hook decided to $XDG_STATE_HOME/memcue/recall.log, prompts that got nothing included;
-// MEMCUE_RECALL_LOG=0 turns it off. A failure to log never fails the hook.
+// logRecall appends what the hook decided to $XDG_STATE_HOME/memcue/recall.log, prompts that got nothing included.
+// It keeps the text of prompts, so it is off unless MEMCUE_RECALL_LOG=1. A failure to log never fails the hook.
 func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duration) {
-	if os.Getenv("MEMCUE_RECALL_LOG") == "0" {
+	if os.Getenv("MEMCUE_RECALL_LOG") != "1" {
 		return
 	}
 	dir, err := stateDir()

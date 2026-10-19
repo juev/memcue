@@ -118,6 +118,7 @@ func TestRenderOmitsEmptyOrigin(t *testing.T) {
 func TestHookLogsEveryPrompt(t *testing.T) {
 	dir := env(t)
 	seed(t)
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
 	for _, p := range []string{"Как запустить gradle без make, какой JAVA_HOME нужен для JDK?", "ок"} {
 		in, _ := json.Marshal(map[string]string{"prompt": p, "cwd": dir, "session_id": "s1"})
 		if err := runHook(strings.NewReader(string(in)), &bytes.Buffer{}); err != nil {
@@ -138,10 +139,10 @@ func TestHookLogsEveryPrompt(t *testing.T) {
 	}
 }
 
-func TestHookLogOff(t *testing.T) {
+func TestHookLogOffByDefault(t *testing.T) {
 	dir := env(t)
 	seed(t)
-	t.Setenv("MEMCUE_RECALL_LOG", "0")
+	t.Setenv("MEMCUE_RECALL_LOG", "")
 	if err := runHook(strings.NewReader(`{"prompt":"gradle JAVA_HOME JDK make"}`), &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}

@@ -95,11 +95,12 @@ memcue recall -cwd . "text"          # what a prompt would get
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the extraction instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
-| `MEMCUE_RECALL_LOG` | `0` stops logging what each prompt got | on |
+| `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log` and per-session read offsets are kept | `~/.local/state` |
 
-`recall.log` has one JSON line per prompt: the session, the first 500 characters of the prompt and the facts it got,
-if any, with their coverage; it stays on your machine and is what you judge recall by. `extract.log` has one JSON
+With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
+prompt and the facts it got, if any, with their coverage. It stays on your machine and is what you judge recall by;
+it is off by default because it keeps the text of your prompts. `extract.log` has one JSON
 line per extraction run: session, part of the transcript read, facts stored, and the cost
 Claude Code reports or the tokens the endpoint reports.
 
