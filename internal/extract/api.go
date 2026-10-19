@@ -36,22 +36,22 @@ func (t *Tokens) Add(o Tokens) {
 	t.Output += o.Output
 }
 
-func runAPI(ctx context.Context, system, input string) (Result, error) {
+func runAPI(ctx context.Context, system, input string) (reply, error) {
 	body, err := json.Marshal(map[string]any{
 		"model": Model,
 		"messages": []map[string]string{
-			{"role": "system", "content": system + jsonAnswer},
+			{"role": "system", "content": system},
 			{"role": "user", "content": input},
 		},
 		"response_format": map[string]string{"type": "json_object"},
 	})
 	if err != nil {
-		return Result{}, err
+		return reply{}, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(API.URL, "/")+"/chat/completions",
 		bytes.NewReader(body))
 	if err != nil {
-		return Result{}, err
+		return reply{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if API.Key != "" {
@@ -59,20 +59,21 @@ func runAPI(ctx context.Context, system, input string) (Result, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return Result{}, err
+		return reply{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
-		return Result{}, err
+		return reply{}, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Result{}, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(raw[:min(len(raw), 500)])))
+		return reply{}, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(raw[:min(len(raw), 500)])))
 	}
 	return parseAPI(raw)
 }
 
-func parseAPI(raw []byte) (Result, error) {
+// parseAPI takes the answer out of a chat completion.
+func parseAPI(raw []byte) (reply, error) {
 	var env struct {
 		Choices []struct {
 			Message struct {
@@ -90,27 +91,17 @@ func parseAPI(raw []byte) (Result, error) {
 		} `json:"usage"`
 	}
 	if err := json.Unmarshal(raw, &env); err != nil {
-		return Result{}, fmt.Errorf("endpoint output: %w", err)
+		return reply{}, fmt.Errorf("endpoint output: %w", err)
 	}
 	if len(env.Choices) == 0 {
-		return Result{}, fmt.Errorf("endpoint returned no choices")
+		return reply{}, fmt.Errorf("endpoint returned no choices")
 	}
 	if fr := env.Choices[0].FinishReason; fr == "length" {
-		return Result{}, fmt.Errorf("answer cut at the token limit")
+		return reply{}, fmt.Errorf("answer cut at the token limit")
 	}
-	var r Result
-	if err := json.Unmarshal([]byte(stripFence(env.Choices[0].Message.Content)), &r); err != nil {
-		return Result{}, fmt.Errorf("facts: %w", err)
-	}
-	r.Tokens = Tokens{Input: env.Usage.PromptTokens, Cached: max(env.Usage.CacheHit, env.Usage.Details.Cached),
-		Output: env.Usage.CompletionTokens}
-	for i := range r.Facts {
-		r.Facts[i].Content = strings.TrimSpace(r.Facts[i].Content)
-	}
-	if len(r.Facts) == 0 && r.Dropped == "" {
-		return r, errEmpty
-	}
-	return r, nil
+	return reply{payload: []byte(stripFence(env.Choices[0].Message.Content)),
+		tokens: Tokens{Input: env.Usage.PromptTokens, Cached: max(env.Usage.CacheHit, env.Usage.Details.Cached),
+			Output: env.Usage.CompletionTokens}}, nil
 }
 
 // stripFence removes a ```json fence some models put around the object despite the instruction.

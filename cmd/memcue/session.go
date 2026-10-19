@@ -170,6 +170,8 @@ func runExtractSession(args []string) error {
 	if lerr := appendLog(filepath.Join(dir, "extract.log"), rec); err == nil {
 		err = lerr
 	}
+	_ = lock.Close() // the session's next run need not wait for the dream
+	maybeDream()
 	return err
 }
 
@@ -267,22 +269,7 @@ func writeOffset(f *os.File, n int) error {
 	return err
 }
 
-func appendLog(path string, rec extractRecord) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	b, err := json.Marshal(rec)
-	if err != nil {
-		_ = f.Close()
-		return err
-	}
-	_, err = f.Write(append(b, '\n'))
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	return err
-}
+func appendLog(path string, rec extractRecord) error { return appendJSON(path, rec) }
 
 // runExtractMessages extracts and stores the facts of chat messages in the OpenAI shape read from stdin: the session
 // of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-session ID].
@@ -309,5 +296,7 @@ func runExtractMessages(args []string, in io.Reader) error {
 	if derr != nil {
 		return errors.Join(err, derr)
 	}
-	return errors.Join(err, appendLog(filepath.Join(dir, "extract.log"), rec))
+	err = errors.Join(err, appendLog(filepath.Join(dir, "extract.log"), rec))
+	maybeDream()
+	return err
 }

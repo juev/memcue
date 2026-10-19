@@ -93,12 +93,29 @@ func mergeParts(prior, fresh []Fact, outdated []int) []Fact {
 }
 
 func run(ctx context.Context, system, input string) (Result, error) {
+	rp, err := call(ctx, system, schema, jsonAnswer, input)
+	if err != nil {
+		return Result{}, err
+	}
+	return decode(rp)
+}
+
+// reply is one answer of the model: the JSON object it gave and what the call cost.
+type reply struct {
+	payload []byte
+	cost    float64 // as `claude -p` reports it
+	tokens  Tokens  // as an endpoint reports them
+}
+
+// call runs the model once. `claude -p` enforces schema; an endpoint only promises some JSON object, so shape is
+// appended to its system prompt to name the object.
+func call(ctx context.Context, system, schema, shape, input string) (reply, error) {
 	if API.URL != "" {
-		return runAPI(ctx, system, input)
+		return runAPI(ctx, system+shape, input)
 	}
 	dir, err := os.MkdirTemp("", "memcue-extract-")
 	if err != nil {
-		return Result{}, err
+		return reply{}, err
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", Model, "--tools", "", "--no-session-persistence",
@@ -109,12 +126,21 @@ func run(ctx context.Context, system, input string) (Result, error) {
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
-		return Result{}, fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return reply{}, fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	return parse(out.Bytes())
+	return envelope(out.Bytes())
 }
 
 func parse(b []byte) (Result, error) {
+	rp, err := envelope(b)
+	if err != nil {
+		return Result{}, err
+	}
+	return decode(rp)
+}
+
+// envelope takes the answer out of the JSON `claude -p` prints.
+func envelope(b []byte) (reply, error) {
 	var env struct {
 		IsError          bool            `json:"is_error"`
 		Result           string          `json:"result"`
@@ -122,20 +148,24 @@ func parse(b []byte) (Result, error) {
 		TotalCostUSD     float64         `json:"total_cost_usd"`
 	}
 	if err := json.Unmarshal(b, &env); err != nil {
-		return Result{}, fmt.Errorf("claude output: %w", err)
+		return reply{}, fmt.Errorf("claude output: %w", err)
 	}
 	if env.IsError {
-		return Result{}, fmt.Errorf("claude: %s", env.Result)
+		return reply{}, fmt.Errorf("claude: %s", env.Result)
 	}
 	payload := env.StructuredOutput
 	if len(payload) == 0 || string(payload) == "null" {
 		payload = json.RawMessage(strings.TrimSpace(env.Result))
 	}
+	return reply{payload: payload, cost: env.TotalCostUSD}, nil
+}
+
+func decode(rp reply) (Result, error) {
 	var r Result
-	if err := json.Unmarshal(payload, &r); err != nil {
+	if err := json.Unmarshal(rp.payload, &r); err != nil {
 		return Result{}, fmt.Errorf("facts: %w", err)
 	}
-	r.CostUSD = env.TotalCostUSD
+	r.CostUSD, r.Tokens = rp.cost, rp.tokens
 	for i := range r.Facts {
 		r.Facts[i].Content = strings.TrimSpace(r.Facts[i].Content)
 	}

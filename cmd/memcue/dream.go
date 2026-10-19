@@ -1,0 +1,375 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/juev/memcue/internal/extract"
+	"github.com/juev/memcue/internal/recall"
+	"github.com/juev/memcue/internal/store"
+)
+
+// A dream is a pass over the facts written since the last one: each new fact is grouped with the stored facts close
+// to it in words, and the model says which of them to retire as duplicates or contradicted, and which to correct.
+// Extraction never sees the base, so this is where two sessions' copies of one fact, or an old fact and the fact
+// that disproved it, meet.
+
+// dreamNeighbours finds the facts close to a fact: the fact itself is the prompt. Coverage is higher than for a
+// prompt because a fact holds many words and shares some of them with unrelated facts.
+var dreamNeighbours = recall.Params{
+	Candidates:     80,
+	MinTerms:       2,
+	MinMatched:     3,
+	MinCoverage:    0.35,
+	MaxPromptTerms: 24,
+	MaxFacts:       3,
+}
+
+const (
+	maxGroup      = 6  // facts in one group: a chain of neighbours longer than that is cut
+	groupsPerCall = 10 // groups the model sees at once
+	dreamEvery    = 24 * time.Hour
+)
+
+// dreamFn is the model step, replaced in tests.
+var dreamFn = func(groups string) (extract.DreamResult, error) {
+	ctx, cancel := contextTimeout()
+	defer cancel()
+	return extract.Dream(ctx, groups)
+}
+
+// dreamRecord is one line of dream.log: what a dream changed and why, the record its decisions are checked by.
+type dreamRecord struct {
+	Time    string           `json:"time"`
+	Since   string           `json:"since"`
+	Fresh   int              `json:"fresh"`
+	Groups  int              `json:"groups"`
+	DryRun  bool             `json:"dry_run,omitempty"`
+	Actions []extract.Action `json:"actions,omitempty"`
+	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
+	CostUSD float64          `json:"cost_usd"`
+	Tokens  extract.Tokens   `json:"tokens"`
+	Error   string           `json:"error,omitempty"`
+}
+
+func runDream(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("dream", flag.ContinueOnError)
+	since := fs.String("since", "", "review facts written since this date or RFC 3339 time (default: since the last dream)")
+	all := fs.Bool("all", false, "review every active fact")
+	dryRun := fs.Bool("dry-run", false, "ask the model but change nothing")
+	list := fs.Bool("list", false, "print the groups and stop, without the model")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return err
+	}
+	var from time.Time
+	switch {
+	case *all:
+	case *since != "":
+		if from, err = parseSince(*since); err != nil {
+			return err
+		}
+	default:
+		var ok bool
+		if from, ok = lastDream(dir); !ok {
+			return errors.New("no dream yet on this machine: give -since DATE or -all")
+		}
+	}
+	unlock, err := lockDream(dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	rec, err := dream(dir, from, *dryRun, *list, out)
+	if *list {
+		return err
+	}
+	if err != nil {
+		rec.Error = err.Error()
+	}
+	return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
+}
+
+// maybeDream runs a dream after an extraction when MEMCUE_DREAM=1 and a day has passed since the last one. The first
+// call only marks the start, so the base a machine already had is not swept by surprise (memcue dream -all does that).
+// Its failures go to dream.log and never fail the extraction.
+func maybeDream() {
+	if os.Getenv("MEMCUE_DREAM") != "1" {
+		return
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return
+	}
+	from, ok := lastDream(dir)
+	if !ok {
+		_ = markDream(dir, time.Now())
+		return
+	}
+	if time.Since(from) < dreamEvery {
+		return
+	}
+	unlock, err := lockDream(dir)
+	if err != nil {
+		return // another dream is running
+	}
+	defer unlock()
+	if from, ok = lastDream(dir); !ok || time.Since(from) < dreamEvery { // it may have just finished
+		return
+	}
+	rec, err := dream(dir, from, false, false, io.Discard)
+	if err != nil {
+		rec.Error = err.Error()
+	}
+	_ = appendJSON(filepath.Join(dir, "dream.log"), rec)
+}
+
+// dream reviews the facts written since from; the zero time means every active fact.
+func dream(dir string, from time.Time, dryRun, list bool, out io.Writer) (dreamRecord, error) {
+	start := time.Now()
+	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339), DryRun: dryRun}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		return rec, err
+	}
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
+		return rec, err
+	}
+	var fresh []store.Fact
+	for _, f := range active {
+		if !f.Created.Before(from) {
+			fresh = append(fresh, f)
+		}
+	}
+	rec.Fresh = len(fresh)
+	groups, err := groupFacts(s, active, fresh)
+	if err != nil {
+		return rec, err
+	}
+	rec.Groups = len(groups)
+	if list {
+		_, err := io.WriteString(out, renderGroups(groups, freshSet(fresh)))
+		return rec, err
+	}
+	for batch := range slices.Chunk(groups, groupsPerCall) {
+		r, err := dreamFn(renderGroups(batch, freshSet(fresh)))
+		rec.CostUSD += r.CostUSD
+		rec.Tokens.Add(r.Tokens)
+		if err != nil {
+			return rec, err
+		}
+		ok, refused := checkActions(batch, r.Actions)
+		rec.Refused = append(rec.Refused, refused...)
+		for _, a := range ok {
+			if !dryRun {
+				if err := apply(s, a); err != nil {
+					return rec, err
+				}
+			}
+			rec.Actions = append(rec.Actions, a)
+			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
+				return rec, err
+			}
+		}
+	}
+	if !dryRun {
+		err = markDream(dir, start)
+	}
+	return rec, err
+}
+
+func freshSet(fresh []store.Fact) map[string]bool {
+	m := map[string]bool{}
+	for _, f := range fresh {
+		m[f.ID] = true
+	}
+	return m
+}
+
+// groupFacts joins each fresh fact with its neighbours; groups that share a fact become one. A group is cut at
+// maxGroup facts, and a fact with no neighbour makes no group.
+func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, error) {
+	byID := map[string]store.Fact{}
+	for _, f := range active {
+		byID[f.ID] = f
+	}
+	parent := map[string]string{}
+	size := map[string]int{}
+	var find func(string) string
+	find = func(id string) string {
+		if _, ok := parent[id]; !ok {
+			parent[id], size[id] = id, 1
+		}
+		if parent[id] != id {
+			parent[id] = find(parent[id])
+		}
+		return parent[id]
+	}
+	union := func(a, b string) {
+		ra, rb := find(a), find(b)
+		if ra == rb || size[ra]+size[rb] > maxGroup {
+			return
+		}
+		parent[rb] = ra
+		size[ra] += size[rb]
+	}
+	for _, f := range fresh {
+		p := dreamNeighbours
+		p.Seen = map[string]bool{f.ID: true}
+		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), "", p)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range hits {
+			union(f.ID, h.ID)
+		}
+	}
+	members := map[string][]store.Fact{}
+	for id := range parent {
+		r := find(id)
+		members[r] = append(members[r], byID[id])
+	}
+	var groups [][]store.Fact
+	for _, g := range members {
+		if len(g) < 2 {
+			continue
+		}
+		slices.SortFunc(g, func(a, b store.Fact) int { return strings.Compare(a.ID, b.ID) })
+		groups = append(groups, g)
+	}
+	slices.SortFunc(groups, func(a, b []store.Fact) int { return strings.Compare(a[0].ID, b[0].ID) })
+	return groups, nil
+}
+
+func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {
+	var b strings.Builder
+	for i, g := range groups {
+		fmt.Fprintf(&b, "## Группа %d\n\n", i+1)
+		for _, f := range g {
+			mark := ""
+			if fresh[f.ID] {
+				mark = ", новый"
+			}
+			fmt.Fprintf(&b, "- id %s (origin: %s; записан %s%s; ключи: %s)\n  %s\n", f.ID, f.Origin,
+				f.Created.Format(time.DateOnly), mark, strings.Join(f.Keywords, ", "),
+				strings.Join(strings.Fields(f.Content), " "))
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+// checkActions keeps the actions that name a fact of the groups sent, at most one per fact, a correction with text,
+// and leave every group at least one active fact; the rest come back with why they were refused.
+func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract.Action, refused []string) {
+	groupOf := map[string]int{}
+	left := make([]int, len(groups))
+	for i, g := range groups {
+		left[i] = len(g)
+		for _, f := range g {
+			groupOf[f.ID] = i
+		}
+	}
+	done := map[string]bool{}
+	for _, a := range actions {
+		g, known := groupOf[a.ID]
+		switch {
+		case !known:
+			refused = append(refused, a.Op+" "+a.ID+": not a fact of the groups")
+		case done[a.ID]:
+			refused = append(refused, a.Op+" "+a.ID+": second action on the fact")
+		case a.Op == "correct" && a.Content == "":
+			refused = append(refused, "correct "+a.ID+": no content")
+		case a.Op == "retire" && left[g] == 1:
+			refused = append(refused, "retire "+a.ID+": last active fact of its group")
+		case a.Op != "retire" && a.Op != "correct":
+			refused = append(refused, a.Op+" "+a.ID+": unknown op")
+		default:
+			done[a.ID] = true
+			if a.Op == "retire" {
+				left[g]--
+			}
+			ok = append(ok, a)
+		}
+	}
+	return ok, refused
+}
+
+func apply(s *store.Store, a extract.Action) error {
+	var err error
+	if a.Op == "retire" {
+		_, err = s.Retire(a.ID)
+	} else {
+		_, err = s.Correct(a.ID, a.Content, a.Keywords)
+	}
+	return err
+}
+
+func parseSince(v string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, v); err == nil {
+		return t, nil
+	}
+	t, err := time.ParseInLocation(time.DateOnly, v, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("-since %q: want YYYY-MM-DD or an RFC 3339 time", v)
+	}
+	return t, nil
+}
+
+// lastDream reads when the last dream on this machine started.
+func lastDream(dir string) (time.Time, bool) {
+	b, err := os.ReadFile(filepath.Join(dir, "dream.at"))
+	if err != nil {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(string(b)))
+	return t, err == nil
+}
+
+func markDream(dir string, t time.Time) error {
+	return os.WriteFile(filepath.Join(dir, "dream.at"), []byte(t.UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
+}
+
+// lockDream keeps two dreams on one machine from deciding over the same facts; it does not wait.
+func lockDream(dir string) (func(), error) {
+	f, err := os.OpenFile(filepath.Join(dir, "dream.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		return nil, errors.New("another dream is running")
+	}
+	return func() { _ = f.Close() }, nil
+}
+
+func appendJSON(path string, v any) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	_, err = f.Write(append(b, '\n'))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
+}

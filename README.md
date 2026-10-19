@@ -86,7 +86,16 @@ memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
 memcue facts                         # every active fact
 memcue recall -cwd . "text"          # what a prompt would get
+memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
+memcue dream -since 2026-10-19 -dry-run
 ```
+
+Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it.
+`memcue dream` groups each fact written since the last dream with the stored facts close to it in words and asks
+the model which to retire as a duplicate or as contradicted, and which to correct with merged text. The new text is
+built only from the facts of the group, every group keeps at least one fact, and each change goes to `dream.log`
+with its reason; a retired fact stays in the history. With `MEMCUE_DREAM=1` a dream runs after an extraction once a
+day; its first run on a machine only marks the start.
 
 ## Configuration
 
@@ -98,6 +107,7 @@ memcue recall -cwd . "text"          # what a prompt would get
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
+| `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day; turn it on on one machine of those sharing a base | off |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the

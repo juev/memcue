@@ -47,6 +47,7 @@ commands:
   correct   new version of a fact: memcue correct [-keywords K] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   facts     list the active facts
+  dream     retire duplicate and contradicted facts written since the last dream: memcue dream [-since DATE|-all] [-dry-run] [-list]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
@@ -61,6 +62,7 @@ environment:
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
+  MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
 `
 
 func main() {
@@ -106,6 +108,8 @@ func main() {
 		err = runRetire(os.Args[2:], os.Stdout)
 	case "facts":
 		err = runFacts(os.Stdout)
+	case "dream":
+		err = runDream(os.Args[2:], os.Stdout)
 	case "migrate":
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":
