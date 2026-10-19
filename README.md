@@ -95,9 +95,12 @@ memcue recall -cwd . "text"          # what a prompt would get
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the extraction instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
-| `XDG_STATE_HOME` | where per-session read offsets and `memcue/extract.log` are kept | `~/.local/state` |
+| `MEMCUE_RECALL_LOG` | `0` stops logging what each prompt got | on |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log` and per-session read offsets are kept | `~/.local/state` |
 
-`extract.log` has one JSON line per extraction run: session, part of the transcript read, facts stored, and the cost
+`recall.log` has one JSON line per prompt: the session, the first 500 characters of the prompt and the facts it got,
+if any, with their coverage; it stays on your machine and is what you judge recall by. `extract.log` has one JSON
+line per extraction run: session, part of the transcript read, facts stored, and the cost
 Claude Code reports or the tokens the endpoint reports.
 
 The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the

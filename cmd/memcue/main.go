@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/recall"
@@ -20,6 +23,13 @@ import (
 )
 
 var version = "dev"
+
+func init() {
+	// go install leaves the version unset; the module version it built is in the build info.
+	if bi, ok := debug.ReadBuildInfo(); ok && version == "dev" && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		version = strings.TrimPrefix(bi.Main.Version, "v")
+	}
+}
 
 const usage = `usage: memcue <command>
 
@@ -49,6 +59,7 @@ environment:
   MEMCUE_MODEL    model of the extraction (default claude-opus-5-5)
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_EXTRACT  0 switches the extraction hook off
+  MEMCUE_RECALL_LOG 0 stops logging what each prompt got ($XDG_STATE_HOME/memcue/recall.log)
 `
 
 func main() {
@@ -140,8 +151,9 @@ func recallFor(s *store.Store, prompt, cwd string) ([]recall.Hit, error) {
 
 func runHook(in io.Reader, out io.Writer) error {
 	var req struct {
-		Prompt string `json:"prompt"`
-		CWD    string `json:"cwd"`
+		Prompt    string `json:"prompt"`
+		CWD       string `json:"cwd"`
+		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(in).Decode(&req); err != nil {
 		return fmt.Errorf("hook input: %w", err)
@@ -149,14 +161,19 @@ func runHook(in io.Reader, out io.Writer) error {
 	if _, err := os.Stat(factsPath()); errors.Is(err, fs.ErrNotExist) {
 		return nil // no base yet: the hook must not create one where git would pick it up
 	}
+	start := time.Now()
 	s, err := store.Open(factsPath())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = s.Close() }()
 	hits, err := recallFor(s, req.Prompt, req.CWD)
-	if err != nil || len(hits) == 0 {
+	if err != nil {
 		return err
+	}
+	logRecall(req.SessionID, req.CWD, req.Prompt, hits, time.Since(start))
+	if len(hits) == 0 {
+		return nil
 	}
 	var resp struct {
 		HookSpecificOutput struct {
@@ -167,6 +184,54 @@ func runHook(in io.Reader, out io.Writer) error {
 	resp.HookSpecificOutput.HookEventName = "UserPromptSubmit"
 	resp.HookSpecificOutput.AdditionalContext = render(hits)
 	return json.NewEncoder(out).Encode(resp)
+}
+
+// recallRecord is one line of recall.log: what a prompt got, the record the read side is judged by.
+type recallRecord struct {
+	Time    string       `json:"time"`
+	Session string       `json:"session,omitempty"`
+	Tier    string       `json:"tier,omitempty"`
+	Prompt  string       `json:"prompt"`
+	Facts   []recallFact `json:"facts,omitempty"`
+	Ms      float64      `json:"ms"`
+}
+
+type recallFact struct {
+	ID       string  `json:"id"`
+	Coverage float64 `json:"coverage"`
+}
+
+// logPrompt is how much of a prompt recall.log keeps: enough to judge what the prompt was about.
+const logPrompt = 500
+
+// logRecall appends what the hook decided to $XDG_STATE_HOME/memcue/recall.log, prompts that got nothing included;
+// MEMCUE_RECALL_LOG=0 turns it off. A failure to log never fails the hook.
+func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duration) {
+	if os.Getenv("MEMCUE_RECALL_LOG") == "0" {
+		return
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return
+	}
+	if r := []rune(prompt); len(r) > logPrompt {
+		prompt = string(r[:logPrompt])
+	}
+	rec := recallRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: session, Tier: tier.Of(cwd, claudeDir()),
+		Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
+	for _, h := range hits {
+		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000})
+	}
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "recall.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	_, _ = f.Write(append(b, '\n'))
+	_ = f.Close()
 }
 
 func render(hits []recall.Hit) string {
