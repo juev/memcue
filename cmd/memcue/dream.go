@@ -313,9 +313,17 @@ func apply(s *store.Store, a extract.Action) error {
 	var err error
 	if a.Op == "retire" {
 		_, err = s.Retire(a.ID)
-	} else {
-		_, err = s.Correct(a.ID, a.Content, a.Keywords)
+		return err
 	}
+	keywords := a.Keywords
+	if len(keywords) == 0 { // the model gave only the text: the words the fact is asked by stay
+		cur, err := s.Get(a.ID)
+		if err != nil {
+			return err
+		}
+		keywords = cur.Keywords
+	}
+	_, err = s.Correct(a.ID, a.Content, keywords)
 	return err
 }
 

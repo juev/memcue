@@ -128,6 +128,23 @@ func TestDreamCorrectsMergedFact(t *testing.T) {
 	}
 }
 
+func TestDreamCorrectWithoutKeywordsKeepsThem(t *testing.T) {
+	env(t)
+	_, a, b, _ := dreamBase(t)
+	fakeDream(t, func(string) []extract.Action {
+		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
+			{Op: "retire", ID: a, Reason: "merged"}}
+	})
+	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := store.Open(factsPath())
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(b); f.Content != "слитый текст" || strings.Join(f.Keywords, ",") != "watch-all,github подписка,workflow" {
+		t.Errorf("corrected: %+v", f)
+	}
+}
+
 func TestDreamRefusesUnsafeActions(t *testing.T) {
 	groups := [][]store.Fact{{{ID: "A"}, {ID: "B"}}}
 	ok, refused := checkActions(groups, []extract.Action{
