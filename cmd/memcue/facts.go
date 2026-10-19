@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -46,6 +47,7 @@ func runAdd(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of the working directory)")
+	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -53,7 +55,7 @@ func runAdd(args []string, out io.Writer) error {
 		*origin = defaultOrigin()
 	}
 	return withStore(func(s *store.Store) error {
-		f, err := s.Add(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin)
+		f, err := s.AddExpiring(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin, *expires)
 		if err != nil {
 			return err
 		}
@@ -74,11 +76,16 @@ func defaultOrigin() string {
 func runCorrect(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("correct", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated; empty keeps the current ones")
+	expires := fs.String("expires", "", "new last day the fact is worth recalling, YYYY-MM-DD; empty keeps the current one")
+	noExpires := fs.Bool("no-expires", false, "drop the expiry: the fact is recalled from now on without end")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() < 2 {
-		return errors.New("usage: memcue correct [-keywords K] ID TEXT")
+		return errors.New("usage: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT")
+	}
+	if *noExpires && *expires != "" {
+		return errors.New("correct: -expires and -no-expires cannot be combined")
 	}
 	return withStore(func(s *store.Store) error {
 		kw := splitKeywords(*keywords)
@@ -89,7 +96,15 @@ func runCorrect(args []string, out io.Writer) error {
 			}
 			kw = cur.Keywords
 		}
-		f, err := s.Correct(fs.Arg(0), strings.Join(fs.Args()[1:], " "), kw)
+		var exp *string
+		switch {
+		case *expires != "":
+			exp = expires
+		case *noExpires:
+			empty := ""
+			exp = &empty
+		}
+		f, err := s.CorrectExpiring(fs.Arg(0), strings.Join(fs.Args()[1:], " "), kw, exp)
 		if err != nil {
 			return err
 		}
@@ -123,8 +138,12 @@ func runFacts(out io.Writer) error {
 			return err
 		}
 		for _, f := range fs {
-			if _, err := fmt.Fprintf(out, "%s v%d %s [%s] %s\n", f.ID, f.Version, f.Origin,
-				strings.Join(f.Keywords, ", "), strings.Join(strings.Fields(f.Content), " ")); err != nil {
+			expires := ""
+			if f.Expires != "" {
+				expires = " expires=" + f.Expires
+			}
+			if _, err := fmt.Fprintf(out, "%s v%d %s [%s]%s %s\n", f.ID, f.Version, f.Origin,
+				strings.Join(f.Keywords, ", "), expires, strings.Join(strings.Fields(f.Content), " ")); err != nil {
 				return err
 			}
 		}
@@ -137,6 +156,7 @@ func runFacts(out io.Writer) error {
 func runSearch(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	n := fs.Int("n", 10, "how many facts")
+	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -145,6 +165,9 @@ func runSearch(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if *asJSON {
+			return json.NewEncoder(out).Encode(searchJSON(hits))
+		}
 		for _, h := range hits {
 			if _, err := fmt.Fprintln(out, strings.Join(strings.Fields(h.ID+" "+h.Origin+" | "+h.Content), " ")); err != nil {
 				return err
@@ -152,6 +175,25 @@ func runSearch(args []string, out io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// searchFact is one fact as search -json prints it: what a caller needs to show, correct or retire it.
+type searchFact struct {
+	ID       string   `json:"id"`
+	Content  string   `json:"content"`
+	Keywords []string `json:"keywords,omitempty"`
+	Origin   string   `json:"origin,omitempty"`
+	Created  string   `json:"created"`
+	Expires  string   `json:"expires,omitempty"`
+}
+
+func searchJSON(hits []store.Hit) []searchFact {
+	out := make([]searchFact, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, searchFact{ID: h.ID, Content: h.Content, Keywords: h.Keywords, Origin: h.Origin,
+			Created: h.Created.UTC().Format(time.RFC3339), Expires: h.Expires})
+	}
+	return out
 }
 
 // runMerge is git's merge driver: memcue merge %O %A %B. The result goes into %A; a non-zero exit tells git the

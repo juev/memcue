@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
@@ -25,6 +26,7 @@ type Params struct {
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
+	Today          string          // "YYYY-MM-DD" the expired facts are judged by; empty means time.Now().UTC()
 }
 
 // Default holds the values chosen on the dev set of facts (2026-10-19, 2335 facts migrated from the notes, 180 real
@@ -80,9 +82,19 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	if err != nil {
 		return nil, err
 	}
+	// A prompt cannot match more terms than its facts know: a short question ("dream memcue") often keeps two terms,
+	// and the dev-set minimum of three then silenced every fact about them.
+	minMatched := p.MinMatched
+	if len(known) < minMatched {
+		minMatched = len(known)
+	}
+	today := p.Today
+	if today == "" {
+		today = time.Now().UTC().Format(time.DateOnly)
+	}
 	var hits []Hit
 	for _, f := range found {
-		if p.Seen[f.ID] {
+		if p.Seen[f.ID] || store.Expired(f.Expires, today) {
 			continue
 		}
 		var got float64
@@ -93,7 +105,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 				matched++
 			}
 		}
-		if cov := got / sum; matched >= p.MinMatched && cov >= p.MinCoverage {
+		if cov := got / sum; matched >= minMatched && cov >= p.MinCoverage {
 			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched})
 		}
 	}

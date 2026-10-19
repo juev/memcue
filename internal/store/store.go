@@ -25,6 +25,8 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
+// The expires column was added without a bump: every reader names its columns, so a base with it stays readable by an
+// older memcue, and Open adds it to a base that predates it (ensureExpires).
 const schemaVersion = 1
 
 const schema = `
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS facts (
 	created  TEXT NOT NULL,
 	status   TEXT NOT NULL CHECK (status IN ('active', 'retired')),
 	author   TEXT NOT NULL DEFAULT '',
+	expires  TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
@@ -60,6 +63,7 @@ type Fact struct {
 	Created  time.Time
 	Status   string
 	Author   string // machine that wrote the version
+	Expires  string // last day the fact is worth recalling, "YYYY-MM-DD"; empty never expires
 }
 
 // ErrNotFound: no fact with that id.
@@ -89,7 +93,39 @@ func Open(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := s.ensureExpires(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+// ensureExpires adds the expires column to a base written before it existed. The column is additive: an older memcue
+// reads the base as it did, because every query names the columns it wants.
+func (s *Store) ensureExpires() error {
+	rows, err := s.db.Query(`PRAGMA table_info(facts)`)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			name, typ        string
+			dflt             any
+		)
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == "expires" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`ALTER TABLE facts ADD COLUMN expires TEXT NOT NULL DEFAULT ''`)
+	return err
 }
 
 // Close closes the base.
@@ -118,21 +154,36 @@ func (s *Store) migrate() error {
 
 // Add stores a new fact as version 1.
 func (s *Store) Add(content string, keywords []string, origin string) (Fact, error) {
+	return s.AddExpiring(content, keywords, origin, "")
+}
+
+// AddExpiring stores a new fact as version 1 with the last day it is worth recalling ("YYYY-MM-DD"; empty never
+// expires).
+func (s *Store) AddExpiring(content string, keywords []string, origin, expires string) (Fact, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return Fact{}, errors.New("empty fact")
+	}
+	if err := ValidExpiry(expires); err != nil {
+		return Fact{}, err
 	}
 	id, err := ulid.New(ulid.Timestamp(s.now()), rand.Reader)
 	if err != nil {
 		return Fact{}, err
 	}
 	f := Fact{ID: id.String(), Version: 1, Content: content, Keywords: keywords, Origin: origin,
-		Created: s.now().UTC(), Status: Active, Author: s.author}
+		Created: s.now().UTC(), Status: Active, Author: s.author, Expires: expires}
 	return f, s.write(f)
 }
 
 // Correct adds a version with new content and keywords; the origin stays.
 func (s *Store) Correct(id, content string, keywords []string) (Fact, error) {
+	return s.CorrectExpiring(id, content, keywords, nil)
+}
+
+// CorrectExpiring adds a version with new content, keywords and optionally a new expiry: nil keeps the current one, a
+// pointer to "" clears it.
+func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
@@ -144,7 +195,29 @@ func (s *Store) Correct(id, content string, keywords []string) (Fact, error) {
 	f := cur
 	f.Version, f.Content, f.Keywords, f.Created, f.Status, f.Author = cur.Version+1, content, keywords,
 		s.now().UTC(), Active, s.author
+	if expires != nil {
+		if err := ValidExpiry(*expires); err != nil {
+			return Fact{}, err
+		}
+		f.Expires = *expires
+	}
 	return f, s.write(f)
+}
+
+// ValidExpiry accepts "" (never expires) or a "YYYY-MM-DD" date.
+func ValidExpiry(expires string) error {
+	if expires == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.DateOnly, expires); err != nil {
+		return fmt.Errorf("expiry %q is not a YYYY-MM-DD date", expires)
+	}
+	return nil
+}
+
+// Expired says whether a fact passed its last day by the given date ("YYYY-MM-DD"). An empty expiry never expires.
+func Expired(expires, today string) bool {
+	return expires != "" && today != "" && expires < today
 }
 
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.
@@ -164,9 +237,9 @@ func (s *Store) write(f Fact) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version, f.Content, strings.Join(f.Keywords, ", "), f.Origin,
-		f.Created.Format(time.RFC3339Nano), f.Status, f.Author); err != nil {
+	if _, err := tx.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author, expires)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version, f.Content, strings.Join(f.Keywords, ", "), f.Origin,
+		f.Created.Format(time.RFC3339Nano), f.Status, f.Author, f.Expires); err != nil {
 		return err
 	}
 	if err := reindex(tx, f.ID); err != nil {
@@ -243,12 +316,13 @@ func (s *Store) Rebuild() error {
 	return tx.Commit()
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author`
+const columns = `id, version, content, keywords, origin, created, status, author, expires`
 
 func scan(row interface{ Scan(...any) error }) (Fact, error) {
 	var f Fact
 	var keywords, created string
-	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author); err != nil {
+	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author,
+		&f.Expires); err != nil {
 		return Fact{}, err
 	}
 	if keywords != "" {
@@ -336,7 +410,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 		var h Hit
 		var stems, keywords, created string
 		if err := rows.Scan(&stems, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
-			&h.Author); err != nil {
+			&h.Author, &h.Expires); err != nil {
 			return nil, err
 		}
 		if keywords != "" {

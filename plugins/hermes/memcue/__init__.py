@@ -2,12 +2,14 @@
 
 Runs the ``memcue`` binary (github.com/juev/memcue): before each turn ``memcue hook`` returns at most two stored facts
 that share enough rare words with the user's message, or nothing; each fact once per session (again after a
-compression), and none for a cron turn, which is a background task's notice; every write of the built-in memory tool
-is mirrored into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the model
-gets tools to search and fix facts. With an OpenAI-compatible endpoint configured, the new messages of a session go to
-``memcue extract-messages`` in the background and the facts a model finds in them are added: once enough new text
-gathers, after a pause in the conversation, before the context is compressed and when the session ends. A chat of a
-messaging gateway can stay one session for days, so its end alone would come too late.
+compression), and none for a cron turn; facts that only mirror a built-in memory note carry the origin
+``hermes-memory`` and are left out, because that note rides with every turn anyway; every write of the built-in memory
+tool is mirrored into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the
+model gets tools to search and fix facts; a reply is checked for the identifiers of the facts it was given, and
+``usage.log`` keeps that score when ``MEMCUE_USAGE_LOG=1``. With an OpenAI-compatible endpoint configured, the new
+messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
+added: once enough new text gathers, after a pause in the conversation, before the context is compressed and when the
+session ends. A chat of a messaging gateway can stay one session for days, so its end alone would come too late.
 
 Config, all optional (``memory.memcue`` in config.yaml):
   binary: path to memcue (default: found on PATH)
@@ -15,6 +17,12 @@ Config, all optional (``memory.memcue`` in config.yaml):
           session extraction (e.g. https://api.deepseek.com, deepseek-flash, DEEPSEEK_API_KEY); off while unset
   extract_threshold: characters of new messages that start an extraction (default 20000)
   extract_idle_minutes: minutes without a turn after which the new messages go (default 30)
+  extract_include_tool_results: send tool output to the extraction too (default false: it is the bulk of a session's
+          characters and rarely holds a durable fact)
+  extract_max_message_chars: cut a message to this many characters before extraction (default 4000)
+  min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15)
+  suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway
+          (default true; mirrored facts carry the origin ``hermes-memory``)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
 """
@@ -43,11 +51,15 @@ logger = logging.getLogger(__name__)
 _RECALL_TIMEOUT = 5  # memcue answers in ~10 ms; anything slower is broken
 _WRITE_TIMEOUT = 15
 _ORIGIN = "hermes"
+_ORIGIN_MIRROR = "hermes-memory"  # a fact that only mirrors a built-in memory note; prefetch hides those
 _THRESHOLD = 20000  # characters of new messages that make a run worth a model call
 _IDLE_MINUTES = 30
 _MIN_IDLE = 2000  # a pause sends no less; memcue skips smaller texts anyway
 _TICK = 60  # seconds between checks for a pause
 _KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
+_MAX_MESSAGE = 4000  # characters of one message the extraction sees
+_WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
+_IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 
 
 def _fingerprint(m: dict[str, Any]) -> str:
@@ -58,6 +70,18 @@ def _fingerprint(m: dict[str, Any]) -> str:
 
 def _size(m: dict[str, Any]) -> int:
     return len(json.dumps([m.get("content"), m.get("tool_calls")], ensure_ascii=False, default=str))
+
+
+def _identifiers(text: str) -> list[str]:
+    """Tokens of a fact that a reply would copy verbatim when it used the fact: paths, hashes, versions, ids. A date
+    and an origin are not identifiers; the caller strips the ``(learnt: …)`` tail before asking."""
+    out: list[str] = []
+    for token in _IDENTIFIER.findall(text):
+        if token in out:
+            continue
+        if any(c.isdigit() for c in token) or any(c in token for c in "/@_"):
+            out.append(token)
+    return out[:6]
 
 
 def _load_plugin_config() -> dict[str, Any]:
@@ -81,7 +105,9 @@ SEARCH_SCHEMA = _schema(
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory: one self-contained statement in one to three sentences, "
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
-    {"content": "The fact.", "keywords": "Comma-separated words someone would ask with, synonyms included."},
+    {"content": "The fact.", "keywords": "Comma-separated words someone would ask with, synonyms included.",
+     "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
+                "omit for a fact that stays true."},
     ["content"])
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",
@@ -107,8 +133,14 @@ class MemcueMemoryProvider(MemoryProvider):
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
         self._tick = _TICK
+        self._min_coverage = self._config.get("min_coverage")
+        self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
+        self._include_tool_results = bool(self._config.get("extract_include_tool_results", False))
+        self._max_message = int(self._config.get("extract_max_message_chars", _MAX_MESSAGE))
         self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
         self._pending_lock = threading.Lock()
+        self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts the last prefetch injected
+        self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
         self._stop = threading.Event()
         self._watcher: Optional[threading.Thread] = None
 
@@ -152,6 +184,8 @@ class MemcueMemoryProvider(MemoryProvider):
         if not binary:
             return False, "memcue binary not found"
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_EXTRACT="0")
+        if self._min_coverage is not None:
+            env["MEMCUE_MIN_COVERAGE"] = str(self._min_coverage)
         try:
             r = subprocess.run([binary] + args, input=stdin, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=timeout, env=env, check=False)
@@ -189,12 +223,49 @@ class MemcueMemoryProvider(MemoryProvider):
         ok, out = self._run(["hook"], stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
         if not ok or not out:
             if not ok:
-                logger.debug("memcue recall failed: %s", out)
+                self._warn_recall_failure(session_id or self._session_id, out)
             return ""
         try:
-            return json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
+            text = json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
         except (ValueError, KeyError, TypeError):
             return ""
+        kept = self._keep_useful_lines(text)
+        self._remember_delivered(session_id or self._session_id, kept)
+        return "\n".join(kept) + ("\n" if kept else "")
+
+    def _warn_recall_failure(self, session: str, reason: str) -> None:
+        """A failed recall is silent memory loss: say it once a session rather than on every turn."""
+        now = time.monotonic()
+        if now - self._warned.get(session, 0.0) >= _WARN_EVERY:
+            self._warned[session] = now
+            logger.warning("memcue recall failed (session %s): %s", session or "-", reason)
+
+    def _keep_useful_lines(self, text: str) -> list[str]:
+        """Drop facts that only repeat the built-in memory block: those notes ride with every turn anyway, and a
+        gateway session mirrors them into the base (origin ``hermes-memory``), so recall would say them twice. Facts
+        gone means the header goes too: an empty recall is no context at all."""
+        lines = [line for line in text.splitlines() if line.strip()]
+        if not lines:
+            return []
+        if self._suppress_mirrored:
+            start = "(learnt: " + _ORIGIN_MIRROR
+            lines = [line for line in lines if not line.lstrip().startswith("- ") or start not in line]
+        return lines if any(line.lstrip().startswith("- ") for line in lines) else []
+
+    def _remember_delivered(self, session: str, lines: list[str]) -> None:
+        facts = []
+        for line in lines:
+            if not line.lstrip().startswith("- "):
+                continue
+            body = line.lstrip()[2:]
+            body = re.sub(r"\s*\(learnt:[^)]*\)\s*$", "", body)
+            tokens = _identifiers(body)
+            if tokens:  # a fact without an identifier cannot be shown to be used
+                facts.append({"tokens": tokens, "chars": len(body)})
+        if facts:
+            self._delivered[session] = facts
+        else:
+            self._delivered.pop(session, None)
 
     # -- session extraction -----------------------------------------------------
 
@@ -207,16 +278,12 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "") -> None:
         """Hand the messages to ``memcue extract-messages`` in its own process group and return: the model call takes
-        a minute and must outlive neither the turn nor depend on it. The outcome goes to memcue's extract.log."""
+        a minute and must outlive neither the turn nor depend on it. The outcome goes to memcue's extract.log. The
+        caller passes what ``_prepare`` kept."""
         env, binary = self._extract_env(), self._binary()
         if not env or not binary or not messages:
             return
-        try:
-            from agent.context_compressor import is_compaction_summary_message
-        except ImportError:  # outside Hermes, or an older one
-            def is_compaction_summary_message(_msg):
-                return False
-        kept = [m for m in messages if isinstance(m, dict) and not is_compaction_summary_message(m)]
+        kept = messages
         if not kept:
             return
         data = json.dumps(kept, ensure_ascii=False, default=str).encode()
@@ -276,6 +343,52 @@ class MemcueMemoryProvider(MemoryProvider):
                 new.append(m)
         return new
 
+    def _prepare(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The messages an extraction sees: no system notes, no compaction summary, no tool output (the bulk of a
+        session's characters, and rarely a durable fact of the user), each message cut to a readable length."""
+        try:
+            from agent.context_compressor import is_compaction_summary_message
+        except ImportError:  # outside Hermes, or an older one
+            def is_compaction_summary_message(_msg):
+                return False
+        kept: list[dict[str, Any]] = []
+        for m in messages:
+            if not isinstance(m, dict) or m.get("role") == "system" or is_compaction_summary_message(m):
+                continue
+            if m.get("role") == "tool" and not self._include_tool_results:
+                continue
+            content = m.get("content")
+            if isinstance(content, str) and len(content) > self._max_message:
+                m = dict(m, content=content[: self._max_message] + "…[truncated]")
+            kept.append(m)
+        return kept
+
+    def _usage_path(self) -> Path:
+        base = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+        return Path(base) / "memcue" / "usage.log"
+
+    def _note_usage(self, session: str, reply: str) -> None:
+        """Judge the facts of the last prefetch by whether the reply copied one of their identifiers. It is a proxy:
+        a fact can be read and not used, and a reply can use it without quoting a path. Off unless
+        MEMCUE_USAGE_LOG=1, the way the recall log is off unless MEMCUE_RECALL_LOG=1."""
+        facts = self._delivered.pop(session, None)
+        if not facts:
+            return
+        matched = [t for f in facts for t in f["tokens"] if t in reply]
+        if os.environ.get("MEMCUE_USAGE_LOG") != "1":
+            return
+        record = {"time": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+                  .isoformat().replace("+00:00", "Z"), "session": session, "facts": len(facts),
+                  "used": sum(1 for f in facts if any(t in reply for t in f["tokens"])), "matched": matched[:6]}
+        try:
+            path = self._usage_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with self._lock:
+                with path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError as e:
+            logger.debug("memcue usage log: %s", e)
+
     def _flush(self, session: str, event: str, messages: Optional[list[dict[str, Any]]] = None) -> None:
         """Send what is new in the session (in messages, or gathered by the turns) and mark it seen."""
         with self._pending_lock:
@@ -294,20 +407,22 @@ class MemcueMemoryProvider(MemoryProvider):
             if not new:
                 return
             self._mark_seen(session, new)
-        self._extract_in_background(new, event, session)
+        self._extract_in_background(self._prepare(new), event, session)
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "",
                   messages: Optional[list[dict[str, Any]]] = None, **kwargs) -> None:
-        """After each turn (Hermes runs it on its background worker): gather the session's new messages and send them
-        once they hold enough text; a pause in the conversation sends a smaller batch (_watch)."""
+        """After each turn (Hermes runs it on its background worker): judge the facts of the last prefetch by the
+        reply, then gather the session's new messages and send them once they hold enough text; a pause in the
+        conversation sends a smaller batch (_watch)."""
+        session = session_id or self._session_id
+        self._note_usage(session, assistant_content or "")
         if self._extract_env() is None or not messages:
             return
-        session = session_id or self._session_id
         with self._pending_lock:
             new = self._new(session, messages)
             self._pending[session] = (new, time.monotonic())
         self._start_watcher()
-        if sum(_size(m) for m in new) >= self._threshold:
+        if sum(_size(m) for m in self._prepare(new)) >= self._threshold:
             self._flush(session, "threshold")
 
     def _start_watcher(self) -> None:
@@ -320,7 +435,7 @@ class MemcueMemoryProvider(MemoryProvider):
             now = time.monotonic()
             with self._pending_lock:
                 due = [s for s, (new, last) in self._pending.items()
-                       if now - last >= self._idle and sum(_size(m) for m in new) >= _MIN_IDLE]
+                       if now - last >= self._idle and sum(_size(m) for m in self._prepare(new)) >= _MIN_IDLE]
             for session in due:
                 self._flush(session, "idle")
 
@@ -342,8 +457,11 @@ class MemcueMemoryProvider(MemoryProvider):
         for session in sessions:
             self._flush(session, "shutdown")
 
-    def _origin(self) -> str:
-        return f"{_ORIGIN} {datetime.date.today().isoformat()}"
+    def _origin(self, mirror: bool = False) -> str:
+        """The origin of a fact: which producer wrote it and when. A mirrored built-in memory note says so, so recall
+        can leave out what the memory block already carries."""
+        name = _ORIGIN_MIRROR if mirror else _ORIGIN
+        return f"{name} {datetime.date.today().isoformat()}"
 
     # -- mirror of the built-in memory tool -----------------------------------
 
@@ -376,7 +494,7 @@ class MemcueMemoryProvider(MemoryProvider):
             written = self._written()
             fact_id = written.get(self._key(target, previous)) if previous else None
             if action == "add" and content.strip():
-                ok, out = self._run(["add", "-origin", self._origin(), "--", content.strip()])
+                ok, out = self._run(["add", "-origin", self._origin(mirror=True), "--", content.strip()])
                 if ok:
                     written[self._key(target, content)] = out.split()[0]
             elif action == "replace" and content.strip():
@@ -386,7 +504,7 @@ class MemcueMemoryProvider(MemoryProvider):
                     if ok:
                         written[self._key(target, content)] = fact_id
                 else:
-                    ok, out = self._run(["add", "-origin", self._origin(), "--", content.strip()])
+                    ok, out = self._run(["add", "-origin", self._origin(mirror=True), "--", content.strip()])
                     if ok:
                         written[self._key(target, content)] = out.split()[0]
             elif action == "remove" and fact_id:
@@ -412,8 +530,13 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_search":
             if not arg("query"):
                 return tool_error("query is required")
-            ok, out = self._run(["search", "--", arg("query")], timeout=_RECALL_TIMEOUT)
-            return json.dumps({"result": out or "No stored facts match."}) if ok else tool_error(out)
+            ok, out = self._run(["search", "-json", "--", arg("query")], timeout=_RECALL_TIMEOUT)
+            if ok:
+                try:
+                    return json.dumps({"facts": json.loads(out)}, ensure_ascii=False)
+                except ValueError:  # an older binary without -json prints text
+                    return json.dumps({"result": out or "No stored facts match."}, ensure_ascii=False)
+            return tool_error(out)
         if tool_name not in ("memcue_add", "memcue_correct", "memcue_retire"):
             return tool_error(f"Unknown tool: {tool_name}")
         if not self._writes:
@@ -424,6 +547,8 @@ class MemcueMemoryProvider(MemoryProvider):
             cmd = ["add", "-origin", self._origin()]
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]
+            if arg("expires"):
+                cmd += ["-expires", arg("expires")]
             ok, out = self._run(cmd + ["--", arg("content")])
         elif tool_name == "memcue_correct":
             if not arg("id") or not arg("content"):
