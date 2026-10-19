@@ -4,7 +4,9 @@ A memory provider for [Hermes Agent](https://github.com/NousResearch/hermes-agen
 memcue fact base:
 
 - **Before each turn** the user's message goes to `memcue hook`; at most two matching facts come back, or nothing.
-  Hermes puts them into the turn's `<memory-context>` block.
+  Hermes puts them into the turn's `<memory-context>` block. Each fact comes once per session, and again after the
+  context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
+  notice, whose wrapper matches facts by accident.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a fact; when the
   agent edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry
   became is kept in `$HERMES_HOME/memcue/written.json`.
