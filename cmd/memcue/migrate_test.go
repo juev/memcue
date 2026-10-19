@@ -123,3 +123,20 @@ func TestNamedNoteIsMigratedAgainButFoundOneIsSkipped(t *testing.T) {
 		t.Errorf("-all listed %q, named listed %q", all.String(), named.String())
 	}
 }
+
+func TestNamedNoteOfBuiltInLayoutGetsItsRepository(t *testing.T) {
+	dir := t.TempDir()
+	claude := filepath.Join(dir, "claude")
+	repo := filepath.Join(dir, "src", "admin-panel")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	proj := filepath.Join(claude, "projects", "-x-admin-panel")
+	write(t, filepath.Join(proj, "s.jsonl"), `{"type":"user","cwd":"`+repo+`","message":{"content":"hi"}}`+"\n")
+	if got := noteTier(filepath.Join(proj, "memory", "a.md"), claude); got != "admin-panel" {
+		t.Errorf("built-in layout: %q", got)
+	}
+	if got := noteTier(filepath.Join(claude, "memory", "lists", "b.md"), claude); got != "lists" {
+		t.Errorf("shared layout: %q", got)
+	}
+}

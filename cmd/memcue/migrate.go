@@ -34,7 +34,7 @@ func runMigrate(args []string, out io.Writer) error {
 	}
 	var named, found []note
 	for _, p := range fs.Args() {
-		named = append(named, note{path: p, tier: filepath.Base(filepath.Dir(p))})
+		named = append(named, note{path: p, tier: noteTier(p, claudeDir())})
 	}
 	if *all {
 		var err error
@@ -137,6 +137,17 @@ func (n note) ref() string { return n.tier + "/" + filepath.Base(n.path) }
 
 func (n note) origin() string {
 	return strings.TrimSpace(n.tier + " " + noteDate(n.path) + " (" + n.ref() + ")")
+}
+
+// noteTier names the repository of a note given by path: the project's repository for a note of the built-in layout
+// (projects/<project>/memory/<note>.md), else the note's directory.
+func noteTier(path, claude string) string {
+	dir := filepath.Dir(path)
+	if abs, err := filepath.Abs(dir); err == nil && filepath.Base(abs) == "memory" &&
+		filepath.Dir(filepath.Dir(abs)) == filepath.Join(claude, "projects") {
+		return projectTier(filepath.Dir(abs), claude)
+	}
+	return filepath.Base(dir)
 }
 
 // findNotes lists the notes of the built-in memory: projects/<project>/memory/*.md, and memory/<tier>/*.md for a
