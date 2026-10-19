@@ -75,7 +75,9 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 
 ## Use
 
-Nothing to do in a session: facts arrive with prompts and are extracted at the end. By hand:
+Nothing to do in a session: facts arrive with prompts and are extracted at the end. A fact comes once per session
+(again after a compaction), and a background task's notice gets none. By hand (`add` without `-origin` names the
+repository of the working directory and today):
 
 ```bash
 memcue search postgres port          # find facts and their IDs
@@ -96,7 +98,7 @@ memcue recall -cwd . "text"          # what a prompt would get
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log` and per-session read offsets are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
 prompt and the facts it got, if any, with their coverage. It stays on your machine and is what you judge recall by;

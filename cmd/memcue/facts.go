@@ -9,9 +9,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
+	"github.com/juev/memcue/internal/tier"
 )
 
 func factsPath() string {
@@ -43,9 +45,12 @@ func withStore(fn func(*store.Store) error) error {
 func runAdd(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
-	origin := fs.String("origin", "", "where it was learnt: repository and date")
+	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of the working directory)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *origin == "" {
+		*origin = defaultOrigin()
 	}
 	return withStore(func(s *store.Store) error {
 		f, err := s.Add(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin)
@@ -55,6 +60,15 @@ func runAdd(args []string, out io.Writer) error {
 		_, err = fmt.Fprintln(out, f.ID)
 		return err
 	})
+}
+
+// defaultOrigin names the repository of the working directory and today, the way extracted facts are named.
+func defaultOrigin() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return time.Now().Format(time.DateOnly)
+	}
+	return strings.TrimSpace(tier.Of(cwd, claudeDir()) + " " + time.Now().Format(time.DateOnly))
 }
 
 func runCorrect(args []string, out io.Writer) error {

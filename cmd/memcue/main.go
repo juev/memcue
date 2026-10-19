@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -74,7 +75,7 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "session-start":
-		err = runSessionStart(os.Stdout)
+		err = runSessionStart(os.Stdin, os.Stdout)
 	case "hook-extract":
 		err = runHookExtract(os.Stdin)
 		if err != nil { // like the recall hook: never block the session
@@ -142,11 +143,63 @@ func claudeDir() string {
 // maxPrompt: what a prompt is about is said by then; a pasted log only adds words that match everything.
 const maxPrompt = 4000
 
-func recallFor(s *store.Store, prompt, cwd string) ([]recall.Hit, error) {
+// recallFor recalls the facts of prompt; seen holds the facts the session already got (nil outside a session).
+func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]recall.Hit, error) {
 	if r := []rune(prompt); len(r) > maxPrompt {
 		prompt = string(r[:maxPrompt])
 	}
-	return recall.Recall(s, prompt, tier.Of(cwd, claudeDir()), recall.Default)
+	p := recall.Default
+	p.Seen = seen
+	return recall.Recall(s, prompt, tier.Of(cwd, claudeDir()), p)
+}
+
+// reHarness matches a prompt the harness wrote instead of the user: a background task's notice. Its words are file
+// paths and tool output, which match facts by accident (2026-10-19: 14 of the 19 prompts that got facts).
+var reHarness = regexp.MustCompile(`^\s*<task-notification>`)
+
+// seenPath is the file of the facts a session already got, one id per line. A session that lost its context to a
+// compaction starts it over (see runHookExtract).
+func seenPath(session string) (string, error) {
+	if !validSession(session) {
+		return "", errors.New("no session id")
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "sessions", session+".recalled"), nil
+}
+
+func readSeen(session string) map[string]bool {
+	path, err := seenPath(session)
+	if err != nil {
+		return nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, id := range strings.Fields(string(b)) {
+		seen[id] = true
+	}
+	return seen
+}
+
+// markSeen records the facts a prompt got. A failure only means a fact may come again: it never fails the hook.
+func markSeen(session string, hits []recall.Hit) {
+	path, err := seenPath(session)
+	if err != nil || len(hits) == 0 {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	for _, h := range hits {
+		_, _ = f.WriteString(h.ID + "\n")
+	}
+	_ = f.Close()
 }
 
 func runHook(in io.Reader, out io.Writer) error {
@@ -162,15 +215,20 @@ func runHook(in io.Reader, out io.Writer) error {
 		return nil // no base yet: the hook must not create one where git would pick it up
 	}
 	start := time.Now()
+	if reHarness.MatchString(req.Prompt) {
+		logRecall(req.SessionID, req.CWD, req.Prompt, nil, time.Since(start))
+		return nil
+	}
 	s, err := store.Open(factsPath())
 	if err != nil {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	hits, err := recallFor(s, req.Prompt, req.CWD)
+	hits, err := recallFor(s, req.Prompt, req.CWD, readSeen(req.SessionID))
 	if err != nil {
 		return err
 	}
+	markSeen(req.SessionID, hits)
 	logRecall(req.SessionID, req.CWD, req.Prompt, hits, time.Since(start))
 	if len(hits) == 0 {
 		return nil
@@ -254,7 +312,7 @@ func runRecall(args []string, out io.Writer) error {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
-		hits, err := recallFor(s, strings.Join(fl.Args(), " "), *cwd)
+		hits, err := recallFor(s, strings.Join(fl.Args(), " "), *cwd, nil)
 		if err != nil {
 			return err
 		}

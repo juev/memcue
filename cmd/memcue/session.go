@@ -36,7 +36,18 @@ type hookInput struct {
 	HookEventName  string `json:"hook_event_name"`
 }
 
-func runSessionStart(out io.Writer) error {
+// runSessionStart is the SessionStart hook. After a compaction the context no longer holds the facts recalled so
+// far, so they may come again.
+func runSessionStart(in io.Reader, out io.Writer) error {
+	var h struct {
+		SessionID string `json:"session_id"`
+		Source    string `json:"source"`
+	}
+	if json.NewDecoder(in).Decode(&h) == nil && h.Source == "compact" {
+		if path, err := seenPath(h.SessionID); err == nil {
+			_ = os.Remove(path)
+		}
+	}
 	var resp struct {
 		HookSpecificOutput struct {
 			HookEventName     string `json:"hookEventName"`

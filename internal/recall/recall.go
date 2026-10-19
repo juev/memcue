@@ -24,6 +24,7 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
+	Seen           map[string]bool // facts the session already got: they give way to the next ones
 }
 
 // Default holds the values chosen on the dev set of facts (2026-10-19, 2335 facts migrated from the notes, 180 real
@@ -81,6 +82,9 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	}
 	var hits []Hit
 	for _, f := range found {
+		if p.Seen[f.ID] {
+			continue
+		}
 		var got float64
 		matched := 0
 		for _, t := range known {

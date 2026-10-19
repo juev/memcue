@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
@@ -148,5 +149,149 @@ func TestHookLogOffByDefault(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "state", "memcue", "recall.log")); !os.IsNotExist(err) {
 		t.Errorf("log written: %v", err)
+	}
+}
+
+// hookContext runs the hook on prompt in session and returns what it injected.
+func hookContext(t *testing.T, dir, session, prompt string) string {
+	t.Helper()
+	in, _ := json.Marshal(map[string]string{"prompt": prompt, "cwd": dir, "session_id": session})
+	var out bytes.Buffer
+	if err := runHook(bytes.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Len() == 0 {
+		return ""
+	}
+	var resp struct {
+		HookSpecificOutput struct {
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	return resp.HookSpecificOutput.AdditionalContext
+}
+
+const gradlePrompt = "Как запустить gradle без make, какой JAVA_HOME нужен для JDK?"
+
+func TestHookSkipsTaskNotification(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
+	prompt := "<task-notification>\n<task-id>b1</task-id>\n<output-file>/tmp/x</output-file>\n" +
+		"gradle JAVA_HOME JDK make failed</task-notification>"
+	if got := hookContext(t, dir, "s1", prompt); got != "" {
+		t.Errorf("notification got facts: %q", got)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec recallRecord
+	if json.Unmarshal(b, &rec) != nil || !strings.HasPrefix(rec.Prompt, "<task-notification>") || len(rec.Facts) != 0 {
+		t.Errorf("log %q", b)
+	}
+	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("user prompt lost its fact: %q", got)
+	}
+}
+
+func TestHookGivesFactOncePerSession(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Fatalf("first prompt: %q", got)
+	}
+	if got := hookContext(t, dir, "s1", gradlePrompt); got != "" {
+		t.Errorf("same session got the fact again: %q", got)
+	}
+	if got := hookContext(t, dir, "s2", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("other session lost the fact: %q", got)
+	}
+}
+
+func TestHookGivesNextFactInsteadOfSeen(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []string{"Gradle без make: JAVA_HOME для JDK задаёт ~/.gradle/gradle.properties, ключ org.gradle.java.home.",
+		"Gradle без make на CI: JAVA_HOME для JDK берётся из setup-java."} {
+		if _, err := s.Add(c, []string{"gradle", "jdk", "java_home"}, "lists 2026-10-09"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+	first := hookContext(t, dir, "s1", gradlePrompt)
+	second := hookContext(t, dir, "s1", gradlePrompt)
+	if first == "" || second == "" {
+		t.Fatalf("first %q, second %q", first, second)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(second), "\n")[1:] {
+		if strings.Contains(first, line) {
+			t.Errorf("fact given twice: %q", line)
+		}
+	}
+}
+
+func TestCompactionLetsFactsComeAgain(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	hookContext(t, dir, "s1", gradlePrompt)
+	if err := runSessionStart(strings.NewReader(`{"session_id":"s1","source":"compact"}`), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("after compaction: %q", got)
+	}
+}
+
+func TestResumeKeepsSeenFacts(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	hookContext(t, dir, "s1", gradlePrompt)
+	if err := runSessionStart(strings.NewReader(`{"session_id":"s1","source":"resume"}`), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookContext(t, dir, "s1", gradlePrompt); got != "" {
+		t.Errorf("resume repeated the fact: %q", got)
+	}
+}
+
+func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	var out bytes.Buffer
+	if err := runAdd([]string{"-keywords", "k", "факт без origin"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := runAdd([]string{"-origin", "x 2026-01-01", "факт с origin"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Get(strings.TrimSpace(out.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "shop " + time.Now().Format(time.DateOnly); f.Origin != want {
+		t.Errorf("origin %q, want %q", f.Origin, want)
+	}
+	all, _ := s.Active()
+	for _, a := range all {
+		if a.Content == "факт с origin" && a.Origin != "x 2026-01-01" {
+			t.Errorf("explicit origin replaced: %q", a.Origin)
+		}
 	}
 }

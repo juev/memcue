@@ -16,7 +16,7 @@ import (
 
 func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 	var out bytes.Buffer
-	if err := runSessionStart(&out); err != nil {
+	if err := runSessionStart(strings.NewReader(`{"source":"startup"}`), &out); err != nil {
 		t.Fatal(err)
 	}
 	var resp struct {
