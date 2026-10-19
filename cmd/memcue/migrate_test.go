@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/juev/memcue/internal/store"
@@ -96,5 +97,29 @@ func TestDecodeProjectFindsTheEncodedPath(t *testing.T) {
 	}
 	if got := decodeProject(name + "-gone"); got != "" {
 		t.Errorf("missing path decoded to %q", got)
+	}
+}
+
+func TestNamedNoteIsMigratedAgainButFoundOneIsSkipped(t *testing.T) {
+	dir := env(t)
+	note := filepath.Join(dir, "claude", "memory", "lists", "a.md")
+	write(t, note, "note a\n")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)"); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	var all, named strings.Builder
+	if err := runMigrate([]string{"-list", "-all"}, &all); err != nil {
+		t.Fatal(err)
+	}
+	if err := runMigrate([]string{"-list", note}, &named); err != nil {
+		t.Fatal(err)
+	}
+	if all.String() != "" || !strings.HasPrefix(named.String(), "lists/a.md ") {
+		t.Errorf("-all listed %q, named listed %q", all.String(), named.String())
 	}
 }

@@ -21,8 +21,8 @@ import (
 )
 
 // runMigrate turns memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]. -all finds the
-// notes of Claude Code's built-in memory itself. A note whose facts are already in the base is skipped, so the run
-// can be repeated. With -dry-run it prints the facts as JSON lines and stores nothing.
+// notes of Claude Code's built-in memory itself and skips a note whose facts are already in the base, so the run can
+// be repeated; a note named on the command line is migrated again, for a note that changed. With -dry-run it prints the facts as JSON lines and stores nothing.
 func runMigrate(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
 	dry := fs.Bool("dry-run", false, "print the facts instead of storing them")
@@ -32,18 +32,17 @@ func runMigrate(args []string, out io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	var notes []note
+	var named, found []note
 	for _, p := range fs.Args() {
-		notes = append(notes, note{path: p, tier: filepath.Base(filepath.Dir(p))})
+		named = append(named, note{path: p, tier: filepath.Base(filepath.Dir(p))})
 	}
 	if *all {
-		found, err := findNotes(claudeDir())
-		if err != nil {
+		var err error
+		if found, err = findNotes(claudeDir()); err != nil {
 			return err
 		}
-		notes = append(notes, found...)
 	}
-	if len(notes) == 0 {
+	if len(named)+len(found) == 0 {
 		return errors.New("usage: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md ...]")
 	}
 	var s *store.Store
@@ -52,10 +51,11 @@ func runMigrate(args []string, out io.Writer) error {
 			return err
 		}
 		defer func() { _ = s.Close() }()
-		if notes, err = notMigrated(s, notes); err != nil {
+		if found, err = notMigrated(s, found); err != nil { // a note named on the command line goes through again
 			return err
 		}
 	}
+	notes := append(named, found...)
 	if *list {
 		for _, n := range notes {
 			if _, err := fmt.Fprintln(out, n.ref(), n.path); err != nil {
