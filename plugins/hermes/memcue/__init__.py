@@ -3,14 +3,17 @@
 Runs the ``memcue`` binary (github.com/juev/memcue): before each turn ``memcue hook`` returns at most two stored facts
 that share enough rare words with the user's message, or nothing; every write of the built-in memory tool is mirrored
 into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the model gets tools to
-search and fix facts. With an OpenAI-compatible endpoint configured, the messages of a session are also sent to
-``memcue extract-messages`` in the background when the session ends or is compressed, and the facts a model finds in
-them are added.
+search and fix facts. With an OpenAI-compatible endpoint configured, the new messages of a session go to
+``memcue extract-messages`` in the background and the facts a model finds in them are added: once enough new text
+gathers, after a pause in the conversation, before the context is compressed and when the session ends. A chat of a
+messaging gateway can stay one session for days, so its end alone would come too late.
 
 Config, all optional (``memory.memcue`` in config.yaml):
   binary: path to memcue (default: found on PATH)
   extract_url, extract_model, extract_key_env: endpoint, model and the environment variable holding its key for the
           session extraction (e.g. https://api.deepseek.com, deepseek-flash, DEEPSEEK_API_KEY); off while unset
+  extract_threshold: characters of new messages that start an extraction (default 20000)
+  extract_idle_minutes: minutes without a turn after which the new messages go (default 30)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
 """
@@ -25,6 +28,8 @@ import os
 import shutil
 import subprocess
 import threading
+import time
+from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,6 +41,21 @@ logger = logging.getLogger(__name__)
 _RECALL_TIMEOUT = 5  # memcue answers in ~10 ms; anything slower is broken
 _WRITE_TIMEOUT = 15
 _ORIGIN = "hermes"
+_THRESHOLD = 20000  # characters of new messages that make a run worth a model call
+_IDLE_MINUTES = 30
+_MIN_IDLE = 2000  # a pause sends no less; memcue skips smaller texts anyway
+_TICK = 60  # seconds between checks for a pause
+_KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
+
+
+def _fingerprint(m: dict[str, Any]) -> str:
+    raw = json.dumps([m.get("role"), m.get("content"), m.get("tool_calls")], ensure_ascii=False, default=str,
+                     sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
+
+
+def _size(m: dict[str, Any]) -> int:
+    return len(json.dumps([m.get("content"), m.get("tool_calls")], ensure_ascii=False, default=str))
 
 
 def _load_plugin_config() -> dict[str, Any]:
@@ -80,6 +100,13 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = ""
         self._writes = True
         self._lock = threading.Lock()
+        self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
+        self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
+        self._tick = _TICK
+        self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
+        self._pending_lock = threading.Lock()
+        self._stop = threading.Event()
+        self._watcher: Optional[threading.Thread] = None
 
     @property
     def name(self) -> str:
@@ -154,7 +181,7 @@ class MemcueMemoryProvider(MemoryProvider):
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")
         return dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
 
-    def _extract_in_background(self, messages: list[dict[str, Any]], event: str) -> None:
+    def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "") -> None:
         """Hand the messages to ``memcue extract-messages`` in its own process group and return: the model call takes
         a minute and must outlive neither the turn nor depend on it. The outcome goes to memcue's extract.log."""
         env, binary = self._extract_env(), self._binary()
@@ -169,7 +196,8 @@ class MemcueMemoryProvider(MemoryProvider):
         if not kept:
             return
         data = json.dumps(kept, ensure_ascii=False, default=str).encode()
-        cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", self._session_id, "-event", event]
+        cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", session or self._session_id,
+               "-event", event]
         try:
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     env=env, start_new_session=True)
@@ -187,12 +215,107 @@ class MemcueMemoryProvider(MemoryProvider):
 
         threading.Thread(target=feed, name="memcue-extract", daemon=True).start()
 
+    # The messages of a session reach the model once each: a message is new until its fingerprint is in the
+    # session's seen list ($HERMES_HOME/memcue/sessions/<session>.json). Compression rewrites the list Hermes holds,
+    # so positions cannot tell what is new; fingerprints can.
+
+    def _seen_path(self, session: str) -> Path:
+        name = hashlib.sha256(session.encode()).hexdigest()[:32]  # a session id is not a safe file name
+        return Path(self._state) / "sessions" / f"{name}.json"
+
+    def _seen(self, session: str) -> list[str]:
+        try:
+            return json.loads(self._seen_path(session).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+
+    def _mark_seen(self, session: str, messages: list[dict[str, Any]]) -> None:
+        seen = (self._seen(session) + [_fingerprint(m) for m in messages])[-_KEEP_SEEN:]
+        path = self._seen_path(session)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(seen), encoding="utf-8")
+        tmp.replace(path)
+
+    def _new(self, session: str, messages: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+        """Messages not processed yet. Equal messages ("ok", "yes") share a fingerprint, so occurrences are counted:
+        the third "ok" of a list is new when two were processed."""
+        left = Counter(self._seen(session))
+        new = []
+        for m in messages or []:
+            if not isinstance(m, dict) or m.get("role") == "system":
+                continue
+            fp = _fingerprint(m)
+            if left[fp] > 0:
+                left[fp] -= 1
+            else:
+                new.append(m)
+        return new
+
+    def _flush(self, session: str, event: str, messages: Optional[list[dict[str, Any]]] = None) -> None:
+        """Send what is new in the session (in messages, or gathered by the turns) and mark it seen."""
+        with self._pending_lock:
+            gathered, _ = self._pending.pop(session, ([], 0.0))
+            new = self._new(session, messages)
+            if messages is not None and gathered:  # turns the given list may not hold
+                have = Counter(_fingerprint(m) for m in messages if isinstance(m, dict))
+                for m in gathered:
+                    fp = _fingerprint(m)
+                    if have[fp] > 0:
+                        have[fp] -= 1
+                    else:
+                        new.append(m)
+            elif messages is None:
+                new = gathered
+            if not new:
+                return
+            self._mark_seen(session, new)
+        self._extract_in_background(new, event, session)
+
+    def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "",
+                  messages: Optional[list[dict[str, Any]]] = None, **kwargs) -> None:
+        """After each turn (Hermes runs it on its background worker): gather the session's new messages and send them
+        once they hold enough text; a pause in the conversation sends a smaller batch (_watch)."""
+        if self._extract_env() is None or not messages:
+            return
+        session = session_id or self._session_id
+        with self._pending_lock:
+            new = self._new(session, messages)
+            self._pending[session] = (new, time.monotonic())
+        self._start_watcher()
+        if sum(_size(m) for m in new) >= self._threshold:
+            self._flush(session, "threshold")
+
+    def _start_watcher(self) -> None:
+        if self._watcher is None or not self._watcher.is_alive():
+            self._watcher = threading.Thread(target=self._watch, name="memcue-idle", daemon=True)
+            self._watcher.start()
+
+    def _watch(self) -> None:
+        while not self._stop.wait(self._tick):
+            now = time.monotonic()
+            with self._pending_lock:
+                due = [s for s, (new, last) in self._pending.items()
+                       if now - last >= self._idle and sum(_size(m) for m in new) >= _MIN_IDLE]
+            for session in due:
+                self._flush(session, "idle")
+
     def on_session_end(self, messages: list[dict[str, Any]]) -> None:
-        self._extract_in_background(messages, "session_end")
+        if self._extract_env() is not None:
+            self._flush(self._session_id, "session_end", messages)
 
     def on_pre_compress(self, messages: list[dict[str, Any]]) -> str:
-        self._extract_in_background(messages, "pre_compress")
+        if self._extract_env() is not None:
+            self._flush(self._session_id, "pre_compress", messages)
         return ""
+
+    def shutdown(self) -> None:
+        """Stop the pause watcher and send what the turns gathered, so a gateway restart loses nothing."""
+        self._stop.set()
+        with self._pending_lock:
+            sessions = list(self._pending)
+        for session in sessions:
+            self._flush(session, "shutdown")
 
     def _origin(self) -> str:
         return f"{_ORIGIN} {datetime.date.today().isoformat()}"

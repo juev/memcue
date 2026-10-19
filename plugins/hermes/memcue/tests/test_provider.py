@@ -176,5 +176,86 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(p.is_available())
 
 
+class AccumulationTest(unittest.TestCase):
+    """Turn-based extraction; the model call is replaced, so no binary is needed."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp()
+        self.p = memcue_provider.MemcueMemoryProvider({"binary": "/bin/true", "extract_url": "http://x",
+                                                       "extract_model": "m", "extract_threshold": 1000,
+                                                       "extract_idle_minutes": 0})
+        self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.p._tick = 0.05
+        self.calls = []
+        self.p._extract_in_background = lambda msgs, event, session="": self.calls.append(
+            (event, session, [m["content"] for m in msgs]))
+        self.msgs = [{"role": "system", "content": "prompt"}]
+
+    def tearDown(self):
+        self.p._stop.set()
+        shutil.rmtree(self.home, ignore_errors=True)
+
+    def turn(self, user, answer="ok"):
+        self.msgs += [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
+        self.p.sync_turn(user, answer, session_id="s1", messages=list(self.msgs))
+
+    def test_threshold_sends_only_new_messages_once(self):
+        self.p._idle = 3600
+        self.turn("a" * 300)
+        self.assertEqual(self.calls, [])
+        self.turn("b" * 800)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.calls[0][0:2], ("threshold", "s1"))
+        self.assertEqual(self.calls[0][2], ["a" * 300, "ok", "b" * 800, "ok"])
+        self.turn("c" * 1200)
+        self.assertEqual(self.calls[1][2], ["c" * 1200, "ok"])
+
+    def test_compressed_list_sends_nothing_twice(self):
+        self.p._idle = 3600
+        self.turn("a" * 1200)
+        # Compression replaces the head with a summary and keeps the last turn; only the new turn is new.
+        self.msgs = [{"role": "user", "content": "summary of a"}, *self.msgs[-2:]]
+        self.turn("d" * 1200)
+        self.assertEqual([c[2] for c in self.calls], [["a" * 1200, "ok"], ["summary of a", "d" * 1200, "ok"]])
+
+    def test_pause_sends_a_smaller_batch(self):
+        self.turn("e" * 2100)  # under the threshold of the run below
+        self.p._threshold = 10000
+        self.calls.clear()
+        self.turn("f" * 2100)
+        for _ in range(100):
+            if self.calls:
+                break
+            time.sleep(0.02)
+        self.assertEqual(self.calls[-1][0], "idle")
+        self.assertIn("f" * 2100, self.calls[-1][2])
+
+    def test_session_end_and_shutdown_send_the_rest(self):
+        self.p._idle = 3600
+        self.turn("g" * 100)
+        self.p.on_session_end(list(self.msgs))
+        self.assertEqual(self.calls, [("session_end", "s1", ["g" * 100, "ok"])])
+        self.turn("h" * 100)
+        self.p.shutdown()
+        self.assertEqual(self.calls[-1], ("shutdown", "s1", ["h" * 100, "ok"]))
+
+    def test_seen_survives_a_restart(self):
+        self.p._idle = 3600
+        self.turn("i" * 1200)
+        p2 = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
+        p2.initialize("s1", hermes_home=self.home, agent_context="primary")
+        sent = []
+        p2._extract_in_background = lambda msgs, event, session="": sent.append([m["content"] for m in msgs])
+        p2.on_session_end(list(self.msgs))
+        self.assertEqual(sent, [])
+        p2._stop.set()
+
+    def test_subagent_gathers_nothing(self):
+        p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
+        p.initialize("s2", hermes_home=self.home, agent_context="subagent")
+        p.sync_turn("x" * 5000, "ok", session_id="s2", messages=[{"role": "user", "content": "x" * 5000}])
+        self.assertEqual(p._pending, {})
+
+
 if __name__ == "__main__":
     unittest.main()

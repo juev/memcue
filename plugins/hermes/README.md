@@ -10,9 +10,13 @@ memcue fact base:
   became is kept in `$HERMES_HOME/memcue/written.json`.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   Subagents, cron and flush runs get only `memcue_search` and do not write.
-- **Session extraction** (optional): when a session ends or is compressed, its messages go to
-  `memcue extract-messages` in the background, which sends them to an OpenAI-compatible model with the same prompt
-  Claude Code sessions get, and adds the facts it finds. Each run is a line in memcue's `extract.log`
+- **Session extraction** (optional): the new messages of a session go to `memcue extract-messages` in the
+  background, which sends them to an OpenAI-compatible model with the same prompt Claude Code sessions get, and adds
+  the facts it finds. A chat of a messaging gateway can stay one session for days, so the messages are not held until
+  the session ends: they go once 20 000 characters of new text gather (`extract_threshold`), after 30 minutes without
+  a turn (`extract_idle_minutes`), before the context is compressed, when the session ends and when Hermes shuts
+  down. Each message is sent once; fingerprints of the sent ones are kept in `$HERMES_HOME/memcue/sessions/`, which
+  also survives compression rewriting the message list. Each run is a line in memcue's `extract.log`
   (`$XDG_STATE_HOME/memcue`, by default `~/.local/state/memcue`).
 
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
