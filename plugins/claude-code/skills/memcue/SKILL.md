@@ -1,0 +1,36 @@
+---
+name: memcue
+description: Write to long-term memory (memcue). Use when the user asks to remember, note or keep something for later ("запомни", "remember this"), to forget it or says a stored fact is wrong or outdated, or when a "memcue: stored facts" block shows a fact this session proved wrong.
+---
+
+# memcue: writing to memory
+
+Memory is a base of atomic facts. Facts come to you before each prompt in a `memcue: stored facts` block, and are
+extracted from every session automatically when it is compacted or ends. Write by hand only what the user asks for
+and corrections; the session extraction covers the rest.
+
+## Remember
+
+```bash
+memcue add -keywords "word1, word2, синоним" -origin "<repository> <YYYY-MM-DD>" "<fact>"
+```
+
+- One statement in one to three sentences; a rule goes with its reason.
+- Self-contained: name the system, host, repository, path. No "it", "this project", "above".
+- Exact values byte for byte: paths, commands with flags, versions, ports.
+- Only what the user said or a command confirmed; no guesses.
+- Keywords: 3–8 words someone would ask with, including synonyms and the other language.
+- Origin: the repository directory name and today's date.
+
+## Correct or forget
+
+Find the fact first; `search` prints IDs, best match first:
+
+```bash
+memcue search "<words of the fact>"
+memcue correct ID "<corrected fact>"   # new version; keywords stay unless -keywords is given
+memcue retire ID                       # no longer recalled; the history keeps it
+```
+
+Correct when the fact changed; retire when it no longer holds and nothing replaces it. Tell the user which fact you
+changed.

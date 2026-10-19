@@ -1,0 +1,11 @@
+{
+  "name": "memcue",
+  "version": "0.1.0",
+  "description": "Long-term memory for Claude Code: a base of atomic facts, recalled by words before each prompt and extracted from sessions automatically",
+  "author": {
+    "name": "Denis Evsyukov"
+  },
+  "homepage": "https://github.com/juev/memcue",
+  "repository": "https://github.com/juev/memcue",
+  "license": "MIT"
+}

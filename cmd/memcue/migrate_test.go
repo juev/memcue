@@ -1,0 +1,100 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"sort"
+	"testing"
+
+	"github.com/juev/memcue/internal/store"
+)
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func refs(ns []note) []string {
+	var out []string
+	for _, n := range ns {
+		out = append(out, n.ref())
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestFindNotesInBothLayouts(t *testing.T) {
+	dir := t.TempDir()
+	claude := filepath.Join(dir, "claude")
+	repo := filepath.Join(dir, "src", "lists")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// Built-in layout: the project directory name does not say which repository it is; its transcript does.
+	proj := filepath.Join(claude, "projects", "-x-src-lists")
+	write(t, filepath.Join(proj, "s.jsonl"), `{"type":"user","cwd":"`+repo+`","message":{"content":"hi"}}`+"\n")
+	write(t, filepath.Join(proj, "memory", "MEMORY.md"), "- [a](a.md)\n")
+	write(t, filepath.Join(proj, "memory", "a.md"), "note a\n")
+	// Shared layout: notes kept in memory/<tier> and linked into a project.
+	write(t, filepath.Join(claude, "memory", "_global", "g.md"), "note g\n")
+	write(t, filepath.Join(claude, "memory", "perigee", "p.md"), "note p\n")
+	if err := os.MkdirAll(filepath.Join(claude, "projects", "-x-perigee"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(claude, "memory", "perigee"), filepath.Join(claude, "projects", "-x-perigee", "memory")); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := findNotes(claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"_global/g.md", "lists/a.md", "perigee/p.md"}
+	if r := refs(got); len(r) != len(want) || r[0] != want[0] || r[1] != want[1] || r[2] != want[2] {
+		t.Errorf("got %v, want %v", r, want)
+	}
+}
+
+func TestNotMigratedSkipsNotesInTheBase(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if _, err := s.Add("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := notMigrated(s, []note{{path: "/m/lists/a.md", tier: "lists"}, {path: "/m/lists/b.md", tier: "lists"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := refs(got); len(r) != 1 || r[0] != "lists/b.md" {
+		t.Errorf("got %v", r)
+	}
+}
+
+func TestDecodeProjectFindsTheEncodedPath(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(dir, "git.example", "admin-panel")
+	if err := os.MkdirAll(filepath.Join(dir, "git-example"), 0o700); err != nil { // a decoy with the same encoding
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(repo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	name := reNotAlnum.ReplaceAllString(repo, "-")
+	if got := decodeProject(name); got != repo {
+		t.Errorf("decodeProject(%q) = %q, want %q", name, got, repo)
+	}
+	if got := decodeProject(name + "-gone"); got != "" {
+		t.Errorf("missing path decoded to %q", got)
+	}
+}

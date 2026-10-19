@@ -1,0 +1,49 @@
+{
+  "description": "memcue: recall facts before each prompt, extract facts at compaction and session end",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v memcue >/dev/null 2>&1 && memcue session-start || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v memcue >/dev/null 2>&1 && memcue hook || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v memcue >/dev/null 2>&1 && memcue hook-extract || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v memcue >/dev/null 2>&1 && memcue hook-extract || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
