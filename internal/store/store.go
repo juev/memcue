@@ -366,14 +366,21 @@ func (s *Store) Candidates() ([]Fact, error) {
 }
 
 // CardFacts returns the facts a session-start card carries: global rules and the decisions of the given repository,
-// newest first. It is a view of the active facts, not a second store: a fact appears only while it is active.
-func (s *Store) CardFacts(tier string) ([]Fact, error) {
+// newest first, skipping facts whose expiry has passed. It is a view of the active facts, not a second store: a fact
+// appears only while it is active and unexpired. today is a "YYYY-MM-DD" date; empty means today in UTC.
+func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
+	if today == "" {
+		today = time.Now().UTC().Format(time.DateOnly)
+	}
 	active, err := s.Active()
 	if err != nil {
 		return nil, err
 	}
 	var out []Fact
 	for _, f := range active {
+		if Expired(f.Expires, today) {
+			continue
+		}
 		switch {
 		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
 		case f.Kind == "decision" && tier != "" && strings.EqualFold(f.Scope, "repo:"+tier):

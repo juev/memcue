@@ -206,6 +206,48 @@ func TestExpiryIsStoredAndKeptByCorrection(t *testing.T) {
 	}
 }
 
+// A card carries the rules and decisions that still hold on the given day and skips the expired ones; a fact whose
+// expiry is that day is still carried, as recall does.
+func TestCardFactsSkipExpired(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, kind, scope, expires string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", expires,
+			Meta{Kind: kind, Scope: scope, Source: "user"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	expiredRule := add("Expired rule.", "rule", "global", "2026-10-19")
+	liveRule := add("Live rule.", "rule", "global", "2026-10-20")
+	expiredDecision := add("Expired decision.", "decision", "repo:shop", "2026-10-19")
+	liveDecision := add("Live decision.", "decision", "repo:shop", "")
+
+	got, err := s.CardFacts("shop", "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, f := range got {
+		ids[f.ID] = true
+	}
+	if len(got) != 2 || !ids[liveRule.ID] || !ids[liveDecision.ID] || ids[expiredRule.ID] || ids[expiredDecision.ID] {
+		t.Errorf("card facts %+v, want only %s and %s", got, liveRule.ID, liveDecision.ID)
+	}
+
+	old := add("Ancient rule.", "rule", "global", "2000-01-01")
+	got, err = s.CardFacts("shop", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range got {
+		if f.ID == old.ID {
+			t.Errorf("an empty today kept the expired fact %s", old.ID)
+		}
+	}
+}
+
 func TestBadExpiryIsRejected(t *testing.T) {
 	s, _ := open(t)
 	if _, err := s.AddExpiring("Срок задан неверно.", nil, "", "21.10.2026"); err == nil {
