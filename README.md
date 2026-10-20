@@ -107,6 +107,10 @@ built only from the facts of the group, every group keeps at least one fact, and
 with its reason; a retired fact stays in the history. With `MEMCUE_DREAM=1` a dream runs after an extraction once a
 day; its first run on a machine only marks the start.
 
+Each retirement names the fact that covers it (`by`) and its kind: `duplicate` or `outdated`. Of two duplicates the
+one with the smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same
+copy and never retire both.
+
 A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`. A fact pulled from another machine
 after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
@@ -129,7 +133,7 @@ marked as of the dry run.
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
-| `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day; turn it on on one machine of those sharing a base | off |
+| `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
