@@ -344,9 +344,13 @@ class AccumulationTest(unittest.TestCase):
         self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
         self.p._tick = 0.05
         self.calls = []
-        self.p._extract_in_background = lambda msgs, event, session="": self.calls.append(
-            (event, session, [m["content"] for m in msgs]))
+        self.p._extract_in_background = self.succeed
         self.msgs = [{"role": "system", "content": "prompt"}]
+
+    def succeed(self, msgs, event, session="", on_done=None):
+        self.calls.append((event, session, [m["content"] for m in msgs]))
+        if on_done:
+            on_done(True)
 
     def tearDown(self):
         self.p._stop.set()
@@ -402,7 +406,13 @@ class AccumulationTest(unittest.TestCase):
         p2 = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
         p2.initialize("s1", hermes_home=self.home, agent_context="primary")
         sent = []
-        p2._extract_in_background = lambda msgs, event, session="": sent.append([m["content"] for m in msgs])
+
+        def capture(msgs, event, session="", on_done=None):
+            sent.append([m["content"] for m in msgs])
+            if on_done:
+                on_done(True)
+
+        p2._extract_in_background = capture
         p2.on_session_end(list(self.msgs))
         self.assertEqual(sent, [])
         p2._stop.set()
@@ -420,6 +430,29 @@ class AccumulationTest(unittest.TestCase):
         self.turn("y" * 400)
         self.assertEqual(len(self.calls), 1)
         self.assertTrue(all(len(text) <= 70 for text in self.calls[0][2]), self.calls[0][2])
+
+    def test_failed_extraction_is_retried_not_marked_seen(self):
+        self.p._idle = 3600
+        attempts = []
+
+        def fail(msgs, event, session="", on_done=None):
+            attempts.append([m["content"] for m in msgs])
+            if on_done:
+                on_done(False)
+
+        self.p._extract_in_background = fail
+        self.turn("a" * 1200)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(self.p._seen("s1"), [])  # the failure must not acknowledge anything
+
+        # The next successful run takes the same messages from the pending batch and only then marks them seen.
+        self.p._extract_in_background = self.succeed
+        self.p._flush("s1", "idle")
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(len(self.calls), 1)
+        self.assertIn("a" * 1200, self.calls[0][2])
+        seen = self.p._seen("s1")
+        self.assertIn(memcue_provider._fingerprint({"role": "user", "content": "a" * 1200}), seen)
 
     def test_subagent_gathers_nothing(self):
         p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
 )
 
@@ -70,12 +72,55 @@ func TestNotMigratedSkipsNotesInTheBase(t *testing.T) {
 	if _, err := s.Add("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)"); err != nil {
 		t.Fatal(err)
 	}
-	got, err := notMigrated(s, []note{{path: "/m/lists/a.md", tier: "lists"}, {path: "/m/lists/b.md", tier: "lists"}})
+	got, err := notMigrated(s, []note{{path: "/m/lists/a.md", tier: "lists"}, {path: "/m/lists/b.md", tier: "lists"}}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if r := refs(got); len(r) != 1 || r[0] != "lists/b.md" {
 		t.Errorf("got %v", r)
+	}
+}
+
+// A note migrated with an older prompt is offered again when the prompt version moves forward.
+func TestNotMigratedRerunsOlderPrompt(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	notes := []note{{path: "/m/lists/a.md", tier: "lists"}}
+	if _, err := s.AddWith("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)", "",
+		store.Meta{PromptVersion: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := notMigrated(s, notes, 0); err != nil || len(got) != 0 {
+		t.Errorf("current prompt: %v %v", refs(got), err)
+	}
+	if got, err := notMigrated(s, notes, 1); err != nil || len(got) != 1 {
+		t.Errorf("newer prompt: %v %v", refs(got), err)
+	}
+}
+
+func TestMigrateRecordsPromptVersion(t *testing.T) {
+	dir := env(t)
+	notePath := filepath.Join(dir, "claude", "memory", "lists", "a.md")
+	write(t, notePath, "note a\n")
+	noteFn = func(context.Context, string, string) (extract.Result, error) {
+		return extract.Result{Facts: []extract.Fact{{Content: "Факт из заметки a.", Keywords: []string{"a"}}}}, nil
+	}
+	t.Cleanup(func() { noteFn = extract.Note })
+	var out strings.Builder
+	if err := runMigrate([]string{notePath}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	act, err := s.Active()
+	if err != nil || len(act) != 1 || act[0].PromptVersion != extract.NotePromptVersion {
+		t.Errorf("migrated facts %+v %v", act, err)
 	}
 }
 

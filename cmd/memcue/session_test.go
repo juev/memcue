@@ -333,7 +333,7 @@ func TestExtractedFactsPassThePolicy(t *testing.T) {
 			{Content: "Агент решил держать базу на db1.", Kind: "decision", Source: "agent", Evidence: "порт базы demo"},
 			{Content: "Порт demo 5433.", Kind: "environment", Source: "tool", Scope: "service:demo",
 				Evidence: "порт 5433 открыт"},
-		}}, nil
+		}, Dropped: []string{"журнал обновления demo"}}, nil
 	}
 	t.Cleanup(func() { extractFn = extractText })
 	msgs := fmt.Sprintf(`[{"role":"user","content":%q}]`, strings.Repeat("порт базы demo ", 200))
@@ -344,7 +344,7 @@ func TestExtractedFactsPassThePolicy(t *testing.T) {
 		t.Errorf("model told %q", where)
 	}
 	recs := readLog(t, state)
-	if len(recs) != 1 || recs[0].Facts != 1 || len(recs[0].Rejected) != 3 ||
+	if len(recs) != 1 || recs[0].Facts != 1 || len(recs[0].Rejected) != 3 || recs[0].Dropped != "журнал обновления demo" ||
 		!strings.HasPrefix(recs[0].Rejected[0], "kind event is not kept: Обновили demo") ||
 		!strings.HasPrefix(recs[0].Rejected[1], "a decision needs the user's words") ||
 		!strings.HasPrefix(recs[0].Rejected[2], "evidence is not in a RESULT block") {

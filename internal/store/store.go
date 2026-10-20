@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS facts (
 	source   TEXT NOT NULL DEFAULT '',
 	evidence TEXT NOT NULL DEFAULT '',
 	review   TEXT NOT NULL DEFAULT '',
+	prompt_version INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
@@ -80,11 +81,12 @@ type Fact struct {
 
 // Meta is what a fact is and what it rests on; every field may be empty, as in facts written before it existed.
 type Meta struct {
-	Kind     string // rule, decision, pitfall or environment
-	Scope    string // where it holds: global, host:<name>, repo:<name>
-	Source   string // who said it: user, user_confirmed, tool, agent, note, memory
-	Evidence string // the words of the source the fact rests on, verbatim
-	Review   string // Candidate while it waits for approval, else empty
+	Kind          string // rule, decision, pitfall or environment
+	Scope         string // where it holds: global, host:<name>, repo:<name>
+	Source        string // who said it: user, user_confirmed, tool, agent, note, memory
+	Evidence      string // the words of the source the fact rests on, verbatim
+	Review        string // Candidate while it waits for approval, else empty
+	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
 }
 
 // ErrNotFound: no fact with that id.
@@ -109,6 +111,9 @@ func Open(path string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
+	if err := privateFile(path); err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)")
 	if err != nil {
 		return nil, err
@@ -124,12 +129,45 @@ func Open(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := s.ensureIndex(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return s, nil
 }
 
-// added are the columns a base may predate; each is additive: an older memcue reads the base as it did, because every
-// query names the columns it wants.
-var added = []string{"expires", "kind", "scope", "source", "evidence", "review"}
+// privateFile creates the base with the mode of ~/.claude/memory (0600) and tightens a base written by an older
+// memcue as 0644. The file may carry facts and evidence, so it must not be world-readable even inside a private
+// directory.
+func privateFile(path string) error {
+	if path == "" || path == ":memory:" || strings.HasPrefix(path, "file:") {
+		return nil // a URI or an in-memory base has no path to tighten
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
+}
+
+// addedColumn is a column a base may predate. Each is additive: an older memcue reads the base as it did, because
+// every query names the columns it wants.
+type addedColumn struct {
+	name, typ, def string
+}
+
+var added = []addedColumn{
+	{"expires", "TEXT", "''"},
+	{"kind", "TEXT", "''"},
+	{"scope", "TEXT", "''"},
+	{"source", "TEXT", "''"},
+	{"evidence", "TEXT", "''"},
+	{"review", "TEXT", "''"},
+	{"prompt_version", "INTEGER", "0"},
+}
 
 // ensureColumns adds to a base the columns written after it was created.
 func (s *Store) ensureColumns() error {
@@ -155,13 +193,45 @@ func (s *Store) ensureColumns() error {
 	}
 	_ = rows.Close()
 	for _, c := range added {
-		if !have[c] {
-			if _, err := s.db.Exec(`ALTER TABLE facts ADD COLUMN ` + c + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !have[c.name] {
+			if _, err := s.db.Exec(`ALTER TABLE facts ADD COLUMN ` + c.name + ` ` + c.typ + ` NOT NULL DEFAULT ` + c.def); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// ensureIndex repairs an index that no longer matches the active facts. The index is derived and the only thing
+// Search reads, so a base whose index row was lost must get it back before a prompt is answered.
+func (s *Store) ensureIndex() error {
+	const active = `SELECT count(*) FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = '' `
+	var facts, indexed, fts, missing, stale int
+	if err := s.db.QueryRow(active, Active).Scan(&facts); err != nil {
+		return err
+	}
+	if err := s.db.QueryRow(`SELECT count(*) FROM fact_index`).Scan(&indexed); err != nil {
+		return err
+	}
+	if err := s.db.QueryRow(`SELECT count(*) FROM fact_fts`).Scan(&fts); err != nil {
+		return err
+	}
+	if facts == indexed && indexed == fts {
+		if err := s.db.QueryRow(active+`AND NOT EXISTS (SELECT 1 FROM fact_index i WHERE i.id = f.id)`, Active).
+			Scan(&missing); err != nil {
+			return err
+		}
+		if err := s.db.QueryRow(`SELECT count(*) FROM fact_index i WHERE NOT EXISTS (
+			SELECT 1 FROM facts f WHERE f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
+			AND f.status = ? AND f.review = '')`, Active).Scan(&stale); err != nil {
+			return err
+		}
+		if missing == 0 && stale == 0 {
+			return nil
+		}
+	}
+	return s.Rebuild()
 }
 
 // Close closes the base.
@@ -360,9 +430,9 @@ func (s *Store) write(f Fact) error {
 
 // insert writes one version as it is.
 func insert(tx *sql.Tx, f Fact) error {
-	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
+	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
 		f.Content, strings.Join(f.Keywords, ", "), f.Origin, f.Created.Format(time.RFC3339Nano), f.Status, f.Author,
-		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review)
+		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion)
 	return err
 }
 
@@ -435,13 +505,13 @@ func (s *Store) Rebuild() error {
 	return tx.Commit()
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review`
+const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version`
 
 func scan(row interface{ Scan(...any) error }) (Fact, error) {
 	var f Fact
 	var keywords, created string
 	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author,
-		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review); err != nil {
+		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion); err != nil {
 		return Fact{}, err
 	}
 	if keywords != "" {
@@ -470,10 +540,12 @@ func (s *Store) Rows() ([]Fact, error) {
 	return s.query(`SELECT ` + columns + ` FROM facts ORDER BY id, version`)
 }
 
-// Active returns the latest version of every fact that is not retired and not a candidate.
+// Active returns the latest version of every fact that is not retired and not a candidate. It reads the facts, not
+// the index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs the index.
 func (s *Store) Active() ([]Fact, error) {
-	return s.query(`SELECT ` + qualified("f") + ` FROM facts f JOIN fact_index i ON i.id = f.id
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) ORDER BY f.id`)
+	return s.query(`SELECT `+qualified("f")+` FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ''
+		ORDER BY f.id`, Active)
 }
 
 func qualified(alias string) string {
@@ -529,7 +601,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 		var h Hit
 		var stems, keywords, created string
 		if err := rows.Scan(&stems, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
-			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review); err != nil {
+			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion); err != nil {
 			return nil, err
 		}
 		if keywords != "" {

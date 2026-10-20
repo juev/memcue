@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -249,7 +250,7 @@ func TestBaseWithoutExpiresColumnStillOpens(t *testing.T) {
 	if got.Expires != "2026-11-01" {
 		t.Errorf("expiry %q after migration", got.Expires)
 	}
-	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "error: x"}
+	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "error: x", PromptVersion: 3}
 	f, err = s.AddWith("Старая база приняла факт с типом.", nil, "", "", m)
 	if err != nil {
 		t.Fatalf("adding meta to a migrated base: %v", err)
@@ -261,7 +262,7 @@ func TestBaseWithoutExpiresColumnStillOpens(t *testing.T) {
 
 func TestMetaIsStoredAndKeptByCorrection(t *testing.T) {
 	s, _ := open(t)
-	m := Meta{Kind: "environment", Scope: "host:db1", Source: "tool", Evidence: "port 5432"}
+	m := Meta{Kind: "environment", Scope: "host:db1", Source: "tool", Evidence: "port 5432", PromptVersion: 2}
 	f, err := s.AddWith("Postgres на db1 слушает порт 5432.", []string{"postgres"}, "x 2026-10-20", "", m)
 	if err != nil {
 		t.Fatal(err)
@@ -419,5 +420,62 @@ func TestReopenPutsAFactBackIntoReview(t *testing.T) {
 	got, _ = s.Get(f.ID)
 	if got.Version != 5 || got.Review != Candidate || got.Status != Active {
 		t.Errorf("after undo of reject %+v", got)
+	}
+}
+
+// The base may hold evidence and secrets; a new file is 0600 and an old 0644 one is tightened on open.
+func TestBaseIsPrivate(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		path := filepath.Join(t.TempDir(), "facts.db")
+		if existing {
+			if err := os.WriteFile(path, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s, err := Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fi, err := os.Stat(path)
+		if err != nil {
+			_ = s.Close()
+			t.Fatal(err)
+		}
+		if got := fi.Mode().Perm(); got != 0o600 {
+			t.Errorf("existing=%v: mode %o, want 600", existing, got)
+		}
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// A lost index row must not hide a fact from facts or an audit; reopening the base repairs Search too.
+func TestActiveSurvivesLostIndexRow(t *testing.T) {
+	s, path := open(t)
+	f, err := s.Add("Vaultwarden обслуживает vault.example.org", []string{"vaultwarden"}, "x 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`DELETE FROM fact_index`); err != nil {
+		t.Fatal(err)
+	}
+	act, err := s.Active()
+	if err != nil || len(act) != 1 || act[0].ID != f.ID {
+		t.Fatalf("active without an index row: %+v %v", act, err)
+	}
+	if got := ids(t, s, "vaultwarden vault"); len(got) != 0 {
+		t.Errorf("search found a fact whose index row is gone: %v", got)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if _, ok := ids(t, s, "vaultwarden vault")[f.ID]; !ok {
+		t.Error("reopening did not repair the index")
 	}
 }

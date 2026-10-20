@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -111,6 +112,9 @@ func (s *Store) Dump(w io.Writer) error {
 			if kv[1] != "" {
 				created += " " + kv[0] + "=" + kv[1]
 			}
+		}
+		if f.PromptVersion != 0 {
+			created += " prompt=" + strconv.Itoa(f.PromptVersion)
 		}
 		if _, err := fmt.Fprintf(w, "%s v%d %s %s %s [%s] %s\n", f.ID, f.Version, f.Status,
 			created, f.Origin, strings.Join(f.Keywords, ", "),

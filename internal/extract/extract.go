@@ -63,6 +63,10 @@ var errEmpty = errors.New("model returned neither facts nor a reason")
 // Model is the model the extraction runs on (the main one, by the user's decision).
 var Model = "claude-opus-5-5"
 
+// NotePromptVersion is the version of note_prompt.md. It is 0 for the prompt that produced the migrated base;
+// bump it whenever the prompt changes, so migrate -all can tell a note that predates the change.
+const NotePromptVersion = 0
+
 // Note extracts the facts of a memory note. name is the note's path, for the model's orientation only.
 func Note(ctx context.Context, name, content string) (Result, error) {
 	return run(ctx, notePrompt, fmt.Sprintf("Заметка `%s`:\n\n%s", name, content))
