@@ -65,6 +65,9 @@ environment:
   MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
   MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
+  MEMCUE_TRIAGE_URL, MEMCUE_TRIAGE_MODEL, MEMCUE_TRIAGE_KEY  decision endpoint that drops groups a dream need not
+                  send to the model; off unless all three are set
+  MEMCUE_TRIAGE_MIN probability of an action a group needs to go on (default 0.2)
 `
 
 func main() {
@@ -76,6 +79,7 @@ func main() {
 		extract.Model = m
 	}
 	extract.API.URL, extract.API.Key = os.Getenv("MEMCUE_API_URL"), os.Getenv("MEMCUE_API_KEY")
+	configureTriage()
 	var err error
 	switch os.Args[1] {
 	case "session-start":
