@@ -1,9 +1,10 @@
 // Package text turns notes and prompts into the stems memcue indexes and matches.
 //
 // FTS5 has no Russian stemmer, so stems are computed here and stored pre-tokenized. Bare numbers, versions, ports
-// and addresses are dropped: matching "Go 1.27" against notes recalls notes about other versions. A ticket key such
-// as PROJ-1234, #123 or !45 is kept as one exact term, because a ticket is a precise anchor and losing its number
-// loses the fact.
+// and addresses are dropped: matching "Go 1.27" against notes recalls notes about other versions. An uppercase
+// ticket key such as PROJ-1234, #123 or !45 is kept as one exact term, because a ticket is a precise anchor and
+// losing its number loses the fact. A versioned name such as PostgreSQL-16 is not a ticket: its word stays in the
+// index and only the number is dropped.
 package text
 
 import (
@@ -18,8 +19,9 @@ import (
 var (
 	// v0.21.6, 1.27, 2026-10-19: never a match.
 	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
-	// PROJ-1234, JIRA-12, #123, !45: one exact term, not a number and not a project word.
-	reTicket = regexp.MustCompile(`(?i)(?:[a-z][a-z0-9]*-\d+|#\d+|!\d+)`)
+	// PROJ-1234, JIRA-12, #123, !45: one exact term. Only an uppercase project key is a ticket; a versioned name
+	// such as PostgreSQL-16 keeps its word and its number is dropped.
+	reTicket = regexp.MustCompile(`\b[A-Z][A-Z0-9]*-\d+\b|#\d+|!\d+`)
 	// Ticket terms carry a tk prefix and always end in a digit; ordinary identifiers such as s3 and k8s do not.
 	reTicketTerm = regexp.MustCompile(`^tk(?:h|b)?[a-z0-9]*\d+$`)
 )
@@ -89,22 +91,27 @@ func Query(term string) string {
 
 func isCyrillic(r rune) bool { return r >= 'а' && r <= 'я' }
 
+// words splits s into words, taking ticket keys out first so their number survives. Tickets are recognized on the
+// original text: only an uppercase key is one, so a versioned name such as PostgreSQL-16 stays an ordinary word and
+// only its number is dropped.
 func words(s string) []string {
-	s = strings.ToLower(s)
-	s = strings.ReplaceAll(s, "ё", "е")
 	var tickets []string
 	s = reTicket.ReplaceAllStringFunc(s, func(m string) string {
 		tickets = append(tickets, ticketTerm(m))
 		return " "
 	})
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, "ё", "е")
 	s = reNumeric.ReplaceAllString(s, " ")
 	out := strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
 	return append(out, tickets...)
 }
 
 // ticketTerm normalizes a ticket key into one FTS token. The prefix keeps it distinct from a bare number (#123)
-// and from an ordinary identifier; a hyphen becomes nothing, so the unicode61 tokenizer cannot split the key.
+// and from an ordinary identifier; a hyphen becomes nothing, so the unicode61 tokenizer cannot split the key. The
+// key is lowercased so a base and a prompt always agree.
 func ticketTerm(s string) string {
+	s = strings.ToLower(s)
 	switch s[0] {
 	case '#':
 		return "tkh" + s[1:]

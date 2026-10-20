@@ -27,10 +27,12 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
-// Version 2 changes the stems: ticket keys such as PROJ-1234 are indexed as one exact term, so every base must be
-// rebuilt once. It also covers the columns added after version 1 (expires, kind, scope, source, evidence, review,
-// prompt_version), and an older memcue refuses a version-2 base instead of reading candidates as active facts.
-const schemaVersion = 2
+// Version 3 changes the stems again: a versioned name such as PostgreSQL-16 keeps its word and only the number is
+// dropped, while an uppercase ticket key such as PROJ-1234 stays one exact term. Opening an older base rebuilds the
+// derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,
+// scope, source, evidence, review, prompt_version); an older memcue refuses a newer base instead of reading
+// candidates as active facts.
+const schemaVersion = 3
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
