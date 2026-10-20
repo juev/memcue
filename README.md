@@ -122,6 +122,14 @@ that was reviewed, and it is paid for once. A group with a fact changed since th
 refused whole and logged, since its actions were decided on the old text; the other groups apply, and the dream is
 marked as of the dry run.
 
+Most groups need no action, and a cheap decision model can tell them apart. With `MEMCUE_TRIAGE_URL`,
+`MEMCUE_TRIAGE_MODEL` and `MEMCUE_TRIAGE_KEY` all set, a dream first asks that endpoint about each group and sends on
+only the groups whose probability of an action reaches `MEMCUE_TRIAGE_MIN` (default 0.2). The endpoint speaks the
+typed decisions API of RouterAI, for example `https://routerai.ru/api/v1/decisions` with `typesafe/jev-1.13`. Triage
+only classifies: the main model still writes every change. A group triage fails on goes on, and `dream.log` records how
+many groups triage dropped. Without all three variables, or with a threshold that is not a probability, there is no
+triage. Measured on 395 groups against an Opus dry run, 0.2 sent on 191 groups and kept 42 of the 43 Opus acted on.
+
 ## Configuration
 
 | Variable | Meaning | Default |
@@ -134,6 +142,10 @@ marked as of the dry run.
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
+| `MEMCUE_TRIAGE_URL` | decision endpoint that drops groups a dream need not send to the model, e.g. `https://routerai.ru/api/v1/decisions` | unset: no triage |
+| `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
+| `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
+| `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the

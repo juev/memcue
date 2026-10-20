@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -42,6 +43,79 @@ const (
 	dreamEvery    = 24 * time.Hour
 )
 
+const (
+	triageMin      = 0.2 // measured: keeps 42 of the 43 groups Opus acted on, sends on 191 of 395
+	triageParallel = 8
+)
+
+// configureTriage reads the triage endpoint from the environment. Triage stays off unless URL, model and key are all
+// set, and when MEMCUE_TRIAGE_MIN is not a probability, so a half-done setup changes nothing.
+func configureTriage() {
+	extract.Triage.URL = os.Getenv("MEMCUE_TRIAGE_URL")
+	extract.Triage.Model = os.Getenv("MEMCUE_TRIAGE_MODEL")
+	extract.Triage.Key = os.Getenv("MEMCUE_TRIAGE_KEY")
+	extract.Triage.Min = triageMin
+	if v := os.Getenv("MEMCUE_TRIAGE_MIN"); v != "" {
+		m, err := strconv.ParseFloat(v, 64)
+		if err != nil || m < 0 || m > 1 {
+			extract.Triage.URL = ""
+			return
+		}
+		extract.Triage.Min = m
+	}
+}
+
+// triageFn is the triage step, replaced in tests.
+var triageFn = func(facts []string) (extract.TriageResult, error) {
+	ctx, cancel := contextTimeout()
+	defer cancel()
+	return extract.TriageGroup(ctx, facts)
+}
+
+// triageRecord says what triage did in a dream.
+type triageRecord struct {
+	Dropped int `json:"dropped"` // groups not sent to the model
+	Errors  int `json:"errors"`  // groups sent on because triage failed on them
+	Input   int `json:"input_tokens"`
+}
+
+// triageGroups keeps the groups triage does not rule out. A group triage fails on goes on, so a broken triage can cost
+// money but never hide a group.
+func triageGroups(groups [][]store.Fact) ([][]store.Fact, *triageRecord) {
+	res := make([]extract.TriageResult, len(groups))
+	errs := make([]error, len(groups))
+	sem := make(chan struct{}, triageParallel)
+	var wg sync.WaitGroup
+	for i, g := range groups {
+		texts := make([]string, len(g))
+		for j, f := range g {
+			texts[j] = f.Content
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			res[i], errs[i] = triageFn(texts)
+		}()
+	}
+	wg.Wait()
+	rec := &triageRecord{}
+	var kept [][]store.Fact
+	for i, g := range groups {
+		rec.Input += res[i].Input
+		switch {
+		case errs[i] != nil:
+			rec.Errors++
+			kept = append(kept, g)
+		case res[i].PAct >= extract.Triage.Min:
+			kept = append(kept, g)
+		default:
+			rec.Dropped++
+		}
+	}
+	return kept, rec
+}
+
 // dreamFn is the model step, replaced in tests.
 var dreamFn = func(groups string) (extract.DreamResult, error) {
 	ctx, cancel := contextTimeout()
@@ -61,6 +135,7 @@ type dreamRecord struct {
 	CostUSD float64          `json:"cost_usd"`
 	Tokens  extract.Tokens   `json:"tokens"`
 	Plan    string           `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
+	Triage  *triageRecord    `json:"triage,omitempty"`
 	Error   string           `json:"error,omitempty"`
 }
 
@@ -210,6 +285,9 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	if list {
 		_, err := io.WriteString(out, renderGroups(groups, freshSet(fresh)))
 		return rec, err
+	}
+	if extract.TriageOn() {
+		groups, rec.Triage = triageGroups(groups)
 	}
 	plan := dreamPlan{Start: start, Seen: versions(active)}
 	for batch := range slices.Chunk(groups, groupsPerCall) {
