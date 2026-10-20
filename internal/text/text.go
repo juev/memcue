@@ -2,7 +2,7 @@
 //
 // FTS5 has no Russian stemmer, so stems are computed here and stored pre-tokenized. Bare numbers, versions, ports
 // and addresses are dropped: matching "Go 1.27" against notes recalls notes about other versions. A ticket key such
-// as VKPG-1914, #123 or !45 is kept as one exact term, because a ticket is a precise anchor and losing its number
+// as PROJ-1234, #123 or !45 is kept as one exact term, because a ticket is a precise anchor and losing its number
 // loses the fact.
 package text
 
@@ -18,7 +18,7 @@ import (
 var (
 	// v0.21.6, 1.27, 2026-10-19: never a match.
 	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
-	// VKPG-1914, JIRA-12, #123, !45: one exact term, not a number and not a project word.
+	// PROJ-1234, JIRA-12, #123, !45: one exact term, not a number and not a project word.
 	reTicket = regexp.MustCompile(`(?i)(?:[a-z][a-z0-9]*-\d+|#\d+|!\d+)`)
 	// Ticket terms carry a tk prefix and always end in a digit; ordinary identifiers such as s3 and k8s do not.
 	reTicketTerm = regexp.MustCompile(`^tk(?:h|b)?[a-z0-9]*\d+$`)
