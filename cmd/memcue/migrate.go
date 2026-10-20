@@ -118,7 +118,7 @@ func runMigrate(args []string, out io.Writer) error {
 		}
 		if err := enc.Encode(map[string]any{"note": res.ref(), "origin": origin, "facts": res.r.Facts,
 			"dropped": res.r.Dropped, "cost_usd": res.r.CostUSD, "ids": ids,
-			"prompt_version": extract.NotePromptVersion}); err != nil {
+			"prompt_version": extract.NotePromptVersion, "review": false}); err != nil {
 			return err
 		}
 	}
@@ -309,6 +309,7 @@ func runImport(args []string, out io.Writer) error {
 				Origin        string         `json:"origin"`
 				Facts         []extract.Fact `json:"facts"`
 				PromptVersion int            `json:"prompt_version"`
+				Review        *bool          `json:"review"`
 			}
 			if err := dec.Decode(&rec); err != nil {
 				_ = f.Close()
@@ -317,7 +318,13 @@ func runImport(args []string, out io.Writer) error {
 			for _, fact := range rec.Facts {
 				meta := store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
 					PromptVersion: rec.PromptVersion}
-				if fact.Kind != "" { // a session's fact (extract -dry-run): it goes through review as any extraction
+				// The record says whether its facts go through review. The kind test is only the fallback for files
+				// written before the field existed: a session's fact has a kind, a migrated note's fact does not.
+				if rec.Review != nil {
+					if *rec.Review {
+						meta.Review = store.Candidate
+					}
+				} else if fact.Kind != "" {
 					meta.Review = store.Candidate
 				}
 				if _, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", meta); err != nil {

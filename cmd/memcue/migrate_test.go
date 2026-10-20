@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -183,5 +184,29 @@ func TestNamedNoteOfBuiltInLayoutGetsItsRepository(t *testing.T) {
 	}
 	if got := noteTier(filepath.Join(claude, "memory", "lists", "b.md"), claude); got != "lists" {
 		t.Errorf("shared layout: %q", got)
+	}
+}
+
+func TestMigrateDryRunSaysFactsDoNotGoThroughReview(t *testing.T) {
+	dir := env(t)
+	notePath := filepath.Join(dir, "claude", "memory", "lists", "a.md")
+	write(t, notePath, "note a\n")
+	noteFn = func(context.Context, string, string) (extract.Result, error) {
+		return extract.Result{Facts: []extract.Fact{{Content: "Факт из заметки a.", Keywords: []string{"a"}}}}, nil
+	}
+	t.Cleanup(func() { noteFn = extract.Note })
+	var out strings.Builder
+	if err := runMigrate([]string{"-dry-run", notePath}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var rec struct {
+		Review bool `json:"review"`
+		Prompt int  `json:"prompt_version"`
+	}
+	if err := json.Unmarshal([]byte(out.String()), &rec); err != nil {
+		t.Fatalf("%q: %v", out.String(), err)
+	}
+	if rec.Review || rec.Prompt != extract.NotePromptVersion {
+		t.Errorf("record %+v", rec)
 	}
 }

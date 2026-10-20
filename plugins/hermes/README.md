@@ -8,9 +8,12 @@ memcue fact base:
   context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
   notice, whose wrapper matches facts by accident.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
-  fact (source `memory`), recalled only after it is approved with `memcue approve`; when the agent edits that entry
-  the fact gets a new version, when it removes it the fact is retired. Which fact an entry
-  became is kept in `$HERMES_HOME/memcue/written.json`.
+  fact (source `memory`) and waits for approval with `memcue review`/`approve`. With the default
+  `suppress_mirrored: true`, an approved mirrored fact is still left out of `prefetch`, because the same entry already
+  rides in the built-in memory block; set `suppress_mirrored: false` to let it be recalled as well. When the agent
+  edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry became is
+  kept in `$HERMES_HOME/memcue/written.json`. An explicit `memcue_correct` of an approved fact stays active: it is a
+  correction, not a new candidate.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   Subagents, cron and flush runs get only `memcue_search` and do not write.
 - **Session extraction** (optional): the new messages of a session go to `memcue extract-messages` in the
