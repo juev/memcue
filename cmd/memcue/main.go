@@ -84,6 +84,12 @@ environment:
   MEMCUE_TRIAGE_URL, MEMCUE_TRIAGE_MODEL, MEMCUE_TRIAGE_KEY  decision endpoint that drops groups a dream need not
                   send to the model; off unless all three are set
   MEMCUE_TRIAGE_MIN probability of an action a group needs to go on (default 0.2)
+  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  decision endpoint that retires a candidate repeating an
+                  approved fact, vet only; off unless all three are set
+  MEMCUE_JUDGE_MIN  probability of "same claim" that retires a candidate (default 0.5)
+  MEMCUE_JUDGE_MAX_FACTS  approved facts the base may hold and still be judged in one request (default 400);
+                  a bigger base falls back to the review model and its neighbours
+  MEMCUE_JUDGE_LONG_CONTEXT  1 sends the danger-zone header, which lifts the request to 262k tokens
 `
 
 func main() {
@@ -98,6 +104,7 @@ func main() {
 	extract.Judge.URL, extract.Judge.Model, extract.Judge.Key =
 		os.Getenv("MEMCUE_VET_URL"), os.Getenv("MEMCUE_VET_MODEL"), os.Getenv("MEMCUE_VET_KEY")
 	configureTriage()
+	configureJudge()
 	var err error
 	switch os.Args[1] {
 	case "session-start":

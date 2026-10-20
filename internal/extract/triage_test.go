@@ -57,8 +57,8 @@ func TestTriageGroupErrors(t *testing.T) {
 		want   string
 	}{
 		"status":    {502, `bad gateway`, "502"},
-		"not json":  {200, `<html>`, "triage output"},
-		"no choice": {200, `{"answers":{}}`, "no choice"},
+		"not json":  {200, `<html>`, "decisions output"},
+		"no choice": {200, `{"answers":{}}`, "no answers"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			triageEndpoint(t, tc.status, tc.answer)

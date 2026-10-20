@@ -145,6 +145,23 @@ The judge runs on the extraction endpoint and model by default. `MEMCUE_VET_URL`
 the dream; that process is already detached from the session, so a turn never waits for the verdict. A run that finds
 another one busy is skipped rather than queued, and its failures go to `vet.log`, not to the extraction.
 
+A duplicate can be answered without reading a candidate: only by comparing it with the base. With `MEMCUE_JUDGE_URL`,
+`MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` set to a typed decisions endpoint (OpenRouter
+`https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14`, TypeSafe `https://api.typesafe.ai/v1/systemone`
+with `jev-latest`), `vet` asks it first: the candidate and the whole approved base in one request, one `score` per
+approved fact over three levels — same claim, same subject with a different claim, unrelated — and a candidate whose
+best "same claim" reaches `MEMCUE_JUDGE_MIN` (default 0.5) is retired with the probability and the fact it repeats in
+`vet.log`. Every fact gets its own question, not one `choice`: a `choice` names the closest fact and drops the others,
+and a base that holds three copies of a fact needs all three. Everything the judge does not call a duplicate still goes
+to the review model, which decides whether the fact is worth keeping at all; a failed call decides nothing and leaves
+the candidate in the queue. The stage is skipped when the approved base is larger than `MEMCUE_JUDGE_MAX_FACTS`
+(default 400: about 150 input tokens per fact fit a 64k request; `MEMCUE_JUDGE_LONG_CONTEXT=1` sends the danger-zone
+header for 262k), and then the review model and its neighbours decide as before. Measured on a base of 235 approved
+facts and 41 candidates the review model had labelled: at 0.5 the judge retires 8–11 of the 15 duplicates and 0–1 of
+the 26 facts worth keeping, AUC 0.835–0.877 across two runs; a plain yes/no question at the same threshold retires 8
+and 1, AUC 0.815–0.822, at 0.3 it still lets 2 facts through. Each candidate costs 1.3 s and $0.0017 —
+[docs/research/jev-judge-2026-10.md](docs/research/jev-judge-2026-10.md).
+
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
 never served it.
@@ -216,6 +233,12 @@ same model about the whole base in one request, with no index at all, is in
 | `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
 | `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
+| `MEMCUE_JUDGE_URL` | decision endpoint that retires a candidate repeating an approved fact, e.g. `https://openrouter.ai/api/alpha/decisions` | unset: no duplicate judge |
+| `MEMCUE_JUDGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.14` | unset: no duplicate judge |
+| `MEMCUE_JUDGE_KEY` | key for that endpoint | unset: no duplicate judge |
+| `MEMCUE_JUDGE_MIN` | probability of "same claim" that retires a candidate | `0.5` |
+| `MEMCUE_JUDGE_MAX_FACTS` | approved facts the base may hold and still be judged in one request; a bigger base falls back to the review model | `400` |
+| `MEMCUE_JUDGE_LONG_CONTEXT` | `1` sends the danger-zone header, which lifts one request to 262k tokens | off |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
