@@ -104,7 +104,7 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 	extractFn = func(origin, text string) (extracted, error) {
 		seen = append(seen, text)
 		return extracted{Facts: []extract.Fact{{Content: fmt.Sprintf("факт %d", len(seen)), Keywords: []string{"k"},
-			Kind: "pitfall", Source: "tool", Scope: "host:db1", Evidence: "реплика 0"}}, CostUSD: 0.1}, nil
+			Kind: "pitfall", Source: "user", Scope: "host:db1", Evidence: "реплика 0"}}, CostUSD: 0.1}, nil
 	}
 	t.Cleanup(func() { extractFn = extractText })
 	tr := filepath.Join(dir, "s.jsonl")
@@ -202,7 +202,7 @@ func TestExtractedFactsPassThePolicy(t *testing.T) {
 	if len(recs) != 1 || recs[0].Facts != 1 || len(recs[0].Rejected) != 3 ||
 		!strings.HasPrefix(recs[0].Rejected[0], "kind event is not kept: Обновили demo") ||
 		!strings.HasPrefix(recs[0].Rejected[1], "a decision needs the user's words") ||
-		!strings.HasPrefix(recs[0].Rejected[2], "evidence is not in the source") {
+		!strings.HasPrefix(recs[0].Rejected[2], "evidence is not in a RESULT block") {
 		t.Errorf("log %+v", recs)
 	}
 }
