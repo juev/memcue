@@ -232,6 +232,27 @@ class ProviderTest(unittest.TestCase):
         lines = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertEqual([(r["facts"], r["used"]) for r in lines], [(1, 1), (1, 0)])
 
+    def test_usage_log_from_config_needs_no_environment(self):
+        self.assertNotIn("MEMCUE_USAGE_LOG", os.environ)
+        state = Path(self.home) / "own-state"
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "usage_log": True, "state_dir": str(state)})
+        p.initialize("s7", hermes_home=self.home, agent_context="primary")
+        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
+        self.assertIn("55432", p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s7"))
+        p.sync_turn("на каком порту слушает база postgres проекта demo?", "База слушает 55432.", session_id="s7")
+        lines = (state / "memcue" / "usage.log").read_text(encoding="utf-8").splitlines()
+        self.assertEqual([(r["facts"], r["used"]) for r in map(json.loads, lines)], [(1, 1)])
+        self.assertFalse((Path(self.home) / "state" / "memcue" / "usage.log").exists())
+
+    def test_usage_log_config_false_stays_off(self):
+        state = Path(self.home) / "own-state"
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "usage_log": "false", "state_dir": str(state)})
+        p.initialize("s8", hermes_home=self.home, agent_context="primary")
+        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
+        p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s8")
+        p.sync_turn("…", "55432", session_id="s8")
+        self.assertFalse((state / "memcue" / "usage.log").exists())
+
     def test_usage_log_is_off_without_the_flag(self):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
         self.p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s1")

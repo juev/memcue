@@ -6,7 +6,7 @@ compression), and none for a cron turn; facts that only mirror a built-in memory
 ``hermes-memory`` and are left out, because that note rides with every turn anyway; every write of the built-in memory
 tool is mirrored into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the
 model gets tools to search and fix facts; a reply is checked for the identifiers of the facts it was given, and
-``usage.log`` keeps that score when ``MEMCUE_USAGE_LOG=1``. With an OpenAI-compatible endpoint configured, the new
+``usage.log`` keeps that score when ``usage_log`` is on. With an OpenAI-compatible endpoint configured, the new
 messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
 added: once enough new text gathers, after a pause in the conversation, before the context is compressed and when the
 session ends. A chat of a messaging gateway can stay one session for days, so its end alone would come too late.
@@ -25,6 +25,10 @@ Config, all optional (``memory.memcue`` in config.yaml):
           (default true; mirrored facts carry the origin ``hermes-memory``)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
+  usage_log: write ``usage.log``, whether a reply used the facts it was given (default false; MEMCUE_USAGE_LOG=1 in
+          the gateway's environment turns it on too)
+  state_dir: where ``memcue/usage.log`` goes (default: $XDG_STATE_HOME, else ~/.local/state); set here, it needs no
+          change to the environment of the gateway or its container
 """
 
 from __future__ import annotations
@@ -84,6 +88,11 @@ def _identifiers(text: str) -> list[str]:
     return out[:6]
 
 
+def _on(v: Any) -> bool:
+    """A config switch: true, or a string a YAML file or a person would mean as true."""
+    return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
+
+
 def _load_plugin_config() -> dict[str, Any]:
     try:
         from hermes_cli.config import load_config
@@ -135,6 +144,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._tick = _TICK
         self._min_coverage = self._config.get("min_coverage")
         self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
+        self._usage_log = _on(self._config.get("usage_log"))
+        self._state_dir = str(self._config.get("state_dir") or "")
         self._include_tool_results = bool(self._config.get("extract_include_tool_results", False))
         self._max_message = int(self._config.get("extract_max_message_chars", _MAX_MESSAGE))
         self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
@@ -364,18 +375,18 @@ class MemcueMemoryProvider(MemoryProvider):
         return kept
 
     def _usage_path(self) -> Path:
-        base = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+        base = self._state_dir or os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
         return Path(base) / "memcue" / "usage.log"
 
     def _note_usage(self, session: str, reply: str) -> None:
         """Judge the facts of the last prefetch by whether the reply copied one of their identifiers. It is a proxy:
         a fact can be read and not used, and a reply can use it without quoting a path. Off unless
-        MEMCUE_USAGE_LOG=1, the way the recall log is off unless MEMCUE_RECALL_LOG=1."""
+        usage_log is on, the way the recall log is off unless MEMCUE_RECALL_LOG=1."""
         facts = self._delivered.pop(session, None)
         if not facts:
             return
         matched = [t for f in facts for t in f["tokens"] if t in reply]
-        if os.environ.get("MEMCUE_USAGE_LOG") != "1":
+        if not (self._usage_log or os.environ.get("MEMCUE_USAGE_LOG") == "1"):
             return
         record = {"time": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
                   .isoformat().replace("+00:00", "Z"), "session": session, "facts": len(facts),
