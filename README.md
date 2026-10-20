@@ -5,6 +5,9 @@ through hooks:
 
 - **Before each prompt** it looks for facts that share enough rare words with the prompt and gives the agent at
   most two of them, or nothing. Most prompts get nothing; that is intended.
+- **At session start, and again after a compaction** it sends a card: global rules and the decisions of the current
+  repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never shares a word with a
+  prompt still reaches the agent.
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
   added; nothing is compared or overwritten.
@@ -107,6 +110,10 @@ action. Rejecting retires the fact and writes `rejected in review` to `$XDG_STAT
 approval is logged there too. The page has no external assets and works offline. `-addr` must stay a loopback
 address, and `-no-open` only prints the URL.
 
+The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
+retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
+never served it.
+
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
 a new one.
@@ -159,7 +166,7 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
 | `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/card.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
 prompt and the facts it got, if any, with their coverage. It stays on your machine and is what you judge recall by;

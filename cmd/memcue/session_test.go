@@ -9,12 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
 )
 
 func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
+	env(t) // no base: the note must not depend on the user's real memory
 	var out bytes.Buffer
 	if err := runSessionStart(strings.NewReader(`{"source":"startup"}`), &out); err != nil {
 		t.Fatal(err)
@@ -31,6 +33,146 @@ func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 	if resp.HookSpecificOutput.HookEventName != "SessionStart" ||
 		!strings.Contains(resp.HookSpecificOutput.AdditionalContext, "memcue add") {
 		t.Errorf("got %+v", resp)
+	}
+}
+
+// sessionStartContext runs the SessionStart hook and returns the context it injected.
+func sessionStartContext(t *testing.T, dir, source, session string) string {
+	t.Helper()
+	in, _ := json.Marshal(map[string]string{"session_id": session, "source": source, "cwd": dir})
+	var out bytes.Buffer
+	if err := runSessionStart(bytes.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		HookSpecificOutput struct {
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	return resp.HookSpecificOutput.AdditionalContext
+}
+
+func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := func(content, kind, scope, source string, review string) store.Fact {
+		f, err := s.AddWith(content, nil, "test 2026-10-20", "", store.Meta{Kind: kind, Scope: scope, Source: source,
+			Review: review})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	old := add("Правило: отвечать по-русски.", "rule", "global", "user", "")
+	add("Правило только на маке.", "rule", "host:mac", "user", "")
+	decision := add("Решение: мержить squash в shop.", "decision", "repo:shop", "user", "")
+	add("Решение чужого репозитория.", "decision", "repo:other", "user", "")
+	add("Глобальное решение.", "decision", "global", "user", "")
+	add("Ловушка в shop.", "pitfall", "repo:shop", "tool", "")
+	add("Кандидат-правило.", "rule", "global", "user", store.Candidate)
+	newest := add("Правило: не пушить в main.", "rule", "global", "user", "")
+	_ = s.Close()
+
+	ctx := sessionStartContext(t, repo, "startup", "s1")
+	if !strings.Contains(ctx, "memcue add") || !strings.Contains(ctx, "rules and decisions from the base") {
+		t.Fatalf("no note or card: %q", ctx)
+	}
+	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "scope: global", "scope: repo:shop",
+		time.Now().Format(time.DateOnly)} {
+		if !strings.Contains(ctx, want) {
+			t.Errorf("card lacks %q: %q", want, ctx)
+		}
+	}
+	for _, unwanted := range []string{"только на маке", "чужого репозитория", "Глобальное решение", "Ловушка в shop",
+		"Кандидат-правило"} {
+		if strings.Contains(ctx, unwanted) {
+			t.Errorf("card carries %q: %q", unwanted, ctx)
+		}
+	}
+	if strings.Index(ctx, "не пушить в main") > strings.Index(ctx, "по-русски") {
+		t.Errorf("rules are not newest first: %q", ctx)
+	}
+
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "card.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec cardRecord
+	if err := json.Unmarshal(bytes.TrimSpace(b), &rec); err != nil {
+		t.Fatalf("card.log %q: %v", b, err)
+	}
+	wantIDs := map[string]bool{newest.ID: true, old.ID: true, decision.ID: true}
+	if len(rec.Facts) != 3 || rec.Tier != "shop" || rec.Source != "startup" || rec.Session != "s1" || rec.Chars == 0 {
+		t.Errorf("card record %+v", rec)
+	}
+	for _, id := range rec.Facts {
+		if !wantIDs[id] {
+			t.Errorf("card logged %s", id)
+		}
+	}
+}
+
+func TestSessionStartCardStaysWithinBudget(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 20; i++ {
+		if _, err := s.AddWith(fmt.Sprintf("Правило %d: %s", i, strings.Repeat("слово ", 80)), nil, "test 2026-10-20",
+			"", store.Meta{Kind: "rule", Scope: "global", Source: "user"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+	ctx := sessionStartContext(t, dir, "startup", "s1")
+	i := strings.Index(ctx, "memcue: rules and decisions")
+	if i < 0 {
+		t.Fatalf("no card: %q", ctx)
+	}
+	card := ctx[i:]
+	if n := len([]rune(card)); n > cardBudget {
+		t.Errorf("card is %d runes, budget %d", n, cardBudget)
+	}
+	if strings.Count(card, "\n- ") >= 20 {
+		t.Errorf("the budget carried every fact: %q", card)
+	}
+}
+
+func TestSessionStartWithoutBaseHasNoCard(t *testing.T) {
+	dir := env(t)
+	ctx := sessionStartContext(t, dir, "startup", "s1")
+	if strings.Contains(ctx, "rules and decisions from the base") {
+		t.Errorf("card without a base: %q", ctx)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "state", "memcue", "card.log")); !os.IsNotExist(err) {
+		t.Errorf("card.log without a card: %v", err)
+	}
+}
+
+func TestSessionStartCardComesAgainAfterCompaction(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Правило: отвечать по-русски.", nil, "test 2026-10-20", "",
+		store.Meta{Kind: "rule", Scope: "global", Source: "user"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	if ctx := sessionStartContext(t, dir, "compact", "s1"); !strings.Contains(ctx, "по-русски") {
+		t.Errorf("no card after compaction: %q", ctx)
 	}
 }
 
