@@ -72,38 +72,27 @@ func quoted(record, role, evidence string) bool {
 	return false
 }
 
-// Secret says whether text holds a token in a known format, or a labelled value: after a password label any value of
-// four or more characters, letters or digits alike; after a token, secret or key label a value that looks like one
-// (six or more characters with a letter and a digit or a sign), so "token budget: 150000" is not one.
+// Secret says whether text holds a token in a known format, or a labelled value: after a password, secret or key
+// label any value of four or more characters; after a token label a value of six or more characters with a letter in
+// it, so "token budget: 150000" is not one. Signs that end the value (a full stop the model put after it) do not count.
 func Secret(text string) bool {
 	if token.MatchString(text) {
 		return true
 	}
 	for _, m := range labelled.FindAllStringSubmatch(text, -1) {
-		if password.MatchString(m[1]) && len([]rune(m[2])) >= 4 || secretLike(m[2]) {
+		v := []rune(strings.TrimRightFunc(m[2], func(r rune) bool { return unicode.IsPunct(r) || unicode.IsSymbol(r) }))
+		if tokenLabel.MatchString(m[1]) {
+			if len(v) >= 6 && strings.IndexFunc(string(v), unicode.IsLetter) >= 0 {
+				return true
+			}
+		} else if len(v) >= 4 {
 			return true
 		}
 	}
 	return false
 }
 
-var password = regexp.MustCompile(`(?i)^(password|passwd|pwd|passphrase|парол\p{L}*)$`)
-
-func secretLike(v string) bool {
-	if len([]rune(v)) < 6 {
-		return false
-	}
-	var letter, other bool
-	for _, r := range v {
-		switch {
-		case unicode.IsLetter(r):
-			letter = true
-		case unicode.IsDigit(r) || unicode.IsPunct(r) || unicode.IsSymbol(r):
-			other = true
-		}
-	}
-	return letter && other
-}
+var tokenLabel = regexp.MustCompile(`(?i)^(token|токен\p{L}*)$`)
 
 // squash folds runs of white space into one space.
 func squash(s string) string { return strings.Join(strings.Fields(s), " ") }
