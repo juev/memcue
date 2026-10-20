@@ -27,7 +27,7 @@ func fakeDream(t *testing.T, answer func(groups string) []extract.Action) *[]str
 	return &calls
 }
 
-// dreamBase stores an old fact and two later copies of the watch-all fact from two sessions, plus an unrelated one.
+// dreamBase stores an old fact and two later copies of the nightly-sync fact from two sessions, plus an unrelated one.
 func dreamBase(t *testing.T) (old, a, b, other string) {
 	t.Helper()
 	s, err := store.Open(factsPath())
@@ -42,12 +42,12 @@ func dreamBase(t *testing.T) (old, a, b, other string) {
 		}
 		return f.ID
 	}
-	old = add("Postgres демо-базы слушает порт 55432 на loffe.", "postgres", "порт")
-	a = add("Репозиторий juev/watch-all каждую ночь запускает workflow watch-all.yml, он подписывает аккаунт juev на все свои репозитории, кроме форков.",
-		"watch-all", "подписка", "workflow")
-	b = add("Workflow watch-all.yml в репозитории juev/watch-all каждую ночь подписывает juev на все свои репозитории кроме форков и архивных.",
-		"watch-all", "github подписка", "workflow")
-	other = add("Gradle в Brook требует JAVA_HOME=/opt/homebrew/opt/openjdk@21.", "gradle", "jdk")
+	old = add("Postgres демо-базы слушает порт 5432 на db1.", "postgres", "порт")
+	a = add("Репозиторий example/nightly-sync каждую ночь запускает workflow nightly-sync.yml, он подписывает аккаунт bot на все свои репозитории, кроме форков.",
+		"nightly-sync", "подписка", "workflow")
+	b = add("Workflow nightly-sync.yml в репозитории example/nightly-sync каждую ночь подписывает bot на все свои репозитории кроме форков и архивных.",
+		"nightly-sync", "github подписка", "workflow")
+	other = add("Gradle в demo-app требует JAVA_HOME=/opt/jdk-21.", "gradle", "jdk")
 	return
 }
 
@@ -115,7 +115,7 @@ func TestDreamCorrectsMergedFact(t *testing.T) {
 	env(t)
 	_, a, b, _ := dreamBase(t)
 	fakeDream(t, func(string) []extract.Action {
-		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"watch-all"}, Reason: "merge"},
+		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"nightly-sync"}, Reason: "merge"},
 			{Op: "retire", ID: a, Reason: "merged into " + b}}
 	})
 	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
@@ -140,7 +140,7 @@ func TestDreamCorrectWithoutKeywordsKeepsThem(t *testing.T) {
 	}
 	s, _ := store.Open(factsPath())
 	defer func() { _ = s.Close() }()
-	if f, _ := s.Get(b); f.Content != "слитый текст" || strings.Join(f.Keywords, ",") != "watch-all,github подписка,workflow" {
+	if f, _ := s.Get(b); f.Content != "слитый текст" || strings.Join(f.Keywords, ",") != "nightly-sync,github подписка,workflow" {
 		t.Errorf("corrected: %+v", f)
 	}
 }
@@ -236,8 +236,8 @@ func TestMaybeDreamOnlyWhenOnAndDue(t *testing.T) {
 	if err := markDream(state, time.Now().Add(-25*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	addFact(t, "Workflow watch-all.yml в juev/watch-all ночью подписывает juev на все свои репозитории, кроме форков.",
-		"watch-all", "workflow")
+	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",
+		"nightly-sync", "workflow")
 	maybeDream()
 	if len(*calls) != 1 {
 		t.Errorf("due dream with a new fact: calls %d", len(*calls))
@@ -270,8 +270,8 @@ func TestDreamReviewsFactPulledAfterLastDream(t *testing.T) {
 	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	pulled := addFact(t, "Репозиторий juev/watch-all ночью подписывает juev на свои репозитории через workflow watch-all.yml.",
-		"watch-all", "workflow")
+	pulled := addFact(t, "Репозиторий example/nightly-sync ночью подписывает bot на свои репозитории через workflow nightly-sync.yml.",
+		"nightly-sync", "workflow")
 	// the mark is later than the pulled fact was written, as when the other machine wrote it before this dream
 	if err := markDream(state, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
@@ -296,7 +296,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	_, a, b, _ := dreamBase(t)
 	calls := fakeDream(t, func(groups string) []extract.Action {
 		if strings.Contains(groups, a) {
-			return []extract.Action{{Op: "correct", ID: b, Content: "Workflow watch-all.yml в juev/watch-all ночью подписывает juev на все репозитории, кроме форков и архивных.", Reason: "merge"},
+			return []extract.Action{{Op: "correct", ID: b, Content: "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все репозитории, кроме форков и архивных.", Reason: "merge"},
 				{Op: "retire", ID: a, Reason: "merged into " + b}}
 		}
 		return nil
@@ -316,12 +316,12 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 		t.Fatalf("seen facts sent again: %q", *calls)
 	}
 
-	other := addFact(t, "Workflow watch-all.yml подписывает аккаунт juev на репозитории каждую ночь.", "watch-all", "workflow")
+	other := addFact(t, "Workflow nightly-sync.yml подписывает аккаунт bot на репозитории каждую ночь.", "nightly-sync", "workflow")
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Correct(b, "Workflow watch-all.yml в juev/watch-all каждую ночь подписывает juev на все репозитории, кроме форков.", nil); err != nil {
+	if _, err := s.Correct(b, "Workflow nightly-sync.yml в example/nightly-sync каждую ночь подписывает bot на все репозитории, кроме форков.", nil); err != nil {
 		t.Fatal(err)
 	}
 	_ = s.Close()
