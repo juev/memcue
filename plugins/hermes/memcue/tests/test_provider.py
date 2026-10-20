@@ -261,7 +261,9 @@ class ProviderTest(unittest.TestCase):
 
     def test_session_end_extracts_through_the_endpoint(self):
         answer = json.dumps({"facts": [{"content": "Hermes на server1: модель по умолчанию deepseek-flash.",
-                                        "keywords": ["модель", "model"]}], "dropped": ""}, ensure_ascii=False)
+                                        "keywords": ["модель", "model"], "kind": "environment",
+                                        "scope": "host:server1", "source": "agent",
+                                        "evidence": "deepseek-flash"}], "dropped": ""}, ensure_ascii=False)
         seen = {}
 
         class Handler(http.server.BaseHTTPRequestHandler):
