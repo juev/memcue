@@ -111,8 +111,8 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		if p.Seen[f.ID] || store.Expired(f.Expires, today) {
 			continue
 		}
-		// A prompt that names a ticket must not recall another ticket through a shared project word: VKPG-1915
-		// and VKPG-1914 can share "vkpg" in a keyword, but only the exact key is the subject of the prompt.
+		// A prompt that names a ticket must not recall another ticket through a shared project word: PROJ-1235
+		// and PROJ-1234 can share "proj" in a keyword, but only the exact key is the subject of the prompt.
 		if len(tickets) > 0 && !slices.ContainsFunc(f.Stems, func(st string) bool { return slices.Contains(tickets, st) }) {
 			continue
 		}

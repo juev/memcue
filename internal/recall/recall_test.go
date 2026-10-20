@@ -98,30 +98,30 @@ func TestShortPromptWithKnownTermsRecalls(t *testing.T) {
 	}
 }
 
-// A ticket key is an exact anchor, not a project word: VKPG-1914 recalls for VKPG-1914 and never for VKPG-1915.
+// A ticket key is an exact anchor, not a project word: PROJ-1234 recalls for PROJ-1234 and never for PROJ-1235.
 func TestTicketKeyRecallsExactOnly(t *testing.T) {
 	s := setup(t)
-	a, err := s.AddWith("Тикет VKPG-1914: берём в работу.", []string{"VKPG"}, "x 2026-10-20", "",
+	a, err := s.AddWith("Тикет PROJ-1234: берём в работу.", []string{"PROJ"}, "x 2026-10-20", "",
 		store.Meta{Kind: "decision", Scope: "repo:x"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := s.AddWith("Тикет VKPG-1915: отложен.", []string{"VKPG"}, "x 2026-10-20", "",
+	b, err := s.AddWith("Тикет PROJ-1235: отложен.", []string{"PROJ"}, "x 2026-10-20", "",
 		store.Meta{Kind: "decision", Scope: "repo:x"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for prompt, want := range map[string]string{"давай брать VKPG-1914": a.ID, "VKPG-1915": b.ID} {
+	for prompt, want := range map[string]string{"давай брать PROJ-1234": a.ID, "PROJ-1235": b.ID} {
 		got := recall(t, s, prompt, "x")
 		if len(got) == 0 || got[0].ID != want {
 			t.Errorf("%q recalled %+v, want %s", prompt, got, want)
 		}
 	}
-	if got := recall(t, s, "давай брать VKPG-1916", "x"); len(got) != 0 {
-		t.Errorf("VKPG-1916 recalled %+v", got)
+	if got := recall(t, s, "давай брать PROJ-1236", "x"); len(got) != 0 {
+		t.Errorf("PROJ-1236 recalled %+v", got)
 	}
-	// A prompt naming the wrong ticket must not reach the other one through the shared keyword "VKPG".
-	if got := recall(t, s, "VKPG-1915 postgres port", "x"); len(got) != 1 || got[0].ID != b.ID {
+	// A prompt naming the wrong ticket must not reach the other one through the shared keyword "PROJ".
+	if got := recall(t, s, "PROJ-1235 postgres port", "x"); len(got) != 1 || got[0].ID != b.ID {
 		t.Errorf("wrong ticket plus postgres recalled %+v", got)
 	}
 }

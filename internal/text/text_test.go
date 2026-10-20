@@ -56,10 +56,10 @@ func TestNumbersVersionsAndPortsNeverMatch(t *testing.T) {
 	}
 }
 
-// A ticket key is one exact term: VKPG-1914, #123 and !45 must survive the number filter with their number.
+// A ticket key is one exact term: PROJ-1234, #123 and !45 must survive the number filter with their number.
 func TestTicketKeysAreOneExactTerm(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
-		{"VKPG-1914", "tkvkpg1914"},
+		{"PROJ-1234", "tkproj1234"},
 		{"JIRA-12", "tkjira12"},
 		{"#123", "tkh123"},
 		{"!45", "tkb45"},
@@ -72,16 +72,16 @@ func TestTicketKeysAreOneExactTerm(t *testing.T) {
 			t.Errorf("%q is not recognized as a ticket term", got[0])
 		}
 	}
-	for _, s := range []string{"vkpg", "s3", "k8s", "gpt6", "1234"} {
+	for _, s := range []string{"proj", "s3", "k8s", "gpt6", "1234"} {
 		if IsTicket(s) {
 			t.Errorf("%q is a ticket term", s)
 		}
 	}
-	got := Terms("давай брать VKPG-1914")
-	if !slices.Contains(got, "tkvkpg1914") {
+	got := Terms("давай брать PROJ-1234")
+	if !slices.Contains(got, "tkproj1234") {
 		t.Errorf("prompt lost its ticket: %q", got)
 	}
-	if slices.Contains(Terms("VKPG-1915"), "tkvkpg1914") {
+	if slices.Contains(Terms("PROJ-1235"), "tkproj1234") {
 		t.Error("a different ticket produced the same term")
 	}
 }

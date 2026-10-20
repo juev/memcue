@@ -484,7 +484,7 @@ func TestActiveSurvivesLostIndexRow(t *testing.T) {
 // key becomes findable without re-adding the fact.
 func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 	s, path := open(t)
-	f, err := s.Add("Тикет VKPG-1914: берём в работу.", nil, "x 2026-10-20")
+	f, err := s.Add("Тикет PROJ-1234: берём в работу.", nil, "x 2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,7 +502,7 @@ func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if _, ok := ids(t, s, "VKPG-1914")[f.ID]; !ok {
+	if _, ok := ids(t, s, "PROJ-1234")[f.ID]; !ok {
 		t.Error("a reopened old base does not index the ticket key")
 	}
 	var version int

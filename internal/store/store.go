@@ -26,7 +26,7 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
-// Version 2 changes the stems: ticket keys such as VKPG-1914 are indexed as one exact term, so every base must be
+// Version 2 changes the stems: ticket keys such as PROJ-1234 are indexed as one exact term, so every base must be
 // rebuilt once. It also covers the columns added after version 1 (expires, kind, scope, source, evidence, review,
 // prompt_version), and an older memcue refuses a version-2 base instead of reading candidates as active facts.
 const schemaVersion = 2

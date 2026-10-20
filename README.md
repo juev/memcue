@@ -16,7 +16,7 @@ through hooks:
 
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
 takes about 10 ms per prompt. A fact keeps where and when it was learnt, but facts from every repository are
-searched: what you learnt in one project is recalled in another. A ticket key such as `VKPG-1914`, `#123` or `!45`
+searched: what you learnt in one project is recalled in another. A ticket key such as `PROJ-1234`, `#123` or `!45`
 is kept as one exact term, so a prompt naming it recalls that ticket and not another number; bare numbers, ports and
 versions are still left out of the index.
 
