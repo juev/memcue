@@ -431,11 +431,21 @@ class AccumulationTest(unittest.TestCase):
         self.assertEqual(sent, [])
         p2._stop.set()
 
-    def test_tool_output_is_not_extracted(self):
+    def test_tool_output_is_cut_and_extracted(self):
+        """A tool-sourced fact may quote only tool output, so the extraction has to see it — but cut short."""
         self.p._idle = 3600
+        self.p._threshold = 10
         self.msgs += [{"role": "user", "content": "a" * 600}, {"role": "tool", "content": "x" * 60000}]
         self.p.sync_turn("a" * 600, "ok", session_id="s1", messages=list(self.msgs))
-        self.assertEqual(self.calls, [])  # 60k of tool output alone would have crossed the 1000-char threshold
+        tool_texts = [t for call in self.calls for t in call[2] if t.startswith("x")]
+        self.assertTrue(tool_texts, self.calls)
+        self.assertTrue(all(len(t) <= self.p._tool_result_chars + 20 for t in tool_texts), tool_texts)
+
+    def test_tool_output_can_be_turned_off(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_tool_result_chars": 0})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.assertFalse(p._keep({"role": "tool", "content": "x" * 100}))
+        self.assertTrue(p._keep({"role": "user", "content": "x"}))
 
     def test_long_messages_are_cut_before_extraction(self):
         self.p._idle = 3600

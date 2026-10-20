@@ -17,8 +17,10 @@ Config, all optional (``memory.memcue`` in config.yaml):
           session extraction (e.g. https://api.deepseek.com, deepseek-flash, DEEPSEEK_API_KEY); off while unset
   extract_threshold: characters of new messages that start an extraction (default 20000)
   extract_idle_minutes: minutes without a turn after which the new messages go (default 30)
-  extract_include_tool_results: send tool output to the extraction too (default false: it is the bulk of a session's
-          characters and rarely holds a durable fact)
+  extract_include_tool_results: DEPRECATED and ignored: tool output is kept, cut to extract_tool_result_chars
+  extract_tool_result_chars: how much of one tool result the extraction sees (default 1500, the cut memcue itself
+          applies to a RESULT block; 0 turns tool output off). Tool output is kept because a fact whose source is a
+          tool can only quote its evidence from a RESULT block, and memcue's write policy drops it without one
   extract_max_message_chars: cut a message to this many characters before extraction (default 4000)
   min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15)
   host: name of this machine for fact scope and the recall tie-break (passed as MEMCUE_HOST; default: the
@@ -64,6 +66,7 @@ _MIN_IDLE = 2000  # a pause sends no less; memcue skips smaller texts anyway
 _TICK = 60  # seconds between checks for a pause
 _KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
 _MAX_MESSAGE = 4000  # characters of one message the extraction sees
+_TOOL_RESULT = 1500  # characters of one tool result the extraction sees; memcue cuts a RESULT to the same length
 _WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 
@@ -149,7 +152,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
         self._usage_log = _on(self._config.get("usage_log"))
         self._state_dir = str(self._config.get("state_dir") or "")
-        self._include_tool_results = bool(self._config.get("extract_include_tool_results", False))
+        self._tool_result_chars = int(self._config.get("extract_tool_result_chars", _TOOL_RESULT))
         self._max_message = int(self._config.get("extract_max_message_chars", _MAX_MESSAGE))
         self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
         self._inflight: dict[str, Counter] = {}  # session -> fingerprints being extracted now
@@ -386,20 +389,24 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _keep(self, m: Any) -> bool:
         """Whether an extraction may see the message at all: no system notes, no compaction summary, and no tool
-        output unless the config asks for it."""
-        return (isinstance(m, dict) and m.get("role") != "system" and not self._compaction_summary(m)
-                and not (m.get("role") == "tool" and not self._include_tool_results))
+        output while tool output is turned off (``extract_tool_result_chars: 0``)."""
+        if not isinstance(m, dict) or m.get("role") == "system" or self._compaction_summary(m):
+            return False
+        return m.get("role") != "tool" or self._tool_result_chars > 0
 
     def _prepare(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The messages an extraction sees, each cut to a readable length. The caller has already used ``_keep`` to
-        decide which messages are sent."""
+        decide which messages are sent. Tool output is the bulk of a session's characters, yet it is also the only
+        place a fact sourced from a tool can quote its evidence from, and memcue's write policy drops such a fact
+        without that quote, so it keeps a shorter cut of its own."""
         kept: list[dict[str, Any]] = []
         for m in messages:
             if not self._keep(m):
                 continue
             content = m.get("content")
-            if isinstance(content, str) and len(content) > self._max_message:
-                m = dict(m, content=content[: self._max_message] + "…[truncated]")
+            limit = self._tool_result_chars if m.get("role") == "tool" else self._max_message
+            if isinstance(content, str) and len(content) > limit:
+                m = dict(m, content=content[:limit] + "…[truncated]")
             kept.append(m)
         return kept
 
