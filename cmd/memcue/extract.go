@@ -80,8 +80,8 @@ func runExtract(args []string, out io.Writer) error {
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
 	return enc.Encode(map[string]any{"note": path, "origin": origin, "facts": facts, "rejected": rejected,
-		"dropped":  strings.Join(x.Dropped, " "),
-		"cost_usd": x.CostUSD, "tokens": x.Tokens, "chars": len(sess.Text), "lines": sess.Lines, "ids": ids})
+		"dropped": strings.Join(x.Dropped, " "), "cost_usd": x.CostUSD, "tokens": x.Tokens,
+		"chars": len(sess.Text), "lines": sess.Lines, "ids": ids, "review": true})
 }
 
 func contextTimeout() (context.Context, context.CancelFunc) {

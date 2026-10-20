@@ -80,3 +80,38 @@ func TestImportOfSessionFactsMakesCandidates(t *testing.T) {
 		t.Errorf("candidates %+v active %+v", cs, act)
 	}
 }
+
+// The dry-run record says whether its facts go through review; the kind test is only a fallback for old files.
+func TestImportUsesTheReviewFlag(t *testing.T) {
+	dir := env(t)
+	path := filepath.Join(dir, "x.json")
+	body := `{"note":"note","origin":"app 2026-10-20","review":false,"facts":[{"content":"Факт заметки.","keywords":["note"],"kind":"environment"}]}` + "\n" +
+		`{"note":"session","origin":"app 2026-10-20","review":true,"facts":[{"content":"Факт сессии без kind.","keywords":["session"]}]}` + "\n" +
+		`{"note":"old","origin":"app 2026-10-20","facts":[{"content":"Старый файл с kind.","keywords":["old"],"kind":"environment"}]}` + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := runImport([]string{path}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	active, _ := s.Active()
+	candidates, _ := s.Candidates()
+	if len(active) != 1 || !strings.Contains(active[0].Content, "заметки") {
+		t.Errorf("active %+v", active)
+	}
+	if len(candidates) != 2 {
+		t.Fatalf("candidates %+v", candidates)
+	}
+	got := map[string]bool{}
+	for _, f := range candidates {
+		got[f.Content] = true
+	}
+	if !got["Факт сессии без kind."] || !got["Старый файл с kind."] {
+		t.Errorf("candidates %+v", candidates)
+	}
+}

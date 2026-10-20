@@ -23,8 +23,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
   min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15)
   host: name of this machine for fact scope and the recall tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
-  suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway
-          (default true; mirrored facts carry the origin ``hermes-memory``)
+  suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway,
+          even after approval (default true; mirrored facts carry the origin ``hermes-memory``)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
   usage_log: write ``usage.log``, whether a reply used the facts it was given (default false; MEMCUE_USAGE_LOG=1 in

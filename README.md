@@ -79,11 +79,19 @@ not yet run for long in daily work.
 
 The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin first is harmless.
 
+## Upgrade
+
+The fact base schema is 2. memcue 0.2.0 and older refuse a newer base with `update memcue`: upgrade every machine that
+shares the base before the first new memcue writes to it. In particular, 0.2.0 does not know review candidates and
+would index them as active after a merge, so there is no safe mixed-version sync.
+
 ## Use
 
 Nothing to do in a session: facts arrive with prompts and are extracted at the end. Extracted facts are candidates:
-recall gives them only after you approve them (`memcue candidates`, `memcue approve ID`; `memcue retire ID` rejects
-one). A fact you add yourself with `memcue add` is active at once. A fact comes once per session
+recall gives them only after you approve them (`memcue candidates`, `memcue approve ID`, or the `memcue review` page;
+`memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
+an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
+extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
 for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
