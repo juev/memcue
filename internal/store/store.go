@@ -92,6 +92,9 @@ var ErrNotFound = errors.New("fact not found")
 // ErrNotCandidate: the fact is not waiting for approval (it is active already, or retired).
 var ErrNotCandidate = errors.New("fact is not a candidate")
 
+// ErrAlreadyCandidate: undo would put a fact back into review when it is already there.
+var ErrAlreadyCandidate = errors.New("fact is already a candidate")
+
 // Store is an open fact base.
 type Store struct {
 	db     *sql.DB
@@ -280,11 +283,26 @@ func state(f Fact) string {
 	return f.Status
 }
 
-// Candidates returns the latest version of every fact that waits for approval, oldest first.
+// Candidates returns the latest version of every fact that waits for approval, newest first.
 func (s *Store) Candidates() ([]Fact, error) {
-	return s.query(`SELECT ` + qualified("f") + ` FROM facts f
+	return s.query(`SELECT `+qualified("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
-		ORDER BY f.id`, Active, Candidate)
+		ORDER BY f.id DESC`, Active, Candidate)
+}
+
+// Reopen adds a version that puts a fact back into review: the undo of an approval or a rejection. The content and
+// its metadata stay; only the review state changes, so the history keeps both decisions.
+func (s *Store) Reopen(id string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Status == Active && cur.Review == Candidate {
+		return Fact{}, fmt.Errorf("%w: %s", ErrAlreadyCandidate, id)
+	}
+	f := cur
+	f.Version, f.Created, f.Author, f.Status, f.Review = cur.Version+1, s.now().UTC(), s.author, Active, Candidate
+	return f, s.write(f)
 }
 
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.
