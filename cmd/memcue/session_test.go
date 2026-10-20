@@ -88,7 +88,7 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 		t.Fatalf("no note or card: %q", ctx)
 	}
 	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "scope: global", "scope: repo:shop",
-		time.Now().Format(time.DateOnly)} {
+		time.Now().UTC().Format(time.DateOnly)} {
 		if !strings.Contains(ctx, want) {
 			t.Errorf("card lacks %q: %q", want, ctx)
 		}
