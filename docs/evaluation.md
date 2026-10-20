@@ -97,6 +97,72 @@ About 30 of the 101 facts of the first run repeated what the base already held, 
 from notes the same sessions wrote. With the built-in memory off, extraction is the only writer and that source of
 duplicates goes away.
 
+### What to keep (October 2026)
+
+A look through the base found many facts that were not worth keeping:
+
+- retellings of the repository a session ran in (release steps, CI jobs, project generation);
+- logs of events ("updated to 0.3.11, containers healthy");
+- multi-step procedures.
+
+The session prompt asked for them: the layout of systems, fix recipes, dated changes of state. The new prompt draws
+the line of Claude Code's built-in memory. A fact must matter a month later, and the agent must not be able to learn
+it with one command from the repository the session ran in, its git history or its instruction files. Anything
+outside that repository stays: hosts, services the session administered, external systems and their identifiers,
+tools' non-obvious behaviour, measurements behind decisions.
+
+**Method.** Each prompt extracted the same sessions on Opus (`memcue extract -dry-run`). One blind call per session
+saw two fact lists as A and B in random order. It labelled each fact with one of:
+
+- KEEP: needed later and not derivable;
+- DERIVABLE;
+- EVENT;
+- PROCEDURE;
+- WRONG.
+
+It also listed the KEEP facts each list lacks from the other. Running the old prompt twice gives the noise: the KEEP
+facts two runs of one prompt disagree on. The scripts are
+[extract_label.py](research/scripts/extract_label.py) and [extract_filter.py](research/scripts/extract_filter.py).
+
+The prompt was tuned on the 10 sessions above, then checked on 10 other sessions from 10 other repositories:
+
+| 10 other sessions | Facts | KEEP | DERIVABLE / EVENT | KEEP facts of the old prompt it lacks |
+|---|---|---|---|---|
+| old prompt | 102 | 72–79 (0.71–0.77) | 16–18 / 10–13 | — |
+| old prompt, second run (noise) | 100 | 76 | 17 / 7 | 6 of 79 |
+| new prompt | 66 | 61 (0.92) | 2 / 3 | 13 of 72; the old prompt lacks 7 of its |
+| Claude Code's types and "What NOT to save", quoted, with memcue's fact format | 62 | 56 (0.90) | 0 / 6 | 22 of 73 |
+
+On the tuning sessions the old prompt kept 72 of 103 facts and the new one 73 of 80, and each lacked 11–12 KEEP facts
+of the other. The noise there was 4–7.
+
+The new prompt writes about a third fewer facts and almost no junk. It loses about one useful fact in ten beyond the
+noise: production measurements, external systems, the local Go setup. Claude Code's criteria as they are lose twice
+as much. They are written for the memory of one project, and the model applies "file paths, project structure" to
+hosts and external systems too.
+
+**Two alternatives were measured and not taken.**
+
+*A filter after a generous extraction.* Jev 1.14 asked two `noul` per fact, with the session's repository in `state`:
+"derivable from this repository" and "a log entry true for a day or two". A fact was dropped when either reached the
+threshold. Over both sets of old-prompt facts (61 junk, 144 KEEP):
+
+| Threshold | Junk dropped | KEEP lost |
+|---|---|---|
+| 0.6 | 33 | 12 |
+| 0.7 | 30 | 8 |
+| 0.8 | 14 | 4 |
+
+At 0.7 the other sessions keep 69 of 72 useful facts and 15 of 30 junk. On top of the new prompt the filter drops as
+much KEEP as junk (0.7: 3 of 12 junk, 4 of 134 KEEP), so the two steps do not add up.
+
+*The prompt in English.* A close translation of the new prompt, on the other sessions, wrote 55 facts, all KEEP. The
+Russian one wrote 66 with 64 KEEP. The English list lacked 6 KEEP facts of the Russian one; the Russian list lacked 2
+of the English. Two runs of the Russian prompt disagree on 3–8, so the difference is within noise. The facts kept the
+session's language: 53 of 55 were Russian.
+
+Each extraction of 10 sessions cost about $5 on Opus; each blind comparison about $1.3.
+
 ### Extraction by patterns
 
 holographic can store user sentences that match patterns such as "I prefer …" or "we decided …". Its patterns found
