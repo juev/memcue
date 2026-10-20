@@ -28,6 +28,7 @@ func fakeDream(t *testing.T, answer func(groups string) []extract.Action) *[]str
 }
 
 // dreamBase stores an old fact and two later copies of the nightly-sync fact from two sessions, plus an unrelated one.
+// b is written a few milliseconds before a, so its id is the smaller one: a dream keeps b and retires a.
 func dreamBase(t *testing.T) (old, a, b, other string) {
 	t.Helper()
 	s, err := store.Open(factsPath())
@@ -43,10 +44,11 @@ func dreamBase(t *testing.T) (old, a, b, other string) {
 		return f.ID
 	}
 	old = add("Postgres демо-базы слушает порт 5432 на db1.", "postgres", "порт")
-	a = add("Репозиторий example/nightly-sync каждую ночь запускает workflow nightly-sync.yml, он подписывает аккаунт bot на все свои репозитории, кроме форков.",
-		"nightly-sync", "подписка", "workflow")
 	b = add("Workflow nightly-sync.yml в репозитории example/nightly-sync каждую ночь подписывает bot на все свои репозитории кроме форков и архивных.",
 		"nightly-sync", "github подписка", "workflow")
+	time.Sleep(3 * time.Millisecond) // a ULID orders by millisecond only
+	a = add("Репозиторий example/nightly-sync каждую ночь запускает workflow nightly-sync.yml, он подписывает аккаунт bot на все свои репозитории, кроме форков.",
+		"nightly-sync", "подписка", "workflow")
 	other = add("Gradle в demo-app требует JAVA_HOME=/opt/jdk-21.", "gradle", "jdk")
 	return
 }
@@ -55,7 +57,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	dir := env(t)
 	old, a, b, other := dreamBase(t)
 	calls := fakeDream(t, func(string) []extract.Action {
-		return []extract.Action{{Op: "retire", ID: a, Reason: "covered by " + b}}
+		return []extract.Action{{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "covered by " + b}}
 	})
 	var out bytes.Buffer
 	if err := runDream([]string{"-all"}, &out); err != nil {
@@ -94,7 +96,7 @@ func TestDreamDryRunChangesNothing(t *testing.T) {
 	_, a, b, _ := dreamBase(t)
 	fakeDream(t, func(string) []extract.Action {
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
-			{Op: "retire", ID: a, Reason: "covered"}}
+			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "covered"}}
 	})
 	if err := runDream([]string{"-all", "-dry-run"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -116,7 +118,7 @@ func TestDreamCorrectsMergedFact(t *testing.T) {
 	_, a, b, _ := dreamBase(t)
 	fakeDream(t, func(string) []extract.Action {
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"nightly-sync"}, Reason: "merge"},
-			{Op: "retire", ID: a, Reason: "merged into " + b}}
+			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 	})
 	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -133,7 +135,7 @@ func TestDreamCorrectWithoutKeywordsKeepsThem(t *testing.T) {
 	_, a, b, _ := dreamBase(t)
 	fakeDream(t, func(string) []extract.Action {
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
-			{Op: "retire", ID: a, Reason: "merged"}}
+			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged"}}
 	})
 	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -146,20 +148,51 @@ func TestDreamCorrectWithoutKeywordsKeepsThem(t *testing.T) {
 }
 
 func TestDreamRefusesUnsafeActions(t *testing.T) {
-	groups := [][]store.Fact{{{ID: "A"}, {ID: "B"}}}
+	groups := [][]store.Fact{{{ID: "A"}, {ID: "B"}, {ID: "C"}}, {{ID: "D"}, {ID: "E"}}}
 	ok, refused := checkActions(groups, []extract.Action{
-		{Op: "retire", ID: "Z", Reason: "outside"},
-		{Op: "retire", ID: "A", Reason: "dup"},
-		{Op: "retire", ID: "A", Reason: "again"},
-		{Op: "retire", ID: "B", Reason: "last one"},
-		{Op: "correct", ID: "B", Reason: "no text"},
-		{Op: "delete", ID: "B", Reason: "unknown"},
+		{Op: "retire", ID: "Z", By: "A", Kind: "duplicate", Reason: "outside"},
+		{Op: "retire", ID: "B", By: "A", Kind: "duplicate", Reason: "dup"},
+		{Op: "retire", ID: "B", By: "A", Kind: "duplicate", Reason: "again"},
+		{Op: "retire", ID: "A", By: "C", Kind: "outdated", Reason: "covers B"},
+		{Op: "retire", ID: "C", Kind: "outdated", Reason: "no by"},
+		{Op: "retire", ID: "C", By: "C", Kind: "outdated", Reason: "by itself"},
+		{Op: "retire", ID: "C", By: "B", Kind: "outdated", Reason: "by a retired fact"},
+		{Op: "retire", ID: "C", By: "D", Kind: "outdated", Reason: "by another group"},
+		{Op: "retire", ID: "C", By: "A", Kind: "dup", Reason: "unknown kind"},
+		{Op: "retire", ID: "D", By: "E", Kind: "duplicate", Reason: "keeps the larger id"},
+		{Op: "retire", ID: "D", By: "E", Kind: "outdated", Reason: "outdated by a later fact"},
+		{Op: "retire", ID: "E", By: "D", Kind: "duplicate", Reason: "last one"},
+		{Op: "correct", ID: "C", Reason: "no text"},
+		{Op: "delete", ID: "C", Reason: "unknown"},
 	})
-	if len(ok) != 1 || ok[0].ID != "A" {
+	if len(ok) != 2 || ok[0].ID != "B" || ok[1].ID != "D" {
 		t.Errorf("ok %+v", ok)
 	}
-	if len(refused) != 5 {
-		t.Errorf("refused %q", refused)
+	if len(refused) != 12 {
+		t.Errorf("refused %d: %q", len(refused), refused)
+	}
+}
+
+// Whichever copy of a duplicate the model names, and in whatever order, only the larger id is retired, so two
+// machines dreaming over one base keep the same copy.
+func TestDreamDuplicateKeepsSmallerID(t *testing.T) {
+	groups := [][]store.Fact{{{ID: "01A"}, {ID: "01B"}}}
+	answers := [][]extract.Action{
+		{{Op: "retire", ID: "01B", By: "01A", Kind: "duplicate", Reason: "dup"}},
+		{{Op: "retire", ID: "01A", By: "01B", Kind: "duplicate", Reason: "dup"}},
+		{{Op: "retire", ID: "01A", By: "01B", Kind: "duplicate", Reason: "dup"},
+			{Op: "retire", ID: "01B", By: "01A", Kind: "duplicate", Reason: "dup"}},
+	}
+	for i, answer := range answers {
+		ok, _ := checkActions(groups, answer)
+		for _, a := range ok {
+			if a.ID != "01B" {
+				t.Errorf("answer %d: retired %s, the smaller id", i, a.ID)
+			}
+		}
+	}
+	if ok, _ := checkActions(groups, answers[2]); len(ok) != 1 {
+		t.Errorf("both orders: ok %+v", ok)
 	}
 }
 
@@ -297,7 +330,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	calls := fakeDream(t, func(groups string) []extract.Action {
 		if strings.Contains(groups, a) {
 			return []extract.Action{{Op: "correct", ID: b, Content: "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все репозитории, кроме форков и архивных.", Reason: "merge"},
-				{Op: "retire", ID: a, Reason: "merged into " + b}}
+				{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 		}
 		return nil
 	})
@@ -343,7 +376,7 @@ func mergeAnswer(a, b string) func(string) []extract.Action {
 			return nil
 		}
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
-			{Op: "retire", ID: a, Reason: "merged into " + b}}
+			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 	}
 }
 
@@ -421,10 +454,10 @@ func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
 	fakeDream(t, func(groups string) []extract.Action {
 		var acts []extract.Action
 		if strings.Contains(groups, a) {
-			acts = append(acts, extract.Action{Op: "retire", ID: a, Reason: "covered by " + b})
+			acts = append(acts, extract.Action{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "covered by " + b})
 		}
 		if strings.Contains(groups, pg) {
-			acts = append(acts, extract.Action{Op: "retire", ID: old, Reason: "covered by " + pg})
+			acts = append(acts, extract.Action{Op: "retire", ID: old, By: pg, Kind: "outdated", Reason: "covered by " + pg})
 		}
 		return acts
 	})

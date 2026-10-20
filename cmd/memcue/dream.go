@@ -488,7 +488,8 @@ func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {
 }
 
 // checkActions keeps the actions that name a fact of the groups sent, at most one per fact, a correction with text,
-// and leave every group at least one active fact; the rest come back with why they were refused.
+// a retirement by another fact of its group that stays, a duplicate retired in favour of the smaller id, and leave
+// every group at least one active fact; the rest come back with why they were refused.
 func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract.Action, refused []string) {
 	groupOf := map[string]int{}
 	left := make([]int, len(groups))
@@ -499,8 +500,11 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 		}
 	}
 	done := map[string]bool{}
+	retired := map[string]bool{}
+	covers := map[string]bool{} // facts named as by: they stay
 	for _, a := range actions {
 		g, known := groupOf[a.ID]
+		byGroup, byKnown := groupOf[a.By]
 		switch {
 		case !known:
 			refused = append(refused, a.Op+" "+a.ID+": not a fact of the groups")
@@ -510,12 +514,24 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 			refused = append(refused, "correct "+a.ID+": no content")
 		case a.Op == "retire" && left[g] == 1:
 			refused = append(refused, "retire "+a.ID+": last active fact of its group")
+		case a.Op == "retire" && (!byKnown || byGroup != g || a.By == a.ID):
+			refused = append(refused, "retire "+a.ID+": by "+a.By+" is not another fact of its group")
+		case a.Op == "retire" && retired[a.By]:
+			refused = append(refused, "retire "+a.ID+": by "+a.By+" is retired too")
+		case a.Op == "retire" && covers[a.ID]:
+			refused = append(refused, "retire "+a.ID+": it covers another retired fact")
+		case a.Op == "retire" && a.Kind != "duplicate" && a.Kind != "outdated":
+			refused = append(refused, "retire "+a.ID+": kind "+a.Kind+" is neither duplicate nor outdated")
+		case a.Op == "retire" && a.Kind == "duplicate" && a.ID < a.By:
+			// every machine keeps the smaller ID of a duplicate pair, so two dreams over one base cannot retire both
+			refused = append(refused, "retire "+a.ID+": a duplicate keeps the smaller id, retire "+a.By+" instead")
 		case a.Op != "retire" && a.Op != "correct":
 			refused = append(refused, a.Op+" "+a.ID+": unknown op")
 		default:
 			done[a.ID] = true
 			if a.Op == "retire" {
 				left[g]--
+				retired[a.ID], covers[a.By] = true, true
 			}
 			ok = append(ok, a)
 		}
