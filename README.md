@@ -23,7 +23,8 @@ and not another number; bare numbers, ports and versions are still left out of t
 `PostgreSQL-16` is not a ticket: it keeps `PostgreSQL` and drops `16`.
 
 The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. The same
-base works for [Hermes Agent](plugins/hermes/README.md).
+base works for [Hermes Agent](plugins/hermes/README.md) and for
+[DeepSeek Harness](plugins/deepseek-harness/README.md).
 
 memcue is young: version 0.1 has been measured on one developer's memory and sessions (see [Results](#results)) and
 not yet run for long in daily work.
