@@ -336,6 +336,134 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	}
 }
 
+// mergeAnswer retires a and folds it into b, the answer for the nightly-sync group of dreamBase.
+func mergeAnswer(a, b string) func(string) []extract.Action {
+	return func(groups string) []extract.Action {
+		if !strings.Contains(groups, a) {
+			return nil
+		}
+		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
+			{Op: "retire", ID: a, Reason: "merged into " + b}}
+	}
+}
+
+func readDreamLog(t *testing.T, dir string) []dreamRecord {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "dream.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recs []dreamRecord
+	for line := range strings.Lines(string(b)) {
+		var r dreamRecord
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatal(err)
+		}
+		recs = append(recs, r)
+	}
+	return recs
+}
+
+// A plan applied on an unchanged base gives what a real dream with the same answer gives, with no model call.
+func TestDreamApplyPlanMatchesRealDream(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
+	_, a, b, _ := dreamBase(t)
+	calls := fakeDream(t, mergeAnswer(a, b))
+	plan := filepath.Join(dir, "plan.json")
+	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lastDream(state); ok {
+		t.Fatal("dry run with a plan moved dream.at")
+	}
+	*calls = nil
+	var out bytes.Buffer
+	if err := runDream([]string{"-apply", plan}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("-apply called the model %d times", len(*calls))
+	}
+	s, _ := store.Open(factsPath())
+	if f, _ := s.Get(a); f.Status != store.Retired {
+		t.Errorf("a not retired: %+v", f)
+	}
+	if f, _ := s.Get(b); f.Content != "слитый текст" || f.Version != 2 {
+		t.Errorf("b not corrected: %+v", f)
+	}
+	_ = s.Close()
+	if !strings.Contains(out.String(), "retire "+a) {
+		t.Errorf("out %q", out.String())
+	}
+	recs := readDreamLog(t, dir)
+	if last := recs[len(recs)-1]; last.Plan != plan || len(last.Actions) != 2 || last.CostUSD != 0 {
+		t.Errorf("apply record %+v", last)
+	}
+	// marked as a real dream: the next one has nothing new, and the corrected version counts as seen
+	if _, ok := lastDream(state); !ok {
+		t.Fatal("-apply did not mark the dream")
+	}
+	*calls = nil
+	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("after -apply the next dream sent %q", *calls)
+	}
+}
+
+// A group whose fact changed after the plan is refused and logged; the other groups still apply.
+func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
+	dir := env(t)
+	old, a, b, _ := dreamBase(t)
+	pg := addFact(t, "Postgres демо-базы на db1 слушает порт 5432, логин test.", "postgres", "порт")
+	fakeDream(t, func(groups string) []extract.Action {
+		var acts []extract.Action
+		if strings.Contains(groups, a) {
+			acts = append(acts, extract.Action{Op: "retire", ID: a, Reason: "covered by " + b})
+		}
+		if strings.Contains(groups, pg) {
+			acts = append(acts, extract.Action{Op: "retire", ID: old, Reason: "covered by " + pg})
+		}
+		return acts
+	})
+	plan := filepath.Join(dir, "plan.json")
+	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := store.Open(factsPath())
+	if _, err := s.Correct(b, "Workflow nightly-sync.yml подписывает bot на все репозитории, кроме форков и архивных.", nil); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	if err := runDream([]string{"-apply", plan}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = store.Open(factsPath())
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(a); f.Status != store.Active {
+		t.Errorf("action of a changed group applied: %+v", f)
+	}
+	if f, _ := s.Get(old); f.Status != store.Retired {
+		t.Errorf("action of an unchanged group not applied: %+v", f)
+	}
+	recs := readDreamLog(t, dir)
+	last := recs[len(recs)-1]
+	if len(last.Refused) != 1 || !strings.Contains(last.Refused[0], "retire "+a+": group changed since the plan") {
+		t.Errorf("refused %q", last.Refused)
+	}
+}
+
+func TestDreamPlanFlags(t *testing.T) {
+	env(t)
+	for _, args := range [][]string{{"-all", "-plan", "p.json"}, {"-apply", "p.json", "-all"}, {"-apply", "p.json", "-dry-run"}} {
+		if err := runDream(args, &bytes.Buffer{}); err == nil {
+			t.Errorf("%q: want an error", args)
+		}
+	}
+}
+
 func TestDreamSeenFile(t *testing.T) {
 	dir := t.TempDir()
 	if seen, err := readDreamSeen(dir); err != nil || seen != nil {

@@ -48,7 +48,7 @@ commands:
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   facts     list the active facts
-  dream     retire duplicate and contradicted facts written since the last dream: memcue dream [-since DATE|-all] [-dry-run] [-list]
+  dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl

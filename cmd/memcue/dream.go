@@ -60,7 +60,21 @@ type dreamRecord struct {
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
 	CostUSD float64          `json:"cost_usd"`
 	Tokens  extract.Tokens   `json:"tokens"`
+	Plan    string           `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
 	Error   string           `json:"error,omitempty"`
+}
+
+// dreamPlan is what a dry run decided, for -apply to carry out later without the model: the actions of each group
+// with the versions of the facts they were decided on, and what the dream would have counted as seen.
+type dreamPlan struct {
+	Start  time.Time        `json:"start"`
+	Seen   map[string]int   `json:"seen"`
+	Groups []dreamPlanGroup `json:"groups"`
+}
+
+type dreamPlanGroup struct {
+	Facts   map[string]int   `json:"facts"` // id → version the model saw
+	Actions []extract.Action `json:"actions"`
 }
 
 func runDream(args []string, out io.Writer) error {
@@ -69,12 +83,32 @@ func runDream(args []string, out io.Writer) error {
 	all := fs.Bool("all", false, "review every active fact")
 	dryRun := fs.Bool("dry-run", false, "ask the model but change nothing")
 	list := fs.Bool("list", false, "print the groups and stop, without the model")
+	plan := fs.String("plan", "", "with -dry-run: write the checked actions to this file for -apply")
+	applyFile := fs.String("apply", "", "apply a plan written by -dry-run -plan, without the model")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *plan != "" && (!*dryRun || *list) {
+		return errors.New("-plan needs -dry-run")
+	}
+	if *applyFile != "" && (*since != "" || *all || *dryRun || *list || *plan != "") {
+		return errors.New("-apply takes no other flag")
 	}
 	dir, err := stateDir()
 	if err != nil {
 		return err
+	}
+	if *applyFile != "" {
+		unlock, err := lockDream(dir)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		rec, err := applyPlan(dir, *applyFile, out)
+		if err != nil {
+			rec.Error = err.Error()
+		}
+		return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 	}
 	var from time.Time
 	var seen map[string]int
@@ -98,7 +132,7 @@ func runDream(args []string, out io.Writer) error {
 		return err
 	}
 	defer unlock()
-	rec, err := dream(dir, from, seen, *dryRun, *list, out)
+	rec, err := dream(dir, from, seen, *dryRun, *list, *plan, out)
 	if *list {
 		return err
 	}
@@ -137,7 +171,7 @@ func maybeDream() {
 		return
 	}
 	seen, err := readDreamSeen(dir) // unreadable: the dream falls back to the facts written since the mark, and says why
-	rec, derr := dream(dir, from, seen, false, false, io.Discard)
+	rec, derr := dream(dir, from, seen, false, false, "", io.Discard)
 	if err = errors.Join(err, derr); err != nil {
 		rec.Error = err.Error()
 	}
@@ -146,8 +180,9 @@ func maybeDream() {
 
 // dream reviews the facts the last dream did not see: those of seen, the facts and versions it saw, missing. A fact
 // pulled from another machine is new to it whenever it was written. Without seen, it reviews the facts written since
-// from; the zero time means every active fact.
-func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, out io.Writer) (dreamRecord, error) {
+// from; the zero time means every active fact. A dry run with planPath writes what it decided there, once every group
+// has an answer.
+func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, planPath string, out io.Writer) (dreamRecord, error) {
 	start := time.Now()
 	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339), DryRun: dryRun}
 	s, err := store.Open(factsPath())
@@ -176,6 +211,7 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, o
 		_, err := io.WriteString(out, renderGroups(groups, freshSet(fresh)))
 		return rec, err
 	}
+	plan := dreamPlan{Start: start, Seen: versions(active)}
 	for batch := range slices.Chunk(groups, groupsPerCall) {
 		r, err := dreamFn(renderGroups(batch, freshSet(fresh)))
 		rec.CostUSD += r.CostUSD
@@ -185,6 +221,7 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, o
 		}
 		ok, refused := checkActions(batch, r.Actions)
 		rec.Refused = append(rec.Refused, refused...)
+		plan.Groups = append(plan.Groups, planGroups(batch, ok)...)
 		for _, a := range ok {
 			if !dryRun {
 				f, err := apply(s, a)
@@ -202,7 +239,112 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, o
 	if !dryRun {
 		err = errors.Join(writeDreamSeen(dir, saw), markDream(dir, start))
 	}
+	if dryRun && planPath != "" {
+		rec.Plan = planPath
+		err = writeJSONFile(planPath, plan)
+	}
 	return rec, err
+}
+
+// planGroups pairs the checked actions of a batch with their groups; a group without an action needs no entry.
+func planGroups(batch [][]store.Fact, ok []extract.Action) []dreamPlanGroup {
+	groupOf := map[string]int{}
+	for i, g := range batch {
+		for _, f := range g {
+			groupOf[f.ID] = i
+		}
+	}
+	byGroup := map[int]*dreamPlanGroup{}
+	var order []int
+	for _, a := range ok {
+		i := groupOf[a.ID]
+		pg, seen := byGroup[i]
+		if !seen {
+			pg = &dreamPlanGroup{Facts: versions(batch[i])}
+			byGroup[i] = pg
+			order = append(order, i)
+		}
+		pg.Actions = append(pg.Actions, a)
+	}
+	out := make([]dreamPlanGroup, 0, len(order))
+	for _, i := range order {
+		out = append(out, *byGroup[i])
+	}
+	return out
+}
+
+// applyPlan carries out a plan written by a dry run. A group whose facts changed since then (a new version, or
+// retired) is refused whole, since its actions were decided on the old text; the rest apply, and the dream is marked
+// as of the dry run, with what it saw.
+func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
+	rec := dreamRecord{Time: time.Now().UTC().Format(time.RFC3339), Plan: path}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return rec, err
+	}
+	var plan dreamPlan
+	if err := json.Unmarshal(b, &plan); err != nil {
+		return rec, fmt.Errorf("plan %s: %w", path, err)
+	}
+	if plan.Seen == nil || plan.Start.IsZero() {
+		return rec, fmt.Errorf("plan %s: not a dream plan", path)
+	}
+	rec.Since = plan.Start.UTC().Format(time.RFC3339)
+	rec.Groups = len(plan.Groups)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		return rec, err
+	}
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
+		return rec, err
+	}
+	now := versions(active)
+	saw := maps.Clone(plan.Seen)
+	for _, g := range plan.Groups {
+		changed := ""
+		for id, v := range g.Facts {
+			if now[id] != v {
+				changed = id
+				break
+			}
+		}
+		for _, a := range g.Actions {
+			if changed != "" {
+				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since the plan ("+changed+")")
+				continue
+			}
+			f, err := apply(s, a)
+			if err != nil {
+				return rec, err
+			}
+			saw[f.ID] = f.Version
+			rec.Actions = append(rec.Actions, a)
+			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
+				return rec, err
+			}
+		}
+	}
+	for _, r := range rec.Refused {
+		if _, err := fmt.Fprintf(out, "refused %s\n", r); err != nil {
+			return rec, err
+		}
+	}
+	return rec, errors.Join(writeDreamSeen(dir, saw), markDream(dir, plan.Start))
+}
+
+// writeJSONFile replaces path through a temporary file next to it.
+func writeJSONFile(path string, v any) error {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // versions maps each fact to its version.

@@ -92,6 +92,8 @@ memcue facts                         # every active fact, with expires= when it 
 memcue recall -cwd . "text"          # what a prompt would get
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -since 2026-10-19 -dry-run
+memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
+memcue dream -apply plan.json              # carry it out later, without the model
 ```
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
@@ -109,6 +111,12 @@ A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`.
 after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
 and writes the file.
+
+A dry run with `-plan FILE` writes the actions that passed the checks, with the version of every fact of their
+groups. `-apply FILE` carries them out without asking the model again, so the run that changes the base is the one
+that was reviewed, and it is paid for once. A group with a fact changed since the plan (a new version, or retired) is
+refused whole and logged, since its actions were decided on the old text; the other groups apply, and the dream is
+marked as of the dry run.
 
 ## Configuration
 
