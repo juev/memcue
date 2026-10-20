@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -288,6 +289,32 @@ func (s *Store) Candidates() ([]Fact, error) {
 	return s.query(`SELECT `+qualified("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
 		ORDER BY f.id DESC`, Active, Candidate)
+}
+
+// CardFacts returns the facts a session-start card carries: global rules and the decisions of the given repository,
+// newest first. It is a view of the active facts, not a second store: a fact appears only while it is active.
+func (s *Store) CardFacts(tier string) ([]Fact, error) {
+	active, err := s.Active()
+	if err != nil {
+		return nil, err
+	}
+	var out []Fact
+	for _, f := range active {
+		switch {
+		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
+		case f.Kind == "decision" && tier != "" && strings.EqualFold(f.Scope, "repo:"+tier):
+		default:
+			continue
+		}
+		out = append(out, f)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if !out[i].Created.Equal(out[j].Created) {
+			return out[i].Created.After(out[j].Created)
+		}
+		return out[i].ID > out[j].ID
+	})
+	return out, nil
 }
 
 // Reopen adds a version that puts a fact back into review: the undo of an approval or a rejection. The content and
