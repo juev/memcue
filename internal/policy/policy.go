@@ -74,13 +74,14 @@ func quoted(record, role, evidence string) bool {
 
 // Secret says whether text holds a token in a known format, or a labelled value: after a password, secret or key
 // label any value of four or more characters; after a token label a value of six or more characters with a letter in
-// it, so "token budget: 150000" is not one. Signs that end the value (a full stop the model put after it) do not count.
+// it, so "token budget: 150000" is not one. The value is measured as written: signs in it (base64 padding, a "!")
+// count toward its length.
 func Secret(text string) bool {
 	if token.MatchString(text) {
 		return true
 	}
 	for _, m := range labelled.FindAllStringSubmatch(text, -1) {
-		v := []rune(strings.TrimRightFunc(m[2], func(r rune) bool { return unicode.IsPunct(r) || unicode.IsSymbol(r) }))
+		v := []rune(m[2])
 		if tokenLabel.MatchString(m[1]) {
 			if len(v) >= 6 && strings.IndexFunc(string(v), unicode.IsLetter) >= 0 {
 				return true
