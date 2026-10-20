@@ -52,7 +52,18 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
    hermes config set memory.memcue.extract_key_env DEEPSEEK_API_KEY
    ```
 
-5. Restart Hermes (the gateway, if you run one).
+5. Optional: keep `usage.log`, which records for each reply whether it quoted an identifier of the facts it was
+   given. Both settings live in the provider config, so the environment of the gateway or its container stays as it
+   is; `state_dir` defaults to `$XDG_STATE_HOME`, else `~/.local/state`, and the log goes to `<state_dir>/memcue/`:
+
+   ```bash
+   hermes config set memory.memcue.usage_log true
+   hermes config set memory.memcue.state_dir "$HERMES_HOME/memcue/state"
+   ```
+
+   `MEMCUE_USAGE_LOG=1` in the gateway's environment still turns the log on as well.
+
+6. Restart Hermes (the gateway, if you run one).
 
 Check: `hermes memory status` should list `memcue` as available. Run the plugin's tests with the binary you
 installed:
