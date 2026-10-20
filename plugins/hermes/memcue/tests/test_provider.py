@@ -77,8 +77,18 @@ class ProviderTest(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp()
         os.environ["XDG_STATE_HOME"] = str(Path(self.home) / "state")  # memcue's extract.log
+        # The suite must never touch a live base: an inherited MEMCUE_FACTS wins over HERMES_HOME and let an earlier
+        # run write test facts into a real base and migrate it to another schema. MEMCUE_USAGE_LOG from the container
+        # would turn the usage log on behind the tests that assert it is off.
+        self._kept_env = {k: os.environ.pop(k, None) for k in ("MEMCUE_FACTS", "MEMCUE_USAGE_LOG")}
+        self.addCleanup(self._restore_facts_env)
         self.p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
+
+    def _restore_facts_env(self):
+        for key, value in self._kept_env.items():
+            if value is not None:
+                os.environ[key] = value
 
     def tearDown(self):
         shutil.rmtree(self.home, ignore_errors=True)
