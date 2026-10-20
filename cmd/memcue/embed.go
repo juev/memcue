@@ -68,11 +68,11 @@ func runEmbed(args []string, out, errOut io.Writer) error {
 			return err
 		}
 		if *dry {
-			fmt.Fprintf(out, "%d facts need a vector for %s\n", len(pending), client.Tag())
+			_, _ = fmt.Fprintf(out, "%d facts need a vector for %s\n", len(pending), client.Tag())
 			return nil
 		}
 		if len(pending) == 0 {
-			fmt.Fprintf(out, "nothing to do: every active fact has a vector for %s\n", client.Tag())
+			_, _ = fmt.Fprintf(out, "nothing to do: every active fact has a vector for %s\n", client.Tag())
 			return nil
 		}
 		size := *batch
@@ -97,9 +97,9 @@ func runEmbed(args []string, out, errOut io.Writer) error {
 				}
 			}
 			done += len(chunk)
-			fmt.Fprintf(errOut, "embedded %d/%d\n", done, len(pending))
+			_, _ = fmt.Fprintf(errOut, "embedded %d/%d\n", done, len(pending))
 		}
-		fmt.Fprintf(out, "embedded %d facts for %s\n", done, client.Tag())
+		_, _ = fmt.Fprintf(out, "embedded %d facts for %s\n", done, client.Tag())
 		return nil
 	})
 }
