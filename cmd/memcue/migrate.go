@@ -298,8 +298,11 @@ func runImport(args []string, out io.Writer) error {
 				return fmt.Errorf("%s: %w", path, err)
 			}
 			for _, fact := range rec.Facts {
-				if _, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", store.Meta{Kind: fact.Kind,
-					Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence}); err != nil {
+				meta := store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence}
+				if fact.Kind != "" { // a session's fact (extract -dry-run): it goes through review as any extraction
+					meta.Review = store.Candidate
+				}
+				if _, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", meta); err != nil {
 					_ = f.Close()
 					return fmt.Errorf("%s: %w", rec.Note, err)
 				}

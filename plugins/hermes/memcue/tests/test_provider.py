@@ -84,7 +84,14 @@ class ProviderTest(unittest.TestCase):
         shutil.rmtree(self.home, ignore_errors=True)
 
     def facts(self):
-        out = subprocess.run([BIN, "facts"], env=dict(os.environ, MEMCUE_FACTS=self.p._facts),
+        return self.memcue("facts")
+
+    def pending(self):
+        """Facts that wait for review: what the mirror and the extraction write."""
+        return self.memcue("candidates")
+
+    def memcue(self, *args):
+        out = subprocess.run([BIN, *args], env=dict(os.environ, MEMCUE_FACTS=self.p._facts),
                              capture_output=True, text=True, check=True).stdout
         return [line for line in out.splitlines() if line]
 
@@ -99,25 +106,30 @@ class ProviderTest(unittest.TestCase):
         """A built-in memory note rides with every turn anyway: repeating it from the base would say it twice."""
         self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
         self.assertEqual(self.p.prefetch("на каком порту слушает база postgres проекта demo?"), "")
-        self.assertIn("hermes-memory", self.facts()[0])
+        self.assertIn("hermes-memory", self.pending()[0])
+        self.assertEqual(self.facts(), [])
 
     def test_mirrored_facts_come_back_when_suppression_is_off(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "suppress_mirrored": False})
         p.initialize("s1", hermes_home=self.home, agent_context="primary")
         p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertIn("55432", p.prefetch("на каком порту слушает база postgres проекта demo?"))
+        query = "на каком порту слушает база postgres проекта demo?"
+        self.assertEqual(p.prefetch(query), "")  # a candidate until the user approves it
+        self.memcue("approve", self.pending()[0].split()[0])
+        self.assertIn("55432", p.prefetch(query))
 
     def test_replace_corrects_the_same_fact_and_remove_retires_it(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
         new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
         self.p.on_memory_write("add", "memory", old)
         self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
-        facts = self.facts()
-        self.assertEqual(len(facts), 1)
-        self.assertIn(" v2 ", facts[0])
-        self.assertIn("55433", facts[0])
+        pending = self.pending()
+        self.assertEqual(len(pending), 1)
+        self.assertIn("55433", pending[0])
+        fact_id = pending[0].split()[0]
+        self.assertIn(f"{fact_id} v2 active", "\n".join(self.memcue("dump", self.p._facts)))
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
-        self.assertEqual(self.facts(), [])
+        self.assertEqual(self.pending(), [])
 
     def add_fact(self, content: str, expires: str = "") -> None:
         """A fact written by another program, not by the built-in memory tool."""
@@ -158,11 +170,11 @@ class ProviderTest(unittest.TestCase):
 
     def test_replace_of_unknown_entry_adds(self):
         self.p.on_memory_write("replace", "user", "Пользователь пишет по-русски.", {"previous_content": "x"})
-        self.assertEqual(len(self.facts()), 1)
+        self.assertEqual(len(self.pending()), 1)
 
     def test_content_starting_with_dash_is_stored(self):
         self.p.on_memory_write("add", "memory", "-v печатает версию memcue")
-        self.assertIn("-v печатает", self.facts()[0])
+        self.assertIn("-v печатает", self.pending()[0])
 
     def test_subagent_does_not_write(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
@@ -310,7 +322,8 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(Path(self.p._facts).exists())
 
     def facts_of(self, p):
-        out = subprocess.run([BIN, "facts"], env=dict(os.environ, MEMCUE_FACTS=p._facts),
+        """The facts an extraction wrote: candidates for review."""
+        out = subprocess.run([BIN, "candidates"], env=dict(os.environ, MEMCUE_FACTS=p._facts),
                              capture_output=True, text=True).stdout
         return [line for line in out.splitlines() if line]
 

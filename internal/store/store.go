@@ -89,6 +89,9 @@ type Meta struct {
 // ErrNotFound: no fact with that id.
 var ErrNotFound = errors.New("fact not found")
 
+// ErrNotCandidate: the fact is not waiting for approval (it is active already, or retired).
+var ErrNotCandidate = errors.New("fact is not a candidate")
+
 // Store is an open fact base.
 type Store struct {
 	db     *sql.DB
@@ -253,6 +256,35 @@ func ValidExpiry(expires string) error {
 // Expired says whether a fact passed its last day by the given date ("YYYY-MM-DD"). An empty expiry never expires.
 func Expired(expires, today string) bool {
 	return expires != "" && today != "" && expires < today
+}
+
+// Approve adds a version that takes a candidate into recall. A fact that is not a candidate is left alone: approving
+// an active fact again, or bringing a retired one back, is not what an approval means.
+func (s *Store) Approve(id string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Status != Active || cur.Review != Candidate {
+		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
+	}
+	f := cur
+	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
+	return f, s.write(f)
+}
+
+func state(f Fact) string {
+	if f.Status == Active && f.Review != "" {
+		return f.Review
+	}
+	return f.Status
+}
+
+// Candidates returns the latest version of every fact that waits for approval, oldest first.
+func (s *Store) Candidates() ([]Fact, error) {
+	return s.query(`SELECT ` + qualified("f") + ` FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
+		ORDER BY f.id`, Active, Candidate)
 }
 
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.

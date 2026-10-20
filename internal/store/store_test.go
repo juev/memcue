@@ -307,3 +307,61 @@ func TestCandidateIsNotRecalled(t *testing.T) {
 		t.Errorf("candidate not kept: %+v %v", got, err)
 	}
 }
+
+func TestApproveTakesACandidateIntoRecall(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "x", "", Meta{Kind: "environment",
+		Source: "tool", Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.Candidates()
+	if err != nil || len(c) != 1 || c[0].ID != f.ID {
+		t.Fatalf("candidates %+v %v", c, err)
+	}
+	a, err := s.Approve(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Version != 2 || a.Review != "" || a.Kind != "environment" || a.Source != "tool" {
+		t.Errorf("approved %+v", a)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; !ok {
+		t.Error("an approved fact is not found")
+	}
+	if c, _ := s.Candidates(); len(c) != 0 {
+		t.Errorf("still a candidate: %+v", c)
+	}
+}
+
+func TestApproveRefusesWhatIsNotACandidate(t *testing.T) {
+	s, _ := open(t)
+	act, _ := s.Add("Активный факт.", nil, "")
+	ret, _ := s.AddWith("Снятый кандидат.", nil, "", "", Meta{Review: Candidate})
+	if _, err := s.Retire(ret.ID); err != nil {
+		t.Fatal(err)
+	}
+	for name, id := range map[string]string{"active": act.ID, "retired": ret.ID} {
+		if _, err := s.Approve(id); !errors.Is(err, ErrNotCandidate) {
+			t.Errorf("%s: err %v", name, err)
+		}
+	}
+	if _, err := s.Approve("01NOPE"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown: err %v", err)
+	}
+	if got, _ := s.Get(ret.ID); got.Status != Retired || got.Version != 2 {
+		t.Errorf("a refused approval wrote a version: %+v", got)
+	}
+}
+
+func TestCorrectingACandidateKeepsItACandidate(t *testing.T) {
+	s, _ := open(t)
+	f, _ := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "", "", Meta{Review: Candidate})
+	c, err := s.Correct(f.ID, "Кандидат про порт gitea 3001.", nil)
+	if err != nil || c.Review != Candidate {
+		t.Fatalf("corrected %+v %v", c, err)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
+		t.Error("a correction took a candidate into recall")
+	}
+}

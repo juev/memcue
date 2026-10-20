@@ -174,3 +174,40 @@ func TestDumpOneLinePerVersion(t *testing.T) {
 	}
 	_ = s.Close()
 }
+
+// One machine approves a candidate while another corrects it: the merge keeps both versions, and the latest decides,
+// as for any two changes made apart. The approval is not lost; it carries the text its machine saw, so the correction
+// made elsewhere stays in the history, not in the current version.
+func TestMergeOfApprovalAndCorrection(t *testing.T) {
+	b := filepath.Join(t.TempDir(), "facts.db")
+	s0 := openAt(t, b, "mac", t0)
+	f, err := s0.AddWith("Кандидат про db1.", []string{"db1"}, "x", "", Meta{Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s0.Close()
+	c := clone(t, b)
+	sc := openAt(t, c, "loffe", t0.Add(time.Minute))
+	if _, err := sc.Correct(f.ID, "Кандидат про db1, уточнён.", nil); err != nil {
+		t.Fatal(err)
+	}
+	_ = sc.Close()
+	s := openAt(t, b, "mac", t0.Add(2*time.Minute))
+	if _, err := s.Approve(f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Merge(c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil || got.Review != "" || got.Version != 3 || got.Content != "Кандидат про db1." {
+		t.Errorf("merged %+v %v", got, err)
+	}
+	if h, _ := s.History(f.ID); len(h) != 3 || h[1].Content != "Кандидат про db1, уточнён." {
+		t.Errorf("history %+v", h)
+	}
+	if _, ok := ids(t, s, "кандидат db1")[f.ID]; !ok {
+		t.Error("the approved fact is not recalled after the merge")
+	}
+	_ = s.Close()
+}

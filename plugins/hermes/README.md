@@ -7,14 +7,15 @@ memcue fact base:
   Hermes puts them into the turn's `<memory-context>` block. Each fact comes once per session, and again after the
   context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
   notice, whose wrapper matches facts by accident.
-- **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a fact; when the
-  agent edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry
+- **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
+  fact (source `memory`), recalled only after it is approved with `memcue approve`; when the agent edits that entry
+  the fact gets a new version, when it removes it the fact is retired. Which fact an entry
   became is kept in `$HERMES_HOME/memcue/written.json`.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   Subagents, cron and flush runs get only `memcue_search` and do not write.
 - **Session extraction** (optional): the new messages of a session go to `memcue extract-messages` in the
   background, which sends them to an OpenAI-compatible model with the same prompt Claude Code sessions get, and adds
-  the facts it finds. A chat of a messaging gateway can stay one session for days, so the messages are not held until
+  the facts it finds as candidates for review. A chat of a messaging gateway can stay one session for days, so the messages are not held until
   the session ends: they go once 20 000 characters of new text gather (`extract_threshold`), after 30 minutes without
   a turn (`extract_idle_minutes`), before the context is compressed, when the session ends and when Hermes shuts
   down. Each message is sent once; fingerprints of the sent ones are kept in `$HERMES_HOME/memcue/sessions/`, which

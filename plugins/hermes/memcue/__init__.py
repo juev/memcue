@@ -4,8 +4,8 @@ Runs the ``memcue`` binary (github.com/juev/memcue): before each turn ``memcue h
 that share enough rare words with the user's message, or nothing; each fact once per session (again after a
 compression), and none for a cron turn; facts that only mirror a built-in memory note carry the origin
 ``hermes-memory`` and are left out, because that note rides with every turn anyway; every write of the built-in memory
-tool is mirrored into the base (add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``); the
-model gets tools to search and fix facts; a reply is checked for the identifiers of the facts it was given, and
+tool is mirrored into the base as a candidate for review (add → ``memcue add -candidate``, replace → ``memcue
+correct``, remove → ``memcue retire``); the model gets tools to search and fix facts; a reply is checked for the identifiers of the facts it was given, and
 ``usage.log`` keeps that score when ``usage_log`` is on. With an OpenAI-compatible endpoint configured, the new
 messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
 added: once enough new text gathers, after a pause in the conversation, before the context is compressed and when the
@@ -505,7 +505,8 @@ class MemcueMemoryProvider(MemoryProvider):
             written = self._written()
             fact_id = written.get(self._key(target, previous)) if previous else None
             if action == "add" and content.strip():
-                ok, out = self._run(["add", "-origin", self._origin(mirror=True), "--", content.strip()])
+                ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
+                                     content.strip()])
                 if ok:
                     written[self._key(target, content)] = out.split()[0]
             elif action == "replace" and content.strip():
@@ -515,7 +516,8 @@ class MemcueMemoryProvider(MemoryProvider):
                     if ok:
                         written[self._key(target, content)] = fact_id
                 else:
-                    ok, out = self._run(["add", "-origin", self._origin(mirror=True), "--", content.strip()])
+                    ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
+                                     content.strip()])
                     if ok:
                         written[self._key(target, content)] = out.split()[0]
             elif action == "remove" and fact_id:
