@@ -249,4 +249,61 @@ func TestBaseWithoutExpiresColumnStillOpens(t *testing.T) {
 	if got.Expires != "2026-11-01" {
 		t.Errorf("expiry %q after migration", got.Expires)
 	}
+	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "error: x"}
+	f, err = s.AddWith("Старая база приняла факт с типом.", nil, "", "", m)
+	if err != nil {
+		t.Fatalf("adding meta to a migrated base: %v", err)
+	}
+	if got, _ := s.Get(f.ID); got.Meta != m {
+		t.Errorf("meta %+v after migration", got.Meta)
+	}
+}
+
+func TestMetaIsStoredAndKeptByCorrection(t *testing.T) {
+	s, _ := open(t)
+	m := Meta{Kind: "environment", Scope: "host:db1", Source: "tool", Evidence: "port 5432"}
+	f, err := s.AddWith("Postgres на db1 слушает порт 5432.", []string{"postgres"}, "x 2026-10-20", "", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.Correct(f.ID, "Postgres на db1 слушает порт 5433.", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Meta != m {
+		t.Errorf("correction lost meta: %+v", c.Meta)
+	}
+	if got, _ := s.Get(f.ID); got.Meta != m || got.Version != 2 {
+		t.Errorf("stored %+v", got)
+	}
+}
+
+func TestCandidateIsNotRecalled(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddWith("Кандидат про порт gitea 3000 ждёт одобрения.", []string{"gitea"}, "", "",
+		Meta{Kind: "environment", Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
+		t.Error("a candidate was found by search")
+	}
+	act, err := s.Active()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range act {
+		if a.ID == f.ID {
+			t.Error("a candidate is listed as active")
+		}
+	}
+	if err := s.Rebuild(); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
+		t.Error("a rebuild indexed a candidate")
+	}
+	if got, err := s.Get(f.ID); err != nil || got.Review != Candidate {
+		t.Errorf("candidate not kept: %+v %v", got, err)
+	}
 }

@@ -133,6 +133,33 @@ func TestMergeOfIdenticalCopiesChangesNothing(t *testing.T) {
 	_ = s.Close()
 }
 
+func TestMergeCarriesMetaAndCandidates(t *testing.T) {
+	b, _ := base(t)
+	c := clone(t, b)
+	sc := openAt(t, c, "loffe", t0.Add(time.Minute))
+	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "exit 1", Review: Candidate}
+	f, err := sc.AddWith("Кандидат с loffe про db1.", nil, "x 2026-10-20", "", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = sc.Close()
+	s := openAt(t, b, "mac", t0.Add(2*time.Minute))
+	if _, err := s.Merge(c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil || got.Meta != m {
+		t.Errorf("merged %+v %v", got, err)
+	}
+	if !strings.Contains(dump(t, s), "kind=pitfall scope=host:db1 source=tool review=candidate") {
+		t.Errorf("dump lacks meta: %s", dump(t, s))
+	}
+	if _, ok := ids(t, s, "кандидат loffe db1")[f.ID]; ok {
+		t.Error("a merged candidate is recalled")
+	}
+	_ = s.Close()
+}
+
 func TestDumpOneLinePerVersion(t *testing.T) {
 	b, f := base(t)
 	s := openAt(t, b, "mac", t0.Add(time.Minute))
