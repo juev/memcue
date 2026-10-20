@@ -129,6 +129,8 @@ typed decisions API of RouterAI, for example `https://routerai.ru/api/v1/decisio
 only classifies: the main model still writes every change. A group triage fails on goes on, and `dream.log` records how
 many groups triage dropped. Without all three variables, or with a threshold that is not a probability, there is no
 triage. Measured on 395 groups against an Opus dry run, 0.2 sent on 191 groups and kept 42 of the 43 Opus acted on.
+The research behind it, with the alternatives that did not work (vectors, pairwise questions), is in
+[docs/research/dream-triage-2026-10.md](docs/research/dream-triage-2026-10.md).
 
 ## Configuration
 
