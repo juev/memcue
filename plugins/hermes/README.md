@@ -44,6 +44,13 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
    hermes config set memory.memcue.binary "$HERMES_HOME/bin/memcue"
    ```
 
+   If the container's host name is not stable, name the machine explicitly. The provider forwards it to memcue as
+   `MEMCUE_HOST`, and recall uses it to show a fact's scope and to prefer facts of this host on equal scores:
+
+   ```bash
+   hermes config set memory.memcue.host mac
+   ```
+
 4. Optional: turn on session extraction with an OpenAI-compatible endpoint. The key is read from the environment
    variable you name, so it stays where Hermes keeps its other keys:
 

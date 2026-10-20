@@ -15,10 +15,11 @@ through hooks:
   skill.
 
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
-takes about 10 ms per prompt. A fact keeps where and when it was learnt, but facts from every repository are
-searched: what you learnt in one project is recalled in another. A ticket key such as `PROJ-1234`, `#123` or `!45`
-is kept as one exact term, so a prompt naming it recalls that ticket and not another number; bare numbers, ports and
-versions are still left out of the index.
+takes about 10 ms per prompt. A fact keeps where and when it was learnt and where it holds (`scope`), but facts from
+every repository are searched: what you learnt in one project is recalled in another. On equal scores a fact of the
+current host comes first; nothing is excluded, because working on a server from a laptop is normal. A ticket key such
+as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a prompt naming it recalls that ticket and not another
+number; bare numbers, ports and versions are still left out of the index.
 
 The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. The same
 base works for [Hermes Agent](plugins/hermes/README.md).
@@ -161,6 +162,7 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the extraction instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
+| `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
@@ -170,11 +172,11 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/card.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
-With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
-prompt and the facts it got, if any, with their coverage. It stays on your machine and is what you judge recall by;
-it is off by default because it keeps the text of your prompts. `extract.log` has one JSON
-line per extraction run: session, part of the transcript read, facts stored, and the cost
-Claude Code reports or the tokens the endpoint reports.
+With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
+characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
+displaced one of this host. It stays on your machine and is what you judge recall by; it is off by default because it
+keeps the text of your prompts. `extract.log` has one JSON line per extraction run: session, part of the transcript
+read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
 The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the
 session or note either way.
