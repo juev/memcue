@@ -15,10 +15,15 @@ import (
 	"strings"
 )
 
-// Fact is one fact the model extracted.
+// Fact is one fact the model extracted. A session's facts also say what they are and what they rest on; a note's
+// facts leave those empty.
 type Fact struct {
 	Content  string   `json:"content"`
 	Keywords []string `json:"keywords"`
+	Kind     string   `json:"kind,omitempty"`     // rule, decision, pitfall, environment, or another word the policy drops
+	Scope    string   `json:"scope,omitempty"`    // global, host:<name>, repo:<name>
+	Source   string   `json:"source,omitempty"`   // user, user_confirmed, tool, agent
+	Evidence string   `json:"evidence,omitempty"` // the words of the record the fact rests on, verbatim
 }
 
 // Result is the model's answer.
@@ -39,6 +44,20 @@ const schema = `{"type":"object","additionalProperties":false,"required":["facts
 "properties":{"content":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}}}}},
 "dropped":{"type":"string"},"outdated":{"type":"array","items":{"type":"integer"}}}}`
 
+// sessionSchema is schema with the fields a session's facts must carry for the policy to judge them.
+const sessionSchema = `{"type":"object","additionalProperties":false,"required":["facts","dropped"],"properties":{
+"facts":{"type":"array","items":{"type":"object","additionalProperties":false,
+"required":["content","keywords","kind","scope","source","evidence"],
+"properties":{"content":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},
+"kind":{"type":"string","enum":["rule","decision","pitfall","environment","event","procedure","repo","other"]},
+"scope":{"type":"string"},"source":{"type":"string","enum":["user","user_confirmed","tool","agent"]},
+"evidence":{"type":"string"}}}},
+"dropped":{"type":"string"},"outdated":{"type":"array","items":{"type":"integer"}}}}`
+
+const sessionAnswer = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
+	`{"facts": [{"content": "…", "keywords": ["…"], "kind": "rule|decision|pitfall|environment|event|procedure|repo|other", ` +
+	`"scope": "…", "source": "user|user_confirmed|tool|agent", "evidence": "…"}], "dropped": "…", "outdated": []}` + "\n"
+
 var errEmpty = errors.New("model returned neither facts nor a reason")
 
 // Model is the model the extraction runs on (the main one, by the user's decision).
@@ -52,8 +71,8 @@ func Note(ctx context.Context, name, content string) (Result, error) {
 //go:embed session_prompt.md
 var sessionPrompt string
 
-// Session extracts the facts of a rendered session transcript. where names the repository and date of the session,
-// for the model's orientation only. For a later part of a long session, prior holds the facts of the earlier parts:
+// Session extracts the facts of a rendered session transcript. where names the repository, date, host and system of
+// the session: the model uses them to name a fact's scope. For a later part of a long session, prior holds the facts of the earlier parts:
 // the model returns only what is new and names the prior facts that are outdated, and the result holds the session's
 // whole list. Prior facts stay unless named, so a model that forgets to repeat them loses nothing.
 func Session(ctx context.Context, where, text string, prior []Fact) (Result, error) {
@@ -66,7 +85,11 @@ func Session(ctx context.Context, where, text string, prior []Fact) (Result, err
 		}
 		input = b.String() + "\nСледующая часть. " + input
 	}
-	r, err := run(ctx, sessionPrompt, input)
+	rp, err := call(ctx, sessionPrompt, sessionSchema, sessionAnswer, input)
+	var r Result
+	if err == nil {
+		r, err = decode(rp)
+	}
 	if errors.Is(err, errEmpty) {
 		err = nil // a part that teaches nothing is the common case
 	}

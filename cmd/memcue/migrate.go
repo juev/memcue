@@ -298,7 +298,8 @@ func runImport(args []string, out io.Writer) error {
 				return fmt.Errorf("%s: %w", path, err)
 			}
 			for _, fact := range rec.Facts {
-				if _, err := s.Add(fact.Content, fact.Keywords, rec.Origin); err != nil {
+				if _, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", store.Meta{Kind: fact.Kind,
+					Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence}); err != nil {
 					_ = f.Close()
 					return fmt.Errorf("%s: %w", rec.Note, err)
 				}

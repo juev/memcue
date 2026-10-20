@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/tier"
 	"github.com/juev/memcue/internal/transcript"
@@ -21,8 +22,9 @@ import (
 const maxChunk = 200_000
 
 // runExtract turns a session transcript into facts: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl.
-// Facts are only added, never compared with the base. With -dry-run it prints them as JSON and stores nothing; the
-// output can be stored later with import.
+// Facts are only added, never compared with the base; the policy drops what may not be stored, and the output names
+// those with the reason. With -dry-run it prints the facts as JSON and stores nothing; the output can be stored later
+// with import.
 func runExtract(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("extract", flag.ContinueOnError)
 	dry := fs.Bool("dry-run", false, "print the facts instead of storing them")
@@ -46,11 +48,19 @@ func runExtract(args []string, out io.Writer) error {
 	}
 	extract.Model = *model
 	origin := strings.TrimSpace(tier.Of(sess.CWD, claudeDir()) + " " + sess.Start)
-	x, err := extractText(origin, sess.Text)
+	x, err := extractText(origin+"; "+hostLine(), sess.Text)
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	facts := x.Facts
+	var facts []extract.Fact
+	var rejected []string
+	for _, fact := range x.Facts {
+		if ok, why := policy.Check(fact, sess.Text); !ok {
+			rejected = append(rejected, why+": "+clip(fact.Content, 80))
+			continue
+		}
+		facts = append(facts, fact)
+	}
 	var ids []string
 	if !*dry {
 		s, err := store.Open(factsPath())
@@ -59,7 +69,8 @@ func runExtract(args []string, out io.Writer) error {
 		}
 		defer func() { _ = s.Close() }()
 		for _, fact := range facts {
-			sf, err := s.Add(fact.Content, fact.Keywords, origin)
+			sf, err := s.AddWith(fact.Content, fact.Keywords, origin, "", store.Meta{Kind: fact.Kind,
+				Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence})
 			if err != nil {
 				return err
 			}
@@ -68,7 +79,8 @@ func runExtract(args []string, out io.Writer) error {
 	}
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
-	return enc.Encode(map[string]any{"note": path, "origin": origin, "facts": facts, "dropped": strings.Join(x.Dropped, " "),
+	return enc.Encode(map[string]any{"note": path, "origin": origin, "facts": facts, "rejected": rejected,
+		"dropped":  strings.Join(x.Dropped, " "),
 		"cost_usd": x.CostUSD, "tokens": x.Tokens, "chars": len(sess.Text), "lines": sess.Lines, "ids": ids})
 }
 

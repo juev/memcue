@@ -10,12 +10,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/tier"
 	"github.com/juev/memcue/internal/transcript"
@@ -130,8 +132,10 @@ type extractRecord struct {
 	CostUSD float64        `json:"cost_usd"`
 	Tokens  extract.Tokens `json:"tokens"`
 	IDs     []string       `json:"ids,omitempty"`
-	Skipped string         `json:"skipped,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	// Rejected are the facts the policy did not store: the reason, then the start of the fact.
+	Rejected []string `json:"rejected,omitempty"`
+	Skipped  string   `json:"skipped,omitempty"`
+	Error    string   `json:"error,omitempty"`
 }
 
 // runExtractSession extracts the part of a session read since the last run and stores its facts. Runs on one
@@ -196,13 +200,21 @@ func storeExtracted(text string, rec *extractRecord) error {
 		rec.Skipped = "too little new text"
 		return nil
 	}
-	x, err := extractFn(rec.Origin, text)
+	x, err := extractFn(rec.Origin+"; "+hostLine(), text)
 	rec.CostUSD, rec.Tokens = x.CostUSD, x.Tokens
 	if err != nil {
 		return err
 	}
-	rec.Facts = len(x.Facts)
-	if len(x.Facts) == 0 {
+	var keep []extract.Fact
+	for _, fact := range x.Facts {
+		if ok, why := policy.Check(fact, text); !ok {
+			rec.Rejected = append(rec.Rejected, why+": "+clip(fact.Content, 80))
+			continue
+		}
+		keep = append(keep, fact)
+	}
+	rec.Facts = len(keep)
+	if len(keep) == 0 {
 		return nil
 	}
 	s, err := store.Open(factsPath())
@@ -210,14 +222,33 @@ func storeExtracted(text string, rec *extractRecord) error {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	for _, fact := range x.Facts {
-		sf, err := s.Add(fact.Content, fact.Keywords, rec.Origin)
+	for _, fact := range keep {
+		sf, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", store.Meta{Kind: fact.Kind,
+			Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence})
 		if err != nil {
 			return err
 		}
 		rec.IDs = append(rec.IDs, sf.ID)
 	}
 	return nil
+}
+
+// hostLine names the machine a session ran on, for the model to tell a fact of this host from a global one.
+// MEMCUE_HOST names it where the host name is meaningless, such as a container.
+func hostLine() string {
+	host := os.Getenv("MEMCUE_HOST")
+	if host == "" {
+		host, _ = os.Hostname()
+	}
+	return "хост " + host + ", " + runtime.GOOS
+}
+
+func clip(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
 }
 
 // extractFn is the model step, replaced in tests.
