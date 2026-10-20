@@ -263,7 +263,8 @@ class ProviderTest(unittest.TestCase):
         answer = json.dumps({"facts": [{"content": "Hermes на server1: модель по умолчанию deepseek-flash.",
                                         "keywords": ["модель", "model"], "kind": "environment",
                                         "scope": "host:server1", "source": "user",
-                                        "evidence": "какая модель у hermes?"}], "dropped": ""}, ensure_ascii=False)
+                                        "evidence": "на server1 у hermes модель по умолчанию deepseek-flash"}],
+                          "dropped": ""}, ensure_ascii=False)
         seen = {}
 
         class Handler(http.server.BaseHTTPRequestHandler):
@@ -290,8 +291,9 @@ class ProviderTest(unittest.TestCase):
                                                   "extract_model": "m1", "extract_key_env": "TEST_MEMCUE_KEY"})
         p.initialize("sess-9", hermes_home=self.home, agent_context="primary")
         p.on_session_end([{"role": "system", "content": "prompt"},
-                          {"role": "user", "content": "какая модель у hermes? " * 120},
-                          {"role": "assistant", "content": "deepseek-flash"}])
+                          {"role": "user",
+                           "content": "на server1 у hermes модель по умолчанию deepseek-flash. " * 60},
+                          {"role": "assistant", "content": "запомнил"}])
         for _ in range(100):
             if Path(p._facts).exists() and self.facts_of(p):
                 break

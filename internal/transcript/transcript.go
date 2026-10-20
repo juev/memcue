@@ -146,8 +146,13 @@ func say(b *strings.Builder, who, text string) {
 	if text == "" {
 		return
 	}
-	fmt.Fprintf(b, "%s: %s\n\n", who, text)
+	fmt.Fprintf(b, "%s: %s\n\n", who, reMarker.ReplaceAllString(text, " $1"))
 }
+
+// reMarker finds a line of a message or tool output that starts the way a block of the record does. say indents it,
+// so text a tool returned (a web page, a file) cannot open a block of its own, such as a USER block that would pass
+// for the user's words.
+var reMarker = regexp.MustCompile(`(?m)^((?:USER|ASSISTANT|RESULT|TOOL [^:\n]*): )`)
 
 // cut keeps the head and the tail of a long text: errors and conclusions tend to sit at either end.
 func cut(s string, n int) string {
