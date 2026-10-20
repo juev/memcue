@@ -126,6 +126,27 @@ func TestTicketKeyRecallsExactOnly(t *testing.T) {
 	}
 }
 
+// A versioned token in a prompt is not a ticket: it must not enable the exact-term filter and drop a fact that shares
+// the ordinary words. The fact spells the version without a hyphen, as a person would in a note.
+func TestVersionedPromptIsNotATicket(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Add("Postgres 16 runs in a container on port 55432.", nil, "demo 2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hs, err := Recall(s, "Which port does postgres-16 use?", "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hs) == 0 || hs[0].ID != f.ID {
+		t.Errorf("versioned prompt recalled %+v, want %s", hs, f.ID)
+	}
+}
+
 // At equal coverage a fact of this host wins the tie, without excluding the other host.
 func TestCurrentHostWinsTies(t *testing.T) {
 	s := setup(t)

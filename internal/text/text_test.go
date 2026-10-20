@@ -86,6 +86,42 @@ func TestTicketKeysAreOneExactTerm(t *testing.T) {
 	}
 }
 
+// A versioned name is not a ticket: its word must stay in the index and only the number is dropped.
+func TestVersionedNamesKeepTheirWord(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want []string
+	}{
+		{"PostgreSQL-16", []string{"postgresql"}},
+		{"Python-3.12", []string{"python"}},
+		{"go-1.27", []string{"go"}},
+		{"claude-opus-5-5", []string{"claud", "opus"}},
+	} {
+		got := Stems(tc.in)
+		for _, want := range tc.want {
+			if !slices.Contains(got, want) {
+				t.Errorf("%q gave %q, missing %q", tc.in, got, want)
+			}
+		}
+		for _, st := range got {
+			if IsTicket(st) {
+				t.Errorf("%q produced the ticket term %q", tc.in, st)
+			}
+		}
+	}
+}
+
+// Only an uppercase project key is a ticket; a lowercase one is an ordinary word and its number is dropped.
+func TestLowercaseTicketShapeIsNotATicket(t *testing.T) {
+	got := Stems("proj-1234")
+	if !slices.Equal(got, []string{"proj"}) {
+		t.Errorf("lowercase key gave %q, want [proj]", got)
+	}
+	if got := Terms("Какой порт у postgres-16?"); slices.ContainsFunc(got, IsTicket) {
+		t.Errorf("a versioned prompt produced a ticket: %q", got)
+	}
+}
+
 func TestIdentifiersWithDigitsKeptAsWritten(t *testing.T) {
 	got := Stems("бакет s3 в k8s и gpt6")
 	for _, want := range []string{"s3", "k8s", "gpt6"} {

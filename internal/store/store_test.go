@@ -598,8 +598,8 @@ func TestActiveSurvivesLostIndexRow(t *testing.T) {
 	}
 }
 
-// Version 2 changes the stems: reopening a base built with the old tokenizer must rebuild the index so a ticket
-// key becomes findable without re-adding the fact.
+// The stems changed since version 1: reopening a base built with the old tokenizer must rebuild the index so a
+// ticket key becomes findable without re-adding the fact.
 func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 	s, path := open(t)
 	f, err := s.Add("Тикет PROJ-1234: берём в работу.", nil, "x 2026-10-20")
@@ -626,6 +626,50 @@ func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 	var version int
 	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
 		t.Errorf("schema version %d, want %d (%v)", version, schemaVersion, err)
+	}
+}
+
+// A versioned name keeps its word in the index: the number is dropped, but "PostgreSQL" is still searchable.
+func TestVersionedNameKeepsItsWordInTheIndex(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.Add("PostgreSQL-16 runs in a container on port 55432.", nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := ids(t, s, "postgresql")[f.ID]; !ok {
+		t.Error("a versioned name dropped its word from the index")
+	}
+}
+
+// A version-2 base indexed a versioned name as one ticket term; opening it rebuilds the stems, so the system word is
+// searchable again.
+func TestOpeningAVersion2BaseRebuildsVersionedStems(t *testing.T) {
+	s, path := open(t)
+	f, err := s.Add("PostgreSQL-16 runs in a container on port 55432.", nil, "x 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What version 2 wrote for "PostgreSQL-16": one ticket term, no "postgresql" stem.
+	if _, err := s.db.Exec(`UPDATE fact_index SET stems = ? WHERE id = ?`, "tkpostgresql16", f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`PRAGMA user_version = 2`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
+		t.Errorf("schema version %d, want %d (%v)", version, schemaVersion, err)
+	}
+	if _, ok := ids(t, s, "postgresql")[f.ID]; !ok {
+		t.Error("a reopened version-2 base does not index the versioned name")
 	}
 }
 

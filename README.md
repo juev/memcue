@@ -17,9 +17,10 @@ through hooks:
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
 takes about 10 ms per prompt. A fact keeps where and when it was learnt and where it holds (`scope`), but facts from
 every repository are searched: what you learnt in one project is recalled in another. On equal scores a fact of the
-current host comes first; nothing is excluded, because working on a server from a laptop is normal. A ticket key such
-as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a prompt naming it recalls that ticket and not another
-number; bare numbers, ports and versions are still left out of the index.
+current host comes first; nothing is excluded, because working on a server from a laptop is normal. An uppercase
+ticket key such as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a prompt naming it recalls that ticket
+and not another number; bare numbers, ports and versions are still left out of the index. A versioned name such as
+`PostgreSQL-16` is not a ticket: it keeps `PostgreSQL` and drops `16`.
 
 The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. The same
 base works for [Hermes Agent](plugins/hermes/README.md).
@@ -81,9 +82,10 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 
 ## Upgrade
 
-The fact base schema is 2. memcue 0.2.0 and older refuse a newer base with `update memcue`: upgrade every machine that
+The fact base schema is 3. memcue 0.2.0 and older refuse a newer base with `update memcue`: upgrade every machine that
 shares the base before the first new memcue writes to it. In particular, 0.2.0 does not know review candidates and
-would index them as active after a merge, so there is no safe mixed-version sync.
+would index them as active after a merge, so there is no safe mixed-version sync. Opening a version-2 base rebuilds
+the derived index once: version 3 keeps the word of a versioned name such as `PostgreSQL-16`.
 
 ## Use
 
