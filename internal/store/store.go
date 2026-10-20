@@ -25,8 +25,9 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
-// The expires column was added without a bump: every reader names its columns, so a base with it stays readable by an
-// older memcue, and Open adds it to a base that predates it (ensureExpires).
+// The expires, kind, scope, source, evidence and review columns were added without a bump: every reader names its
+// columns, so a base with them stays readable by an older memcue, and Open adds them to a base that predates them
+// (ensureColumns).
 const schemaVersion = 1
 
 const schema = `
@@ -40,6 +41,11 @@ CREATE TABLE IF NOT EXISTS facts (
 	status   TEXT NOT NULL CHECK (status IN ('active', 'retired')),
 	author   TEXT NOT NULL DEFAULT '',
 	expires  TEXT NOT NULL DEFAULT '',
+	kind     TEXT NOT NULL DEFAULT '',
+	scope    TEXT NOT NULL DEFAULT '',
+	source   TEXT NOT NULL DEFAULT '',
+	evidence TEXT NOT NULL DEFAULT '',
+	review   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
@@ -53,6 +59,10 @@ const (
 	Retired = "retired"
 )
 
+// Candidate is the review state of an active fact that waits for the user's approval: it is stored but not indexed,
+// so recall never gives it.
+const Candidate = "candidate"
+
 // Fact is one version of a fact.
 type Fact struct {
 	ID       string
@@ -64,6 +74,16 @@ type Fact struct {
 	Status   string
 	Author   string // machine that wrote the version
 	Expires  string // last day the fact is worth recalling, "YYYY-MM-DD"; empty never expires
+	Meta
+}
+
+// Meta is what a fact is and what it rests on; every field may be empty, as in facts written before it existed.
+type Meta struct {
+	Kind     string // rule, decision, pitfall or environment
+	Scope    string // where it holds: global, host:<name>, repo:<name>
+	Source   string // who said it: user, user_confirmed, tool, agent, note, memory
+	Evidence string // the words of the source the fact rests on, verbatim
+	Review   string // Candidate while it waits for approval, else empty
 }
 
 // ErrNotFound: no fact with that id.
@@ -93,21 +113,25 @@ func Open(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := s.ensureExpires(); err != nil {
+	if err := s.ensureColumns(); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 	return s, nil
 }
 
-// ensureExpires adds the expires column to a base written before it existed. The column is additive: an older memcue
-// reads the base as it did, because every query names the columns it wants.
-func (s *Store) ensureExpires() error {
+// added are the columns a base may predate; each is additive: an older memcue reads the base as it did, because every
+// query names the columns it wants.
+var added = []string{"expires", "kind", "scope", "source", "evidence", "review"}
+
+// ensureColumns adds to a base the columns written after it was created.
+func (s *Store) ensureColumns() error {
 	rows, err := s.db.Query(`PRAGMA table_info(facts)`)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rows.Close() }()
+	have := map[string]bool{}
 	for rows.Next() {
 		var (
 			cid, notnull, pk int
@@ -117,15 +141,20 @@ func (s *Store) ensureExpires() error {
 		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
 			return err
 		}
-		if name == "expires" {
-			return nil
-		}
+		have[name] = true
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`ALTER TABLE facts ADD COLUMN expires TEXT NOT NULL DEFAULT ''`)
-	return err
+	_ = rows.Close()
+	for _, c := range added {
+		if !have[c] {
+			if _, err := s.db.Exec(`ALTER TABLE facts ADD COLUMN ` + c + ` TEXT NOT NULL DEFAULT ''`); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Close closes the base.
@@ -160,6 +189,12 @@ func (s *Store) Add(content string, keywords []string, origin string) (Fact, err
 // AddExpiring stores a new fact as version 1 with the last day it is worth recalling ("YYYY-MM-DD"; empty never
 // expires).
 func (s *Store) AddExpiring(content string, keywords []string, origin, expires string) (Fact, error) {
+	return s.AddWith(content, keywords, origin, expires, Meta{})
+}
+
+// AddWith stores a new fact as version 1 with what it is and what it rests on. A fact with Review Candidate is not
+// recalled until it is approved.
+func (s *Store) AddWith(content string, keywords []string, origin, expires string, m Meta) (Fact, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return Fact{}, errors.New("empty fact")
@@ -172,7 +207,7 @@ func (s *Store) AddExpiring(content string, keywords []string, origin, expires s
 		return Fact{}, err
 	}
 	f := Fact{ID: id.String(), Version: 1, Content: content, Keywords: keywords, Origin: origin,
-		Created: s.now().UTC(), Status: Active, Author: s.author, Expires: expires}
+		Created: s.now().UTC(), Status: Active, Author: s.author, Expires: expires, Meta: m}
 	return f, s.write(f)
 }
 
@@ -237,9 +272,7 @@ func (s *Store) write(f Fact) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author, expires)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version, f.Content, strings.Join(f.Keywords, ", "), f.Origin,
-		f.Created.Format(time.RFC3339Nano), f.Status, f.Author, f.Expires); err != nil {
+	if err := insert(tx, f); err != nil {
 		return err
 	}
 	if err := reindex(tx, f.ID); err != nil {
@@ -248,7 +281,16 @@ func (s *Store) write(f Fact) error {
 	return tx.Commit()
 }
 
-// reindex puts the latest version of id into the FTS index, or takes it out when that version is retired.
+// insert writes one version as it is.
+func insert(tx *sql.Tx, f Fact) error {
+	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
+		f.Content, strings.Join(f.Keywords, ", "), f.Origin, f.Created.Format(time.RFC3339Nano), f.Status, f.Author,
+		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review)
+	return err
+}
+
+// reindex puts the latest version of id into the FTS index, or takes it out when that version is retired or a
+// candidate.
 func reindex(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec(`INSERT INTO fact_fts(fact_fts, rowid, stems) SELECT 'delete', rid, stems FROM fact_index
 		WHERE id = ?`, id); err != nil {
@@ -257,10 +299,10 @@ func reindex(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec(`DELETE FROM fact_index WHERE id = ?`, id); err != nil {
 		return err
 	}
-	var content, keywords, status string
-	err := tx.QueryRow(`SELECT content, keywords, status FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`, id).
-		Scan(&content, &keywords, &status)
-	if errors.Is(err, sql.ErrNoRows) || status == Retired {
+	var content, keywords, status, review string
+	err := tx.QueryRow(`SELECT content, keywords, status, review FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`,
+		id).Scan(&content, &keywords, &status, &review)
+	if errors.Is(err, sql.ErrNoRows) || status == Retired || review == Candidate {
 		return nil
 	}
 	if err != nil {
@@ -316,13 +358,13 @@ func (s *Store) Rebuild() error {
 	return tx.Commit()
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author, expires`
+const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review`
 
 func scan(row interface{ Scan(...any) error }) (Fact, error) {
 	var f Fact
 	var keywords, created string
 	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author,
-		&f.Expires); err != nil {
+		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review); err != nil {
 		return Fact{}, err
 	}
 	if keywords != "" {
@@ -351,7 +393,7 @@ func (s *Store) Rows() ([]Fact, error) {
 	return s.query(`SELECT ` + columns + ` FROM facts ORDER BY id, version`)
 }
 
-// Active returns the latest version of every fact that is not retired.
+// Active returns the latest version of every fact that is not retired and not a candidate.
 func (s *Store) Active() ([]Fact, error) {
 	return s.query(`SELECT ` + qualified("f") + ` FROM facts f JOIN fact_index i ON i.id = f.id
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) ORDER BY f.id`)
@@ -410,7 +452,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 		var h Hit
 		var stems, keywords, created string
 		if err := rows.Scan(&stems, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
-			&h.Author, &h.Expires); err != nil {
+			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review); err != nil {
 			return nil, err
 		}
 		if keywords != "" {
