@@ -25,6 +25,7 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
+	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
 	Today          string          // "YYYY-MM-DD" the expired facts are judged by; empty means time.Now().UTC()
 }
@@ -44,8 +45,9 @@ var Default = Params{
 // Hit is a fact chosen for the prompt.
 type Hit struct {
 	store.Fact
-	Coverage float64
-	Matched  int
+	Coverage  float64
+	Matched   int
+	Displaced bool // a fact of another host took a slot while a fact of this host was left out
 }
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
@@ -128,15 +130,18 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched})
 		}
 	}
-	// Ties: a fact learnt in the session's repository, then a global one, then the rest; then the newer fact.
+	// Ties: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
+	// then the newer fact. The host only orders facts of equal coverage; it never excludes another host's fact.
 	place := func(h Hit) int {
 		switch {
-		case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
+		case hostScope(h.Scope, p.Host):
 			return 0
-		case strings.HasPrefix(h.Origin, tier.Global+" "):
+		case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
 			return 1
+		case strings.HasPrefix(h.Origin, tier.Global+" "):
+			return 2
 		}
-		return 2
+		return 3
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		if hits[i].Coverage != hits[j].Coverage {
@@ -147,8 +152,40 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		}
 		return hits[i].ID > hits[j].ID
 	})
+	served := hits
 	if len(hits) > p.MaxFacts {
-		hits = hits[:p.MaxFacts]
+		served = hits[:p.MaxFacts]
 	}
-	return hits, nil
+	// Did another host take one of the slots while a fact of this host was left out? The log uses this to decide
+	// whether a hard filter is ever needed; it never changes the choice.
+	if p.Host != "" {
+		omitted := false
+		for _, h := range hits[len(served):] {
+			if hostScope(h.Scope, p.Host) {
+				omitted = true
+				break
+			}
+		}
+		if omitted {
+			for i := range served {
+				if otherHostScope(served[i].Scope, p.Host) {
+					served[i].Displaced = true
+				}
+			}
+		}
+	}
+	return served, nil
+}
+
+// hostScope reports whether scope names this host.
+func hostScope(scope, host string) bool {
+	return host != "" && strings.EqualFold(scope, "host:"+host)
+}
+
+// otherHostScope reports whether scope names a host other than this one.
+func otherHostScope(scope, host string) bool {
+	if host == "" || !strings.HasPrefix(strings.ToLower(scope), "host:") {
+		return false
+	}
+	return !hostScope(scope, host)
 }

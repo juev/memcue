@@ -328,6 +328,20 @@ class ProviderTest(unittest.TestCase):
                              capture_output=True, text=True).stdout
         return [line for line in out.splitlines() if line]
 
+    def test_host_config_is_forwarded_to_memcue(self):
+        script = Path(self.home) / "host.sh"
+        script.write_text("#!/bin/sh\nprintf '%s' \"$MEMCUE_HOST\"\n", encoding="utf-8")
+        script.chmod(0o755)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "host": "mac"})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        ok, out = p._run([])
+        self.assertTrue(ok)
+        self.assertEqual(out, "mac")
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "host": "mac", "extract_url": "http://x",
+                                                   "extract_model": "m"})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.assertEqual(p._extract_env()["MEMCUE_HOST"], "mac")
+
     def test_missing_binary_is_unavailable(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": "/nonexistent/memcue"})
         self.assertFalse(p.is_available())

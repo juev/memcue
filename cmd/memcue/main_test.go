@@ -116,6 +116,63 @@ func TestRenderOmitsEmptyOrigin(t *testing.T) {
 	}
 }
 
+func TestRenderShowsScope(t *testing.T) {
+	got := render([]recall.Hit{{Fact: store.Fact{Content: "факт", Origin: "x 2026-10-19", Scope: "host:mac"}}})
+	if !strings.Contains(got, "(learnt: x 2026-10-19; scope: host:mac)") {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestRecallLogRecordsScopeHostAndDisplacement(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_HOST", "mac")
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
+	hits := []recall.Hit{{Fact: store.Fact{ID: "01TEST", Scope: "host:loffe"}, Coverage: 0.5, Displaced: true}}
+	logRecall("s1", dir, "прокси", hits, time.Millisecond)
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec recallRecord
+	if err := json.Unmarshal(bytes.TrimSpace(b), &rec); err != nil {
+		t.Fatalf("%q: %v", b, err)
+	}
+	if rec.Host != "mac" || !rec.Displaced || len(rec.Facts) != 1 || rec.Facts[0].Scope != "host:loffe" ||
+		!rec.Facts[0].Displaced {
+		t.Errorf("record %+v", rec)
+	}
+}
+
+func TestHookShowsAndLogsScope(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_HOST", "mac")
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Vaultwarden на этом хосте обслуживает vault.example.org.", []string{"vaultwarden", "vault"},
+		"x 2026-10-20", "", store.Meta{Kind: "environment", Scope: "host:mac"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	ctx := hookContext(t, dir, "s1", "vaultwarden vault")
+	if !strings.Contains(ctx, "scope: host:mac") {
+		t.Fatalf("hook output lacks scope: %q", ctx)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec recallRecord
+	if err := json.Unmarshal(bytes.TrimSpace(b), &rec); err != nil {
+		t.Fatalf("%q: %v", b, err)
+	}
+	if rec.Host != "mac" || len(rec.Facts) != 1 || rec.Facts[0].Scope != "host:mac" {
+		t.Errorf("record %+v", rec)
+	}
+}
+
 func TestHookLogsEveryPrompt(t *testing.T) {
 	dir := env(t)
 	seed(t)

@@ -21,6 +21,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
           characters and rarely holds a durable fact)
   extract_max_message_chars: cut a message to this many characters before extraction (default 4000)
   min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15)
+  host: name of this machine for fact scope and the recall tie-break (passed as MEMCUE_HOST; default: the
+          environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway
           (default true; mirrored facts carry the origin ``hermes-memory``)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
@@ -143,6 +145,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
         self._tick = _TICK
         self._min_coverage = self._config.get("min_coverage")
+        self._host = str(self._config.get("host") or "")
         self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
         self._usage_log = _on(self._config.get("usage_log"))
         self._state_dir = str(self._config.get("state_dir") or "")
@@ -196,6 +199,8 @@ class MemcueMemoryProvider(MemoryProvider):
         if not binary:
             return False, "memcue binary not found"
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_EXTRACT="0")
+        if self._host:
+            env["MEMCUE_HOST"] = self._host
         if self._min_coverage is not None:
             env["MEMCUE_MIN_COVERAGE"] = str(self._min_coverage)
         try:
@@ -286,7 +291,10 @@ class MemcueMemoryProvider(MemoryProvider):
         if not (url and model and self._writes):
             return None
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")
-        return dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
+        env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
+        if self._host:
+            env["MEMCUE_HOST"] = self._host
+        return env
 
     def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "",
                                on_done: Optional[Callable[[bool], None]] = None) -> None:

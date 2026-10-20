@@ -334,12 +334,16 @@ func storeExtracted(text string, rec *extractRecord) error {
 
 // hostLine names the machine a session ran on, for the model to tell a fact of this host from a global one.
 // MEMCUE_HOST names it where the host name is meaningless, such as a container.
-func hostLine() string {
-	host := os.Getenv("MEMCUE_HOST")
-	if host == "" {
-		host, _ = os.Hostname()
+func hostLine() string { return "хост " + currentHost() + ", " + runtime.GOOS }
+
+// currentHost names the machine for fact scope and the recall tie-break. MEMCUE_HOST matters where the host name
+// is unstable, such as a container; the Hermes provider forwards its `host` option through it.
+func currentHost() string {
+	if host := os.Getenv("MEMCUE_HOST"); host != "" {
+		return host
 	}
-	return "хост " + host + ", " + runtime.GOOS
+	host, _ := os.Hostname()
+	return host
 }
 
 func clip(s string, n int) string {

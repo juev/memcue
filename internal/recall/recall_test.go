@@ -126,6 +126,48 @@ func TestTicketKeyRecallsExactOnly(t *testing.T) {
 	}
 }
 
+// At equal coverage a fact of this host wins the tie, without excluding the other host.
+func TestCurrentHostWinsTies(t *testing.T) {
+	s := setup(t)
+	a, err := s.AddWith("Кэш memcached на этом хосте.", []string{"кэш", "memcached"},
+		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:mac"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Кэш memcached на этом хосте.", []string{"кэш", "memcached"},
+		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:loffe"}); err != nil {
+		t.Fatal(err)
+	}
+	p := Default
+	p.Host = "mac"
+	p.MinMatched, p.MinCoverage, p.MaxFacts = 2, 0, 1
+	hs, err := Recall(s, "кэш memcached", "", p)
+	if err != nil || len(hs) != 1 || hs[0].ID != a.ID {
+		t.Errorf("got %+v %v, want %s", hs, err, a.ID)
+	}
+}
+
+// A fact of another host that takes a slot while a fact of this host is left out is marked in the hit and the log.
+func TestOtherHostDisplacementIsMarked(t *testing.T) {
+	s := setup(t)
+	if _, err := s.AddWith("Кэш на этом хосте.", []string{"кэш"}, "loadtest 2026-10-10", "",
+		store.Meta{Kind: "environment", Scope: "host:mac"}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.AddWith("Кэш redis на 127.0.0.1:6379, порт по умолчанию.", []string{"кэш", "redis"},
+		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:loffe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := Default
+	p.Host = "mac"
+	p.MinMatched, p.MinCoverage, p.MaxFacts = 1, 0, 1
+	hs, err := Recall(s, "кэш redis", "", p)
+	if err != nil || len(hs) != 1 || hs[0].ID != b.ID || !hs[0].Displaced {
+		t.Errorf("got %+v %v, want displaced %s", hs, err, b.ID)
+	}
+}
+
 func TestExpiredFactIsNotRecalled(t *testing.T) {
 	s := setup(t)
 	f, err := s.AddExpiring("Стенд нагрузки поднимается на порту 8443 в staging.", []string{"staging"},
