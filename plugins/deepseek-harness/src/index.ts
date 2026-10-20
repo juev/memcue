@@ -56,6 +56,7 @@ function settingsOf(config) {
 		minNewChars: Number.isFinite(config?.minNewChars) ? config.minNewChars : MIN_NEW_CHARS,
 		stateDir: config?.stateDir || stateDir(),
 		searchLimit: Number.isFinite(config?.searchLimit) ? config.searchLimit : 5,
+		maxToolResultChars: Number.isFinite(config?.maxToolResultChars) ? config.maxToolResultChars : 1500,
 	}
 }
 
@@ -185,7 +186,7 @@ async function readOffset(path) {
 }
 
 /** Model-shaped messages out of the session log since the last extraction. */
-function messagesSince(session, from) {
+function messagesSince(session, from, settings) {
 	const messages = []
 	for (let seq = from; seq < session.seq; seq += 1) {
 		const event = session.eventAt(seq)
@@ -197,6 +198,11 @@ function messagesSince(session, from) {
 		} else if (event.type === 'assistant/message') {
 			const text = textOf(event.data?.message).trim()
 			if (text) messages.push({ role: 'assistant', content: text })
+		} else if (event.type === 'tool/result') {
+			// Tool output is the only place a tool-sourced fact can quote its evidence, and memcue's
+			// write policy rejects such a fact without it. Keep it short: the binary cuts it again.
+			const text = textOf(event.data?.message).trim()
+			if (text) messages.push({ role: 'tool', content: text.slice(0, settings.maxToolResultChars) })
 		}
 	}
 	return messages
@@ -252,7 +258,7 @@ export function apply(ctx, config) {
 				try {
 					const path = statePathFor(settings, sessionId)
 					const from = await readOffset(path)
-					const messages = messagesSince(session, from)
+					const messages = messagesSince(session, from, settings)
 					const chars = messages.reduce((total, message) => total + message.content.length, 0)
 					if (chars < settings.minNewChars) return
 					const seq = session.seq

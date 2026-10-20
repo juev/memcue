@@ -119,6 +119,18 @@ async function waitForLog(needle, timeoutMs = 5000) {
 	throw new Error(`stub log never saw ${needle}`)
 }
 
+/** Drop what earlier tests recorded, so a wait cannot match their lines. */
+async function resetLog() {
+	await writeFile(log, '')
+}
+
+/** The payload of the last line the stub recorded with this marker. */
+function lastPayload(text, marker) {
+	const line = text.split('\n').filter((row) => row.startsWith(marker)).pop()
+	if (line === undefined) throw new Error(`no ${marker} line in the stub log`)
+	return line.slice(marker.length)
+}
+
 test('a matching fact reaches the step as a recall message', async () => {
 	const { listeners } = mount()
 	const decision = await preStep(listeners, [userMessage('what is the harness base?')])
@@ -132,13 +144,14 @@ test('a matching fact reaches the step as a recall message', async () => {
 })
 
 test('the binary is asked with the real prompt, not with injected context', async () => {
+	await resetLog()
 	const { listeners } = mount()
 	await preStep(listeners, [
 		userMessage('what is the harness base?'),
 		userMessage('Current runtime context. Snapshot 42.', { kind: 'runtime-context', form: 'snapshot', sections: [] }),
 	])
 	const text = await waitForLog('hook-input')
-	const input = JSON.parse(text.split('hook-input: ')[1].split('\n')[0])
+	const input = JSON.parse(lastPayload(text, 'hook-input: '))
 	assert.equal(input.prompt, 'what is the harness base?')
 	assert.equal(input.session_id, 's1')
 	assert.equal(input.cwd, dir)
@@ -151,23 +164,43 @@ test('no facts mean no message', async () => {
 })
 
 test('a turn end sends the new messages to extract-messages', async () => {
+	await resetLog()
 	const { listeners } = mount()
 	const events = [
 		{ type: 'turn/start', data: { turn: 1 } },
 		{ type: 'user/message', data: userMessage('remember the base port') },
 		{ type: 'user/message', data: userMessage('injected', { kind: 'runtime-context', form: 'snapshot', sections: [] }) },
 		{ type: 'assistant/message', data: { turn: 1, step: 1, message: { role: 'assistant', content: [{ type: 'text', text: 'noted' }] } } },
+		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'PORT=55432\nsecond line' }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
 	const session = { id: 's2', seq: events.length, eventAt: (seq) => events[seq] }
 	const [listener] = listeners.get('session/event')
 	listener(session, events[events.length - 1])
 	const text = await waitForLog('extract-input')
-	const sent = JSON.parse(text.split('extract-input: ')[1].split('\n')[0])
+	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
 	assert.deepEqual(sent, [
 		{ role: 'user', content: 'remember the base port' },
 		{ role: 'assistant', content: 'noted' },
+		{ role: 'tool', content: 'PORT=55432\nsecond line' },
 	])
+})
+
+test('tool output sent to extraction is capped', async () => {
+	await resetLog()
+	const { listeners } = mount({ maxToolResultChars: 10 })
+	const events = [
+		{ type: 'user/message', data: userMessage('look at the port') },
+		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'x'.repeat(500) }] } } },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's3', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+	listener(session, events[events.length - 1])
+	const text = await waitForLog('extract-input')
+	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
+	assert.equal(sent[1].role, 'tool')
+	assert.equal(sent[1].content.length, 10)
 })
 
 test('a missing binary costs the facts, not the step', async () => {
@@ -191,6 +224,7 @@ test('memcue_search returns the facts the binary printed', async () => {
 })
 
 test('memcue_add reports success and writes nothing itself', async () => {
+	await resetLog()
 	const { tools } = mount()
 	const result = await tools.get('memcue_add').execute({ text: 'A new fact.', keywords: 'new, fact' }, {})
 	assert.equal(result.stored, true)
