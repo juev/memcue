@@ -47,6 +47,7 @@ commands:
   add       store a fact: memcue add [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] TEXT
   candidates list the facts that wait for approval: memcue candidates [-json]
   approve   take candidates into recall: memcue approve ID...
+  review    approve or reject candidates on a local page: memcue review [-addr 127.0.0.1:0] [-no-open]
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   facts     list the active facts
@@ -116,6 +117,8 @@ func main() {
 		err = runCandidates(os.Args[2:], os.Stdout)
 	case "approve":
 		err = runApprove(os.Args[2:], os.Stdout)
+	case "review":
+		err = runReview(os.Args[2:], os.Stdout)
 	case "retire":
 		err = runRetire(os.Args[2:], os.Stdout)
 	case "facts":

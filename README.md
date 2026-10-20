@@ -90,8 +90,9 @@ memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
-memcue candidates                    # extracted facts waiting for approval (-json for a JSON array)
+memcue candidates                    # extracted facts waiting for approval, newest first (-json for a JSON array)
 memcue approve ID [ID ...]           # take candidates into recall
+memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
@@ -99,6 +100,12 @@ memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
 memcue dream -apply plan.json              # carry it out later, without the model
 ```
+
+`memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
+evidence, origin and date; filters by kind and source; approves or rejects several at once; and undoes the last
+action. Rejecting retires the fact and writes `rejected in review` to `$XDG_STATE_HOME/memcue/review.log`; an
+approval is logged there too. The page has no external assets and works offline. `-addr` must stay a loopback
+address, and `-no-open` only prints the URL.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
@@ -152,7 +159,7 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
 | `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the first 500 characters of the
 prompt and the facts it got, if any, with their coverage. It stays on your machine and is what you judge recall by;
