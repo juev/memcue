@@ -105,6 +105,8 @@ memcue dream -since 2026-10-19 -list # groups of similar facts a dream would rev
 memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
 memcue dream -apply plan.json              # carry it out later, without the model
+memcue audit -dry-run -plan audit.json     # propose old journal and CI facts to retire
+memcue audit -apply audit.json             # carry out the retire decisions after review
 ```
 
 `memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
@@ -116,6 +118,13 @@ address, and `-no-open` only prints the URL.
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
 never served it.
+
+`memcue audit` is the one-off clean-up of the migrated base. It proposes active facts that read as a journal entry
+(a date next to "обновили", "упал", …) or a retelling of CI or a Makefile, and writes them with a reason, their
+`last_recalled` and card delivery to a JSON plan. Mark each proposal `retire` or `keep`, then apply the plan:
+`-min-precision` (default 0.95) refuses a whole heuristic whose labelled precision is lower, and a fact changed since
+the plan is not retired on stale text. The plan, the measured precision and every applied or refused decision go to
+`audit.log`. Usage only orders the review; it never retires a fact by itself.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
@@ -170,7 +179,7 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
 | `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/card.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/card.log`, `memcue/audit.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
