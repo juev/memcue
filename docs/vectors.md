@@ -32,6 +32,8 @@ memcue embed -dry-run   # how many active facts have no vector for this model
 memcue embed            # 32 facts per request; -batch N, -limit N and -timeout 2m change that
 ```
 
+233 facts against a local `bge-m3` took 54 seconds on one host (8 requests of 32, model warm-up included).
+
 `add` and `correct` never call the endpoint: a fact without a vector simply does not take part in the meaning pass
 until the next `memcue embed`.
 
