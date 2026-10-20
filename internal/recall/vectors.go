@@ -19,6 +19,10 @@ type Embedder interface {
 // VectorParams are the knobs of the meaning pass. The zero value (no Embedder) means it never runs.
 type VectorParams struct {
 	Embedder Embedder
+	// Only makes the meaning pass the only reader: the words are not consulted at all, and the answer is what the
+	// vectors found, even when that is nothing. A failing endpoint still falls back to the words, so a dead model
+	// costs precision, never the memory itself.
+	Only bool
 	// Margin is how far above the chance maximum a fact's similarity must stand to be offered on meaning alone, in
 	// standard deviations of this query's similarities. The chance maximum grows with the store as sqrt(2 ln N), so
 	// the bar rises with the base while a paraphrase of a stored fact keeps standing out.
@@ -41,12 +45,42 @@ const MinVectors = 8
 // RecallHybrid is Recall plus, when the words were not enough, one pass over the meaning of the prompt. Any failure
 // of the embedder leaves the lexical result exactly as it was: recall never gets worse because the endpoint is
 // missing, slow or wrong.
+//
+// With VectorParams.Only the meaning pass is the only reader: what it found is the answer, and the words are read
+// only when the endpoint fails or the base has no vectors to compare.
 func RecallHybrid(s *store.Store, prompt, sessionTier string, p Params, vp VectorParams) ([]Hit, error) {
+	if vp.Embedder != nil && vp.Only {
+		hits, answered, err := onlyMeaning(s, prompt, p, vp)
+		if err != nil {
+			return nil, err
+		}
+		if answered {
+			return hits, nil
+		}
+	}
 	hits, err := Recall(s, prompt, sessionTier, p)
 	if err != nil {
 		return nil, err
 	}
 	return byMeaning(s, prompt, p, vp, hits)
+}
+
+// onlyMeaning is the meaning pass as the only reader. answered is false when it could not decide — the endpoint failed
+// or the base has nothing to compare — and the caller is to fall back to the words.
+func onlyMeaning(s *store.Store, prompt string, p Params, vp VectorParams) ([]Hit, bool, error) {
+	rows, err := s.Vectors(vp.Embedder.Tag())
+	if err != nil || len(rows) < MinVectors {
+		return nil, false, nil
+	}
+	query, err := embed1(vp.Embedder, prompt)
+	if err != nil || query == nil {
+		return nil, false, nil
+	}
+	hits, err := meaningHits(s, rows, query, p, vp, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	return hits, true, nil
 }
 
 // byMeaning adds at most the room left by MaxFacts facts that stand out from the rest of the base by meaning.
@@ -65,12 +99,20 @@ func byMeaning(s *store.Store, prompt string, p Params, vp VectorParams, hits []
 	if err != nil || len(rows) < MinVectors {
 		return hits, nil
 	}
-	vectors, err := vp.Embedder.Embed(context.Background(), []string{prompt})
-	if err != nil || len(vectors) == 0 || len(vectors[0]) == 0 {
+	query, err := embed1(vp.Embedder, prompt)
+	if err != nil || query == nil {
 		return hits, nil
 	}
-	query := vectors[0]
+	return meaningHits(s, rows, query, p, vp, hits)
+}
 
+// meaningHits decides which facts stand out for query and appends them to hits.
+func meaningHits(s *store.Store, rows []store.VectorRow, query []float32, p Params, vp VectorParams,
+	hits []Hit) ([]Hit, error) {
+	maxFacts := vp.MaxFacts
+	if maxFacts <= 0 {
+		maxFacts = p.MaxFacts
+	}
 	today := p.Today
 	if today == "" {
 		today = time.Now().UTC().Format(time.DateOnly)
@@ -136,4 +178,16 @@ func byMeaning(s *store.Store, prompt string, p Params, vp VectorParams, hits []
 		room--
 	}
 	return hits, nil
+}
+
+// embed1 asks the embedder for the vector of one text.
+func embed1(e Embedder, text string) ([]float32, error) {
+	vectors, err := e.Embed(context.Background(), []string{text})
+	if err != nil {
+		return nil, err
+	}
+	if len(vectors) == 0 || len(vectors[0]) == 0 {
+		return nil, nil
+	}
+	return vectors[0], nil
 }

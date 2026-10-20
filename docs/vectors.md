@@ -66,6 +66,28 @@ The bar therefore rises as the base grows, while a paraphrase of a stored fact k
 another model, or made from another version of the text, are never compared: each vector carries its model tag and
 the hash of the text it was made from.
 
+## Two modes
+
+`MEMCUE_EMBED_MODE` decides who reads the base.
+
+- unset or `fallback` (default): the words first; the pass adds facts only when they found fewer than the limit.
+- `only`: the pass is the only reader, and what it finds is the answer — even when that is nothing. The words are
+  read only when the endpoint fails or the base has no vectors yet, so a dead model costs precision, never memory.
+
+Measured on the 120-prompt labelled set (233 facts of `bge-m3`), counting what `memcue eval` reports:
+
+| mode | prompts with a fact | labelled useful | all facts | into prompts needing no memory |
+|---|---|---|---|---|
+| words only | 73 | 13 | 127 | 45 |
+| fallback, margin 1.0 (default) | 87 | 13 | 159 | 52 |
+| only, margin 1.0 | 46 | 3 | 64 | 14 |
+| only, floor 0.62 | 49 | 8 | 84 | 25 |
+
+Vector-only is the weaker reader on this base: it keeps 3-8 of the 13 prompts the words serve, because bge-m3's
+similarities are flat enough that a gate strict enough to keep noise out also throws out paraphrases. Its one
+advantage is noise — it never served a fact the judges called NOISE. `only` is there for an experiment or for a base
+where the words have proven uselessly imprecise, not as an improvement over the default.
+
 ## When the endpoint is down, slow or wrong
 
 Recall falls back to the words, silently and with the same answer it would have given before the feature existed.

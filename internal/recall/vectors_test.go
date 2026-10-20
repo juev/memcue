@@ -194,3 +194,59 @@ func ids(hits []Hit) []string {
 	}
 	return out
 }
+
+func TestOnlyModeIgnoresTheWords(t *testing.T) {
+	s, _ := meaningBase(t)
+	// The words alone would find this fact; the vector gate finds nothing for the prompt, and in only mode that
+	// nothing is the answer.
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
+	lexical, err := Recall(s, prompt, "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lexical) == 0 {
+		t.Fatal("the test needs a prompt the words do find")
+	}
+	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: modelTag, vec: []float32{0, 1}}}
+	hits, err := RecallHybrid(s, prompt, "", Default, vp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("hits = %v: only mode must not consult the words", ids(hits))
+	}
+}
+
+func TestOnlyModeFallsBackWhenTheEndpointFails(t *testing.T) {
+	s, _ := meaningBase(t)
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
+	lexical, err := Recall(s, prompt, "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: modelTag, err: errors.New("down")}}
+	hits, err := RecallHybrid(s, prompt, "", Default, vp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != len(lexical) || (len(hits) > 0 && hits[0].ID != lexical[0].ID) {
+		t.Fatalf("a dead endpoint must leave the words: %v vs %v", ids(hits), ids(lexical))
+	}
+}
+
+func TestOnlyModeWithoutVectorsFallsBack(t *testing.T) {
+	s, _ := meaningBase(t)
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
+	lexical, err := Recall(s, prompt, "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: "https://elsewhere/v1/other-model", vec: []float32{1, 0}}}
+	hits, err := RecallHybrid(s, prompt, "", Default, vp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != len(lexical) {
+		t.Fatalf("hits = %v, want the words %v", ids(hits), ids(lexical))
+	}
+}

@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/juev/memcue/internal/embed"
@@ -21,6 +23,7 @@ func vectorParams() recall.VectorParams {
 		Margin:   embed.ParseMargin("MEMCUE_EMBED_MARGIN", recall.DefaultVectorMargin),
 		MinScore: embed.ParseScore("MEMCUE_EMBED_MIN_SCORE"),
 		MaxFacts: embed.ParseCount("MEMCUE_EMBED_MAX_FACTS"),
+		Only:     strings.EqualFold(strings.TrimSpace(os.Getenv("MEMCUE_EMBED_MODE")), "only"),
 	}
 	set := embed.FromEnv()
 	if set == nil {

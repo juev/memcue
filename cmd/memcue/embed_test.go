@@ -163,3 +163,14 @@ func TestVectorParamsReadTheMargin(t *testing.T) {
 		t.Fatalf("a malformed margin must keep the default, got %v", vp.Margin)
 	}
 }
+
+func TestOnlyModeIsReadFromTheEnvironment(t *testing.T) {
+	t.Setenv("MEMCUE_EMBED_MODE", "only")
+	if vp := vectorParams(); !vp.Only {
+		t.Fatal("MEMCUE_EMBED_MODE=only did not reach the params")
+	}
+	t.Setenv("MEMCUE_EMBED_MODE", "fallback")
+	if vp := vectorParams(); vp.Only {
+		t.Fatal("any other value must keep the words first")
+	}
+}
