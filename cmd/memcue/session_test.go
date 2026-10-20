@@ -176,6 +176,62 @@ func TestSessionStartCardComesAgainAfterCompaction(t *testing.T) {
 	}
 }
 
+// An expired rule or decision leaves the card and card.log, while a fact whose expiry is today stays: the card
+// follows the same last-day rule as recall.
+func TestSessionStartCardDropsExpiredFacts(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := func(content, kind, scope, expires string) store.Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", expires, store.Meta{Kind: kind, Scope: scope, Source: "user"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	add("EXPIRED-RULE: old.", "rule", "global", "2026-01-01")
+	liveRule := add("LIVE-RULE: current.", "rule", "global", time.Now().UTC().Format(time.DateOnly))
+	add("EXPIRED-DECISION: old.", "decision", "repo:shop", "2026-01-01")
+	liveDecision := add("LIVE-DECISION: current.", "decision", "repo:shop", "")
+	_ = s.Close()
+
+	ctx := sessionStartContext(t, repo, "startup", "s1")
+	for _, want := range []string{"LIVE-RULE", "LIVE-DECISION"} {
+		if !strings.Contains(ctx, want) {
+			t.Errorf("card lacks %q: %q", want, ctx)
+		}
+	}
+	for _, unwanted := range []string{"EXPIRED-RULE", "EXPIRED-DECISION"} {
+		if strings.Contains(ctx, unwanted) {
+			t.Errorf("card carries expired %q: %q", unwanted, ctx)
+		}
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "card.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec cardRecord
+	if err := json.Unmarshal(bytes.TrimSpace(b), &rec); err != nil {
+		t.Fatalf("card.log %q: %v", b, err)
+	}
+	want := map[string]bool{liveRule.ID: true, liveDecision.ID: true}
+	if len(rec.Facts) != len(want) {
+		t.Errorf("card.log ids %v, want %v", rec.Facts, want)
+	}
+	for _, id := range rec.Facts {
+		if !want[id] {
+			t.Errorf("card.log carries an expired or unknown fact %s", id)
+		}
+	}
+}
+
 func TestHookExtractRejectsPathInSessionID(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	for _, id := range []string{"../x", "a/b", "", ".."} {
