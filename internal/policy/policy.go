@@ -72,19 +72,22 @@ func quoted(record, role, evidence string) bool {
 	return false
 }
 
-// Secret says whether text holds a token in a known format, or a value labelled as a password, token, secret or key
-// that looks like one: six or more characters with a letter and a digit or a sign.
+// Secret says whether text holds a token in a known format, or a labelled value: after a password label any value of
+// four or more characters, letters or digits alike; after a token, secret or key label a value that looks like one
+// (six or more characters with a letter and a digit or a sign), so "token budget: 150000" is not one.
 func Secret(text string) bool {
 	if token.MatchString(text) {
 		return true
 	}
 	for _, m := range labelled.FindAllStringSubmatch(text, -1) {
-		if secretLike(m[2]) {
+		if password.MatchString(m[1]) && len([]rune(m[2])) >= 4 || secretLike(m[2]) {
 			return true
 		}
 	}
 	return false
 }
+
+var password = regexp.MustCompile(`(?i)^(password|passwd|pwd|passphrase|парол\p{L}*)$`)
 
 func secretLike(v string) bool {
 	if len([]rune(v)) < 6 {
