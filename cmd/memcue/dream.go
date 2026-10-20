@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -75,6 +77,7 @@ func runDream(args []string, out io.Writer) error {
 		return err
 	}
 	var from time.Time
+	var seen map[string]int
 	switch {
 	case *all:
 	case *since != "":
@@ -86,13 +89,16 @@ func runDream(args []string, out io.Writer) error {
 		if from, ok = lastDream(dir); !ok {
 			return errors.New("no dream yet on this machine: give -since DATE or -all")
 		}
+		if seen, err = readDreamSeen(dir); err != nil {
+			return err
+		}
 	}
 	unlock, err := lockDream(dir)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	rec, err := dream(dir, from, *dryRun, *list, out)
+	rec, err := dream(dir, from, seen, *dryRun, *list, out)
 	if *list {
 		return err
 	}
@@ -103,7 +109,8 @@ func runDream(args []string, out io.Writer) error {
 }
 
 // maybeDream runs a dream after an extraction when MEMCUE_DREAM=1 and a day has passed since the last one. The first
-// call only marks the start, so the base a machine already had is not swept by surprise (memcue dream -all does that).
+// call only marks the start and the facts the base holds, so the base a machine already had is not swept by surprise
+// (memcue dream -all does that).
 // Its failures go to dream.log and never fail the extraction.
 func maybeDream() {
 	if os.Getenv("MEMCUE_DREAM") != "1" {
@@ -115,7 +122,7 @@ func maybeDream() {
 	}
 	from, ok := lastDream(dir)
 	if !ok {
-		_ = markDream(dir, time.Now())
+		_ = markBase(dir)
 		return
 	}
 	if time.Since(from) < dreamEvery {
@@ -129,15 +136,18 @@ func maybeDream() {
 	if from, ok = lastDream(dir); !ok || time.Since(from) < dreamEvery { // it may have just finished
 		return
 	}
-	rec, err := dream(dir, from, false, false, io.Discard)
-	if err != nil {
+	seen, err := readDreamSeen(dir) // unreadable: the dream falls back to the facts written since the mark, and says why
+	rec, derr := dream(dir, from, seen, false, false, io.Discard)
+	if err = errors.Join(err, derr); err != nil {
 		rec.Error = err.Error()
 	}
 	_ = appendJSON(filepath.Join(dir, "dream.log"), rec)
 }
 
-// dream reviews the facts written since from; the zero time means every active fact.
-func dream(dir string, from time.Time, dryRun, list bool, out io.Writer) (dreamRecord, error) {
+// dream reviews the facts the last dream did not see: those of seen, the facts and versions it saw, missing. A fact
+// pulled from another machine is new to it whenever it was written. Without seen, it reviews the facts written since
+// from; the zero time means every active fact.
+func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, out io.Writer) (dreamRecord, error) {
 	start := time.Now()
 	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339), DryRun: dryRun}
 	s, err := store.Open(factsPath())
@@ -151,10 +161,11 @@ func dream(dir string, from time.Time, dryRun, list bool, out io.Writer) (dreamR
 	}
 	var fresh []store.Fact
 	for _, f := range active {
-		if !f.Created.Before(from) {
+		if seen != nil && seen[f.ID] != f.Version || seen == nil && !f.Created.Before(from) {
 			fresh = append(fresh, f)
 		}
 	}
+	saw := versions(active) // what the next dream counts as seen: the base now, with this dream's own changes
 	rec.Fresh = len(fresh)
 	groups, err := groupFacts(s, active, fresh)
 	if err != nil {
@@ -176,9 +187,11 @@ func dream(dir string, from time.Time, dryRun, list bool, out io.Writer) (dreamR
 		rec.Refused = append(rec.Refused, refused...)
 		for _, a := range ok {
 			if !dryRun {
-				if err := apply(s, a); err != nil {
+				f, err := apply(s, a)
+				if err != nil {
 					return rec, err
 				}
+				saw[f.ID] = f.Version // a retired fact is not active, so its entry is never compared again
 			}
 			rec.Actions = append(rec.Actions, a)
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
@@ -187,9 +200,68 @@ func dream(dir string, from time.Time, dryRun, list bool, out io.Writer) (dreamR
 		}
 	}
 	if !dryRun {
-		err = markDream(dir, start)
+		err = errors.Join(writeDreamSeen(dir, saw), markDream(dir, start))
 	}
 	return rec, err
+}
+
+// versions maps each fact to its version.
+func versions(facts []store.Fact) map[string]int {
+	m := make(map[string]int, len(facts))
+	for _, f := range facts {
+		m[f.ID] = f.Version
+	}
+	return m
+}
+
+// markBase marks a first dream on this machine: from now on, and with every fact the base holds already seen.
+func markBase(dir string) error {
+	s, err := store.Open(factsPath())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
+		return err
+	}
+	return errors.Join(writeDreamSeen(dir, versions(active)), markDream(dir, time.Now()))
+}
+
+// readDreamSeen reads the facts and versions the last dream saw, one "ID VERSION" a line; no file gives nil, and the dream
+// then goes by when facts were written, as before the file existed.
+func readDreamSeen(dir string) (map[string]int, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "dream.seen"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]int{}
+	for line := range strings.Lines(string(b)) {
+		id, v, ok := strings.Cut(strings.TrimSpace(line), " ")
+		n, err := strconv.Atoi(v)
+		if !ok || err != nil {
+			return nil, fmt.Errorf("dream.seen: bad line %q", strings.TrimSpace(line))
+		}
+		seen[id] = n
+	}
+	return seen, nil
+}
+
+// writeDreamSeen replaces dream.seen through a temporary file, so a crash leaves the old list or the new one.
+func writeDreamSeen(dir string, seen map[string]int) error {
+	ids := slices.Sorted(maps.Keys(seen))
+	var b strings.Builder
+	for _, id := range ids {
+		fmt.Fprintf(&b, "%s %d\n", id, seen[id])
+	}
+	tmp := filepath.Join(dir, "dream.seen.tmp")
+	if err := os.WriteFile(tmp, []byte(b.String()), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(dir, "dream.seen"))
 }
 
 func freshSet(fresh []store.Fact) map[string]bool {
@@ -309,22 +381,20 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 	return ok, refused
 }
 
-func apply(s *store.Store, a extract.Action) error {
-	var err error
+// apply makes one checked action and returns the version it wrote.
+func apply(s *store.Store, a extract.Action) (store.Fact, error) {
 	if a.Op == "retire" {
-		_, err = s.Retire(a.ID)
-		return err
+		return s.Retire(a.ID)
 	}
 	keywords := a.Keywords
 	if len(keywords) == 0 { // the model gave only the text: the words the fact is asked by stay
 		cur, err := s.Get(a.ID)
 		if err != nil {
-			return err
+			return store.Fact{}, err
 		}
 		keywords = cur.Keywords
 	}
-	_, err = s.Correct(a.ID, a.Content, keywords)
-	return err
+	return s.Correct(a.ID, a.Content, keywords)
 }
 
 func parseSince(v string) (time.Time, error) {

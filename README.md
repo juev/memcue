@@ -99,11 +99,16 @@ skips it, so a one-off reminder does not keep coming back months later. A correc
 a new one.
 
 Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it.
-`memcue dream` groups each fact written since the last dream with the stored facts close to it in words and asks
+`memcue dream` groups each fact the last dream did not see with the stored facts close to it in words and asks
 the model which to retire as a duplicate or as contradicted, and which to correct with merged text. The new text is
 built only from the facts of the group, every group keeps at least one fact, and each change goes to `dream.log`
 with its reason; a retired fact stays in the history. With `MEMCUE_DREAM=1` a dream runs after an extraction once a
 day; its first run on a machine only marks the start.
+
+A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`. A fact pulled from another machine
+after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
+Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
+and writes the file.
 
 ## Configuration
 
