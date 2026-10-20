@@ -27,12 +27,14 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
+// Version 4 adds fact_vectors: the optional vectors of the active facts, one per model tag, kept next to the facts
+// because a laptop without an embeddings endpoint simply has none of them (internal/embed).
 // Version 3 changes the stems again: a versioned name such as PostgreSQL-16 keeps its word and only the number is
 // dropped, while an uppercase ticket key such as PROJ-1234 stays one exact term. Opening an older base rebuilds the
 // derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,
 // scope, source, evidence, review, prompt_version); an older memcue refuses a newer base instead of reading
 // candidates as active facts.
-const schemaVersion = 3
+const schemaVersion = 4
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
@@ -56,6 +58,14 @@ CREATE TABLE IF NOT EXISTS facts (
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS fact_fts USING fts5(stems, content='fact_index', content_rowid='rid',
 	tokenize='unicode61 remove_diacritics 0');
+CREATE TABLE IF NOT EXISTS fact_vectors (
+	id        TEXT NOT NULL,
+	tag       TEXT NOT NULL,
+	dim       INTEGER NOT NULL,
+	text_hash TEXT NOT NULL,
+	vec       BLOB NOT NULL,
+	PRIMARY KEY (id, tag)
+) WITHOUT ROWID;
 `
 
 // Status of a fact version.
