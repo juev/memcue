@@ -46,13 +46,43 @@ func TestStemsFoldYo(t *testing.T) {
 	}
 }
 
-func TestNumbersVersionsAndIssueRefsNeverMatch(t *testing.T) {
-	for _, s := range []string{"1.27", "Go 1.27", "v0.21.6", "#20", "!123", "2026-10-19", "42", "(v1.2.3)"} {
+func TestNumbersVersionsAndPortsNeverMatch(t *testing.T) {
+	for _, s := range []string{"1.27", "Go 1.27", "v0.21.6", "port 55432", "2026-10-19", "42", "(v1.2.3)"} {
 		for _, st := range Stems(s) {
-			if st != "go" {
+			if st != "go" && st != "port" {
 				t.Errorf("%q gave stem %q", s, st)
 			}
 		}
+	}
+}
+
+// A ticket key is one exact term: VKPG-1914, #123 and !45 must survive the number filter with their number.
+func TestTicketKeysAreOneExactTerm(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"VKPG-1914", "tkvkpg1914"},
+		{"JIRA-12", "tkjira12"},
+		{"#123", "tkh123"},
+		{"!45", "tkb45"},
+	} {
+		got := Stems(tc.in)
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("%q gave %q, want [%q]", tc.in, got, tc.want)
+		}
+		if !IsTicket(got[0]) {
+			t.Errorf("%q is not recognized as a ticket term", got[0])
+		}
+	}
+	for _, s := range []string{"vkpg", "s3", "k8s", "gpt6", "1234"} {
+		if IsTicket(s) {
+			t.Errorf("%q is a ticket term", s)
+		}
+	}
+	got := Terms("давай брать VKPG-1914")
+	if !slices.Contains(got, "tkvkpg1914") {
+		t.Errorf("prompt lost its ticket: %q", got)
+	}
+	if slices.Contains(Terms("VKPG-1915"), "tkvkpg1914") {
+		t.Error("a different ticket produced the same term")
 	}
 }
 
@@ -72,7 +102,7 @@ func TestStopWordsAndShortWordsDropped(t *testing.T) {
 }
 
 func TestTermsDropActionWordsOfPrompts(t *testing.T) {
-	for _, s := range []string{"да, запускай эксперимент", "давай закрывать #20", "комит и создавай мр",
+	for _, s := range []string{"да, запускай эксперимент", "давай закрывать", "комит и создавай мр",
 		"ok, go ahead", "продолжаем"} {
 		got := Terms(s)
 		for _, st := range got {
@@ -84,7 +114,7 @@ func TestTermsDropActionWordsOfPrompts(t *testing.T) {
 	if got := Terms("да, запускай эксперимент"); !slices.Equal(got, Stems("эксперимент")) {
 		t.Errorf("want only the topic, got %q", got)
 	}
-	if got := Terms("давай закрывать #20"); len(got) != 0 {
+	if got := Terms("давай закрывать"); len(got) != 0 {
 		t.Errorf("want nothing, got %q", got)
 	}
 }
