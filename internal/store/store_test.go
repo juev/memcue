@@ -492,6 +492,82 @@ func TestBaseIsPrivate(t *testing.T) {
 	}
 }
 
+// A path is a file path, not a URI: characters SQLite would treat as URI syntax stay part of the name, only one file
+// is created, and the file is 0600.
+func TestSpecialCharactersStayInTheBasePath(t *testing.T) {
+	for _, name := range []string{"plain.db", "a?b.db", "a#b.db", "a%20b.db", "a b.db"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, name)
+			s, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f, err := s.Add("A fact in a base with an unusual path.", nil, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 || entries[0].Name() != name {
+				t.Fatalf("files %v, want only %q", entries, name)
+			}
+			fi, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := fi.Mode().Perm(); got != 0o600 {
+				t.Errorf("mode %o, want 600", got)
+			}
+
+			s, err = Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = s.Close() }()
+			if got, err := s.Get(f.ID); err != nil || got.Content != f.Content {
+				t.Errorf("reopened base: %+v, %v", got, err)
+			}
+		})
+	}
+}
+
+// A URI is not a base path: accepting one half-way used to create a directory named "file:" in the working directory.
+func TestFileURIRejected(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := Open("file:" + filepath.Join(dir, "facts.db")); err == nil {
+		t.Fatal("a file: URI opened")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("files created for a rejected URI: %v", entries)
+	}
+}
+
+func TestOpenMemoryBase(t *testing.T) {
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Add("A fact in an in-memory base.", nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Get(f.ID); err != nil || got.Content != f.Content {
+		t.Errorf("in-memory base: %+v, %v", got, err)
+	}
+}
+
 // A lost index row must not hide a fact from facts or an audit; reopening the base repairs Search too.
 func TestActiveSurvivesLostIndexRow(t *testing.T) {
 	s, path := open(t)

@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -108,13 +109,19 @@ type Store struct {
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
 // git never takes half of one.
 func Open(path string) (*Store, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dsn, file, err := dataSource(path)
+	if err != nil {
 		return nil, err
 	}
-	if err := privateFile(path); err != nil {
-		return nil, err
+	if file != "" {
+		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+			return nil, err
+		}
+		if err := privateFile(file); err != nil {
+			return nil, err
+		}
 	}
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)")
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +143,32 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
+// dataSource returns the SQLite data source for path and the file it names, or "" for an in-memory base. A file path
+// is made absolute and escaped as a URI, so characters that are special in a URI stay part of the name. A "file:" URI
+// is refused: a base must be a path this process can own and tighten, and a half-parsed URI used to create a directory
+// named "file:" in the working directory.
+func dataSource(path string) (dsn, file string, err error) {
+	switch {
+	case path == "":
+		return "", "", errors.New("store: empty base path")
+	case path == ":memory:":
+		return "file::memory:?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)", "", nil
+	case strings.HasPrefix(path, "file:"):
+		return "", "", fmt.Errorf("store: %q is a URI: give the base as a file path", path)
+	}
+	file, err = filepath.Abs(path)
+	if err != nil {
+		return "", "", err
+	}
+	u := url.URL{Scheme: "file", Path: file}
+	u.RawQuery = "_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)"
+	return u.String(), file, nil
+}
+
 // privateFile creates the base with the mode of ~/.claude/memory (0600) and tightens a base written by an older
 // memcue as 0644. The file may carry facts and evidence, so it must not be world-readable even inside a private
 // directory.
 func privateFile(path string) error {
-	if path == "" || path == ":memory:" || strings.HasPrefix(path, "file:") {
-		return nil // a URI or an in-memory base has no path to tighten
-	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return err
