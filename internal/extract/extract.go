@@ -134,18 +134,23 @@ type reply struct {
 	tokens  Tokens  // as an endpoint reports them
 }
 
-// call runs the model once. `claude -p` enforces schema; an endpoint only promises some JSON object, so shape is
-// appended to its system prompt to name the object.
+// call runs the model once on the extraction endpoint. `claude -p` enforces schema; an endpoint only promises some
+// JSON object, so shape is appended to its system prompt to name the object.
 func call(ctx context.Context, system, schema, shape, input string) (reply, error) {
-	if API.URL != "" {
-		return runAPI(ctx, system+shape, input)
+	return callModel(ctx, Endpoint{URL: API.URL, Model: Model, Key: API.Key}, system, schema, shape, input)
+}
+
+// callModel runs the model once on ep: the endpoint when it has a URL, `claude -p` on ep.Model otherwise.
+func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input string) (reply, error) {
+	if ep.URL != "" {
+		return runAPI(ctx, ep, system+shape, input)
 	}
 	dir, err := os.MkdirTemp("", "memcue-extract-")
 	if err != nil {
 		return reply{}, err
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", Model, "--tools", "", "--no-session-persistence",
+	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", ep.Model, "--tools", "", "--no-session-persistence",
 		"--settings", `{"disableAllHooks": true}`, "--system-prompt", system, "--json-schema", schema,
 		"--output-format", "json")
 	cmd.Dir = dir // no project CLAUDE.md, no repository

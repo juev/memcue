@@ -367,6 +367,12 @@ func Expired(expires, today string) bool {
 // Approve adds a version that takes a candidate into recall. A fact that is not a candidate is left alone: approving
 // an active fact again, or bringing a retired one back, is not what an approval means.
 func (s *Store) Approve(id string) (Fact, error) {
+	return s.ApproveExpiring(id, "")
+}
+
+// ApproveExpiring is Approve with a last day the fact is worth recalling, decided at approval time; an empty expires
+// keeps the candidate's own. It writes one version, not an approval followed by a correction.
+func (s *Store) ApproveExpiring(id, expires string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
@@ -374,7 +380,13 @@ func (s *Store) Approve(id string) (Fact, error) {
 	if cur.Status != Active || cur.Review != Candidate {
 		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
 	}
+	if err := ValidExpiry(expires); err != nil {
+		return Fact{}, err
+	}
 	f := cur
+	if expires != "" {
+		f.Expires = expires
+	}
 	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
 	return f, s.write(f)
 }

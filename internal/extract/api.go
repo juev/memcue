@@ -36,9 +36,17 @@ func (t *Tokens) Add(o Tokens) {
 	t.Output += o.Output
 }
 
-func runAPI(ctx context.Context, system, input string) (reply, error) {
+// Endpoint is where a model call goes: an OpenAI-compatible base URL with its key and model, or, with no URL, the
+// `claude -p` on this machine, where only the model matters.
+type Endpoint struct {
+	URL   string // base URL, e.g. https://api.deepseek.com; /chat/completions is appended
+	Model string
+	Key   string
+}
+
+func runAPI(ctx context.Context, ep Endpoint, system, input string) (reply, error) {
 	body, err := json.Marshal(map[string]any{
-		"model": Model,
+		"model": ep.Model,
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": input},
@@ -48,14 +56,14 @@ func runAPI(ctx context.Context, system, input string) (reply, error) {
 	if err != nil {
 		return reply{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(API.URL, "/")+"/chat/completions",
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(ep.URL, "/")+"/chat/completions",
 		bytes.NewReader(body))
 	if err != nil {
 		return reply{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if API.Key != "" {
-		req.Header.Set("Authorization", "Bearer "+API.Key)
+	if ep.Key != "" {
+		req.Header.Set("Authorization", "Bearer "+ep.Key)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

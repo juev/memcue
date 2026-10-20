@@ -91,8 +91,8 @@ the derived index once: version 3 keeps the word of a versioned name such as `Po
 ## Use
 
 Nothing to do in a session: facts arrive with prompts and are extracted at the end. Extracted facts are candidates:
-recall gives them only after you approve them (`memcue candidates`, `memcue approve ID`, or the `memcue review` page;
-`memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
+recall gives them only after someone approves them — `memcue vet` by a rule or a model, or by hand (`memcue candidates`,
+`memcue approve ID`, the `memcue review` page; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
 an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
 extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction), and a background task's notice gets none. A prompt decides by the terms its facts know:
@@ -108,6 +108,9 @@ memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
 memcue candidates                    # extracted facts waiting for approval, newest first (-json for a JSON array)
+memcue vet -dry-run                  # what the rules and the judge would decide about the queue
+memcue vet                           # decide it: approve what belongs in the base, retire what does not
+memcue vet -no-model                 # only the deterministic rules, no model call
 memcue approve ID [ID ...]           # take candidates into recall
 memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
@@ -125,6 +128,22 @@ evidence, origin and date; filters by kind and source; approves or rejects sever
 action. Rejecting retires the fact and writes `rejected in review` to `$XDG_STATE_HOME/memcue/review.log`; an
 approval is logged there too. The page has no external assets and works offline. `-addr` must stay a loopback
 address, and `-no-open` only prints the URL.
+
+`memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
+decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
+(`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
+mirror), an origin that starts with `test` is retired as a test trace, and a candidate whose words are all in an
+approved fact is retired as covered. The rest goes to the `keep / drop / unsure` judge, twelve candidates a call, each
+with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the answer.
+Everything else the judge cannot settle stays a candidate: `vet` never approves on a failed or empty answer, and
+`unsure` is an entry in the report, not a decision. Every verdict goes to `$XDG_STATE_HOME/memcue/vet.log` with the
+rule or model and its reason; the page, `approve`, `reopen` and its undo stay the manual way, unchanged.
+
+The judge runs on the extraction endpoint and model by default. `MEMCUE_VET_URL`, `MEMCUE_VET_MODEL` and
+`MEMCUE_VET_KEY` override it field by field, so a cheaper model can review what the main one extracted. With
+`MEMCUE_VET=1` the facts a session just stored are reviewed in the extraction process, after storing them and before
+the dream; that process is already detached from the session, so a turn never waits for the verdict. A run that finds
+another one busy is skipped rather than queued, and its failures go to `vet.log`, not to the extraction.
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
@@ -186,11 +205,16 @@ The research behind it, with the alternatives that did not work (vectors, pairwi
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
+| `MEMCUE_VET` | `1` decides the facts a session extracted, right after storing them and before the dream; needs an endpoint | off |
+| `MEMCUE_VET_URL` | OpenAI-compatible endpoint of that review | `MEMCUE_API_URL` |
+| `MEMCUE_VET_MODEL` | model of that review | `MEMCUE_MODEL` |
+| `MEMCUE_VET_KEY` | key for that endpoint | `MEMCUE_API_KEY` |
+| `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
 | `MEMCUE_TRIAGE_URL` | decision endpoint that drops groups a dream need not send to the model, e.g. `https://routerai.ru/api/v1/decisions` | unset: no triage |
 | `MEMCUE_TRIAGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.13` | unset: no triage |
 | `MEMCUE_TRIAGE_KEY` | key for that endpoint | unset: no triage |
 | `MEMCUE_TRIAGE_MIN` | probability of an action a group needs to go on to the model | `0.2` |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/card.log`, `memcue/audit.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
@@ -203,11 +227,16 @@ session or note either way.
 
 ## Cost
 
-Extraction is the only part that calls a model. On ten recorded sessions it cost $0.18–1.33 per session on Opus,
+Extraction is the part that costs most. On ten recorded sessions it cost $0.18–1.33 per session on Opus,
 about $5 per million characters of transcript; tool output is the bulk of it. Sonnet was half the price but kept
 73 % of the facts worth keeping against 88 % for Opus, and nothing at all in two of the ten sessions. DeepSeek
 (`deepseek-flash` through `MEMCUE_API_URL`) cost $0.17 for all ten and kept 74 % against 87 % for Opus. Set
 `MEMCUE_EXTRACT=0` to keep recall and turn extraction off.
+
+A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
+no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
+`claude -p` reports one; a rules-only run (`-no-model`) costs nothing. `MEMCUE_VET_MODEL` is the cheap way to keep a
+long queue cheap.
 
 ## Results
 

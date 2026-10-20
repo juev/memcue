@@ -271,7 +271,8 @@ func runExtractSession(args []string) error {
 	if lerr := appendLog(filepath.Join(dir, "extract.log"), rec); err == nil {
 		err = lerr
 	}
-	_ = lock.Close() // the session's next run need not wait for the dream
+	_ = lock.Close()  // the session's next run need not wait for the dream
+	maybeVet(rec.IDs) // before the dream: it only sees approved facts
 	maybeDream()
 	return err
 }
@@ -431,6 +432,7 @@ func runExtractMessages(args []string, in io.Reader) error {
 		return errors.Join(err, derr)
 	}
 	err = errors.Join(err, appendLog(filepath.Join(dir, "extract.log"), rec))
+	maybeVet(rec.IDs)
 	maybeDream()
 	return err
 }
