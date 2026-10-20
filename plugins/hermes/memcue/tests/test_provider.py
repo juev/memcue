@@ -191,6 +191,7 @@ class ProviderTest(unittest.TestCase):
         fact_id = added["result"].split()[0]
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
         self.assertEqual([f["id"] for f in found["facts"]], [fact_id])
+        self.assertIn(f"{fact_id} v1 active", "\n".join(l for l in self.memcue("dump", self.p._facts) if "source=agent" in l))
         corrected = json.loads(self.p.handle_tool_call("memcue_correct", {"id": fact_id, "content": "Новый текст."}))
         self.assertIn("v2", corrected["result"])
         json.loads(self.p.handle_tool_call("memcue_retire", {"id": fact_id}))

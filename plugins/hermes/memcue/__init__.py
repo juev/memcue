@@ -557,7 +557,7 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_add":
             if not arg("content"):
                 return tool_error("content is required")
-            cmd = ["add", "-origin", self._origin()]
+            cmd = ["add", "-source", "agent", "-origin", self._origin()]  # the model writes it, not the user
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]
             if arg("expires"):
