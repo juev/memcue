@@ -228,12 +228,135 @@ func TestMaybeDreamOnlyWhenOnAndDue(t *testing.T) {
 	if err := markDream(state, time.Now().Add(-25*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	// the facts are older than the mark moved back a day, so the dream reviews them
+	// the first call saw the whole base, so a due dream has nothing new to review
+	maybeDream()
+	if len(*calls) != 0 {
+		t.Errorf("facts the first call saw were sent: calls %d", len(*calls))
+	}
+	if err := markDream(state, time.Now().Add(-25*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	addFact(t, "Workflow watch-all.yml в juev/watch-all ночью подписывает juev на все свои репозитории, кроме форков.",
+		"watch-all", "workflow")
 	maybeDream()
 	if len(*calls) != 1 {
-		t.Errorf("due dream: calls %d", len(*calls))
+		t.Errorf("due dream with a new fact: calls %d", len(*calls))
 	}
 	if at, _ := lastDream(state); time.Since(at) > time.Minute {
 		t.Errorf("dream.at not moved: %v", at)
+	}
+}
+
+func addFact(t *testing.T, content string, keywords ...string) string {
+	t.Helper()
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Add(content, keywords, "y 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f.ID
+}
+
+// A fact written on another machine before this one's last dream, and pulled after it, is new to this machine.
+func TestDreamReviewsFactPulledAfterLastDream(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
+	_, a, _, _ := dreamBase(t)
+	calls := fakeDream(t, func(string) []extract.Action { return nil })
+	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	pulled := addFact(t, "Репозиторий juev/watch-all ночью подписывает juev на свои репозитории через workflow watch-all.yml.",
+		"watch-all", "workflow")
+	// the mark is later than the pulled fact was written, as when the other machine wrote it before this dream
+	if err := markDream(state, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	*calls = nil
+	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 || !strings.Contains((*calls)[0], pulled) || !strings.Contains((*calls)[0], a) {
+		t.Fatalf("pulled fact not reviewed with its neighbour: %q", *calls)
+	}
+	if !strings.Contains((*calls)[0], pulled+" (origin: y 2026-10-20; записан 2026-") ||
+		!strings.Contains((*calls)[0], ", новый;") {
+		t.Errorf("pulled fact not marked new: %q", (*calls)[0])
+	}
+}
+
+// Facts the last dream saw, including the versions it wrote, are not sent again; a version written since is.
+func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
+	_, a, b, _ := dreamBase(t)
+	calls := fakeDream(t, func(groups string) []extract.Action {
+		if strings.Contains(groups, a) {
+			return []extract.Action{{Op: "correct", ID: b, Content: "Workflow watch-all.yml в juev/watch-all ночью подписывает juev на все репозитории, кроме форков и архивных.", Reason: "merge"},
+				{Op: "retire", ID: a, Reason: "merged into " + b}}
+		}
+		return nil
+	})
+	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	// a mark in the past would send every fact by when it was written; the seen list keeps them out
+	if err := markDream(state, time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	*calls = nil
+	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Fatalf("seen facts sent again: %q", *calls)
+	}
+
+	other := addFact(t, "Workflow watch-all.yml подписывает аккаунт juev на репозитории каждую ночь.", "watch-all", "workflow")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(b, "Workflow watch-all.yml в juev/watch-all каждую ночь подписывает juev на все репозитории, кроме форков.", nil); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	if err := markDream(state, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 || !strings.Contains((*calls)[0], other) || !strings.Contains((*calls)[0], b+" (origin: x 2026-10-19; записан 2026-") {
+		t.Fatalf("new fact and new version not reviewed: %q", *calls)
+	}
+}
+
+func TestDreamSeenFile(t *testing.T) {
+	dir := t.TempDir()
+	if seen, err := readDreamSeen(dir); err != nil || seen != nil {
+		t.Fatalf("no file: %v %v", seen, err)
+	}
+	want := map[string]int{"01B": 2, "01A": 1}
+	if err := writeDreamSeen(dir, want); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "dream.seen"))
+	if string(b) != "01A 1\n01B 2\n" {
+		t.Errorf("file %q", b)
+	}
+	got, err := readDreamSeen(dir)
+	if err != nil || len(got) != 2 || got["01A"] != 1 || got["01B"] != 2 {
+		t.Errorf("read %v %v", got, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "dream.seen"), []byte("01A x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readDreamSeen(dir); err == nil {
+		t.Error("bad line read without error")
 	}
 }
