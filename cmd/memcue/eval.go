@@ -57,11 +57,12 @@ func runEval(args []string, out io.Writer) error {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
+		vp := vectorParams()
 		run := func(text, tier string) ([]recall.Hit, error) {
 			if r := []rune(text); len(r) > maxPrompt {
 				text = string(r[:maxPrompt])
 			}
-			return recall.Recall(s, text, tier, p)
+			return recall.RecallHybrid(s, text, tier, p, vp)
 		}
 
 		if len(ev.Questions) > 0 {

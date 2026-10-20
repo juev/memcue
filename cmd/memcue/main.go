@@ -56,6 +56,7 @@ commands:
   audit     propose retirements for the migrated base: memcue audit -dry-run -plan FILE | memcue audit -apply FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
+  embed     fill the vectors the meaning pass compares against: memcue embed [-dry-run] [-batch N] [-limit N]
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
@@ -69,6 +70,11 @@ environment:
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
   MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
+  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL  OpenAI-compatible embeddings endpoint and model for the meaning pass; both
+                  unset keeps recall lexical only. The key comes from MEMCUE_EMBED_KEY_ENV (default OPENAI_API_KEY)
+  MEMCUE_EMBED_MARGIN  standard deviations above the chance maximum a fact must stand to be recalled by meaning
+                  alone (default 1.0); MEMCUE_EMBED_MIN_SCORE adds an absolute floor, MEMCUE_EMBED_MAX_FACTS a cap
+  MEMCUE_EMBED_TIMEOUT  one request, default 2s; MEMCUE_EMBED_SPACE labels the vector space of the model
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs an
                   endpoint (MEMCUE_VET_URL or MEMCUE_API_URL); undecided ones stay candidates
@@ -141,6 +147,8 @@ func main() {
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":
 		err = runImport(os.Args[2:], os.Stdout)
+	case "embed":
+		err = runEmbed(os.Args[2:], os.Stdout, os.Stderr)
 	case "extract":
 		err = runExtract(os.Args[2:], os.Stdout)
 	case "merge":
@@ -187,7 +195,7 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]reca
 			p.MinCoverage = f
 		}
 	}
-	return recall.Recall(s, prompt, tier.Of(cwd, claudeDir()), p)
+	return recall.RecallHybrid(s, prompt, tier.Of(cwd, claudeDir()), p, vectorParams())
 }
 
 // reHarness matches a prompt the harness wrote instead of the user: a background task's notice. Its words are file
@@ -296,6 +304,7 @@ type recallRecord struct {
 type recallFact struct {
 	ID        string  `json:"id"`
 	Coverage  float64 `json:"coverage"`
+	Meaning   float64 `json:"meaning,omitempty"` // similarity, when the fact came from the meaning pass
 	Scope     string  `json:"scope,omitempty"`
 	Displaced bool    `json:"displaced,omitempty"`
 }
@@ -320,7 +329,7 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,
-			Scope: h.Scope, Displaced: h.Displaced})
+			Meaning: math.Round(h.Meaning*1000) / 1000, Scope: h.Scope, Displaced: h.Displaced})
 		if h.Displaced {
 			rec.Displaced = true
 		}
@@ -373,8 +382,8 @@ func runRecall(args []string, out io.Writer) error {
 			if h.Scope != "" {
 				scope = " scope=" + h.Scope
 			}
-			if _, err := fmt.Fprintf(out, "%.2f %d %s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
-				strings.Join(strings.Fields(h.Content), " ")); err != nil {
+			if _, err := fmt.Fprintf(out, "%.2f %d %s%s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
+				meaning(h.Meaning), strings.Join(strings.Fields(h.Content), " ")); err != nil {
 				return err
 			}
 		}

@@ -48,6 +48,8 @@ type Hit struct {
 	Coverage  float64
 	Matched   int
 	Displaced bool // a fact of another host took a slot while a fact of this host was left out
+	// Meaning is the prompt similarity of a fact the vector pass added; 0 for a fact the words found.
+	Meaning float64
 }
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
