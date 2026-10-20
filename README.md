@@ -75,7 +75,9 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 
 ## Use
 
-Nothing to do in a session: facts arrive with prompts and are extracted at the end. A fact comes once per session
+Nothing to do in a session: facts arrive with prompts and are extracted at the end. Extracted facts are candidates:
+recall gives them only after you approve them (`memcue candidates`, `memcue approve ID`; `memcue retire ID` rejects
+one). A fact you add yourself with `memcue add` is active at once. A fact comes once per session
 (again after a compaction), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
 for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
@@ -88,6 +90,8 @@ memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
+memcue candidates                    # extracted facts waiting for approval (-json for a JSON array)
+memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review

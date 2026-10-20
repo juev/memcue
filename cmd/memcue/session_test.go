@@ -142,7 +142,10 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	fs, err := s.Active()
+	if act, _ := s.Active(); len(act) != 0 {
+		t.Errorf("extracted facts are active: %+v", act)
+	}
+	fs, err := s.Candidates()
 	if err != nil || len(fs) != 2 || fs[0].Origin != "app 2026-10-19" {
 		t.Errorf("facts %+v %v", fs, err)
 	}
@@ -230,9 +233,10 @@ func TestExtractMessagesStoresFactsWithOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	fs, err := s.Active()
+	fs, err := s.Candidates()
 	if err != nil || len(fs) != 1 || fs[0].Origin != "hermes 2026-10-19" ||
-		fs[0].Meta != (store.Meta{Kind: "environment", Scope: "service:demo", Source: "user", Evidence: "порт базы demo"}) {
+		fs[0].Meta != (store.Meta{Kind: "environment", Scope: "service:demo", Source: "user", Evidence: "порт базы demo",
+			Review: store.Candidate}) {
 		t.Errorf("facts %+v %v", fs, err)
 	}
 	if recs := readLog(t, state); len(recs) != 1 || recs[0].Session != "h1" || recs[0].Facts != 1 {

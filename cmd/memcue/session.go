@@ -194,7 +194,8 @@ func extractSession(path string, rec *extractRecord) error {
 	return storeExtracted(sess.Text, rec)
 }
 
-// storeExtracted runs the extraction over rendered text and stores the facts with rec.Origin; too little text waits.
+// storeExtracted runs the extraction over rendered text and stores the facts that pass the policy as candidates with
+// rec.Origin: recall gives them only after the user approves them. Too little text waits.
 func storeExtracted(text string, rec *extractRecord) error {
 	if rec.Chars < minNew {
 		rec.Skipped = "too little new text"
@@ -224,7 +225,7 @@ func storeExtracted(text string, rec *extractRecord) error {
 	defer func() { _ = s.Close() }()
 	for _, fact := range keep {
 		sf, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", store.Meta{Kind: fact.Kind,
-			Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence})
+			Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence, Review: store.Candidate})
 		if err != nil {
 			return err
 		}

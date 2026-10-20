@@ -48,19 +48,77 @@ func runAdd(args []string, out io.Writer) error {
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of the working directory)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
+	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
+	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
+	kind := fs.String("kind", "", "rule, decision, pitfall or environment")
+	scope := fs.String("scope", "", "where it holds: global, host:<name>, repo:<name>, service:<name>")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if !sources[*source] {
+		return fmt.Errorf("add: unknown -source %q", *source)
 	}
 	if *origin == "" {
 		*origin = defaultOrigin()
 	}
+	m := store.Meta{Kind: *kind, Scope: *scope, Source: *source}
+	if *candidate {
+		m.Review = store.Candidate
+	}
 	return withStore(func(s *store.Store) error {
-		f, err := s.AddExpiring(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin, *expires)
+		f, err := s.AddWith(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin, *expires, m)
 		if err != nil {
 			return err
 		}
 		_, err = fmt.Fprintln(out, f.ID)
 		return err
+	})
+}
+
+var sources = map[string]bool{"user": true, "user_confirmed": true, "tool": true, "agent": true, "note": true,
+	"memory": true}
+
+// runCandidates lists the facts that wait for approval: memcue candidates [-json].
+func runCandidates(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("candidates", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "print a JSON array")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return withStore(func(s *store.Store) error {
+		cs, err := s.Candidates()
+		if err != nil {
+			return err
+		}
+		if *asJSON {
+			return writeFactsJSON(out, cs)
+		}
+		for _, f := range cs {
+			if _, err := fmt.Fprintf(out, "%s %s kind=%s scope=%s source=%s | %s\n", f.ID, f.Origin, f.Kind, f.Scope,
+				f.Source, strings.Join(strings.Fields(f.Content), " ")); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// runApprove takes candidates into recall: memcue approve ID...
+func runApprove(args []string, out io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: memcue approve ID [ID ...]")
+	}
+	return withStore(func(s *store.Store) error {
+		for _, id := range args {
+			f, err := s.Approve(id)
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(out, "%s v%d\n", f.ID, f.Version); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -194,6 +252,28 @@ func searchJSON(hits []store.Hit) []searchFact {
 			Created: h.Created.UTC().Format(time.RFC3339), Expires: h.Expires})
 	}
 	return out
+}
+
+// candidateFact is one candidate as candidates -json prints it: what a review needs to judge it.
+type candidateFact struct {
+	searchFact
+	Kind     string `json:"kind,omitempty"`
+	Scope    string `json:"scope,omitempty"`
+	Source   string `json:"source,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
+	Author   string `json:"author,omitempty"`
+}
+
+func writeFactsJSON(out io.Writer, fs []store.Fact) error {
+	list := make([]candidateFact, 0, len(fs))
+	for _, f := range fs {
+		list = append(list, candidateFact{searchFact: searchFact{ID: f.ID, Content: f.Content, Keywords: f.Keywords,
+			Origin: f.Origin, Created: f.Created.UTC().Format(time.RFC3339), Expires: f.Expires}, Kind: f.Kind,
+			Scope: f.Scope, Source: f.Source, Evidence: f.Evidence, Author: f.Author})
+	}
+	enc := json.NewEncoder(out)
+	enc.SetEscapeHTML(false)
+	return enc.Encode(list)
 }
 
 // runMerge is git's merge driver: memcue merge %O %A %B. The result goes into %A; a non-zero exit tells git the

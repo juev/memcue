@@ -22,8 +22,8 @@ import (
 const maxChunk = 200_000
 
 // runExtract turns a session transcript into facts: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl.
-// Facts are only added, never compared with the base; the policy drops what may not be stored, and the output names
-// those with the reason. With -dry-run it prints the facts as JSON and stores nothing; the output can be stored later
+// Facts are only added, as candidates for review, never compared with the base; the policy drops what may not be
+// stored, and the output names those with the reason. With -dry-run it prints the facts as JSON and stores nothing; the output can be stored later
 // with import.
 func runExtract(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("extract", flag.ContinueOnError)
@@ -70,7 +70,7 @@ func runExtract(args []string, out io.Writer) error {
 		defer func() { _ = s.Close() }()
 		for _, fact := range facts {
 			sf, err := s.AddWith(fact.Content, fact.Keywords, origin, "", store.Meta{Kind: fact.Kind,
-				Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence})
+				Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence, Review: store.Candidate})
 			if err != nil {
 				return err
 			}

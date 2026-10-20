@@ -44,13 +44,15 @@ commands:
   search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
   recall    print what a prompt would recall: memcue recall [-cwd DIR] TEXT
   eval      measure recall and noise against labelled sets
-  add       store a fact: memcue add [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] TEXT
+  add       store a fact: memcue add [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] TEXT
+  candidates list the facts that wait for approval: memcue candidates [-json]
+  approve   take candidates into recall: memcue approve ID...
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   facts     list the active facts
   dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
-  import    store the facts of migrate -dry-run output: memcue import FILE.json...
+  import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
@@ -110,6 +112,10 @@ func main() {
 		err = runAdd(os.Args[2:], os.Stdout)
 	case "correct":
 		err = runCorrect(os.Args[2:], os.Stdout)
+	case "candidates":
+		err = runCandidates(os.Args[2:], os.Stdout)
+	case "approve":
+		err = runApprove(os.Args[2:], os.Stdout)
 	case "retire":
 		err = runRetire(os.Args[2:], os.Stdout)
 	case "facts":
