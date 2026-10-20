@@ -229,8 +229,10 @@ type extractRecord struct {
 	IDs     []string       `json:"ids,omitempty"`
 	// Rejected are the facts the policy did not store: the reason, then the start of the fact.
 	Rejected []string `json:"rejected,omitempty"`
-	Skipped  string   `json:"skipped,omitempty"`
-	Error    string   `json:"error,omitempty"`
+	// Dropped is what the model noticed in the source and why it did not become a fact.
+	Dropped string `json:"dropped,omitempty"`
+	Skipped string `json:"skipped,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // runExtractSession extracts the part of a session read since the last run and stores its facts. Runs on one
@@ -298,6 +300,7 @@ func storeExtracted(text string, rec *extractRecord) error {
 	}
 	x, err := extractFn(rec.Origin+"; "+hostLine(), text)
 	rec.CostUSD, rec.Tokens = x.CostUSD, x.Tokens
+	rec.Dropped = strings.Join(x.Dropped, " ")
 	if err != nil {
 		return err
 	}

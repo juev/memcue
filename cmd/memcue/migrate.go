@@ -51,7 +51,7 @@ func runMigrate(args []string, out io.Writer) error {
 			return err
 		}
 		defer func() { _ = s.Close() }()
-		if found, err = notMigrated(s, found); err != nil { // a note named on the command line goes through again
+		if found, err = notMigrated(s, found, extract.NotePromptVersion); err != nil { // a named note goes through again
 			return err
 		}
 	}
@@ -81,7 +81,7 @@ func runMigrate(args []string, out io.Writer) error {
 				var r extract.Result
 				if err == nil {
 					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-					r, err = extract.Note(ctx, n.ref(), string(b))
+					r, err = noteFn(ctx, n.ref(), string(b))
 					cancel()
 				}
 				done <- result{note: n, r: r, err: err}
@@ -109,7 +109,7 @@ func runMigrate(args []string, out io.Writer) error {
 		var ids []string
 		if s != nil {
 			for _, f := range res.r.Facts {
-				sf, err := s.Add(f.Content, f.Keywords, origin)
+				sf, err := s.AddWith(f.Content, f.Keywords, origin, "", store.Meta{PromptVersion: extract.NotePromptVersion})
 				if err != nil {
 					return fmt.Errorf("%s: %w", res.ref(), err)
 				}
@@ -117,7 +117,8 @@ func runMigrate(args []string, out io.Writer) error {
 			}
 		}
 		if err := enc.Encode(map[string]any{"note": res.ref(), "origin": origin, "facts": res.r.Facts,
-			"dropped": res.r.Dropped, "cost_usd": res.r.CostUSD, "ids": ids}); err != nil {
+			"dropped": res.r.Dropped, "cost_usd": res.r.CostUSD, "ids": ids,
+			"prompt_version": extract.NotePromptVersion}); err != nil {
 			return err
 		}
 	}
@@ -249,26 +250,41 @@ func decodeProject(name string) string {
 	return walk(string(filepath.Separator), name[1:])
 }
 
-// notMigrated drops the notes whose facts the base already holds.
-func notMigrated(s *store.Store, notes []note) ([]note, error) {
+// notMigrated drops the notes whose facts the base already holds at the current prompt version. A note that was
+// migrated with an older prompt is included again, so a better note prompt can be applied with -all. A named note is
+// always migrated again, whatever this says.
+func notMigrated(s *store.Store, notes []note, current int) ([]note, error) {
 	rows, err := s.Rows()
 	if err != nil {
 		return nil, err
 	}
-	done := map[string]bool{}
+	type migrated struct {
+		seen    bool
+		version int
+	}
+	done := map[string]migrated{}
 	for _, f := range rows {
 		if i := strings.LastIndex(f.Origin, " ("); i >= 0 && strings.HasSuffix(f.Origin, ")") {
-			done[f.Origin[i+2:len(f.Origin)-1]] = true
+			ref := f.Origin[i+2 : len(f.Origin)-1]
+			m := done[ref]
+			m.seen = true
+			if f.PromptVersion > m.version {
+				m.version = f.PromptVersion
+			}
+			done[ref] = m
 		}
 	}
 	var out []note
 	for _, n := range notes {
-		if !done[n.ref()] {
+		if m := done[n.ref()]; !m.seen || m.version < current {
 			out = append(out, n)
 		}
 	}
 	return out, nil
 }
+
+// noteFn is the model step of migrate, replaced in tests.
+var noteFn = extract.Note
 
 // runImport stores the facts of `memcue migrate -dry-run` output files: memcue import FILE.json...
 func runImport(args []string, out io.Writer) error {
@@ -289,16 +305,18 @@ func runImport(args []string, out io.Writer) error {
 		dec := json.NewDecoder(f)
 		for dec.More() {
 			var rec struct {
-				Note   string         `json:"note"`
-				Origin string         `json:"origin"`
-				Facts  []extract.Fact `json:"facts"`
+				Note          string         `json:"note"`
+				Origin        string         `json:"origin"`
+				Facts         []extract.Fact `json:"facts"`
+				PromptVersion int            `json:"prompt_version"`
 			}
 			if err := dec.Decode(&rec); err != nil {
 				_ = f.Close()
 				return fmt.Errorf("%s: %w", path, err)
 			}
 			for _, fact := range rec.Facts {
-				meta := store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence}
+				meta := store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
+					PromptVersion: rec.PromptVersion}
 				if fact.Kind != "" { // a session's fact (extract -dry-run): it goes through review as any extraction
 					meta.Review = store.Candidate
 				}

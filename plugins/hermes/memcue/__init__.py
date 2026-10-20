@@ -45,7 +45,7 @@ import threading
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from agent.memory_provider import MemoryProvider
 from tools.registry import tool_error
@@ -149,6 +149,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._include_tool_results = bool(self._config.get("extract_include_tool_results", False))
         self._max_message = int(self._config.get("extract_max_message_chars", _MAX_MESSAGE))
         self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
+        self._inflight: dict[str, Counter] = {}  # session -> fingerprints being extracted now
         self._pending_lock = threading.Lock()
         self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts the last prefetch injected
         self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
@@ -287,17 +288,18 @@ class MemcueMemoryProvider(MemoryProvider):
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")
         return dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
 
-    def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "") -> None:
+    def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "",
+                               on_done: Optional[Callable[[bool], None]] = None) -> None:
         """Hand the messages to ``memcue extract-messages`` in its own process group and return: the model call takes
-        a minute and must outlive neither the turn nor depend on it. The outcome goes to memcue's extract.log. The
-        caller passes what ``_prepare`` kept."""
+        a minute and must outlive neither the turn nor depend on it. ``on_done`` runs in the feed thread with True
+        only when the process exited 0. Until then the caller keeps the messages in flight and does not mark them
+        seen; a failed extraction is retried instead of silently dropped."""
         env, binary = self._extract_env(), self._binary()
         if not env or not binary or not messages:
+            if on_done:
+                on_done(False)
             return
-        kept = messages
-        if not kept:
-            return
-        data = json.dumps(kept, ensure_ascii=False, default=str).encode()
+        data = json.dumps(messages, ensure_ascii=False, default=str).encode()
         cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", session or self._session_id,
                "-event", event]
         try:
@@ -305,15 +307,25 @@ class MemcueMemoryProvider(MemoryProvider):
                                     env=env, start_new_session=True)
         except OSError as e:
             logger.warning("memcue extraction did not start: %s", e)
+            if on_done:
+                on_done(False)
             return
 
         def feed() -> None:
+            ok = False
             try:
                 proc.stdin.write(data)
                 proc.stdin.close()
-                proc.wait()
+                ok = proc.wait() == 0
             except OSError as e:
                 logger.warning("memcue extraction: %s", e)
+                try:
+                    proc.wait()
+                except OSError:
+                    pass
+            finally:
+                if on_done:
+                    on_done(ok)
 
         threading.Thread(target=feed, name="memcue-extract", daemon=True).start()
 
@@ -341,8 +353,10 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _new(self, session: str, messages: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
         """Messages not processed yet. Equal messages ("ok", "yes") share a fingerprint, so occurrences are counted:
-        the third "ok" of a list is new when two were processed."""
+        the third "ok" of a list is new when two were processed. A message in flight is not new either, so a turn
+        that arrives while the extraction runs cannot send it twice."""
         left = Counter(self._seen(session))
+        left.update(self._inflight.get(session, Counter()))
         new = []
         for m in messages or []:
             if not isinstance(m, dict) or m.get("role") == "system":
@@ -354,19 +368,26 @@ class MemcueMemoryProvider(MemoryProvider):
                 new.append(m)
         return new
 
-    def _prepare(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The messages an extraction sees: no system notes, no compaction summary, no tool output (the bulk of a
-        session's characters, and rarely a durable fact of the user), each message cut to a readable length."""
+    @staticmethod
+    def _compaction_summary(m: dict[str, Any]) -> bool:
         try:
             from agent.context_compressor import is_compaction_summary_message
         except ImportError:  # outside Hermes, or an older one
-            def is_compaction_summary_message(_msg):
-                return False
+            return False
+        return bool(is_compaction_summary_message(m))
+
+    def _keep(self, m: Any) -> bool:
+        """Whether an extraction may see the message at all: no system notes, no compaction summary, and no tool
+        output unless the config asks for it."""
+        return (isinstance(m, dict) and m.get("role") != "system" and not self._compaction_summary(m)
+                and not (m.get("role") == "tool" and not self._include_tool_results))
+
+    def _prepare(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The messages an extraction sees, each cut to a readable length. The caller has already used ``_keep`` to
+        decide which messages are sent."""
         kept: list[dict[str, Any]] = []
         for m in messages:
-            if not isinstance(m, dict) or m.get("role") == "system" or is_compaction_summary_message(m):
-                continue
-            if m.get("role") == "tool" and not self._include_tool_results:
+            if not self._keep(m):
                 continue
             content = m.get("content")
             if isinstance(content, str) and len(content) > self._max_message:
@@ -401,7 +422,8 @@ class MemcueMemoryProvider(MemoryProvider):
             logger.debug("memcue usage log: %s", e)
 
     def _flush(self, session: str, event: str, messages: Optional[list[dict[str, Any]]] = None) -> None:
-        """Send what is new in the session (in messages, or gathered by the turns) and mark it seen."""
+        """Send what is new in the session (in messages, or gathered by the turns). Messages are marked seen only
+        after the extraction exits 0; a failure returns them to the pending batch for the next attempt."""
         with self._pending_lock:
             gathered, _ = self._pending.pop(session, ([], 0.0))
             new = self._new(session, messages)
@@ -417,8 +439,42 @@ class MemcueMemoryProvider(MemoryProvider):
                 new = gathered
             if not new:
                 return
-            self._mark_seen(session, new)
-        self._extract_in_background(self._prepare(new), event, session)
+            kept = [m for m in new if self._keep(m)]
+            skipped = [m for m in new if not self._keep(m)]
+            if skipped:  # system notes and tool output are not sent and never will be
+                self._mark_seen(session, skipped)
+            if not kept:
+                return
+            self._inflight.setdefault(session, Counter()).update(_fingerprint(m) for m in kept)
+            ready = self._prepare(kept)
+        self._extract_in_background(ready, event, session, on_done=lambda ok: self._extracted(session, kept, ok))
+
+    def _extracted(self, session: str, messages: list[dict[str, Any]], ok: bool) -> None:
+        """Finish one extraction: on success mark its messages seen; on failure put them back for a retry. The
+        in-flight count goes away either way, so the next turn can see the messages again."""
+        with self._pending_lock:
+            left = self._inflight.get(session)
+            if left:
+                for m in messages:
+                    fp = _fingerprint(m)
+                    if left[fp] > 1:
+                        left[fp] -= 1
+                    else:
+                        left.pop(fp, None)
+                if not left:
+                    self._inflight.pop(session, None)
+            if ok:
+                self._mark_seen(session, messages)
+            else:
+                cur, _ = self._pending.get(session, ([], 0.0))
+                have = Counter(_fingerprint(m) for m in cur)
+                for m in messages:
+                    fp = _fingerprint(m)
+                    if have[fp] > 0:
+                        have[fp] -= 1
+                    else:
+                        cur.append(m)
+                self._pending[session] = (cur, time.monotonic())
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "",
                   messages: Optional[list[dict[str, Any]]] = None, **kwargs) -> None:
@@ -431,7 +487,17 @@ class MemcueMemoryProvider(MemoryProvider):
             return
         with self._pending_lock:
             new = self._new(session, messages)
-            self._pending[session] = (new, time.monotonic())
+            # Keep what a failed extraction put back: a later turn may hold a compressed list that no longer has it.
+            pending, _ = self._pending.get(session, ([], 0.0))
+            have = Counter(_fingerprint(m) for m in pending)
+            for m in new:
+                fp = _fingerprint(m)
+                if have[fp] > 0:
+                    have[fp] -= 1
+                else:
+                    pending.append(m)
+            self._pending[session] = (pending, time.monotonic())
+            new = pending
         self._start_watcher()
         if sum(_size(m) for m in self._prepare(new)) >= self._threshold:
             self._flush(session, "threshold")
