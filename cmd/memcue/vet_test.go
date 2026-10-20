@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/juev/memcue/internal/extract"
@@ -281,5 +282,145 @@ func TestVetAppliesExpiryFromTheJudge(t *testing.T) {
 	f := vetStatus(t, id)
 	if f.Review != "" || f.Expires != "2026-11-01" || f.Version != 2 {
 		t.Errorf("approved fact %+v", f)
+	}
+}
+
+// fakeDupJudge stands in for the duplicate judge: it answers by candidate text and counts the calls.
+func fakeDupJudge(t *testing.T, answer func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error)) *[]extract.JudgeFact {
+	t.Helper()
+	var calls []extract.JudgeFact
+	var mu sync.Mutex
+	oldFn := judgeDupFn
+	judgeDupFn = func(_ context.Context, cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		mu.Lock()
+		calls = append(calls, cand)
+		mu.Unlock()
+		return answer(cand, approved)
+	}
+	oldJev := extract.JevJudge
+	extract.JevJudge.URL, extract.JevJudge.Model, extract.JevJudge.Key = "http://127.0.0.1:1", "typesafe/jev-1.14", "k"
+	extract.JevJudge.Min, extract.JevJudge.MaxFacts = 0.9, 400
+	t.Cleanup(func() { judgeDupFn, extract.JevJudge = oldFn, oldJev })
+	return &calls
+}
+
+// approvedFact stores a fact the base already holds: what the duplicate judge compares a candidate with.
+func approvedFact(t *testing.T, content string) string {
+	t.Helper()
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Add(content, []string{"x"}, "hermes 2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f.ID
+}
+
+// A candidate the judge calls a duplicate is retired with its probability in the log; everything it does not call a
+// duplicate still goes to the chat judge, because Jev answers "is this known", not "is this worth keeping".
+func TestVetJudgeRetiresDuplicateAndLeavesTheRestToTheModel(t *testing.T) {
+	dir := env(t)
+	existing := approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
+	dup := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
+	other := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.", "hermes 2026-10-21", "tool")
+	calls := fakeDupJudge(t, func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		if cand.ID == dup {
+			return extract.DuplicateVerdict{P: 0.95, HitID: existing, Tokens: extract.Tokens{Input: 40000}, Cost: 0.0017}, nil
+		}
+		return extract.DuplicateVerdict{P: 0.11, Tokens: extract.Tokens{Input: 40000}, Cost: 0.0017}, nil
+	})
+	reviewCalls := fakeJudge(t, judgeByID(other))
+
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 2 {
+		t.Fatalf("judge calls %d, want one per candidate", len(*calls))
+	}
+	if f := vetStatus(t, dup); f.Status != store.Retired {
+		t.Errorf("duplicate %+v", f)
+	}
+	if f := vetStatus(t, other); f.Review != "" {
+		t.Errorf("the model did not decide the rest: %+v", f)
+	}
+	if len(*reviewCalls) != 1 || strings.Contains((*reviewCalls)[0], dup) {
+		t.Errorf("the chat judge saw the duplicate: %s", (*reviewCalls)[0])
+	}
+
+	logb, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "vet.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen vetLine
+	for _, line := range strings.Split(strings.TrimSpace(string(logb)), "\n") {
+		var l vetLine
+		if err := json.Unmarshal([]byte(line), &l); err != nil {
+			t.Fatalf("log line %q: %v", line, err)
+		}
+		if l.ID == dup {
+			seen = l
+		}
+	}
+	if seen.By != "judge" || seen.Decision != "retire" || seen.P == nil || *seen.P != 0.95 ||
+		!strings.Contains(seen.Reason, existing) {
+		t.Errorf("log line %+v", seen)
+	}
+	if !strings.Contains(out.String(), "отклонено 1") || !strings.Contains(out.String(), "$0.005") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// A judge call that fails decides nothing: the candidate waits for the next run instead of being approved blind, and
+// the chat judge is not asked to answer the question the duplicate judge could not.
+func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
+	env(t)
+	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
+	fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		return extract.DuplicateVerdict{}, errors.New("decisions 500: boom")
+	})
+	reviewCalls := fakeJudge(t, judgeByID(cand))
+
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, cand); f.Review != store.Candidate || f.Status != store.Active {
+		t.Errorf("a failed judge changed the base: %+v", f)
+	}
+	if len(*reviewCalls) != 0 {
+		t.Errorf("the chat judge was asked after the duplicate judge failed")
+	}
+	if !strings.Contains(out.String(), "duplicate judge failed") || !strings.Contains(out.String(), "осталось решать 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// A base larger than one request is not judged: the review model with its neighbours stays in charge, unchanged.
+func TestVetJudgeSkippedWhenTheBaseDoesNotFit(t *testing.T) {
+	env(t)
+	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
+	approvedFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.")
+	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
+	calls := fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		return extract.DuplicateVerdict{P: 0.99}, nil
+	})
+	extract.JevJudge.MaxFacts = 1
+	reviewCalls := fakeJudge(t, judgeByID(cand))
+
+	if err := runVet(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("the judge ran on a base that does not fit: %d calls", len(*calls))
+	}
+	if len(*reviewCalls) != 1 {
+		t.Fatalf("review calls %d", len(*reviewCalls))
+	}
+	if f := vetStatus(t, cand); f.Review != "" {
+		t.Errorf("the model did not decide: %+v", f)
 	}
 }

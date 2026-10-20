@@ -131,6 +131,30 @@ size; context is.
 Latency stays around 1.2–1.3 s in all shapes above, 0.9 s for the nine pairs. It does not grow visibly
 between 60 and 255 facts.
 
+### 6. A `score` against a yes/no question, on labelled candidates ([jev_shapes.py](scripts/jev_shapes.py))
+
+The threshold of experiment 2 was set on a rewritten probe: a near-verbatim copy of a fact scores 0.94–0.96 of
+`noul`, which is not what extraction produces. Real paraphrases of an approved fact land near 0.4–0.6, so that
+threshold would never fire.
+
+Candidates: all 41 in the queue of the same base, 235 approved facts in `state`. Labels: the review model's own
+verdict on those candidates from `memcue vet -dry-run -json` (15 drop, 26 keep), which is an opinion, not truth. Each
+candidate was asked about every approved fact twice, as one `noul` and as one `score` over three levels; the strongest
+answer of each shape is what a threshold would see. Two runs, $0.07 and $0.09.
+
+| Shape | Run | AUC | ≥ 0.3: dup / false | ≥ 0.5: dup / false | ≥ 0.7: dup / false |
+|---|---|---|---|---|---|
+| `noul` "same claim" | 1 | 0.815 | 11 / 2 | 6 / 1 | 4 / 0 |
+| `noul` "same claim" | 2 | 0.822 | 10 / 2 | 8 / 1 | 2 / 0 |
+| `score` P(same claim) | 1 | 0.835 | 12 / 5 | 11 / 1 | 8 / 0 |
+| `score` P(same claim) | 2 | 0.877 | 11 / 0 | 8 / 0 | 4 / 0 |
+
+The score shape wins on AUC in both runs and its middle level says why a candidate stayed: "same subject, a
+different or stale claim" is what the chat judge then has to read. Both shapes are noisier between runs than the
+separation suggests: the same candidate moved by 0.1–0.2, and run 2 retired one duplicate fewer at 0.5 than run 1.
+At 0.5 the score shape retires 8–11 of 15 duplicates and 0–1 of 26 facts worth keeping; at 0.3 it retires one or two
+of the keeps. 0.5 is the default, and `MEMCUE_JUDGE_MIN` is how a base tunes it.
+
 ## Where the judge belongs
 
 Three places differ in how often they run, not in what they ask.
@@ -168,8 +192,9 @@ or behind an explicit command.
   $0.0017 per operation, which is fine for `vet` and for a search command.
 - **It is a better duplicate judge than cosine** on our material: 0.94–0.96 against 0.11 for the next
   candidate, where cosine ranks a "same subject" pair (0.89) above every true duplicate but one (0.85–0.87).
-- **One `noul` per fact, not one `choice`.** A `choice` returns the closest fact and suppresses the other
-  copies, and it stops working at 256 options.
+- **One question per fact, not one `choice`.** A `choice` returns the closest fact and suppresses the other
+  copies, and it stops working at 256 options. A `score` over three levels beats a `noul` on labelled candidates
+  (AUC 0.877 against 0.822 in the second run) and says whether a candidate stayed because it is a neighbour.
 - **The ceiling is context, not money**: about 400 facts per default request, 1 700 with the long-context
   header, 153 tokens per fact.
 - **Keep it out of the recall hook.** A 1.2 s external call on every turn is the shape that already failed
@@ -189,7 +214,11 @@ python3 -I docs/research/scripts/jev_whole_store.py --facts FACTS.db --key-file 
     --recall "a real prompt" --top 10
 python3 -I docs/research/scripts/jev_whole_store.py --facts FACTS.db --key-file KEY \
     --dedup "the rewritten fact" --choice --limit 255   # to see the choice/limit behaviour
+python3 -I docs/research/scripts/jev_shapes.py --facts FACTS.db --key-file KEY --labels labels.json
 ```
+
+`jev_shapes.py` takes its labels from a `memcue vet -dry-run -json` run; the header of the script says how to cut them
+out of it.
 
 `--long-context` adds the danger-zone header. The scripts print the top rows and write the full answers with
 `--json`. Inputs and outputs contain the facts of the base: keep them out of the repository.
