@@ -51,7 +51,18 @@ type Hit struct {
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
 func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error) {
 	terms := text.Terms(prompt)
-	if len(terms) < p.MinTerms {
+	var tickets []string
+	for _, t := range terms {
+		if text.IsTicket(t) {
+			tickets = append(tickets, t)
+		}
+	}
+	// A ticket key is a precise anchor: on its own it says enough, without a second known term.
+	minTerms := p.MinTerms
+	if len(tickets) > 0 {
+		minTerms = 1
+	}
+	if len(terms) < minTerms {
 		return nil, nil
 	}
 	df, total, err := s.DocFreq(terms)
@@ -66,7 +77,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 			known = append(known, t)
 		}
 	}
-	if len(known) < p.MinTerms {
+	if len(known) < minTerms {
 		return nil, nil
 	}
 	if p.MaxPromptTerms > 0 && len(known) > p.MaxPromptTerms {
@@ -85,6 +96,9 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	// A prompt cannot match more terms than its facts know: a short question ("dream memcue") often keeps two terms,
 	// and the dev-set minimum of three then silenced every fact about them.
 	minMatched := p.MinMatched
+	if len(tickets) > 0 {
+		minMatched = 1
+	}
 	if len(known) < minMatched {
 		minMatched = len(known)
 	}
@@ -95,6 +109,11 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	var hits []Hit
 	for _, f := range found {
 		if p.Seen[f.ID] || store.Expired(f.Expires, today) {
+			continue
+		}
+		// A prompt that names a ticket must not recall another ticket through a shared project word: VKPG-1915
+		// and VKPG-1914 can share "vkpg" in a keyword, but only the exact key is the subject of the prompt.
+		if len(tickets) > 0 && !slices.ContainsFunc(f.Stems, func(st string) bool { return slices.Contains(tickets, st) }) {
 			continue
 		}
 		var got float64

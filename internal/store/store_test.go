@@ -479,3 +479,51 @@ func TestActiveSurvivesLostIndexRow(t *testing.T) {
 		t.Error("reopening did not repair the index")
 	}
 }
+
+// Version 2 changes the stems: reopening a base built with the old tokenizer must rebuild the index so a ticket
+// key becomes findable without re-adding the fact.
+func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
+	s, path := open(t)
+	f, err := s.Add("Тикет VKPG-1914: берём в работу.", nil, "x 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE fact_index SET stems = 'тикет'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`PRAGMA user_version = 1`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if _, ok := ids(t, s, "VKPG-1914")[f.ID]; !ok {
+		t.Error("a reopened old base does not index the ticket key")
+	}
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
+		t.Errorf("schema version %d, want %d (%v)", version, schemaVersion, err)
+	}
+}
+
+func TestBaseOfAFutureVersionIsRefused(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "facts.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`PRAGMA user_version = 99`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(path); err == nil {
+		t.Error("a base of schema 99 opened")
+	}
+}

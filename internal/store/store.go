@@ -26,10 +26,10 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
-// The expires, kind, scope, source, evidence and review columns were added without a bump: every reader names its
-// columns, so a base with them stays readable by an older memcue, and Open adds them to a base that predates them
-// (ensureColumns).
-const schemaVersion = 1
+// Version 2 changes the stems: ticket keys such as VKPG-1914 are indexed as one exact term, so every base must be
+// rebuilt once. It also covers the columns added after version 1 (expires, kind, scope, source, evidence, review,
+// prompt_version), and an older memcue refuses a version-2 base instead of reading candidates as active facts.
+const schemaVersion = 2
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
@@ -249,6 +249,10 @@ func (s *Store) migrate() error {
 		return fmt.Errorf("fact base has schema %d, this memcue knows %d: update memcue", v, schemaVersion)
 	}
 	if _, err := s.db.Exec(schema); err != nil {
+		return err
+	}
+	// An old base may lack columns the rebuild reads (review, prompt_version), so add them before touching the index.
+	if err := s.ensureColumns(); err != nil {
 		return err
 	}
 	if err := s.Rebuild(); err != nil {
