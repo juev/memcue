@@ -55,6 +55,9 @@ All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment ar
 - `minNewChars` — new text a turn must add before extraction runs (default `2000`).
 - `stateDir` — where this plugin keeps per-session read offsets (default `$XDG_STATE_HOME/memcue/dsh`).
 - `searchLimit` — default for `memcue_search` (default `5`).
+- `maxToolResultChars` — how much of one tool result goes to extraction (default `1500`). Tool output is kept on
+  purpose: a fact sourced from a tool can only quote its evidence from a `RESULT` block, and memcue's write policy
+  drops such a fact when the quote is missing.
 
 ## Testing
 
