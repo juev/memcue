@@ -1,9 +1,11 @@
 package store
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -849,6 +851,71 @@ func TestOpeningACurrentBaseAddsMissingIndexes(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("facts_created after reopening a current base: %d, want 1", n)
+	}
+}
+
+// A textconv must not write to the file it reads: OpenReadOnly does not migrate a version-3 base, tighten its mode,
+// rebuild the index or change a byte.
+func TestOpenReadOnlyDoesNotTouchTheBase(t *testing.T) {
+	s, path := open(t)
+	if _, err := s.Add("Gitea слушает порт 3000.", []string{"gitea"}, "demo 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`PRAGMA user_version = 3`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ro, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ro.Dump(io.Discard); err != nil {
+		t.Fatalf("dump of a version-3 base: %v", err)
+	}
+	var version int
+	if err := ro.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != 3 {
+		t.Errorf("read-only open migrated the base: version %d, %v", version, err)
+	}
+	if err := ro.Close(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Error("a read-only dump changed the base file")
+	}
+}
+
+// A missing path is not a base and must not be created by dump.
+func TestOpenReadOnlyMissingBaseCreatesNothing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.db")
+	if _, err := OpenReadOnly(path); err == nil {
+		t.Fatal("a missing base opened read-only")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("read-only open created %s: %v", path, err)
+	}
+}
+
+// A base from a newer memcue is refused, not read as if this version understood it.
+func TestOpenReadOnlyRefusesANewerSchema(t *testing.T) {
+	s, path := open(t)
+	if _, err := s.db.Exec(`PRAGMA user_version = 99`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenReadOnly(path); err == nil {
+		t.Fatal("a schema-99 base opened read-only")
 	}
 }
 
