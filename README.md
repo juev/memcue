@@ -153,8 +153,8 @@ Everything else the judge cannot settle stays **provisional** by default: `vet` 
 answer blind, and `unsure` is an entry in the report, not an approval. A provisional fact is recalled after approved
 facts, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
 `MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue. Every verdict goes to
-`$XDG_STATE_HOME/memcue/vet.log` with the rule or model and its reason; the page, `approve`, `reopen` and its undo
-stay the manual way, unchanged.
+`$XDG_STATE_HOME/memcue/vet.log` with the rule or model and its reason; the page, the `approve` command and the
+page's undo (`store.Reopen`) stay the manual way, unchanged.
 
 The review runs on the main model. With `MEMCUE_VET=1` the facts a session just stored are reviewed in the
 extraction process, after storing them and before the dream; that process is already detached from the session, so a
