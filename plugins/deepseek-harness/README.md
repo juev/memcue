@@ -23,7 +23,15 @@ fact base:
   (a new version of a stored fact) and `memcue_retire` (stop recalling a fact; the history keeps it).
 
 The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
-the harness, so everything that works for Claude Code and Hermes works here on the same file.
+the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and
+Hermes.
+
+## Review and vet
+
+Session extraction writes **candidates**, not active facts: `memcue extract-messages` stores them, recall ignores
+them, and `memcue vet`, `memcue approve ID...` or `memcue review` decides. A fact written by `memcue_add` is active at
+once; `memcue_correct` of an approved fact is a deliberate correction, not a candidate. The shared rules are in
+[Review and vet](../../README.md#review-and-vet).
 
 ## Supported dsh
 

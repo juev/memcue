@@ -31,6 +31,13 @@ memcue fact base:
   run is a line in memcue's `extract.log`
   (`$XDG_STATE_HOME/memcue`, by default `~/.local/state/memcue`).
 
+## Review and vet
+
+Mirrored built-in memory writes and extracted facts are **candidates**: the base stores them, recall ignores them, and
+`memcue vet`, `memcue approve ID...` or `memcue review` decides. A fact written by `memcue_add` is active at once;
+`memcue_correct` of an approved fact is a deliberate correction, not a new candidate. The shared rules are in
+[Review and vet](../../README.md#review-and-vet).
+
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
 …). The built-in `MEMORY.md`/`USER.md` stays on either way.
 

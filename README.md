@@ -303,6 +303,39 @@ Measured while building memcue; details and method in [docs/evaluation.md](docs/
 - **Migration of 312 notes:** 2335 facts for $40; 2.5 % of facts carried the model's own conclusions after the
   prompt forbade them.
 
+## Review and vet
+
+Facts written by extraction, and facts mirrored from Hermes' built-in memory, are **candidates**: they are stored and
+visible in `memcue candidates`, but recall ignores them until someone approves them. `memcue vet` applies the
+deterministic rules and the review model to the queue, `memcue approve ID...` takes candidates into recall, and
+`memcue review` serves the local batch page; `memcue retire ID` rejects one. A fact written by `memcue add` is active at
+once, and an explicit `correct` of an approved fact writes a new active version. The full rules are in [Use](#use).
+
+## Harness support
+
+The same base and binary serve all three hosts; the adapters differ at the edges:
+
+| Capability | Claude Code | DeepSeek Harness | Hermes Agent |
+|---|---|---|---|
+| Recall before a prompt | `UserPromptSubmit` hook | `agent/pre-step` | `prefetch` |
+| Session card | `SessionStart` | `session-card` on first step and after compaction | no separate card: the built-in memory block is the global layer |
+| Facts again after a compaction / `/clear` | yes | yes | yes |
+| Session extraction | `PreCompact` / `SessionEnd` | `turn/end` / `session/disposed` | threshold, idle, pre-compress, session end |
+| `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
+| Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
+| Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as candidates |
+| Candidate review and vet | binary | binary | binary |
+
+State and logs live in `$XDG_STATE_HOME/memcue` for Claude Code and in `$XDG_STATE_HOME/memcue/dsh` for DSH; Hermes
+keeps its state under `$HERMES_HOME/memcue`. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db` (or
+`~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH unless
+`facts` is configured. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the same file.
+
+## DeepSeek Harness
+
+memcue also works as a native DSH plugin: recall before each step, the session card, extraction at turn end and on
+disposal, and four fact tools. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
+
 ## Hermes Agent
 
 memcue also works as a memory provider for Hermes Agent: recall before each turn, the built-in memory tool mirrored
