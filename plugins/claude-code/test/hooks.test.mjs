@@ -29,6 +29,13 @@ test('the hooks cover the four lifecycle events', async () => {
 		['PreCompact', 'SessionEnd', 'SessionStart', 'UserPromptSubmit'])
 })
 
+test('the SessionStart hook warns about a binary older than the plugin', async () => {
+	const config = await json('hooks/hooks.json')
+	const [hook] = config.hooks.SessionStart[0].hooks
+	assert.match(hook.command, /memcue version -minimum 0\.4\.0/, 'the hook must check the binary version')
+	assert.match(hook.command, /older than 0\.4\.0/, 'the warning must name the required version')
+})
+
 test('every hook is a guarded command with a timeout', async () => {
 	const config = await json('hooks/hooks.json')
 	const expected = {

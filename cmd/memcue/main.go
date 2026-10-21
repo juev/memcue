@@ -26,6 +26,67 @@ import (
 
 var version = "dev"
 
+// runVersion prints the version, or checks it against a minimum: an adapter that needs session-card or -min-chars
+// calls `memcue version -minimum 0.4.0` and gets a non-zero exit with the reason on an older binary.
+func runVersion(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("version", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "print the version as JSON")
+	minimum := fs.String("minimum", "", "exit non-zero when this build is older than the given release")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *minimum != "" && !versionAtLeast(version, *minimum) {
+		return fmt.Errorf("memcue %s is older than the required %s: update memcue", version, *minimum)
+	}
+	if *asJSON {
+		return json.NewEncoder(out).Encode(struct {
+			Version string `json:"version"`
+		}{version})
+	}
+	_, err := fmt.Fprintln(out, version)
+	return err
+}
+
+// versionAtLeast compares release versions numerically, component by component. A dev or unparsable version counts as
+// new enough: the caller is then running a working tree or a build memcue cannot judge, and refusing it would block
+// development for no safety gain.
+func versionAtLeast(current, minimum string) bool {
+	if current == "" || current == "dev" {
+		return true
+	}
+	cur, ok1 := parseVersion(current)
+	min, ok2 := parseVersion(minimum)
+	if !ok1 || !ok2 {
+		return true
+	}
+	for i := range cur {
+		if cur[i] != min[i] {
+			return cur[i] > min[i]
+		}
+	}
+	return true
+}
+
+// parseVersion reads a clean release X.Y.Z, with an optional leading v. A build suffix (a VCS pseudo-version, a
+// -dirty marker, the dsh- tag prefix) means a source build, which the caller treats as the current tree: only a
+// released number can be judged against the minimum.
+func parseVersion(v string) ([3]int, bool) {
+	var out [3]int
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return out, false
+	}
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 {
+			return out, false
+		}
+		out[i] = n
+	}
+	return out, true
+}
+
 func init() {
 	// go install leaves the version unset; the module version it built is in the build info.
 	if bi, ok := debug.ReadBuildInfo(); ok && version == "dev" && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
@@ -62,7 +123,7 @@ commands:
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
   install   set up the git repository of the base for sync: memcue install [-repo DIR]
-  version   print the version
+  version   print the version: memcue version [-json] [-minimum X.Y.Z]
 
 environment:
   MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
@@ -170,7 +231,7 @@ func main() {
 	case "install":
 		err = runInstall(os.Args[2:], os.Stdout)
 	case "version":
-		fmt.Println(version)
+		err = runVersion(os.Args[2:], os.Stdout)
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:

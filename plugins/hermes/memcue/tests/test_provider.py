@@ -142,6 +142,21 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(p.is_available())
         self.assertIn("absolute", p.unavailable_reason())
 
+    def test_an_older_binary_turns_the_card_and_extraction_off(self):
+        stub = Path(self.home, "old-memcue")
+        stub.write_text("#!/bin/sh\ncase \"$1\" in\n  version) printf '{\"version\":\"0.3.0\"}\\n' ;;\n"
+                        "  hook) printf '{}\\n' ;;\nesac\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "extract_url": "http://127.0.0.1:9/v1",
+                                                  "extract_model": "m"})
+        p.initialize("s1", hermes_home=self.home)
+        self.assertFalse(p._binary_ok())
+        self.assertEqual(p._card_text(), "")
+        self.assertIsNone(p._extract_env())
+
+    def test_the_current_binary_is_compatible(self):
+        self.assertTrue(self.p._binary_ok())
+
     def test_provider_matches_real_hermes_api(self):
         from agent.memory_provider import MemoryProvider
         if not hasattr(MemoryProvider, "on_session_switch"):

@@ -483,3 +483,46 @@ func TestOriginNameFallsBackToTheDirectory(t *testing.T) {
 		t.Errorf("originName(root) = %q, want empty", got)
 	}
 }
+
+func TestVersionMinimum(t *testing.T) {
+	old := version
+	defer func() { version = old }()
+	version = "0.4.0"
+	var out bytes.Buffer
+	if err := runVersion([]string{"-json"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.TrimSpace(out.String()), `{"version":"0.4.0"}`; got != want {
+		t.Errorf("version -json = %q, want %q", got, want)
+	}
+	if err := runVersion([]string{"-minimum", "0.4.0"}, &bytes.Buffer{}); err != nil {
+		t.Errorf("0.4.0 is not older than 0.4.0: %v", err)
+	}
+	err := runVersion([]string{"-minimum", "0.5.0"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "older than the required 0.5.0") {
+		t.Errorf("0.4.0 against 0.5.0 = %v, want an older-than error", err)
+	}
+	version = "dev"
+	if err := runVersion([]string{"-minimum", "99.0.0"}, &bytes.Buffer{}); err != nil {
+		t.Errorf("a dev build is not blocked: %v", err)
+	}
+}
+
+func TestVersionAtLeast(t *testing.T) {
+	for _, tc := range []struct {
+		current, minimum string
+		want             bool
+	}{
+		{"0.4.0", "0.4.0", true},
+		{"v0.4.1", "0.4.0", true},
+		{"0.4.0-dirty", "0.4.0", true},
+		{"0.10.0", "0.9.9", true},
+		{"0.3.9", "0.4.0", false},
+		{"dev", "99.0.0", true},
+		{"garbage", "0.4.0", true},
+	} {
+		if got := versionAtLeast(tc.current, tc.minimum); got != tc.want {
+			t.Errorf("versionAtLeast(%q, %q) = %v, want %v", tc.current, tc.minimum, got, tc.want)
+		}
+	}
+}
