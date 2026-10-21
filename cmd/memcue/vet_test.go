@@ -285,6 +285,42 @@ func TestVetAppliesExpiryFromTheJudge(t *testing.T) {
 	}
 }
 
+// A malformed expiry is not a write failure: the candidate becomes unsure and stays in the queue.
+func TestVetInvalidExpiryStaysCandidate(t *testing.T) {
+	env(t)
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.KeepVerdict,
+			Reason: "временная проверка", Expires: "2026-11-01T00:00:00Z"}}}, nil
+	})
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, id); f.Review != store.Candidate || f.Status != store.Active {
+		t.Errorf("a malformed expiry changed the base: %+v", f)
+	}
+	if !strings.Contains(out.String(), "invalid expiry") || strings.Contains(out.String(), "принято 1") {
+		t.Errorf("report hides the malformed expiry:\n%s", out.String())
+	}
+}
+
+// A write failure is visible in the human report and makes the command fail; it is not counted as a decided fact.
+func TestPrintVetShowsFailedWrite(t *testing.T) {
+	line := vetLine{ID: "01a", Verdict: "KEEP", Decision: "failed: disk full", Applied: false,
+		Reason: "looks useful", Content: "a fact"}
+	var out bytes.Buffer
+	if err := printVet(&out, []vetLine{line}, vetRecord{Candidates: 1, Failed: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "failed: disk full") || !strings.Contains(out.String(), "ошибок записи 1") {
+		t.Errorf("report hides the failed write:\n%s", out.String())
+	}
+	if err := vetFailure(vetRecord{Failed: 1}); err == nil {
+		t.Error("a failed write must make the command fail")
+	}
+}
+
 // fakeDupJudge stands in for the duplicate judge: it answers by candidate text and counts the calls.
 func fakeDupJudge(t *testing.T, answer func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error)) *[]extract.JudgeFact {
 	t.Helper()

@@ -93,6 +93,7 @@ type vetRecord struct {
 	Approved   int            `json:"approved"`
 	Retired    int            `json:"retired"`
 	Unsure     int            `json:"unsure"`
+	Failed     int            `json:"failed,omitempty"`
 	JudgeErrs  int            `json:"judge_errors,omitempty"`
 	DryRun     bool           `json:"dry_run,omitempty"`
 	CostUSD    float64        `json:"cost_usd,omitempty"`
@@ -144,9 +145,23 @@ func runVet(args []string, out io.Writer) error {
 	if *asJSON {
 		enc := json.NewEncoder(out)
 		enc.SetEscapeHTML(false)
-		return enc.Encode(map[string]any{"record": rec, "decisions": lines})
+		if err := enc.Encode(map[string]any{"record": rec, "decisions": lines}); err != nil {
+			return err
+		}
+		return vetFailure(rec)
 	}
-	return printVet(out, lines, rec)
+	if err := printVet(out, lines, rec); err != nil {
+		return err
+	}
+	return vetFailure(rec)
+}
+
+// vetFailure is the command's exit status: a run that could not write a decision is not a success.
+func vetFailure(rec vetRecord) error {
+	if rec.Failed > 0 {
+		return fmt.Errorf("%d vet decision(s) failed to apply", rec.Failed)
+	}
+	return nil
 }
 
 // vetQueue decides cands and, unless dry, carries the verdicts out. approved facts are what a rule and the judge
@@ -209,6 +224,22 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		}
 	}
 
+	// A malformed expiry is a model answer we cannot apply. Turn it into a judgement for a human instead of
+	// turning a formatting mistake into a failed write.
+	for i := range decided {
+		d := &decided[i]
+		if d.Verdict != vet.Keep || d.Expires == "" {
+			continue
+		}
+		if err := store.ValidExpiry(d.Expires); err != nil {
+			reason := "invalid expiry: " + err.Error()
+			if d.Reason != "" {
+				reason += "; " + d.Reason
+			}
+			d.Verdict, d.Reason, d.Expires = vet.Unsure, reason, ""
+		}
+	}
+
 	lines := make([]vetLine, 0, len(decided))
 	for _, d := range decided {
 		line := vetLine{Time: rec.Time, ID: d.Fact.ID, Verdict: string(d.Verdict), By: d.By,
@@ -218,17 +249,40 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		}
 		switch d.Verdict {
 		case vet.Keep:
-			line.Decision, rec.Approved = "approve", rec.Approved+1
+			line.Decision = "approve"
 		case vet.Drop:
-			line.Decision, rec.Retired = "retire", rec.Retired+1
+			line.Decision = "retire"
 		default:
-			line.Decision, rec.Unsure = "left", rec.Unsure+1
+			line.Decision = "left"
 		}
-		if !o.dry {
-			line.Applied, line.Decision = true, applyVet(s, d, line.Decision)
-			if strings.HasPrefix(line.Decision, "failed") {
-				line.Applied = false
+		if o.dry {
+			switch d.Verdict {
+			case vet.Keep:
+				rec.Approved++
+			case vet.Drop:
+				rec.Retired++
+			default:
+				rec.Unsure++
 			}
+			lines = append(lines, line)
+			continue
+		}
+		switch d.Verdict {
+		case vet.Keep, vet.Drop:
+			line.Decision = applyVet(s, d, line.Decision)
+			if strings.HasPrefix(line.Decision, "failed") {
+				rec.Failed++
+			} else {
+				line.Applied = true
+				if d.Verdict == vet.Keep {
+					rec.Approved++
+				} else {
+					rec.Retired++
+				}
+			}
+		default:
+			line.Decision = "left"
+			rec.Unsure++
 		}
 		lines = append(lines, line)
 	}
@@ -416,8 +470,12 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 		if l.Expires != "" {
 			expires = " expires=" + l.Expires
 		}
+		reason := l.Reason
+		if strings.HasPrefix(l.Decision, "failed:") {
+			reason += " [" + l.Decision + "]"
+		}
 		if _, err := fmt.Fprintf(out, "%-6s %s by %s%s | %s — %s\n", l.Verdict, l.ID, l.By, expires,
-			clip(l.Content, 90), l.Reason); err != nil {
+			clip(l.Content, 90), reason); err != nil {
 			return err
 		}
 	}
@@ -430,6 +488,9 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 	if rec.DryRun {
 		line = fmt.Sprintf("Пробный прогон, ничего не изменено. Кандидатов %d: к принятию %d, к отклонению %d, "+
 			"осталось решать %d", rec.Candidates, rec.Approved, rec.Retired, rec.Unsure)
+	}
+	if rec.Failed > 0 {
+		line += fmt.Sprintf("; ошибок записи %d", rec.Failed)
 	}
 	if rec.Error != "" {
 		line += "; ошибка: " + rec.Error
