@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
 	"github.com/juev/memcue/internal/tier"
@@ -34,6 +35,12 @@ func splitKeywords(s string) []string {
 	return out
 }
 
+// hasSecret says whether a fact's text or keywords looks like a credential. Extraction applies the same policy; this
+// guard covers the by-hand and migration paths, whose text may be a note or a user request.
+func hasSecret(content string, keywords []string) bool {
+	return policy.Secret(content) || policy.Secret(strings.Join(keywords, " "))
+}
+
 func withStore(fn func(*store.Store) error) error {
 	s, err := store.Open(factsPath())
 	if err != nil {
@@ -53,11 +60,16 @@ func runAdd(args []string, out io.Writer) error {
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
 	kind := fs.String("kind", "", "rule, decision, pitfall or environment")
 	scope := fs.String("scope", "", "where it holds: global, host:<name>, repo:<name>, service:<name>")
+	force := fs.Bool("force", false, "store it even when it looks like a secret")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if !sources[*source] {
 		return fmt.Errorf("add: unknown -source %q", *source)
+	}
+	content, keywordsList := strings.Join(fs.Args(), " "), splitKeywords(*keywords)
+	if !*force && hasSecret(content, keywordsList) {
+		return errors.New("add: the fact looks like a secret; use a password manager, or pass -force to store it anyway")
 	}
 	if *origin == "" {
 		*origin = defaultOriginAt(*cwd)
@@ -67,7 +79,7 @@ func runAdd(args []string, out io.Writer) error {
 		m.Review = store.Candidate
 	}
 	return withStore(func(s *store.Store) error {
-		f, err := s.AddWith(strings.Join(fs.Args(), " "), splitKeywords(*keywords), *origin, *expires, m)
+		f, err := s.AddWith(content, keywordsList, *origin, *expires, m)
 		if err != nil {
 			return err
 		}
@@ -141,15 +153,17 @@ func runCorrect(args []string, out io.Writer) error {
 	keywords := fs.String("keywords", "", "comma-separated; empty keeps the current ones")
 	expires := fs.String("expires", "", "new last day the fact is worth recalling, YYYY-MM-DD; empty keeps the current one")
 	noExpires := fs.Bool("no-expires", false, "drop the expiry: the fact is recalled from now on without end")
+	force := fs.Bool("force", false, "store it even when it looks like a secret")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() < 2 {
-		return errors.New("usage: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT")
+		return errors.New("usage: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] [-force] ID TEXT")
 	}
 	if *noExpires && *expires != "" {
 		return errors.New("correct: -expires and -no-expires cannot be combined")
 	}
+	content := strings.Join(fs.Args()[1:], " ")
 	return withStore(func(s *store.Store) error {
 		kw := splitKeywords(*keywords)
 		if kw == nil {
@@ -159,6 +173,9 @@ func runCorrect(args []string, out io.Writer) error {
 			}
 			kw = cur.Keywords
 		}
+		if !*force && hasSecret(content, kw) {
+			return errors.New("correct: the fact looks like a secret; use a password manager, or pass -force to store it anyway")
+		}
 		var exp *string
 		switch {
 		case *expires != "":
@@ -167,7 +184,7 @@ func runCorrect(args []string, out io.Writer) error {
 			empty := ""
 			exp = &empty
 		}
-		f, err := s.CorrectExpiring(fs.Arg(0), strings.Join(fs.Args()[1:], " "), kw, exp)
+		f, err := s.CorrectExpiring(fs.Arg(0), content, kw, exp)
 		if err != nil {
 			return err
 		}

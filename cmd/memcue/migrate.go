@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/tier"
 	"github.com/juev/memcue/internal/transcript"
@@ -107,8 +108,17 @@ func runMigrate(args []string, out io.Writer) error {
 		}
 		origin := res.origin()
 		var ids []string
+		var kept []extract.Fact
+		var rejected []string
+		for _, f := range res.r.Facts {
+			if hasSecret(f.Content, f.Keywords) || policy.Secret(f.Evidence) {
+				rejected = append(rejected, "looks like a secret: content omitted")
+				continue
+			}
+			kept = append(kept, f)
+		}
 		if s != nil {
-			for _, f := range res.r.Facts {
+			for _, f := range kept {
 				sf, err := s.AddWith(f.Content, f.Keywords, origin, "", store.Meta{PromptVersion: extract.NotePromptVersion})
 				if err != nil {
 					return fmt.Errorf("%s: %w", res.ref(), err)
@@ -116,8 +126,8 @@ func runMigrate(args []string, out io.Writer) error {
 				ids = append(ids, sf.ID)
 			}
 		}
-		if err := enc.Encode(map[string]any{"note": res.ref(), "origin": origin, "facts": res.r.Facts,
-			"dropped": res.r.Dropped, "cost_usd": res.r.CostUSD, "ids": ids,
+		if err := enc.Encode(map[string]any{"note": res.ref(), "origin": origin, "facts": kept,
+			"rejected": rejected, "dropped": res.r.Dropped, "cost_usd": res.r.CostUSD, "ids": ids,
 			"prompt_version": extract.NotePromptVersion, "review": false}); err != nil {
 			return err
 		}
@@ -320,7 +330,7 @@ func runImport(args []string, out io.Writer) error {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	n := 0
+	n, skipped := 0, 0
 	for _, path := range args {
 		f, err := os.Open(path)
 		if err != nil {
@@ -340,6 +350,10 @@ func runImport(args []string, out io.Writer) error {
 				return fmt.Errorf("%s: %w", path, err)
 			}
 			for _, fact := range rec.Facts {
+				if hasSecret(fact.Content, fact.Keywords) || policy.Secret(fact.Evidence) {
+					skipped++
+					continue
+				}
 				meta := store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
 					PromptVersion: rec.PromptVersion}
 				// The record says whether its facts go through review. The kind test is only the fallback for files
@@ -360,7 +374,11 @@ func runImport(args []string, out io.Writer) error {
 		}
 		_ = f.Close()
 	}
-	_, err = fmt.Fprintf(out, "imported %d facts\n", n)
+	if skipped > 0 {
+		_, err = fmt.Fprintf(out, "imported %d facts, skipped %d that look like secrets\n", n, skipped)
+	} else {
+		_, err = fmt.Fprintf(out, "imported %d facts\n", n)
+	}
 	return err
 }
 

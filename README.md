@@ -144,6 +144,10 @@ action. Rejecting retires the fact and writes `rejected in review` to `$XDG_STAT
 approval is logged there too. The page has no external assets and works offline. `-addr` must stay a loopback
 address, and `-no-open` only prints the URL.
 
+`memcue add` and `memcue correct` refuse text that looks like a token or a password; `-force` stores it anyway.
+`migrate` and `import` skip such facts and report them without echoing the value, because the base may be synced
+through git.
+
 `memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
 decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
 (`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
