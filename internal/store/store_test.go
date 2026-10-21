@@ -629,6 +629,35 @@ func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 	}
 }
 
+// A version-3 base has no fact_vectors; opening it must create the table and leave it usable.
+func TestOpeningAVersion3BaseCreatesFactVectors(t *testing.T) {
+	s, path := open(t)
+	f, err := s.Add("PostgreSQL-16 runs in a container on port 55432.", nil, "x 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`DROP TABLE fact_vectors`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`PRAGMA user_version = 3`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if err := s.SaveVector(f.ID, "test-model", TextHash(f.Content), []float32{1, 0}); err != nil {
+		t.Fatalf("saving a vector on a migrated base: %v", err)
+	}
+	if n, err := s.TagVectors("test-model"); err != nil || n != 1 {
+		t.Errorf("vectors after migration = %d, %v; want 1", n, err)
+	}
+}
+
 // A versioned name keeps its word in the index: the number is dropped, but "PostgreSQL" is still searchable.
 func TestVersionedNameKeepsItsWordInTheIndex(t *testing.T) {
 	s, _ := open(t)

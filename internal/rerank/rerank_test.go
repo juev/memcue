@@ -22,9 +22,9 @@ func stub(t *testing.T, calls *atomic.Int32) *httptest.Server {
 			calls.Add(1)
 		}
 		var req struct {
-			Model     string          `json:"model"`
-			State     []string        `json:"state"`
-			Questions map[string]any  `json:"questions"`
+			Model     string         `json:"model"`
+			State     []string       `json:"state"`
+			Questions map[string]any `json:"questions"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Errorf("decode: %v", err)

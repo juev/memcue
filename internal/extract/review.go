@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -51,11 +52,29 @@ const reviewSchema = `{"type":"object","additionalProperties":false,"required":[
 const reviewShape = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
 	`{"decisions": [{"id": "…", "verdict": "keep|drop|unsure", "reason": "…", "expires": null}]}` + "\n"
 
+// sameReviewHost reports whether two endpoint URLs name the same scheme and host.
+func sameReviewHost(a, b string) bool {
+	ua, err := url.Parse(a)
+	if err != nil || ua.Host == "" {
+		return false
+	}
+	ub, err := url.Parse(b)
+	if err != nil || ub.Host == "" {
+		return false
+	}
+	return strings.EqualFold(ua.Scheme, ub.Scheme) && strings.EqualFold(ua.Host, ub.Host)
+}
+
 // reviewEndpoint is where a review goes: Judge overrides the extraction endpoint field by field.
+// The extraction key follows only when the review stays on the same host; a different review
+// endpoint needs its own MEMCUE_VET_KEY rather than receiving the extraction credential.
 func reviewEndpoint() Endpoint {
 	ep := Endpoint{URL: API.URL, Model: Model, Key: API.Key}
 	if Judge.URL != "" {
 		ep.URL = Judge.URL
+		if !sameReviewHost(API.URL, Judge.URL) {
+			ep.Key = ""
+		}
 	}
 	if Judge.Model != "" {
 		ep.Model = Judge.Model

@@ -42,6 +42,25 @@ func TestReviewEndpointFallsBackToTheExtraction(t *testing.T) {
 	}
 }
 
+// A review endpoint on another host must not receive the extraction key just because Judge.Key is empty.
+func TestReviewEndpointDoesNotLeakTheExtractionKeyToAnotherHost(t *testing.T) {
+	oldAPI, oldModel, oldJudge := API, Model, Judge
+	t.Cleanup(func() { API, Model, Judge = oldAPI, oldModel, oldJudge })
+	API.URL, API.Key, Model = "https://api.example/v1", "k1", "main-model"
+	Judge.URL, Judge.Model, Judge.Key = "https://judge.example/v1", "cheap", ""
+	if ep := reviewEndpoint(); ep.Key != "" {
+		t.Errorf("another host received the extraction key: %+v", ep)
+	}
+	Judge.URL = "https://api.example/v2"
+	if ep := reviewEndpoint(); ep.Key != "k1" {
+		t.Errorf("same host should keep the extraction key: %+v", ep)
+	}
+	Judge.Key = "k2"
+	if ep := reviewEndpoint(); ep.Key != "k2" {
+		t.Errorf("the review key should win: %+v", ep)
+	}
+}
+
 // Review reads the verdicts it knows and folds the rest to unsure: a word the code cannot place never approves a fact.
 func TestReviewReadsDecisions(t *testing.T) {
 	oldAPI, oldModel, oldJudge := API, Model, Judge

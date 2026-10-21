@@ -83,10 +83,11 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 
 ## Upgrade
 
-The fact base schema is 3. memcue 0.2.0 and older refuse a newer base with `update memcue`: upgrade every machine that
-shares the base before the first new memcue writes to it. In particular, 0.2.0 does not know review candidates and
-would index them as active after a merge, so there is no safe mixed-version sync. Opening a version-2 base rebuilds
-the derived index once: version 3 keeps the word of a versioned name such as `PostgreSQL-16`.
+The fact base schema is 4. memcue 0.2.1 and older refuse a newer base with `update memcue`: upgrade every machine that
+shares the base before the first new memcue writes to it. A mixed-version sync is not safe: an older binary refuses
+the version-4 base instead of reading it, and 0.2.1 does not know `fact_vectors`. Opening a version-3 base creates
+`fact_vectors` and rebuilds the derived index once; version 4 adds the optional vectors on top of the version-3
+stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 
 ## Use
 

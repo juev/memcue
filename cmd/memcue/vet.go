@@ -70,8 +70,8 @@ func configureJudge() {
 	}
 }
 
-// vetLine is one decision as vet.log records it, and as the review page logs its own: the same fields, so a weekly
-// report or an audit reads both without knowing which decided.
+// vetLine is one decision as vet.log records it. The review page logs its own shape (time, fact, decision), so an
+// audit reads both with that difference in mind.
 type vetLine struct {
 	Time     string   `json:"time"`
 	ID       string   `json:"id"`
