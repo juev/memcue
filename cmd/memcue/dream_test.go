@@ -91,6 +91,76 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	}
 }
 
+// A provisional fact is recalled as a neighbour, so it must enter the group with its own data, not as a zero fact.
+func TestDreamGroupKeepsAProvisionalNeighbour(t *testing.T) {
+	env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	approved, err := s.Add("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisional, err := s.AddWith("Postgres демо-базы на db1 держит порт 5432.", []string{"postgres", "порт"},
+		"x 2026-10-19", "2026-12-01", store.Meta{Review: store.Provisional, Kind: "environment", Scope: "host:db1",
+			Source: "tool", Evidence: "port 5432"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	active, err := s.Active()
+	if err != nil || len(active) != 1 {
+		t.Fatalf("active %+v %v", active, err)
+	}
+	groups, err := groupFacts(s, active, active)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 1 || len(groups[0]) != 2 {
+		t.Fatalf("groups %+v", groups)
+	}
+	for _, f := range groups[0] {
+		if f.ID != approved.ID && f.ID != provisional.ID {
+			t.Errorf("unexpected group member %+v", f)
+		}
+		if f.ID == "" || f.Content == "" || f.Origin == "" {
+			t.Errorf("zero group member %+v", f)
+		}
+	}
+}
+
+// The list view must not print an empty entry for a provisional neighbour either.
+func TestDreamListShowsAProvisionalNeighbour(t *testing.T) {
+	env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := s.Add("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provisional, err := s.AddWith("Postgres демо-базы на db1 держит порт 5432.", []string{"postgres", "порт"},
+		"x 2026-10-19", "2026-12-01", store.Meta{Review: store.Provisional, Kind: "environment", Scope: "host:db1",
+			Source: "tool", Evidence: "port 5432"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	var out bytes.Buffer
+	if err := runDream([]string{"-all", "-list"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, approved.ID) || !strings.Contains(text, provisional.ID) {
+		t.Fatalf("group misses a fact:\n%s", text)
+	}
+	if strings.Contains(text, "- id  (origin") {
+		t.Fatalf("empty group entry:\n%s", text)
+	}
+}
+
 func TestDreamDryRunChangesNothing(t *testing.T) {
 	dir := env(t)
 	_, a, b, _ := dreamBase(t)
