@@ -114,8 +114,9 @@ the rerank-gate issue.
 ## Operational details
 
 - One judge endpoint owns one key and one pause/health state. Triage, rerank and
-  duplicate share `internal/judge` and `$XDG_STATE_HOME/memcue/judge.pause`; embeddings keep
-  their own pause because they are a different endpoint.
+  duplicate share `internal/judge` and the `judge.pause` file in the binary's state directory
+  (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or
+  `MEMCUE_STATE_DIR`); embeddings keep their own pause because they are a different endpoint.
 - `recall.log` records the candidate source (lexical/vector) and the judge score separately;
   `Hit.Meaning` is the vector similarity before the judge and the judge score after it.
 - `memcue eval` exercises the combined flow and reports the source mix, so the measured
