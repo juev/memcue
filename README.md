@@ -213,6 +213,10 @@ same model about the whole base in one request, with no index at all, is in
 
 ## Configuration
 
+The 0.3.0 table below is the current contract. The accepted three-model layout and the
+0.4.0 environment contract are in [docs/models.md](docs/models.md); the migration is tracked
+in [#62](https://github.com/juev/memcue/issues/62).
+
 | Variable | Meaning | Default |
 |---|---|---|
 | `MEMCUE_FACTS` | the fact base | `$CLAUDE_CONFIG_DIR/memory/facts.db`, else `~/.claude/memory/facts.db` |

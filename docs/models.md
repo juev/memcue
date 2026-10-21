@@ -1,0 +1,164 @@
+# Three models: main, judge, embeddings
+
+Status: **accepted 2026-10-21**, target for 0.4.0. The 0.3.0 code still uses the old opt-in
+endpoint names; this document is the contract the implementation and the README will move to.
+Implementation: [#62](https://github.com/juev/memcue/issues/62).
+
+## Decision
+
+Keep exactly three model roles, each configured by environment variables:
+
+1. **Main chat model** — extraction and candidate review. `MEMCUE_API_*`; when `MEMCUE_API_URL`
+   is empty, extraction falls back to `claude -p`.
+2. **Judge** — Jev, one model for all three typed decisions: dream triage, recall rerank and
+   duplicate check. `MEMCUE_JUDGE_*`.
+3. **Embeddings** — a local or hosted OpenAI-compatible embedder (bge-m3 in the pilot),
+   used only to propose candidates for the judge. `MEMCUE_EMBED_*`.
+
+There is no fourth model: no separate review endpoint, no second judge, no vector-only reader.
+
+## Why: the pilot
+
+2,571 active facts from a copy of the Claude Code base, 180 real prompts from 636 Claude Code
+transcripts, 3,223 blind usefulness labels, 177/180 prompts reranked by Jev 1.14, and a 60-fact
+truth-priority sample. Aggregate data only; private facts stay outside the repository.
+
+| Reader | Useful top-1 | Useful top-2 |
+|---|---:|---:|
+| lexical only | 75 / 180 | 94 / 180 |
+| Jev over lexical candidates | 112 / 177 | 119 / 177 |
+| **Jev over lexical + vector candidates** | **129 / 180** | **137 / 180** |
+| vector additions alone | 35 / 180 | 56 / 180 |
+
+Paired against lexical, Jev rescues 39 prompts at top-1 and loses 1. Against Jev-over-lexical,
+adding the vector candidates rescues **18** prompts and loses 2; all 18 rescued top-1 facts came
+from the vector-only set. Vector alone is weak, but it is a useful candidate generator once the
+judge sees its facts.
+
+Cost and time: Jev over lexical candidates 396k input tokens, $0.0166, 0.79 s median; over
+lexical + vector 669k input tokens, $0.0281, 0.87 s median. The local bge-m3 backfill of 2,539
+facts took 64 s; the embedding endpoint is free and local in the pilot.
+
+Truth sample: 60 discordant facts, 52 `TRUE_NOW`, 8 `STALE`, 0 `FALSE`, 0 `UNVERIFIABLE`.
+The 17 unique vector rescues are 15 true + 2 stale; the 21 Jev rescues are 17 true + 4 stale;
+controls are 19/20 true. The sample is deliberately discordant, **not random**: it cannot
+estimate the base false rate, and 0 `FALSE` is not evidence that the base is clean. The random
+160-fact audit and the full 200-row served audit were not completed.
+
+## Variables
+
+### Required
+
+| Variable | Meaning |
+|---|---|
+| `MEMCUE_API_URL`, `MEMCUE_API_KEY`, `MEMCUE_MODEL` | main chat endpoint, key and model; URL empty means `claude -p` |
+| `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_KEY`, `MEMCUE_JUDGE_MODEL` | one Jev endpoint for triage, rerank and duplicate check |
+| `MEMCUE_EMBED_URL`, `MEMCUE_EMBED_KEY`, `MEMCUE_EMBED_MODEL` | OpenAI-compatible embeddings endpoint; key may be empty for a local server |
+
+### Optional tuning
+
+| Variable | Default | Meaning |
+|---|---:|---|
+| `MEMCUE_JUDGE_RERANK_MIN` | 0.5 | Jev probability below which a candidate is not given |
+| `MEMCUE_JUDGE_RERANK_CANDIDATES` | 10 | candidates taken from each source (lexical and vector) |
+| `MEMCUE_JUDGE_RERANK_TIMEOUT` | 2 s | one rerank request |
+| `MEMCUE_JUDGE_TRIAGE_MIN` | 0.2 | probability of an action that sends a dream group to the main model |
+| `MEMCUE_JUDGE_DUP_MIN` | 0.5 | probability of "same claim" that retires a candidate |
+| `MEMCUE_JUDGE_DUP_MAX_FACTS` | 400 | approved facts that still fit one duplicate request |
+| `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | off | send the 262k danger-zone header for the duplicate check |
+| `MEMCUE_EMBED_TIMEOUT` | 2 s | one embedding request |
+| `MEMCUE_EMBED_SPACE` | empty | label of the vector space when a server changes model under one name |
+
+### Removed
+
+| Old | Replaced by | Why |
+|---|---|---|
+| `MEMCUE_VET_URL`, `MEMCUE_VET_MODEL`, `MEMCUE_VET_KEY` | main `MEMCUE_API_*` | review runs on the main model; a fourth model is out of scope |
+| `MEMCUE_RERANK_URL`, `_MODEL`, `_KEY`, `_KEY_ENV` | `MEMCUE_JUDGE_*` | one Jev endpoint, not a separate rerank endpoint |
+| `MEMCUE_TRIAGE_URL`, `_MODEL`, `_KEY` | `MEMCUE_JUDGE_*` | one Jev endpoint, not a separate triage endpoint |
+| `MEMCUE_JUDGE_MIN`, `_MAX_FACTS`, `_LONG_CONTEXT` | `MEMCUE_JUDGE_DUP_*` | the old names become duplicate-specific |
+| `MEMCUE_RERANK_MIN`, `_CANDIDATES`, `_TIMEOUT` | `MEMCUE_JUDGE_RERANK_*` | group under the judge namespace |
+| `MEMCUE_TRIAGE_MIN` | `MEMCUE_JUDGE_TRIAGE_MIN` | group under the judge namespace |
+| `MEMCUE_EMBED_KEY_ENV` | `MEMCUE_EMBED_KEY` | direct key, same shape as the other two models |
+| `MEMCUE_EMBED_MODE`, `_MARGIN`, `_MIN_SCORE`, `_MAX_FACTS` | removed | vector is a candidate generator, not a standalone reader; Jev decides |
+
+Operational flags stay: `MEMCUE_VET`, `MEMCUE_DREAM`, `MEMCUE_MEMORY_DIR`, `MEMCUE_MIN_COVERAGE`,
+`MEMCUE_EXTRACT`, `MEMCUE_FACTS`, `MEMCUE_RECALL_LOG`, `MEMCUE_HOST`, `CLAUDE_CONFIG_DIR`,
+`XDG_STATE_HOME`.
+
+## Recall flow
+
+```
+prompt
+  -> lexical candidates: FTS5, existing MinTerms/MinMatched/MinCoverage/ticket gate
+  -> + vector top-N (only when judge and embeddings are both configured)
+  -> ticket exactness applied to the combined candidate set
+  -> Jev: one noul per candidate, keep >= MEMCUE_JUDGE_RERANK_MIN, sort, cap MaxFacts
+  -> hits
+```
+
+Fallbacks are deliberate:
+
+- Jev error, timeout or missing settings: the lexical answer, unchanged.
+- Embeddings error or missing settings: Jev over lexical candidates.
+- Both missing: lexical only. The vector reader is never a standalone reader; `only` mode and
+  its margin/floor knobs are removed.
+
+The lexical gate stays lexical: `MEMCUE_MIN_COVERAGE` continues to filter word candidates. The
+ticket exactness rule is a hard rule and must also be applied to vector candidates, otherwise a
+prompt naming `PROJ-1235` can surface `PROJ-1234` through semantic similarity. This depends on
+the rerank-gate issue.
+
+## Operational details
+
+- One judge client should own one HTTP client, one key and one pause/health state. Today the
+  rerank pass has a pause file, embeddings have their own, and triage/duplicate have none; a
+  dead Jev endpoint should pause all three judge roles for the same interval.
+- `recall.log` and the CLI should record the candidate source (lexical/vector) and the judge
+  score separately. `Hit.Meaning` currently conflates vector similarity with a Jev probability,
+  which makes the logs hard to compare.
+- `memcue eval` should exercise the combined flow and report the source mix, so the measured
+  129/180 mode is reproducible after the refactor.
+- The old variable names should fail with a message naming the replacement, or be rejected at
+  startup; silently ignoring them would leave a 0.3.0 setup half-configured.
+
+## Other decisions and non-goals
+
+- **Review runs on the main model.** `MEMCUE_VET=1` remains off by default; do not enable it on a
+  dirty base until the contradiction policy is fixed (a contradiction with an approved fact is
+  currently `drop`, which entrenches a false approved fact).
+- **Duplicate check is one Jev role, but it is not exercised on this base.** The base has 2,571
+  approved facts and the duplicate request caps at 400 (1,700 with long context), so the stage is
+  skipped. It stays for small bases; do not claim a duplicate benefit on the 2.6k base until a
+  subset/split strategy is measured.
+- **Triage is the same Jev role**; it is a cost filter for dream groups, not a fourth model.
+- **No Jev-as-retriever.** Whole-base Jev retrieval measured 12/120 useful top-1, worse than
+  bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.
+- **No `only` mode, no `MEMCUE_EMBED_MARGIN`, no absolute vector floor.** The vector model
+  proposes top-N; the judge decides.
+- **Schema is unchanged.** `fact_vectors` stays; `memcue embed` stays. No migration.
+- **0.4.0 is a breaking configuration release.** Old variable names are removed, not aliased;
+  the README and release notes carry the migration table. If one release of warnings is wanted,
+  it is a separate decision.
+
+## Consequences
+
+- Three models, two provider keys plus a local embeddings server; the pilot's bge-m3 is local.
+- Per-prompt cost/latency grows with the combined Jev request: 0.87 s median on the pilot,
+  $0.0281 per 180 prompts. The pass stays opt-in and can be off on a laptop.
+- Recall quality on the pilot: 129/180 useful top-1 vs 75 lexical; 18 of those wins exist only
+  because the vector candidates reached Jev.
+- The result is measured on one user's 2.6k base and one judge; it is directional, not universal.
+- The base still contains false and stale facts; the 60-sample did not find `FALSE`, but it was
+  not random. Base cleanup and the random audit remain separate work.
+
+## Open work
+
+- Implement the combined candidate flow and environment contract (this decision's issue).
+- Fix the hard ticket/coverage gate for the combined path (existing rerank-gate issue).
+- Fix the failed-write and concurrency problems in `vet` before enabling auto-vet.
+- A/B the main model as the reranker, to test whether the judge can be removed later.
+- Decide whether vector candidates are added on every prompt or only on lexical misses; the
+  pilot used every prompt, which is the measured 129/180 mode.
+- Measure the duplicate check on a 400-fact subset, or split large bases.
+- Complete the random 160-fact truth audit if a base false-rate estimate is needed.
