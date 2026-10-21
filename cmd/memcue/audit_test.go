@@ -187,6 +187,52 @@ func TestAuditApplyUsesLabelledPrecision(t *testing.T) {
 	}
 }
 
+// A partial review labels one proposal of three. Its precision is 1.0, but the unreviewed facts must stay active.
+func TestAuditApplyRefusesAPartiallyLabelledHeuristic(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := auditTestFact(t, s, "20 октября 2026 обновили alpha.")
+	b := auditTestFact(t, s, "21 октября 2026 обновили beta.")
+	c := auditTestFact(t, s, "22 октября 2026 обновили gamma.")
+	_ = s.Close()
+	plan := auditPlan{Generated: "2026-10-20T12:00:00Z", MinPrecision: auditMinPrecision, Heuristics: []auditHeuristic{
+		{Name: "event_date", Proposed: 3}}, Proposals: []auditProposal{
+		{ID: a.ID, Version: a.Version, Heuristic: "event_date", Reason: "r", Decision: "retire"},
+		{ID: b.ID, Version: b.Version, Heuristic: "event_date", Reason: "r"},
+		{ID: c.ID, Version: c.Version, Heuristic: "event_date", Reason: "r"}}}
+	path := filepath.Join(dir, "plan.json")
+	writeJSON(t, path, plan)
+	var out strings.Builder
+	if err := runAudit([]string{"-apply", path}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err = store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	for _, id := range []string{a.ID, b.ID, c.ID} {
+		if got, _ := s.Get(id); got.Status != store.Active {
+			t.Errorf("partially reviewed fact %s was retired: %+v", id, got)
+		}
+	}
+	bts, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "audit.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec auditRecord
+	if err := json.Unmarshal(bytesTrim(bts), &rec); err != nil {
+		t.Fatalf("%q: %v", bts, err)
+	}
+	if rec.Applied != 0 || rec.Refused != 1 || len(rec.Heuristics) != 1 || rec.Heuristics[0].Labelled != 1 ||
+		rec.Heuristics[0].Precision == nil || *rec.Heuristics[0].Precision != 1 {
+		t.Errorf("record %+v", rec)
+	}
+}
+
 func TestAuditApplyRefusesAChangedFact(t *testing.T) {
 	dir := env(t)
 	s, err := store.Open(factsPath())

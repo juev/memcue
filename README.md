@@ -185,10 +185,12 @@ never served it.
 
 `memcue audit` is the one-off clean-up of the migrated base. It proposes active facts that read as a journal entry
 (a date next to "обновили", "упал", …) or a retelling of CI or a Makefile, and writes them with a reason, their
-`last_recalled` and card delivery to a JSON plan. Mark each proposal `retire` or `keep`, then apply the plan:
-`-min-precision` (default 0.95) refuses a whole heuristic whose labelled precision is lower, and a fact changed since
-the plan is not retired on stale text. The plan, the measured precision and every applied or refused decision go to
-`audit.log`. Usage only orders the review; it never retires a fact by itself.
+`last_recalled` and card delivery to a JSON plan. Mark each proposal `retire` or `keep`, then apply the plan: a
+heuristic is applied only when every one of its proposals is labelled, `-min-precision` (default 0.95) refuses a whole
+heuristic whose labelled precision is lower, and a fact changed since the plan is not retired on stale text. A partial
+review therefore retires nothing of that heuristic, even when its few labels agree. The plan, the measured precision
+and every applied or refused decision go to `audit.log`. Usage only orders the review; it never retires a fact by
+itself.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
