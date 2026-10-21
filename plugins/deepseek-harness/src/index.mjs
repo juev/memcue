@@ -333,7 +333,7 @@ export function apply(ctx, config) {
 		const { out } = await runMemcue(settings, ['hook'], {
 			input: JSON.stringify({
 				prompt,
-				cwd: payload.agent.session.cwd ?? process.cwd(),
+				cwd: payload.agent.session.header?.cwd ?? process.cwd(),
 				session_id: String(payload.agent.session.id),
 			}),
 			timeoutMs: HOOK_TIMEOUT_MS,
