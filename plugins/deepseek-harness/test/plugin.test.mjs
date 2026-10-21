@@ -6,12 +6,13 @@
  *   node --test plugins/deepseek-harness/test/*.test.mjs
  */
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 
-import { apply } from '../src/index.mjs'
+import { apply, memcueSessionId } from '../src/index.mjs'
 
 const FACT = 'The harness base is STUB-FACT-7743.'
 
@@ -19,7 +20,9 @@ let dir
 let binary
 let log
 
-/** A stub memcue: records each call, answers `hook` and `search`, accepts `add`. */
+/** A stub memcue: records each call, answers `hook` and `search`, accepts `add`. When
+ * MEMCUE_STUB_SEEN_DIR is set, it mimics memcue's seen file: a valid session id gets one line per
+ * delivered fact, and a fact already in the file is not delivered again. */
 const STUB = `#!/bin/sh
 printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
 printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
@@ -32,9 +35,21 @@ case "$1" in
   hook)
     payload=$(cat)
     printf 'hook-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
+    sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id":"\\([^"]*\\)".*/\\1/p')
+    emit=1
+    if [ -n "$MEMCUE_STUB_SEEN_DIR" ] && [ -n "$sid" ] && [ \${#sid} -le 128 ]; then
+      case "$sid" in
+        .|..) ;;
+        *[!A-Za-z0-9._-]*) ;;
+        *)
+          seenfile="$MEMCUE_STUB_SEEN_DIR/$sid.recalled"
+          if [ -e "$seenfile" ]; then emit=0; else printf 'stub-fact-1\\n' >> "$seenfile"; fi
+          ;;
+      esac
+    fi
     case "$payload" in
       *NOTHING-MATCHES*) ;;
-      *) printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"memcue: stored facts\\\\n- ${FACT} (learnt: test 2026-10-20)\\\\n"}}\\n' ;;
+      *) if [ "$emit" -eq 1 ]; then printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"memcue: stored facts\\\\n- ${FACT} (learnt: test 2026-10-20)\\\\n"}}\\n'; fi ;;
     esac
     ;;
   search)
@@ -267,6 +282,81 @@ test('the session header cwd wins over the process cwd', async () => {
 	})
 	const text = await waitForLog('hook-input')
 	assert.equal(JSON.parse(lastPayload(text, 'hook-input: ')).cwd, workspace)
+})
+
+test('memcueSessionId keeps a valid id and hashes anything else', () => {
+	assert.equal(memcueSessionId('s1'), 's1')
+	assert.equal(memcueSessionId('a.b_c-d'), 'a.b_c-d')
+	assert.equal(memcueSessionId('a'.repeat(128)), 'a'.repeat(128))
+
+	// Hermes' rule: anything outside [A-Za-z0-9._-], ".", "..", or over 128 chars is a sha256 prefix.
+	const hashed = (id) => createHash('sha256').update(id).digest('hex').slice(0, 32)
+	for (const invalid of ['session:129', 'a'.repeat(129), '', '.', '..']) {
+		const scope = memcueSessionId(invalid)
+		assert.match(scope, /^[A-Za-z0-9._-]{1,128}$/)
+		assert.equal(scope, hashed(invalid))
+		assert.equal(memcueSessionId(invalid), scope) // deterministic across prompts
+	}
+})
+
+test('a colon-containing session id reaches memcue sanitized and counts once', async () => {
+	await resetLog()
+	const seenDir = join(dir, 'seen-129-colon')
+	await mkdir(seenDir, { recursive: true })
+	process.env.MEMCUE_STUB_SEEN_DIR = seenDir
+	try {
+		const { listeners } = mount()
+		const session = { id: 'session:129 with spaces', header: { cwd: dir } }
+		const scope = memcueSessionId(session.id)
+		assert.match(scope, /^[A-Za-z0-9._-]{1,128}$/)
+		assert.notEqual(scope, session.id)
+
+		const first = await preStep(listeners, [userMessage('what is the harness base?')], session)
+		assert.equal(first.messages.length, 2) // the recall; the default stub's card is empty
+		const second = await preStep(listeners, [userMessage('and again?')], session)
+		assert.equal(second.messages.length, 1) // a correctly scoped fact is not recalled twice
+
+		const text = await readFile(log, 'utf8')
+		const inputs = text.split('\n').filter((line) => line.startsWith('hook-input: '))
+			.map((line) => JSON.parse(line.slice('hook-input: '.length)))
+		assert.equal(inputs.length, 2)
+		for (const input of inputs) assert.equal(input.session_id, scope)
+		assert.equal(JSON.parse(lastPayload(text, 'card-input: ')).session_id, scope)
+
+		const seen = (await readFile(join(seenDir, `${scope}.recalled`), 'utf8')).trim().split('\n')
+		assert.deepEqual(seen, ['stub-fact-1'])
+	} finally {
+		delete process.env.MEMCUE_STUB_SEEN_DIR
+	}
+})
+
+test('a session id over 128 characters reaches recall and extraction sanitized', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-129-long')
+	const { listeners } = mount({ stateDir, minNewChars: 1 })
+	const raw = `long-${'x'.repeat(200)}`
+	const scope = memcueSessionId(raw)
+	assert.match(scope, /^[A-Za-z0-9._-]{1,128}$/)
+
+	const decision = await preStep(listeners, [userMessage('what is the harness base?')], {
+		id: raw,
+		header: { cwd: dir },
+	})
+	assert.equal(decision.messages.length, 2)
+	const hookText = await waitForLog('hook-input')
+	assert.equal(JSON.parse(lastPayload(hookText, 'hook-input: ')).session_id, scope)
+
+	const events = [
+		{ type: 'user/message', data: userMessage('remember the long session id') },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = fakeSession(raw, events)
+	const [turnEnd] = listeners.get('session/event')
+	turnEnd(session, events.at(-1))
+	const extractText = await waitForLog(`arg: extract-messages -session ${scope} `)
+	assert.equal(extractText.includes(`-session ${raw}`), false)
+	await waitForState(join(stateDir, `${scope}.json`),
+		(state) => state.pending === null && Object.keys(state.seen).length === 1)
 })
 
 test('no facts mean no message', async () => {
