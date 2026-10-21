@@ -189,3 +189,37 @@ func TestRankedSkipsWhatTheSessionSaw(t *testing.T) {
 		}
 	}
 }
+
+// A provisional fact above the threshold is served even when an approved candidate earlier in the order scores below
+// it: the approved-before-provisional order is not a score order, so a weak approved fact must not cut the tail.
+func TestRecallJudgeKeepsProvisionalAboveThreshold(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	approved, err := s.AddWith("Approved fact about the postgres port.", []string{"postgres", "port"},
+		"x 2026-10-20", "", store.Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prov, err := s.AddWith("Provisional fact about the postgres port.", []string{"postgres", "port"},
+		"x 2026-10-20", "", store.Meta{Review: store.Provisional})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Approved": 0.1, "Provisional": 0.9}}
+	p := rankedParams()
+	p.MaxFacts = 2
+	hits, err := RecallJudge(s, "postgres port", "x", p, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != prov.ID {
+		t.Fatalf("hits = %v, want only the provisional fact %s (approved %s scored below the threshold)",
+			ids(hits), prov.ID, approved.ID)
+	}
+	if !hits[0].Provisional {
+		t.Fatalf("hit = %+v, want the provisional flag", hits[0])
+	}
+}

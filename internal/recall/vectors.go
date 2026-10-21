@@ -70,10 +70,12 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 		return candidates[order[i]].ID > candidates[order[j]].ID
 	})
 	// Keep every fact above the threshold first, then cut: the omitted tail is what the displacement flag is about.
+	// The order puts approved facts before provisional ones, so it is not a score order: a weak approved candidate
+	// must not hide a provisional fact that the judge scored above the threshold further down the list.
 	var eligible []Hit
 	for _, i := range order {
 		if scores[i] < r.Min() {
-			break
+			continue
 		}
 		h := candidates[i]
 		h.Meaning = scores[i]
