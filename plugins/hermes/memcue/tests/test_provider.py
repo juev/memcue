@@ -162,6 +162,51 @@ class ProviderTest(unittest.TestCase):
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
         self.assertEqual(self.pending(), [])
 
+    def written(self) -> dict:
+        return json.loads((Path(self.p._state) / "written.json").read_text(encoding="utf-8"))
+
+    def test_failed_replace_keeps_the_mapping_and_a_later_remove_retires_the_fact(self):
+        old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
+        new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
+        self.p.on_memory_write("add", "memory", old)
+        fact_id = self.pending()[0].split()[0]
+        old_key = self.p._key("memory", old)
+        self.assertEqual(self.written(), {old_key: fact_id})
+
+        real_run = self.p._run
+        self.p._run = lambda args, **kwargs: (False, "memcue timed out after 15s")
+        try:
+            self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
+        finally:
+            self.p._run = real_run
+
+        # The failed correct must not drop the only link between the entry and its fact.
+        self.assertEqual(self.written(), {old_key: fact_id})
+        self.assertNotIn(self.p._key("memory", new), self.written())
+        self.assertIn("55432", self.pending()[0])
+        self.assertNotIn("55433", self.pending()[0])
+
+        # The memory entry still says old, so a later remove reaches the fact through the kept mapping.
+        self.p.on_memory_write("remove", "memory", "", {"previous_content": old})
+        self.assertEqual(self.pending(), [])
+        self.assertEqual(self.written(), {})
+
+    def test_failed_remove_keeps_the_mapping(self):
+        old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
+        self.p.on_memory_write("add", "memory", old)
+        fact_id = self.pending()[0].split()[0]
+        old_key = self.p._key("memory", old)
+
+        real_run = self.p._run
+        self.p._run = lambda args, **kwargs: (False, "memcue timed out after 15s")
+        try:
+            self.p.on_memory_write("remove", "memory", "", {"previous_content": old})
+        finally:
+            self.p._run = real_run
+
+        self.assertEqual(self.written(), {old_key: fact_id})
+        self.assertEqual(len(self.pending()), 1)  # the fact is still there to be retired later
+
     def add_fact(self, content: str, expires: str = "") -> None:
         """A fact written by another program, not by the built-in memory tool."""
         cmd = [str(BIN), "add", "-origin", "test"]

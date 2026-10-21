@@ -701,7 +701,9 @@ class MemcueMemoryProvider(MemoryProvider):
         previous = str((metadata or {}).get("previous_content") or "")
         with self._lock:
             written = self._written()
-            fact_id = written.get(self._key(target, previous)) if previous else None
+            before = dict(written)
+            previous_key = self._key(target, previous) if previous else ""
+            fact_id = written.get(previous_key) if previous_key else None
             if action == "add" and content.strip():
                 ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
                                      content.strip()])
@@ -710,8 +712,8 @@ class MemcueMemoryProvider(MemoryProvider):
             elif action == "replace" and content.strip():
                 if fact_id:
                     ok, out = self._run(["correct", "--", fact_id, content.strip()])
-                    written.pop(self._key(target, previous), None)
-                    if ok:
+                    if ok:  # a failed correct keeps the old entry: its fact id is the only link to the fact
+                        written.pop(previous_key, None)
                         written[self._key(target, content)] = fact_id
                 else:
                     ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
@@ -720,12 +722,14 @@ class MemcueMemoryProvider(MemoryProvider):
                         written[self._key(target, content)] = out.split()[0]
             elif action == "remove" and fact_id:
                 ok, out = self._run(["retire", "--", fact_id])
-                written.pop(self._key(target, previous), None)
+                if ok:  # a failed retire keeps the mapping, so the next remove can try again
+                    written.pop(previous_key, None)
             else:
                 return
             if not ok:
                 logger.warning("memcue mirror of %s failed: %s", action, out)
-            self._save_written(written)
+            if written != before:
+                self._save_written(written)
 
     # -- tools ------------------------------------------------------------------
 
