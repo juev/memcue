@@ -283,7 +283,23 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 		ok, refused := checkActions(batch, r.Actions)
 		rec.Refused = append(rec.Refused, refused...)
 		plan.Groups = append(plan.Groups, planGroups(batch, ok)...)
+		// The model decided on the text of the groups as they were sent; a fact corrected or retired while it ran
+		// makes them stale, so the whole group is refused, as a plan does. A dry run changes nothing and keeps the
+		// versions for -apply to check then.
+		stale := make([]string, len(batch))
+		if !dryRun && len(ok) > 0 {
+			for i, g := range batch {
+				if stale[i], err = changedFact(s, g); err != nil {
+					return rec, err
+				}
+			}
+		}
+		groupOf := groupsOf(batch)
 		for _, a := range ok {
+			if changed := stale[groupOf[a.ID]]; changed != "" {
+				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since it was sent ("+changed+")")
+				continue
+			}
 			if !dryRun {
 				f, err := apply(s, a)
 				if err != nil {
@@ -309,12 +325,7 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 
 // planGroups pairs the checked actions of a batch with their groups; a group without an action needs no entry.
 func planGroups(batch [][]store.Fact, ok []extract.Action) []dreamPlanGroup {
-	groupOf := map[string]int{}
-	for i, g := range batch {
-		for _, f := range g {
-			groupOf[f.ID] = i
-		}
-	}
+	groupOf := groupsOf(batch)
 	byGroup := map[int]*dreamPlanGroup{}
 	var order []int
 	for _, a := range ok {
@@ -332,6 +343,36 @@ func planGroups(batch [][]store.Fact, ok []extract.Action) []dreamPlanGroup {
 		out = append(out, *byGroup[i])
 	}
 	return out
+}
+
+// groupsOf maps each fact of a batch to its group's index.
+func groupsOf(groups [][]store.Fact) map[string]int {
+	m := make(map[string]int)
+	for i, g := range groups {
+		for _, f := range g {
+			m[f.ID] = i
+		}
+	}
+	return m
+}
+
+// changedFact re-reads the facts of a group sent to the model and returns the id of the first whose version is not the
+// one sent: a fact corrected, retired or reopened while the model ran. The live dream refuses such a group whole, as a
+// plan does; no fact with that id means the same.
+func changedFact(s *store.Store, g []store.Fact) (string, error) {
+	for _, f := range g {
+		cur, err := s.Get(f.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			return f.ID, nil
+		}
+		if err != nil {
+			return "", err
+		}
+		if cur.Version != f.Version {
+			return f.ID, nil
+		}
+	}
+	return "", nil
 }
 
 // applyPlan carries out a plan written by a dry run. A group whose facts changed since then (a new version, or

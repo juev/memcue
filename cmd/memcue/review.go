@@ -175,13 +175,9 @@ func (rs *reviewServer) decide(w http.ResponseWriter, r *http.Request, kind stri
 		if kind == "approve" {
 			f, err = rs.store.Approve(id)
 		} else {
-			var cur store.Fact
-			if cur, err = rs.store.Get(id); err == nil && (cur.Status != store.Active || cur.Review != store.Candidate) {
-				err = fmt.Errorf("%w: %s", store.ErrNotCandidate, id)
-			}
-			if err == nil {
-				f, err = rs.store.Retire(id)
-			}
+			// RetireCandidate re-checks the fact under the write, so an approval made after this page was rendered
+			// is not undone by a stale rejection; ErrNotCandidate lands in failures as before.
+			f, err = rs.store.RetireCandidate(id)
 		}
 		if err != nil {
 			failures = append(failures, id+": "+err.Error())

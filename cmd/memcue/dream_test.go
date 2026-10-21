@@ -558,6 +558,68 @@ func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
 	}
 }
 
+// A correction made while the model runs makes the group's decisions stale: the whole group is refused, so the
+// corrected fact is not overwritten and its duplicate is not retired on the old text.
+func TestDreamRefusesGroupChangedDuringTheModelCall(t *testing.T) {
+	dir := env(t)
+	_, a, b, _ := dreamBase(t)
+	const edited = "Workflow nightly-sync.yml подписывает bot на все репозитории, кроме форков и архивных."
+	fakeDream(t, func(groups string) []extract.Action {
+		if !strings.Contains(groups, a) {
+			return nil
+		}
+		s, err := store.Open(factsPath())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = s.Close() }()
+		if _, err := s.Correct(b, edited, nil); err != nil {
+			t.Fatal(err)
+		}
+		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
+			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
+	})
+	var out bytes.Buffer
+	if err := runDream([]string{"-all"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(b); f.Content != edited || f.Version != 2 || f.Status != store.Active {
+		t.Errorf("the correction made during the call was overwritten: %+v", f)
+	}
+	if f, _ := s.Get(a); f.Status != store.Active {
+		t.Errorf("a stale action retired a fact: %+v", f)
+	}
+	recs := readDreamLog(t, dir)
+	last := recs[len(recs)-1]
+	if len(last.Actions) != 0 {
+		t.Errorf("stale actions applied: %+v", last.Actions)
+	}
+	if len(last.Refused) != 2 {
+		t.Errorf("refused %q", last.Refused)
+	}
+	for _, want := range []string{"retire " + a + ": group changed since it was sent",
+		"correct " + b + ": group changed since it was sent"} {
+		found := false
+		for _, r := range last.Refused {
+			if strings.Contains(r, want) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("refused %q misses %q", last.Refused, want)
+		}
+	}
+	if strings.Contains(out.String(), "retire "+a) ||
+		strings.Contains(out.String(), "correct "+b+": ") {
+		t.Errorf("a stale action was printed as applied: %q", out.String())
+	}
+}
+
 func TestDreamPlanFlags(t *testing.T) {
 	env(t)
 	for _, args := range [][]string{{"-all", "-plan", "p.json"}, {"-apply", "p.json", "-all"}, {"-apply", "p.json", "-dry-run"}} {
