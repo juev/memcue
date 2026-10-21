@@ -24,7 +24,8 @@ memcue fact base:
   the facts it finds as candidates for review. A chat of a messaging gateway can stay one session for days, so the messages are not held until
   the session ends: they go once 20 000 characters of new text gather (`extract_threshold`), after 30 minutes without
   a turn (`extract_idle_minutes`), before the context is compressed, when the session ends and when Hermes shuts
-  down. Each message is sent once; fingerprints of the sent ones are kept in `$HERMES_HOME/memcue/sessions/`, which
+  down. Shutdown waits a bounded 20 seconds for the in-flight calls; a longer one keeps its pending batch for the next
+  start. Each message is sent once; fingerprints of the sent ones are kept in `$HERMES_HOME/memcue/sessions/`, which
   also survives compression rewriting the message list. Tool output goes too, cut to
   `extract_tool_result_chars` (1500 characters, the same cut memcue applies to a `RESULT` block): a fact sourced from
   a tool can quote its evidence only from tool output, and the write policy drops such a fact without the quote. Each

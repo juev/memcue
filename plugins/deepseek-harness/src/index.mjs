@@ -19,7 +19,7 @@
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -343,9 +343,10 @@ async function readState(path) {
 			seen: seenOf(parsed?.seen),
 			pending: pendingOf(parsed?.pending),
 			legacy: !hasSeen && Number.isInteger(parsed?.seq),
+			cwd: typeof parsed?.cwd === 'string' ? parsed.cwd : '',
 		}
 	} catch {
-		return { seen: {}, pending: null, legacy: false }
+		return { seen: {}, pending: null, legacy: false, cwd: '' }
 	}
 }
 
@@ -504,6 +505,7 @@ export function apply(ctx, config) {
 			// parent's facts and spends a model call on a transcript nobody asked to remember.
 			if (session.header?.origin === 'subagent') return
 			const sessionId = memcueSessionId(session.id)
+			const cwd = session.header?.cwd ?? process.cwd()
 			if (busy.has(sessionId)) {
 				if (final) pendingFinal.add(sessionId)
 				return
@@ -518,7 +520,7 @@ export function apply(ctx, config) {
 					if (!batch) {
 						// The old state was an event offset, unusable without the deprecated event reader.
 						// Mark the current history seen instead of extracting it a second time.
-						await writeState(path, { seen: capSeen(countEntries(entries)), pending: null })
+						await writeState(path, { seen: capSeen(countEntries(entries)), pending: null, cwd })
 						return
 					}
 					// Keep the pending batch and seed the rest of the current history as seen, so the
@@ -533,7 +535,7 @@ export function apply(ctx, config) {
 						seed[entry.fingerprint] = (seed[entry.fingerprint] ?? 0) + 1
 					}
 					state.seen = seed
-					await writeState(path, { seen: seed, pending: batch })
+					await writeState(path, { seen: seed, pending: batch, cwd })
 				}
 				if (!batch) {
 					const entries = messagesFromSession(session, settings)
@@ -549,14 +551,14 @@ export function apply(ctx, config) {
 						messages: fresh.map((entry) => entry.message),
 						fingerprints: fresh.map((entry) => entry.fingerprint),
 					}
-					await writeState(path, { seen: state.seen, pending: batch })
+					await writeState(path, { seen: state.seen, pending: batch, cwd })
 				}
 				const { code, err } = await runMemcue(settings, [
 					'extract-messages',
 					'-session', sessionId,
 					'-event', eventName,
 					// The session workspace names the repository in origin, the same way Claude Code does.
-					'-cwd', session.header?.cwd ?? process.cwd(),
+					'-cwd', cwd,
 					// The plugin owns the turn threshold; the binary must not apply its larger transcript
 					// minimum, or the final short tail from session/disposed would be skipped.
 					'-min-chars', '1',
@@ -567,22 +569,64 @@ export function apply(ctx, config) {
 				}
 				const seen = { ...state.seen }
 				for (const fingerprint of batch.fingerprints) seen[fingerprint] = (seen[fingerprint] ?? 0) + 1
-				await writeState(path, { seen: capSeen(seen), pending: null })
+				await writeState(path, { seen: capSeen(seen), pending: null, cwd })
 			} catch (error) {
 				console.warn(`memcue: extraction failed: ${String(error)}`)
 			} finally {
 				busy.delete(sessionId)
-				if (pendingFinal.delete(sessionId)) void extractSession(session, 'session-end', true)
+				if (pendingFinal.delete(sessionId)) await extractSession(session, 'session-end', true)
 			}
 		}
+
+		// A batch persisted before a model call survives a crash, but a disposed session never comes back to retry
+		// it. On load, finish every unacknowledged batch before a new turn can produce more work.
+		const retryPending = async () => {
+			let names
+			try {
+				names = await readdir(settings.stateDir)
+			} catch {
+				return
+			}
+			for (const name of names) {
+				if (!name.endsWith('.json')) continue
+				const sessionId = name.slice(0, -'.json'.length)
+				if (busy.has(sessionId)) continue
+				const path = join(settings.stateDir, name)
+				const state = await readState(path)
+				if (!state.pending) continue
+				busy.add(sessionId)
+				try {
+					const cwd = state.cwd || process.cwd()
+					const { code, err } = await runMemcue(settings, [
+						'extract-messages',
+						'-session', sessionId,
+						'-event', 'retry',
+						'-cwd', cwd,
+						'-min-chars', '1',
+					], { input: JSON.stringify(state.pending.messages), timeoutMs: EXTRACT_TIMEOUT_MS })
+					if (code !== 0) {
+						console.warn(`memcue: retry of ${sessionId} exited ${code}: ${err.trim().slice(0, 500)}`)
+						continue
+					}
+					const seen = { ...state.seen }
+					for (const fingerprint of state.pending.fingerprints) seen[fingerprint] = (seen[fingerprint] ?? 0) + 1
+					await writeState(path, { seen: capSeen(seen), pending: null, cwd })
+				} catch (error) {
+					console.warn(`memcue: retry of ${sessionId} failed: ${String(error)}`)
+				} finally {
+					busy.delete(sessionId)
+				}
+			}
+		}
+		void retryPending()
 
 		ctx.on('session/event', (session, event) => {
 			if (event?.type !== 'turn/end') return
 			void extractSession(session, 'turn-end', false)
 		})
-		ctx.on('session/disposed', (session) => {
+		ctx.on('session/disposed', async (session) => {
 			cardSources.delete(memcueSessionId(session.id))
-			void extractSession(session, 'session-end', true)
+			await extractSession(session, 'session-end', true)
 		})
 	}
 

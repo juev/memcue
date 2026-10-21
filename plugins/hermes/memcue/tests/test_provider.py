@@ -561,6 +561,22 @@ class AccumulationTest(unittest.TestCase):
         self.p.shutdown()
         self.assertEqual(self.calls[-1], ("shutdown", "s1", ["h" * 100, "ok"]))
 
+    def test_shutdown_waits_for_inflight_extraction(self):
+        done = threading.Event()
+
+        def slow():
+            time.sleep(0.2)
+            done.set()
+
+        feed = threading.Thread(target=slow, daemon=True)
+        with self.p._feeds_lock:
+            self.p._feeds.append(feed)
+        feed.start()
+        started = time.monotonic()
+        self.p.shutdown()
+        self.assertTrue(done.is_set())
+        self.assertGreaterEqual(time.monotonic() - started, 0.15)
+
     def test_session_end_after_switch_flushes_new_session(self):
         self.p._idle = 3600
         self.turn("a" * 1200)
