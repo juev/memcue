@@ -164,8 +164,8 @@ func runVet(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("vet", flag.ContinueOnError)
 	dry := fs.Bool("dry-run", false, "print the verdicts and change nothing")
 	limit := fs.Int("limit", 0, "decide at most N candidates, newest first (0: the whole queue)")
-	noModel := fs.Bool("no-model", false, "run the deterministic rules only")
-	auto := fs.Bool("auto", false, "turn unsure into provisional facts (the default)")
+	noModel := fs.Bool("no-model", false, "run the deterministic rules only; undecided candidates stay for review")
+	auto := fs.Bool("auto", false, "turn a model's unsure answer into a provisional fact (the default; ignored with -no-model)")
 	quarantine := fs.Bool("quarantine", false, "leave unsure candidates for review even if the default is provisional")
 	ttlDays := fs.Int("ttl-days", vetTTLDays(), "how long a provisional fact is recalled")
 	asJSON := fs.Bool("json", false, "print the decisions as JSON")
@@ -193,6 +193,11 @@ func runVet(args []string, out io.Writer) error {
 			cands = cands[:*limit]
 		}
 		policyAuto := (*auto || vetAutoPolicy()) && !*quarantine
+		if *noModel {
+			// Rules alone cannot answer what the judge would: an undecided candidate waits for a real review
+			// instead of entering recall as provisional.
+			policyAuto = false
+		}
 		ttl := *ttlDays
 		if ttl <= 0 {
 			ttl = vetTTLDays()
@@ -281,10 +286,10 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 				switch {
 				case err != nil:
 					// A failed call decides nothing: the batch waits for the next run rather than being approved blind.
-					decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "model",
+					decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "model", Failed: true,
 						Reason: "the judge failed: " + err.Error()})
 				case !ok:
-					decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "model",
+					decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "model", Failed: true,
 						Reason: "the judge said nothing"})
 				default:
 					decided = append(decided, vet.Decision{Fact: f, Verdict: verdictOf(d.Verdict), By: "model",
@@ -306,7 +311,7 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 			if d.Reason != "" {
 				reason += "; " + d.Reason
 			}
-			d.Verdict, d.Reason, d.Expires = vet.Unsure, reason, ""
+			d.Verdict, d.Reason, d.Expires, d.Failed = vet.Unsure, reason, "", true
 		}
 	}
 
@@ -318,7 +323,9 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		until := time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
 		for i := range decided {
 			d := &decided[i]
-			if d.Verdict != vet.Unsure {
+			// Only a model that read the candidate and said "unsure" may become provisional. A failed or empty
+			// answer, an undecided rule, or a malformed expiry is not that judgement.
+			if d.Verdict != vet.Unsure || d.Failed || d.By != "model" {
 				continue
 			}
 			expires := until
@@ -458,7 +465,7 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 		switch {
 		case a.err != nil:
 			out.Errors++
-			out.Failed = append(out.Failed, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "judge",
+			out.Failed = append(out.Failed, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "judge", Failed: true,
 				Reason: "the duplicate judge failed: " + a.err.Error()})
 		case a.v.P >= min:
 			out.Retired = append(out.Retired, vet.Decision{Fact: f, Verdict: vet.Drop, By: "judge",

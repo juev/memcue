@@ -35,6 +35,9 @@ type Decision struct {
 	Expires     string // last day the fact is worth recalling, when the decision came with one
 	By          string // rule, model or policy
 	Provisional bool   // keep it for a TTL instead of approving it
+	// Failed says the step could not decide: a failed or empty model answer, a duplicate judge error, or a
+	// malformed expiry. Such a candidate stays for the next run and never becomes provisional.
+	Failed bool
 }
 
 // Rules decides what code can decide and returns the candidates it left for the model.

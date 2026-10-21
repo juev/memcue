@@ -174,10 +174,10 @@ func TestVetDryRunChangesNothing(t *testing.T) {
 	}
 }
 
-// A judge that fails or says nothing approves nothing: those candidates wait for the next run.
+// A judge that fails or says nothing approves nothing: those candidates wait for the next run, even under the
+// default provisional policy, because a failed call is not a model "unsure" answer.
 func TestVetJudgeFailureKeepsCandidates(t *testing.T) {
 	env(t)
-	quarantine(t)
 	id := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
 	fakeJudge(t, func(string) (extract.ReviewResult, error) {
 		return extract.ReviewResult{}, errors.New("endpoint returned no choices")
@@ -194,10 +194,10 @@ func TestVetJudgeFailureKeepsCandidates(t *testing.T) {
 	}
 }
 
-// The rules alone need no endpoint and no model.
+// The rules alone need no endpoint and no model, and an undecided candidate stays a candidate under the default
+// provisional policy: there was no model judgement to turn into a provisional fact.
 func TestVetNoModel(t *testing.T) {
 	env(t)
-	quarantine(t)
 	trace := vetFact(t, "Проект demo: база PostgreSQL 18 слушает порт 55432.", "test 2026-10-19", "tool")
 	other := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
 	calls := fakeJudge(t, judgeByID(other))
@@ -213,6 +213,26 @@ func TestVetNoModel(t *testing.T) {
 	}
 	if f := vetStatus(t, other); f.Review != store.Candidate {
 		t.Errorf("undecided candidate %+v", f)
+	}
+	if !strings.Contains(out.String(), "осталось решать 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// An explicit -auto cannot override -no-model: without a model answer there is nothing to make provisional.
+func TestVetNoModelWinsOverAuto(t *testing.T) {
+	env(t)
+	id := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
+	calls := fakeJudge(t, judgeByID(id))
+	var out bytes.Buffer
+	if err := runVet([]string{"-no-model", "-auto"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 0 {
+		t.Errorf("the model was called with -no-model")
+	}
+	if f := vetStatus(t, id); f.Review != store.Candidate || f.Status != store.Active {
+		t.Errorf("-auto overrode -no-model: %+v", f)
 	}
 	if !strings.Contains(out.String(), "осталось решать 1") {
 		t.Errorf("report:\n%s", out.String())
@@ -289,6 +309,24 @@ func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	}
 }
 
+// A model outage during MEMCUE_VET=1 leaves the session's candidates in the queue: a failed call is not a model
+// "unsure" answer, so the default provisional policy must not turn it into a recallable fact.
+func TestMaybeVetFailureKeepsCandidate(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_VET", "1")
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
+	extract.API.URL = "http://127.0.0.1:1"
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{}, errors.New("endpoint returned no choices")
+	})
+	maybeVet([]string{id})
+	if f := vetStatus(t, id); f.Review != store.Candidate || f.Status != store.Active {
+		t.Errorf("a failed session review changed the candidate: %+v", f)
+	}
+}
+
 // A candidate reaches the judge with the approved facts nearest to it, so a duplicate or a contradiction is visible
 // in the answer rather than guessed.
 func TestVetInputCarriesNeighbours(t *testing.T) {
@@ -333,10 +371,10 @@ func TestVetAppliesExpiryFromTheJudge(t *testing.T) {
 	}
 }
 
-// A malformed expiry is not a write failure: the candidate becomes unsure and stays in the queue.
+// A malformed expiry is not a write failure: the candidate becomes unsure and stays in the queue, even under the
+// default provisional policy, because the model answer could not be applied as written.
 func TestVetInvalidExpiryStaysCandidate(t *testing.T) {
 	env(t)
-	quarantine(t)
 	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
 	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
 		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.KeepVerdict,
