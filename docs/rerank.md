@@ -51,6 +51,20 @@ meaning pass. After a failure the endpoint is left alone for 60 s, doubling to 1
 The pass runs on every prompt while it is configured, so its 0.7 s is paid per turn. On a laptop without a key it is
 off; on the server it is a deliberate trade of latency for precision, not a free improvement.
 
+## On the older labelled set
+
+The eval set of `docs/evaluation.md` labels only the pairs the lexical run produced, so it cannot show the pass's
+gain — but it does show what the pass stops doing. Same 120 prompts, same base:
+
+| run | prompts with a fact | facts | NOISE | into prompts needing no memory |
+|---|---|---|---|---|
+| words alone | 73 | 127 | 43 | 45 |
+| words + this pass | 75 | 127 | **1** | **24** |
+
+94 of the 127 facts the pass served were not in that label set at all, which is the expected consequence of a
+different candidate list; the labelled part of its output is 13 USEFUL, 19 RELATED and one NOISE. That run is a
+consistency check, not a measurement of the gain — the gain is the gold set above.
+
 ## Known limits
 
 - The gold labels were produced by DeepSeek asking the same question the pass asks Jev; the pass is therefore measured
