@@ -133,6 +133,46 @@ func TestAtMostMaxFacts(t *testing.T) {
 	}
 }
 
+// A non-positive MaxFacts means no cap, the rule RecallRanked and RecallJudge already follow: it must serve every
+// fact instead of none and must never slice the hits with a negative index. A positive value still truncates.
+func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
+	s := setup(t)
+	p := Default
+	p.MinMatched, p.MinCoverage = 1, 0
+	const prompt = "прокси mihomo caddy gradle"
+	p.MaxFacts = 100 // a cap above any candidate list: "no cap" as well
+	all, err := Recall(s, prompt, "", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) < 3 {
+		t.Fatalf("the test needs several facts to tell a cap from no cap, got %v", ids(all))
+	}
+	for _, maxFacts := range []int{0, -1} {
+		p.MaxFacts = maxFacts
+		got, err := Recall(s, prompt, "", p)
+		if err != nil {
+			t.Fatalf("MaxFacts %d: %v", maxFacts, err)
+		}
+		if len(got) != len(all) {
+			t.Fatalf("MaxFacts %d served %v, want all %v", maxFacts, ids(got), ids(all))
+		}
+		for i := range all {
+			if got[i].ID != all[i].ID {
+				t.Fatalf("MaxFacts %d served %v, want %v", maxFacts, ids(got), ids(all))
+			}
+		}
+	}
+	p.MaxFacts = 1
+	got, err := Recall(s, prompt, "", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != all[0].ID {
+		t.Fatalf("MaxFacts 1 served %v, want the first of %v", ids(got), ids(all))
+	}
+}
+
 // A two-word prompt asks about two terms: the dev-set minimum of three matched terms silenced every fact about them.
 func TestShortPromptWithKnownTermsRecalls(t *testing.T) {
 	s := setup(t)

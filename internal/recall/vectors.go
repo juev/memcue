@@ -61,10 +61,7 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 		}
 		return scores[order[i]] > scores[order[j]]
 	})
-	maxFacts := p.MaxFacts
-	if maxFacts <= 0 {
-		maxFacts = len(order)
-	}
+	maxFacts := capFacts(p.MaxFacts, len(order))
 	var hits []Hit
 	for _, i := range order {
 		if len(hits) >= maxFacts {
