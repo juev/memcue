@@ -324,8 +324,9 @@ func readUsage(path string, parse func(json.RawMessage) map[string]string) (map[
 	return out, sc.Err()
 }
 
-// applyAudit carries out the retire decisions of a reviewed plan. Only a heuristic whose labelled precision reaches
-// minPrecision is applied; a fact changed since the plan is refused rather than retired on stale text.
+// applyAudit carries out the retire decisions of a reviewed plan. A heuristic is applied only when every one of its
+// proposals is labelled, and only when its labelled precision reaches minPrecision; a fact changed since the plan is
+// refused rather than retired on stale text.
 func applyAudit(path string, minPrecision float64, out io.Writer) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -382,6 +383,14 @@ func applyAudit(path string, minPrecision float64, out io.Writer) error {
 			continue
 		}
 		h := summaries[p.Heuristic]
+		// Precision over a partial review only describes the proposals the owner looked at. A retirement batch is
+		// applied only when every proposal of its heuristic carries a decision, so unreviewed facts are never
+		// retired on the strength of a few labels.
+		if h.Labelled < h.Proposed {
+			h.Refused++
+			refused++
+			continue
+		}
 		if h.Precision == nil || *h.Precision < minPrecision {
 			h.Refused++
 			refused++
