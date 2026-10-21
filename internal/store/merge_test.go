@@ -211,3 +211,71 @@ func TestMergeOfApprovalAndCorrection(t *testing.T) {
 	}
 	_ = s.Close()
 }
+
+// A merge carries the vectors whose text hash still matches the merged content, so a synced base does not need a full
+// embed run for facts written on the other machine.
+func TestMergeCarriesMatchingVectors(t *testing.T) {
+	macPath := filepath.Join(t.TempDir(), "mac.db")
+	m := openAt(t, macPath, "mac", t0)
+	mf, err := m.Add("Факт mac про порт 3000.", nil, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SaveVector(mf.ID, "bge", TextHash(mf.Content), []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	serverPath := filepath.Join(t.TempDir(), "server.db")
+	server := openAt(t, serverPath, "server", t0.Add(time.Hour))
+	sf, err := server.Add("Факт server про порт 3001.", nil, "y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.SaveVector(sf.ID, "bge", TextHash(sf.Content), []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Merge(serverPath); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := m.Vectors("bge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 2 {
+		t.Fatalf("vectors after merge = %d, want 2", len(vs))
+	}
+}
+
+// A vector made from an older version is not copied: it would be skipped by the hash check anyway and a later embed
+// run fills the current one.
+func TestMergeSkipsAStaleVector(t *testing.T) {
+	macPath := filepath.Join(t.TempDir(), "mac.db")
+	m := openAt(t, macPath, "mac", t0)
+	serverPath := filepath.Join(t.TempDir(), "server.db")
+	server := openAt(t, serverPath, "server", t0.Add(time.Hour))
+	sf, err := server.Add("Факт server про порт 3001.", nil, "y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.SaveVector(sf.ID, "bge", TextHash(sf.Content), []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := server.Correct(sf.ID, "Факт server про порт 3002.", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Merge(serverPath); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := m.Vectors("bge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vs) != 0 {
+		t.Fatalf("a stale vector was copied: %d", len(vs))
+	}
+}
