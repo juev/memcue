@@ -115,6 +115,16 @@ class ProviderTest(unittest.TestCase):
     def test_base_lives_in_hermes_home(self):
         self.assertEqual(self.p._facts, str(Path(self.home) / "memcue" / "facts.db"))
 
+    def test_facts_path_expands_home(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": "~/memcue/facts.db"})
+        self.assertEqual(p._facts, str(Path(os.path.expanduser("~")) / "memcue" / "facts.db"))
+        self.assertTrue(p.is_available())
+
+    def test_relative_facts_path_is_unavailable(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": "relative/facts.db"})
+        self.assertFalse(p.is_available())
+        self.assertIn("absolute", p.unavailable_reason())
+
     def test_provider_matches_real_hermes_api(self):
         from agent.memory_provider import MemoryProvider
         if not hasattr(MemoryProvider, "on_session_switch"):

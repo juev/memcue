@@ -21,7 +21,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
@@ -105,6 +105,19 @@ function countOf(value, field, fallback, min) {
 }
 
 /**
+ * Expand a leading `~/` or `$HOME/` the way a shell would: a profile patch and an app launched from Finder do not run
+ * one, and a literal `~` would make memcue create a directory named `~` in the process working directory.
+ * @param value - configured path.
+ * @returns the expanded path.
+ */
+function expandHome(value) {
+	if (value === '~') return homedir()
+	if (value.startsWith('~/')) return join(homedir(), value.slice(2))
+	if (value.startsWith('$HOME/')) return join(homedir(), value.slice(6))
+	return value
+}
+
+/**
  * Resolve the plugin configuration with defaults applied.
  * @param config - raw config from the loader entry.
  * @returns the resolved settings.
@@ -112,10 +125,14 @@ function countOf(value, field, fallback, min) {
 function settingsOf(config) {
 	const raw = config ?? {}
 	const fallbackStateDir = defaultStateDir()
-	const stateDir = textOf(raw.stateDir, 'stateDir', fallbackStateDir) || fallbackStateDir
+	const stateDir = expandHome(textOf(raw.stateDir, 'stateDir', fallbackStateDir)) || fallbackStateDir
+	const facts = expandHome(textOf(raw.facts, 'facts', process.env.MEMCUE_FACTS || DEFAULTS.facts))
+	if (facts && !isAbsolute(facts)) {
+		throw new Error('memcue: facts must be an absolute path (or start with ~/)')
+	}
 	return {
-		binary: textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary) || DEFAULTS.binary,
-		facts: textOf(raw.facts, 'facts', process.env.MEMCUE_FACTS || DEFAULTS.facts),
+		binary: expandHome(textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary)) || DEFAULTS.binary,
+		facts,
 		extract: flagOf(raw.extract, 'extract', DEFAULTS.extract),
 		minNewChars: countOf(raw.minNewChars, 'minNewChars', DEFAULTS.minNewChars, 0),
 		stateDir,

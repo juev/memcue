@@ -108,7 +108,9 @@ All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment ar
 A configured field wins over the environment.
 
 - `binary` — path or name of the memcue executable (default `memcue`).
-- `facts` — the fact base; set as `MEMCUE_FACTS` for every child process (default: the binary's own default).
+- `facts` — the fact base; set as `MEMCUE_FACTS` for every child process (default: the binary's own default). A
+  leading `~/` is expanded; a relative path is rejected at load, so the value cannot name a different file for each
+  host.
 - `extract` — `false` turns session extraction off (default `true`).
 - `minNewChars` — new text a turn must add before extraction runs (default `2000`).
 - `stateDir` — where this plugin keeps per-session extraction checkpoints (default `$XDG_STATE_HOME/memcue/dsh`).

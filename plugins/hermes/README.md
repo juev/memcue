@@ -104,7 +104,8 @@ MEMCUE_BIN="$HERMES_HOME/bin/memcue" python3 "$HERMES_HOME/plugins/memcue/tests/
 
 By default the base is `$HERMES_HOME/memcue/facts.db`, inside Hermes' home, so `hermes backup` covers it. Set
 `memory.memcue.facts` (or `MEMCUE_FACTS` in Hermes' environment) to use another file, for example one shared with
-Claude Code. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
+Claude Code. A leading `~/` or `$HOME/` is expanded; the path must be absolute, so the value names one file rather
+than one per process working directory. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
 repository that holds it. The binary's logs, locks and dream schedule follow the base: the default Hermes base gets
 its own `$XDG_STATE_HOME/memcue/<hash>` directory, so it does not share a dream clock with a Claude Code/DSH base.
 
