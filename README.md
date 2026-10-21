@@ -5,9 +5,9 @@ through hooks:
 
 - **Before each prompt** it looks for facts that share enough rare words with the prompt and gives the agent at
   most two of them, or nothing. Most prompts get nothing; that is intended.
-- **At session start, and again after a compaction** it sends a card: global rules and the decisions of the current
-  repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never shares a word with a
-  prompt still reaches the agent.
+- **At session start, and again after a compaction or `/clear`** it sends a card: global rules and the decisions
+  of the current repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never
+  shares a word with a prompt still reaches the agent.
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
   added; nothing is compared or overwritten.
@@ -96,7 +96,7 @@ recall gives them only after someone approves them — `memcue vet` by a rule or
 `memcue approve ID`, the `memcue review` page; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
 an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
 extracted and mirrored facts wait for review. A fact comes once per session
-(again after a compaction), and a background task's notice gets none. A prompt decides by the terms its facts know:
+(again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
 for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
 and today):

@@ -46,15 +46,24 @@ type sessionStartInput struct {
 	CWD       string `json:"cwd"`
 }
 
-// runSessionStart is the SessionStart hook. After a compaction the context no longer holds the facts recalled so
-// far, so they may come again.
+// resetSeen lets facts come again after the context lost them: a compaction, or /clear. A resume keeps them,
+// because the restored context already holds what the session got.
+func resetSeen(h sessionStartInput) {
+	if h.Source != "compact" && h.Source != "clear" {
+		return
+	}
+	if path, err := seenPath(h.SessionID); err == nil {
+		_ = os.Remove(path)
+	}
+}
+
+// runSessionStart is the SessionStart hook. After a compaction or /clear the context no longer holds the facts
+// recalled so far, so they may come again.
 func runSessionStart(in io.Reader, out io.Writer) error {
 	var h sessionStartInput
 	decodeErr := json.NewDecoder(in).Decode(&h)
-	if decodeErr == nil && h.Source == "compact" {
-		if path, err := seenPath(h.SessionID); err == nil {
-			_ = os.Remove(path)
-		}
+	if decodeErr == nil {
+		resetSeen(h)
 	}
 	context := sessionNote
 	if decodeErr == nil {
@@ -85,11 +94,7 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 	if err := json.NewDecoder(in).Decode(&h); err != nil {
 		return fmt.Errorf("session-card input: %w", err)
 	}
-	if h.Source == "compact" || h.Source == "clear" {
-		if path, err := seenPath(h.SessionID); err == nil {
-			_ = os.Remove(path)
-		}
-	}
+	resetSeen(h)
 	card, ids, err := sessionCard(h.CWD)
 	if err != nil {
 		return err
