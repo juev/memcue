@@ -68,6 +68,7 @@ _KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
 _MAX_MESSAGE = 4000  # characters of one message the extraction sees
 _TOOL_RESULT = 1500  # characters of one tool result the extraction sees; memcue cuts a RESULT to the same length
 _WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
+_FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail no later trigger will collect
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 
 
@@ -299,6 +300,15 @@ class MemcueMemoryProvider(MemoryProvider):
             env["MEMCUE_HOST"] = self._host
         return env
 
+    def _extract_command(self, binary: str, event: str, session: str) -> list[str]:
+        """The command that extracts one batch. A final flush is the last chance for this tail, so it lowers memcue's
+        minimum; a threshold or idle run waits for the next trigger instead."""
+        cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", session or self._session_id,
+               "-event", event]
+        if event in _FINAL_EVENTS:
+            cmd += ["-min-chars", "1"]
+        return cmd
+
     def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "",
                                on_done: Optional[Callable[[bool], None]] = None) -> None:
         """Hand the messages to ``memcue extract-messages`` in its own process group and return: the model call takes
@@ -311,8 +321,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 on_done(False)
             return
         data = json.dumps(messages, ensure_ascii=False, default=str).encode()
-        cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", session or self._session_id,
-               "-event", event]
+        cmd = self._extract_command(binary, event, session)
         try:
             proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                     env=env, start_new_session=True)
