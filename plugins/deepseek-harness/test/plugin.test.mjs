@@ -290,6 +290,7 @@ test('a turn end sends the new messages to extract-messages', async () => {
 	const [listener] = listeners.get('session/event')
 	listener(session, events[events.length - 1])
 	const text = await waitForLog('extract-input')
+	assert.match(text, /arg: extract-messages -session s2 -event turn-end -origin dsh \d{4}-\d{2}-\d{2} -min-chars 1/)
 	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
 	assert.deepEqual(sent, [
 		{ role: 'user', content: 'remember the base port' },

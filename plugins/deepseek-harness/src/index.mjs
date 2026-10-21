@@ -537,6 +537,9 @@ export function apply(ctx, config) {
 					'-session', sessionId,
 					'-event', eventName,
 					'-origin', `dsh ${new Date().toISOString().slice(0, 10)}`,
+					// The plugin owns the turn threshold; the binary must not apply its larger transcript
+					// minimum, or the final short tail from session/disposed would be skipped.
+					'-min-chars', '1',
 				], { input: JSON.stringify(batch.messages), timeoutMs: EXTRACT_TIMEOUT_MS })
 				if (code !== 0) {
 					console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
