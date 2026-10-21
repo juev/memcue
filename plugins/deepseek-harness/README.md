@@ -10,9 +10,9 @@ fact base:
   resets the session's delivered facts, so a fact dropped with the old context may come again.
 - **When a turn ends** the messages it added go to `memcue extract-messages` in the background, once
   `minNewChars` of new text has gathered. The checkpoint per session lives in `<stateDir>/<session>.json`: it holds
-  the last acknowledged event and a pending batch, written atomically before the model call. A failed extraction
-  keeps the batch and retries it on the next turn; a successful one advances the checkpoint, so a turn boundary
-  does not send the same text twice. Extraction reads only direct human messages: compaction summaries, cron and
+  fingerprints of messages already extracted and a pending batch, written atomically before the model call. A failed
+  extraction keeps the batch and retries it on the next turn; a successful one acknowledges its fingerprints, so a
+  turn boundary does not send the same text twice. Extraction reads only direct human messages: compaction summaries, cron and
   goal notices, hook contexts and subagent sessions are left out, and a forked session starts at its inherited
   prefix instead of re-extracting the parent's history. Tool calls travel with the assistant message and their
   results follow as `RESULT`, the same pair Claude Code transcripts carry. When the session is disposed, the
@@ -108,7 +108,7 @@ A configured field wins over the environment.
 - `facts` — the fact base; set as `MEMCUE_FACTS` for every child process (default: the binary's own default).
 - `extract` — `false` turns session extraction off (default `true`).
 - `minNewChars` — new text a turn must add before extraction runs (default `2000`).
-- `stateDir` — where this plugin keeps per-session read offsets (default `$XDG_STATE_HOME/memcue/dsh`).
+- `stateDir` — where this plugin keeps per-session extraction checkpoints (default `$XDG_STATE_HOME/memcue/dsh`).
 - `searchLimit` — default for `memcue_search` (default `5`).
 - `maxToolResultChars` — how much of one tool result goes to extraction (default `1500`). Tool output is kept on
   purpose: a fact sourced from a tool can only quote its evidence from a `RESULT` block, and memcue's write policy

@@ -18,6 +18,7 @@
  * @module memcue-dsh
  */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -275,27 +276,58 @@ function sessionCwd(exec) {
 	return typeof cwd === 'string' && cwd ? cwd : process.cwd()
 }
 
+/** Bound on remembered message fingerprints per session; beyond it the oldest are forgotten. */
+const SEEN_LIMIT = 5000
+
+/** Stable hash of a model-shaped message, so the same text is not extracted twice. */
+function fingerprintOf(message) {
+	return createHash('sha256')
+		.update(JSON.stringify([message.role, message.content, message.tool_calls ?? []]))
+		.digest('hex')
+}
+
+/** Validate a persisted fingerprint -> occurrence-count object. */
+function seenOf(value) {
+	const seen = {}
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return seen
+	for (const [key, count] of Object.entries(value)) {
+		if (typeof key === 'string' && Number.isSafeInteger(count) && count > 0) seen[key] = count
+	}
+	return seen
+}
+
+/** Validate a pending batch; the old `{ seq, messages }` shape is accepted and gets fingerprints. */
+function pendingOf(value) {
+	if (!value || !Array.isArray(value.messages)) return null
+	const messages = value.messages.filter((message) => message
+		&& typeof message.role === 'string'
+		&& typeof message.content === 'string')
+	if (messages.length === 0) return null
+	const fingerprints = Array.isArray(value.fingerprints)
+		? value.fingerprints.filter((fingerprint) => typeof fingerprint === 'string')
+		: messages.map(fingerprintOf)
+	if (fingerprints.length !== messages.length) return null
+	return { messages, fingerprints }
+}
+
 /**
- * The extraction checkpoint of one session: the last event sequence whose facts were stored, and a
+ * The extraction checkpoint of one session: fingerprints of messages whose facts were stored, and a
  * batch that has not been acknowledged yet. A plain `{ seq }` file from an older plugin version is
- * still accepted.
+ * migrated on first use: its history is marked seen rather than extracted again.
  * @param path - the session's state file.
  * @returns the checkpoint.
  */
 async function readState(path) {
 	try {
 		const parsed = JSON.parse(await readFile(path, 'utf8'))
-		const seq = Number.isInteger(parsed?.seq) ? parsed.seq : 0
-		const pending = parsed?.pending
-		if (!pending || !Number.isInteger(pending.seq) || pending.seq <= seq || !Array.isArray(pending.messages)) {
-			return { seq, pending: null }
+		const hasSeen = parsed?.seen !== undefined && parsed?.seen !== null
+		return {
+			seen: seenOf(parsed?.seen),
+			pending: pendingOf(parsed?.pending),
+			legacy: !hasSeen && Number.isInteger(parsed?.seq),
 		}
-		const messages = pending.messages.filter((message) => message
-			&& typeof message.role === 'string'
-			&& typeof message.content === 'string')
-		return { seq, pending: messages.length > 0 ? { seq: pending.seq, messages } : null }
 	} catch {
-		return { seq: 0, pending: null }
+		return { seen: {}, pending: null, legacy: false }
 	}
 }
 
@@ -307,35 +339,76 @@ async function writeState(path, state) {
 	await rename(tmp, path)
 }
 
-/** Model-shaped messages out of the session log since the last extraction. */
-function messagesSince(session, from, settings) {
-	const messages = []
-	for (let seq = from; seq < session.seq; seq += 1) {
-		const event = session.eventAt(seq)
-		if (!event) continue
-		if (event.type === 'user/message') {
-			const source = event.data?.source
-			// Only a direct human prompt has kind "user" and no context form. Compaction
-			// checkpoints, schedules, goal rounds and injected contexts are not the user's words.
+/** Occurrence counts of fresh entries. */
+function countEntries(entries) {
+	const counts = {}
+	for (const entry of entries) counts[entry.fingerprint] = (counts[entry.fingerprint] ?? 0) + 1
+	return counts
+}
+
+/** Entries not covered by seen, preserving duplicate occurrences beyond the seen count. */
+function freshEntries(entries, seen) {
+	const left = { ...seen }
+	const fresh = []
+	for (const entry of entries) {
+		const count = left[entry.fingerprint] ?? 0
+		if (count > 0) {
+			left[entry.fingerprint] = count - 1
+			continue
+		}
+		fresh.push(entry)
+	}
+	return fresh
+}
+
+/** Keep the most recent fingerprints; older messages may then be extracted again after a long session. */
+function capSeen(seen) {
+	const entries = Object.entries(seen)
+	if (entries.length <= SEEN_LIMIT) return seen
+	return Object.fromEntries(entries.slice(-SEEN_LIMIT))
+}
+
+/**
+ * Model-shaped entries from the session's supported derived history. A compaction checkpoint, a
+ * schedule, a goal round or injected context is not the user's words; a forked session skips the
+ * inherited surface prefix that its parent already extracted.
+ */
+function messagesFromSession(session, settings) {
+	const all = session.deriveMessages()
+	const nodes = session.surface?.nodes
+	const inherited = session.inheritedEventCount ?? 0
+	const entries = []
+	for (let i = 0; i < all.length; i += 1) {
+		if (Array.isArray(nodes) && nodes.length === all.length && inherited > 0 && nodes[i] < inherited) continue
+		const message = all[i]
+		if (!message) continue
+		if (message.role === 'user') {
+			const source = message.source
 			if (source?.kind !== 'user' || source.form) continue
-			const text = textOfMessage(event.data).trim()
-			if (text) messages.push({ role: 'user', content: text })
-		} else if (event.type === 'assistant/message') {
-			const text = textOfMessage(event.data?.message).trim()
-			const toolCalls = toolCallsOf(event.data?.message)
-			if (text || toolCalls.length > 0) {
-				const message = { role: 'assistant', content: text }
-				if (toolCalls.length > 0) message.tool_calls = toolCalls
-				messages.push(message)
+			const text = textOfMessage(message).trim()
+			if (text) {
+				const out = { role: 'user', content: text }
+				entries.push({ message: out, fingerprint: fingerprintOf(out) })
 			}
-		} else if (event.type === 'tool/result') {
+		} else if (message.role === 'assistant') {
+			const text = textOfMessage(message).trim()
+			const toolCalls = toolCallsOf(message)
+			if (text || toolCalls.length > 0) {
+				const out = { role: 'assistant', content: text }
+				if (toolCalls.length > 0) out.tool_calls = toolCalls
+				entries.push({ message: out, fingerprint: fingerprintOf(out) })
+			}
+		} else if (message.role === 'tool') {
 			// Tool output is the only place a tool-sourced fact can quote its evidence, and memcue's
 			// write policy rejects such a fact without it. Keep it short: the binary cuts it again.
-			const text = textOfMessage(event.data?.message).trim()
-			if (text) messages.push({ role: 'tool', content: text.slice(0, settings.maxToolResultChars) })
+			const text = textOfMessage(message).trim()
+			if (text) {
+				const out = { role: 'tool', content: text.slice(0, settings.maxToolResultChars) }
+				entries.push({ message: out, fingerprint: fingerprintOf(out) })
+			}
 		}
 	}
-	return messages
+	return entries
 }
 
 /**
@@ -421,19 +494,43 @@ export function apply(ctx, config) {
 				const path = statePathFor(settings, sessionId)
 				const state = await readState(path)
 				let batch = state.pending
+				if (state.legacy) {
+					const entries = messagesFromSession(session, settings)
+					if (!batch) {
+						// The old state was an event offset, unusable without the deprecated event reader.
+						// Mark the current history seen instead of extracting it a second time.
+						await writeState(path, { seen: capSeen(countEntries(entries)), pending: null })
+						return
+					}
+					// Keep the pending batch and seed the rest of the current history as seen, so the
+					// retry neither loses the batch nor duplicates the older session.
+					const pendingCounts = countEntries(batch.fingerprints.map((fingerprint) => ({ fingerprint })))
+					const seed = {}
+					for (const entry of entries) {
+						if ((pendingCounts[entry.fingerprint] ?? 0) > 0) {
+							pendingCounts[entry.fingerprint] -= 1
+							continue
+						}
+						seed[entry.fingerprint] = (seed[entry.fingerprint] ?? 0) + 1
+					}
+					state.seen = seed
+					await writeState(path, { seen: seed, pending: batch })
+				}
 				if (!batch) {
-					// A forked session carries the parent's prefix; it was already extracted there.
-					const from = state.seq > 0 ? state.seq : (session.inheritedEventCount ?? 0)
-					const messages = messagesSince(session, from, settings)
-					const chars = messages.reduce((total, message) => total + message.content.length, 0)
-					if (messages.length === 0) return
+					const entries = messagesFromSession(session, settings)
+					const fresh = freshEntries(entries, state.seen)
+					const chars = fresh.reduce((total, entry) => total + entry.message.content.length, 0)
+					if (fresh.length === 0) return
 					// A normal turn waits for enough new text; a disposing session takes the tail even
 					// when it is short, because there will be no next turn to collect it.
 					if (!final && chars < settings.minNewChars) return
 					// Persist the batch before the model call. A crash after this point retries the
-					// same text; an offset written before the call would lose it on a failed call.
-					batch = { seq: session.seq, messages }
-					await writeState(path, { seq: state.seq, pending: batch })
+					// same text; acknowledging it before the call would lose it on a failed call.
+					batch = {
+						messages: fresh.map((entry) => entry.message),
+						fingerprints: fresh.map((entry) => entry.fingerprint),
+					}
+					await writeState(path, { seen: state.seen, pending: batch })
 				}
 				const { code, err } = await runMemcue(settings, [
 					'extract-messages',
@@ -445,7 +542,9 @@ export function apply(ctx, config) {
 					console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
 					return // keep the pending batch for the next attempt
 				}
-				await writeState(path, { seq: batch.seq, pending: null })
+				const seen = { ...state.seen }
+				for (const fingerprint of batch.fingerprints) seen[fingerprint] = (seen[fingerprint] ?? 0) + 1
+				await writeState(path, { seen: capSeen(seen), pending: null })
 			} catch (error) {
 				console.warn(`memcue: extraction failed: ${String(error)}`)
 			} finally {
