@@ -335,7 +335,7 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Capability | Claude Code | DeepSeek Harness | Hermes Agent |
 |---|---|---|---|
 | Recall before a prompt | `UserPromptSubmit` hook | `agent/pre-step` | `prefetch` |
-| Session card | `SessionStart` | `session-card` on first step and after compaction | no separate card: the built-in memory block is the global layer |
+| Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` with the first turn and after compression |
 | Facts again after a compaction / `/clear` | yes | yes | yes |
 | Session extraction | `PreCompact` / `SessionEnd` | `turn/end` / `session/disposed` | threshold, idle, pre-compress, session end |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |

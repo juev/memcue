@@ -7,6 +7,9 @@ memcue fact base:
   Hermes puts them into the turn's `<memory-context>` block. Each fact comes once per session, and again after the
   context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
   notice, whose wrapper matches facts by accident.
+- **The session card** (global rules and the decisions of the current repository) rides with the first turn and
+  again after a compression, through the same `memcue session-card` call Claude Code and DSH use. It stays in the
+  conversation instead of being repeated in the system prompt; `session_card: false` turns it off.
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.
