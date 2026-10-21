@@ -265,6 +265,24 @@ function factsOf(stdout) {
 	}
 }
 
+/** The session id shape memcue accepts; it builds the seen-file name from it. Mirrors cmd/memcue/session.go. */
+const SESSION_ID_RE = /^[A-Za-z0-9._-]{1,128}$/
+
+/**
+ * Map a dsh session id to the id memcue may use for its seen file.
+ *
+ * A valid id is returned unchanged, so an existing base keeps its "once per session" state. Anything
+ * else — a colon or a slash, a dot-only id, an id over 128 characters — is replaced by a stable hash,
+ * as the Hermes plugin does. The result is deterministic, so every prompt of one session shares a scope.
+ * @param sessionId - the harness session id.
+ * @returns a string matching SESSION_ID_RE.
+ */
+export function memcueSessionId(sessionId) {
+	const id = String(sessionId ?? '')
+	if (SESSION_ID_RE.test(id) && id !== '.' && id !== '..') return id
+	return createHash('sha256').update(id).digest('hex').slice(0, 32)
+}
+
 /** One safe file name per session id. */
 function statePathFor(settings, sessionId) {
 	return join(settings.stateDir, `${String(sessionId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`)
@@ -438,7 +456,7 @@ export function apply(ctx, config) {
 		if (decision.kind === 'reject' || payload.signal.aborted) return decision
 		const prompt = promptOf(decision.messages)
 		if (!prompt) return decision
-		const sessionId = String(payload.agent.session.id)
+		const sessionId = memcueSessionId(payload.agent.session.id)
 		const cwd = payload.agent.session.header?.cwd ?? process.cwd()
 
 		// The card is a view of the base, not a copy: deliver it on the first prompt of a session and
@@ -484,7 +502,7 @@ export function apply(ctx, config) {
 			// A subagent conversation is derived from the parent's work; extracting it duplicates the
 			// parent's facts and spends a model call on a transcript nobody asked to remember.
 			if (session.header?.origin === 'subagent') return
-			const sessionId = String(session.id)
+			const sessionId = memcueSessionId(session.id)
 			if (busy.has(sessionId)) {
 				if (final) pendingFinal.add(sessionId)
 				return
@@ -561,7 +579,7 @@ export function apply(ctx, config) {
 			void extractSession(session, 'turn-end', false)
 		})
 		ctx.on('session/disposed', (session) => {
-			cardSources.delete(String(session.id))
+			cardSources.delete(memcueSessionId(session.id))
 			void extractSession(session, 'session-end', true)
 		})
 	}
@@ -570,7 +588,7 @@ export function apply(ctx, config) {
 	// session-card reset the seen file so those facts may be recalled once more.
 	ctx.on('session/event', (session, event) => {
 		if (event?.type !== 'compaction/end') return
-		cardSources.set(String(session.id), 'compact')
+		cardSources.set(memcueSessionId(session.id), 'compact')
 	})
 
 	ctx.tools.register(defineTool({
