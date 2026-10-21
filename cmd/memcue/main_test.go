@@ -307,6 +307,18 @@ func TestCompactionLetsFactsComeAgain(t *testing.T) {
 	}
 }
 
+func TestClearLetsFactsComeAgain(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	hookContext(t, dir, "s1", gradlePrompt)
+	if err := runSessionStart(strings.NewReader(`{"session_id":"s1","source":"clear"}`), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("after /clear: %q", got)
+	}
+}
+
 func TestResumeKeepsSeenFacts(t *testing.T) {
 	dir := env(t)
 	seed(t)
