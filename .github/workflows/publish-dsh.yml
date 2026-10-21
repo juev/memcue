@@ -43,7 +43,11 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
-            npm publish --access public --dry-run
+            # A dry run still refuses a version that already exists, so pack a
+            # throwaway prerelease and never upload it.
+            npm version "$(node -p "require('./package.json').version")-dryrun.$(date +%s)" \
+              --no-git-tag-version --allow-same-version >/dev/null
+            npm publish --access public --dry-run --tag dryrun
           else
             npm publish --access public
           fi
