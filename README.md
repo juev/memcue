@@ -154,9 +154,10 @@ best "same claim" reaches `MEMCUE_JUDGE_DUP_MIN` (default 0.5) is retired with t
 `vet.log`. Every fact gets its own question, not one `choice`: a `choice` names the closest fact and drops the others,
 and a base that holds three copies of a fact needs all three. Everything the judge does not call a duplicate still goes
 to the review model, which decides whether the fact is worth keeping at all; a failed call decides nothing and leaves
-the candidate in the queue. The stage is skipped when the approved base is larger than `MEMCUE_JUDGE_DUP_MAX_FACTS`
-(default 400: about 150 input tokens per fact fit a 64k request; `MEMCUE_JUDGE_DUP_LONG_CONTEXT=1` sends the danger-zone
-header for 262k), and then the review model and its neighbours decide as before. Measured on a base of 235 approved
+the candidate in the queue. A base larger than `MEMCUE_JUDGE_DUP_MAX_FACTS` is split into requests of that size
+(default 400: about 150 input tokens per fact fit a 64k request; `MEMCUE_JUDGE_DUP_LONG_CONTEXT=1` sends the
+danger-zone header for 262k). Every chunk is asked and the strongest "same claim" wins, so the cost per candidate
+grows with the number of chunks; a failed chunk leaves the candidate undecided. Measured on a base of 235 approved
 facts and 41 candidates the review model had labelled: at 0.5 the judge retires 8–11 of the 15 duplicates and 0–1 of
 the 26 facts worth keeping, AUC 0.835–0.877 across two runs; a plain yes/no question at the same threshold retires 8
 and 1, AUC 0.815–0.822, at 0.3 it still lets 2 facts through. Each candidate costs 1.3 s and $0.0017 —

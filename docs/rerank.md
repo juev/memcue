@@ -70,6 +70,6 @@ $0.0166 and 0.79 s median.
 
 - Cost and latency are paid per prompt while the judge is configured; on a laptop without a key it is off.
 - The labels are one model's opinion; the later 60-fact truth sample was 52 TRUE_NOW / 8 STALE, but it was not random.
-- A base larger than the duplicate cap (400 facts, 1,700 with the long-context header) skips the duplicate stage;
-  that is a separate follow-up, not a rerank property.
+- A base larger than the duplicate cap (400 facts, 1,700 with the long-context header) is split into chunks; the
+  cost per candidate grows with the number of chunks, and a failed chunk leaves the candidate undecided.
 - Jev is a judge, not a retriever: do not ask it to search the whole base.
