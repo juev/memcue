@@ -202,6 +202,21 @@ function textOfMessage(message) {
 		.join('\n')
 }
 
+/** Tool calls of one assistant message in the OpenAI shape memcue's transcript renderer expects. */
+function toolCallsOf(message) {
+	const content = message?.content
+	if (!Array.isArray(content)) return []
+	return content
+		.filter((block) => block && block.type === 'tool-call'
+			&& typeof block.name === 'string'
+			&& typeof block.arguments === 'string')
+		.map((block) => ({
+			id: block.id,
+			type: 'function',
+			function: { name: block.name, arguments: block.arguments },
+		}))
+}
+
 /** The prompt to look facts up by: the last real user text, never an injected context message. */
 function promptOf(messages) {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -307,7 +322,12 @@ function messagesSince(session, from, settings) {
 			if (text) messages.push({ role: 'user', content: text })
 		} else if (event.type === 'assistant/message') {
 			const text = textOfMessage(event.data?.message).trim()
-			if (text) messages.push({ role: 'assistant', content: text })
+			const toolCalls = toolCallsOf(event.data?.message)
+			if (text || toolCalls.length > 0) {
+				const message = { role: 'assistant', content: text }
+				if (toolCalls.length > 0) message.tool_calls = toolCalls
+				messages.push(message)
+			}
 		} else if (event.type === 'tool/result') {
 			// Tool output is the only place a tool-sourced fact can quote its evidence, and memcue's
 			// write policy rejects such a fact without it. Keep it short: the binary cuts it again.
