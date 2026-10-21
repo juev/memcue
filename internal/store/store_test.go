@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -1017,5 +1018,38 @@ func TestBaseOfAFutureVersionIsRefused(t *testing.T) {
 	}
 	if _, err := Open(path); err == nil {
 		t.Error("a base of schema 99 opened")
+	}
+}
+
+// AddBatch calls from several goroutines share one ULID entropy source; the locked reader keeps the ids unique and
+// the race detector quiet.
+func TestAddBatchConcurrentIDsAreUnique(t *testing.T) {
+	s, _ := open(t)
+	const writers = 16
+	ids := make(chan string, writers)
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			facts, err := s.AddBatch([]FactInput{{Content: fmt.Sprintf("Concurrent fact %d.", i), Origin: "x 2026-10-20"}})
+			if err != nil {
+				t.Errorf("AddBatch %d: %v", i, err)
+				return
+			}
+			ids <- facts[0].ID
+		}(i)
+	}
+	wg.Wait()
+	close(ids)
+	seen := map[string]bool{}
+	for id := range ids {
+		if seen[id] {
+			t.Fatalf("duplicate id %s", id)
+		}
+		seen[id] = true
+	}
+	if len(seen) != writers {
+		t.Fatalf("ids = %d, want %d", len(seen), writers)
 	}
 }
