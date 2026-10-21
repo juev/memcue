@@ -364,7 +364,7 @@ func extractSession(path string, rec *extractRecord, minChars int) error {
 		return err
 	}
 	rec.To, rec.Chars = sess.Lines, len(sess.Text)
-	rec.Origin = strings.TrimSpace(tier.Of(sess.CWD, claudeDir()) + " " + sess.Start)
+	rec.Origin = strings.TrimSpace(originName(sess.CWD) + " " + sess.Start)
 	return storeExtracted(sess.Text, rec, minChars)
 }
 

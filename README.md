@@ -115,7 +115,7 @@ extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
 for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
-and today):
+and today, or the directory's own name outside a repository):
 
 ```bash
 memcue search -json postgres port    # find facts and their IDs (a JSON array with -json)
