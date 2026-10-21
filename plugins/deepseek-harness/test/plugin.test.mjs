@@ -274,6 +274,68 @@ test('a turn end sends the new messages to extract-messages', async () => {
 	])
 })
 
+test('tool calls travel with the assistant message', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const events = [
+		{ type: 'user/message', data: userMessage('run the check') },
+		{
+			type: 'assistant/message',
+			data: {
+				turn: 1,
+				step: 1,
+				message: {
+					role: 'assistant',
+					content: [
+						{ type: 'text', text: 'checking' },
+						{ type: 'tool-call', id: 'call-1', name: 'bash', arguments: '{"cmd":"ls"}' },
+					],
+				},
+			},
+		},
+		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'a.txt' }] } } },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's87', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+	const text = await waitForLog('extract-input')
+	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
+	assert.equal(sent[1].role, 'assistant')
+	assert.equal(sent[1].content, 'checking')
+	assert.equal(sent[1].tool_calls[0].function.name, 'bash')
+	assert.equal(sent[1].tool_calls[0].function.arguments, '{"cmd":"ls"}')
+	assert.deepEqual(sent[2], { role: 'tool', content: 'a.txt' })
+})
+
+test('a tool-only assistant message is kept', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const events = [
+		{ type: 'user/message', data: userMessage('look') },
+		{
+			type: 'assistant/message',
+			data: {
+				turn: 1,
+				step: 1,
+				message: {
+					role: 'assistant',
+					content: [{ type: 'tool-call', id: 'call-2', name: 'read', arguments: '{"path":"a.txt"}' }],
+				},
+			},
+		},
+		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'contents' }] } } },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's87b', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+	const text = await waitForLog('extract-input')
+	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
+	assert.equal(sent[1].content, '')
+	assert.equal(sent[1].tool_calls[0].function.name, 'read')
+})
+
 test('a failed extraction keeps the batch and retries it', async () => {
 	const stateDir = join(dir, 'state-81-fail')
 	const failLog = join(dir, 'fail-81.log')
