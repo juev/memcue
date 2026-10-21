@@ -157,6 +157,30 @@ class ProviderTest(unittest.TestCase):
     def test_the_current_binary_is_compatible(self):
         self.assertTrue(self.p._binary_ok())
 
+    def test_a_failed_session_card_is_retried_after_a_pause(self):
+        counter = Path(self.home, "card-count")
+        stub = Path(self.home, "card-fail-memcue")
+        stub.write_text("#!/bin/sh\n"
+                        "case \"$1\" in\n"
+                        "  version) printf '{\"version\":\"0.4.0\"}\\n' ;;\n"
+                        f"  session-card) echo x >> {counter}; echo locked >&2; exit 1 ;;\n"
+                        "  hook) printf '{}\\n' ;;\n"
+                        "esac\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        base = str(Path(self.home) / "card.db")
+        subprocess.run([BIN, "add", "-origin", "x 2026-10-19", "Правило карты."],
+                       env=dict(os.environ, MEMCUE_FACTS=base), check=True, capture_output=True)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "facts": base})
+        p.initialize("s1", hermes_home=self.home)
+        self.assertEqual(p._card_text(), "")
+        self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
+        # Within the pause the provider does not spawn the failing call again.
+        self.assertEqual(p._card_text(), "")
+        self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
+        p._card_retry_at = 0.0
+        p._card_text()
+        self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
+
     def test_provider_matches_real_hermes_api(self):
         from agent.memory_provider import MemoryProvider
         if not hasattr(MemoryProvider, "on_session_switch"):

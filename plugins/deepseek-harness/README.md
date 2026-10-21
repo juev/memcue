@@ -5,6 +5,8 @@ fact base:
 
 - **Before each step** the prompt goes to `memcue hook`; at most two matching facts come back and are appended as a
   user-role message with source `memcue` and form `recall`. memcue itself keeps a fact to one delivery per session.
+  A failed recall is reported once per session and the step still runs; a failed session card is not treated as
+  delivered, so the next step retries it (with one report per session).
 - **At the first prompt and after every compaction** `memcue session-card` supplies the card of global rules and
   repository decisions as a user-role notice. The card is a view of the base, not a copy; after a compaction it also
   resets the session's delivered facts, so a fact dropped with the old context may come again.

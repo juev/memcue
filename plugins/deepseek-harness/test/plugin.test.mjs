@@ -758,6 +758,65 @@ exit 0
 	}
 })
 
+test('a failed recall is reported once and the step still runs', async () => {
+	const failBinary = join(dir, 'recall-fail.sh')
+	await writeFile(failBinary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"0.4.0"}\\n' ;;
+  session-card) printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":""}}\\n' ;;
+  hook) echo 'base is locked' >&2; exit 1 ;;
+esac
+exit 0
+`)
+	await chmod(failBinary, 0o755)
+	const warnings = []
+	const original = console.warn
+	console.warn = (...args) => warnings.push(args.join(' '))
+	try {
+		const { listeners } = mount({ binary: failBinary })
+		const first = await preStep(listeners, [userMessage('hello there')])
+		const second = await preStep(listeners, [userMessage('again')])
+		assert.equal(first.messages.length, 1)
+		assert.equal(second.messages.length, 1)
+		const recallWarnings = warnings.filter((warning) => warning.includes('recall failed'))
+		assert.equal(recallWarnings.length, 1, warnings.join('\n'))
+		assert.match(recallWarnings[0], /base is locked/)
+	} finally {
+		console.warn = original
+	}
+})
+
+test('a failed card is retried on the next step', async () => {
+	const counter = join(dir, 'card-190.count')
+	process.env.MEMCUE_CARD_COUNT = counter
+	const cardBinary = join(dir, 'card-retry.sh')
+	await writeFile(cardBinary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"0.4.0"}\\n' ;;
+  session-card)
+    n=$(cat "$MEMCUE_CARD_COUNT" 2>/dev/null || echo 0)
+    n=$((n+1))
+    echo "$n" > "$MEMCUE_CARD_COUNT"
+    if [ "$n" -eq 1 ]; then echo 'transient lock' >&2; exit 1; fi
+    printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"retried card"}}\\n'
+    ;;
+  hook) printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}\\n' ;;
+esac
+exit 0
+`)
+	await chmod(cardBinary, 0o755)
+	try {
+		const { listeners } = mount({ binary: cardBinary })
+		const first = await preStep(listeners, [userMessage('hello there')])
+		assert.equal(first.messages.length, 1, 'the failed card must not be delivered')
+		const second = await preStep(listeners, [userMessage('again')])
+		assert.equal(second.messages.length, 2, 'the card must arrive on the retry')
+		assert.match(second.messages[1].content[0].text, /retried card/)
+	} finally {
+		delete process.env.MEMCUE_CARD_COUNT
+	}
+})
+
 test('a missing binary costs the facts, not the step', async () => {
 	const { listeners } = mount({ binary: join(dir, 'no-such-memcue') })
 	const decision = await preStep(listeners, [userMessage('what is the harness base?')])
