@@ -657,10 +657,16 @@ test('a non-string model is rejected', () => {
 	assert.throws(() => mount({ model: 42 }), /model/)
 })
 
+test('an incomplete dsh context fails loud', () => {
+	assert.throws(() => apply({}, {}), /lacks the event, tool or system-prompt service/)
+})
+
 test('the package is a dsh bundle with a loadable entry', async () => {
 	const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 	assert.equal(pkg.dsh?.bundle?.patch, './cordis.patch.yml')
 	assert.equal(pkg.exports, './src/index.mjs')
+	assert.equal(pkg.peerDependencies?.['@deepseek-ai/dsh-llm'], '>=0.2.0-rc.2 <0.3.0')
+	assert.equal(pkg.peerDependencies?.['@deepseek-ai/dsh-tools'], '>=0.2.0-rc.2 <0.3.0')
 	const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 	assert.match(patch, /- id: memcue/)
 	assert.match(patch, /name: \.\/src\/index\.mjs/)
@@ -673,6 +679,8 @@ test('the repository root is installable without a path parameter', async () => 
 	const rootDir = new URL('./', rootUrl)
 	assert.equal(root.dsh?.bundle?.patch, 'plugins/deepseek-harness/cordis.patch.yml')
 	assert.equal(root.exports, './plugins/deepseek-harness/src/index.mjs')
+	assert.equal(root.peerDependencies?.['@deepseek-ai/dsh-llm'], '>=0.2.0-rc.2 <0.3.0')
+	assert.equal(root.peerDependencies?.['@deepseek-ai/dsh-tools'], '>=0.2.0-rc.2 <0.3.0')
 	await readFile(new URL(root.dsh.bundle.patch, rootDir), 'utf8')
 	await readFile(new URL(root.exports, rootDir), 'utf8')
 })

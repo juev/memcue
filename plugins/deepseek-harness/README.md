@@ -25,6 +25,12 @@ fact base:
 The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
 the harness, so everything that works for Claude Code and Hermes works here on the same file.
 
+## Supported dsh
+
+Tested with `dsh 0.2.0-rc.2`. Both the repository bundle and the standalone package declare
+`>=0.2.0-rc.2 <0.3.0` peer ranges for `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools`, so dsh's compatibility
+check refuses a different minor instead of loading a plugin whose session or event shape it no longer recognises.
+
 ## Install
 
 The repository root is a dsh bundle wrapper: its `package.json` declares `dsh.bundle.patch`, pointing at this

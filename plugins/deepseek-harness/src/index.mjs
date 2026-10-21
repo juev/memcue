@@ -345,6 +345,10 @@ function messagesSince(session, from, settings) {
  * `maxToolResultChars`, `model`, `apiUrl`, `apiKey`.
  */
 export function apply(ctx, config) {
+	if (typeof ctx?.on !== 'function' || typeof ctx?.tools?.register !== 'function'
+		|| typeof ctx?.systemPrompt?.section !== 'function') {
+		throw new Error('memcue: this dsh runtime lacks the event, tool or system-prompt service')
+	}
 	const settings = settingsOf(config)
 	const busy = new Set()
 	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
