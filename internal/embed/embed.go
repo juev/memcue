@@ -36,12 +36,12 @@ var ErrPaused = errors.New("embeddings endpoint is paused after a failure")
 
 // Settings describe the endpoint. A nil *Settings means the feature is off.
 type Settings struct {
-	URL     string        // base address, e.g. https://openrouter.ai/api/v1
-	Model   string        // embedding model name
-	KeyEnv  string        // name of the environment variable holding the API key
-	Space   string        // optional label of the vector space, for a server that changes model under one name
-	Timeout time.Duration // one request
-	StateFile string      // where the pause is remembered between processes; empty keeps it in memory
+	URL       string        // base address, e.g. https://openrouter.ai/api/v1
+	Model     string        // embedding model name
+	KeyEnv    string        // name of the environment variable holding the API key
+	Space     string        // optional label of the vector space, for a server that changes model under one name
+	Timeout   time.Duration // one request
+	StateFile string        // where the pause is remembered between processes; empty keeps it in memory
 }
 
 // FromEnv reads MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY_ENV, MEMCUE_EMBED_SPACE and

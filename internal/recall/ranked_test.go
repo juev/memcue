@@ -18,8 +18,8 @@ type fakeRanker struct {
 	asked  int
 }
 
-func (f *fakeRanker) Min() float64       { return f.min }
-func (f *fakeRanker) Candidates() int    { return 10 }
+func (f *fakeRanker) Min() float64    { return f.min }
+func (f *fakeRanker) Candidates() int { return 10 }
 func (f *fakeRanker) Scores(_ context.Context, _ string, facts []string) ([]float64, error) {
 	f.asked = len(facts)
 	if f.err != nil {
