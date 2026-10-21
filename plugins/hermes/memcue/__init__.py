@@ -429,10 +429,17 @@ class MemcueMemoryProvider(MemoryProvider):
                   "used": sum(1 for f in facts if any(t in reply for t in f["tokens"])), "matched": matched[:6]}
         try:
             path = self._usage_path()
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             with self._lock:
-                with path.open("a", encoding="utf-8") as f:
+                # The log holds identifiers copied from replies and facts (paths, hashes, versions), so it is
+                # private like every other memcue log; Path.open() would use the process umask instead.
+                fd = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                try:
+                    os.chmod(path, 0o600)
+                except OSError:
+                    pass  # Windows and exotic filesystems may not support the mode
         except OSError as e:
             logger.debug("memcue usage log: %s", e)
 

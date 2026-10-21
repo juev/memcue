@@ -12,6 +12,7 @@ import threading
 import time
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -306,8 +307,11 @@ class ProviderTest(unittest.TestCase):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
         self.assertIn("55432", p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s7"))
         p.sync_turn("на каком порту слушает база postgres проекта demo?", "База слушает 55432.", session_id="s7")
-        lines = (state / "memcue" / "usage.log").read_text(encoding="utf-8").splitlines()
+        log = state / "memcue" / "usage.log"
+        lines = log.read_text(encoding="utf-8").splitlines()
         self.assertEqual([(r["facts"], r["used"]) for r in map(json.loads, lines)], [(1, 1)])
+        self.assertEqual(stat.S_IMODE(log.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(log.parent.stat().st_mode), 0o700)
         self.assertFalse((Path(self.home) / "state" / "memcue" / "usage.log").exists())
 
     def test_usage_log_config_false_stays_off(self):
