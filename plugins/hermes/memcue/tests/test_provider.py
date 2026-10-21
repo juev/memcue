@@ -162,6 +162,23 @@ class ProviderTest(unittest.TestCase):
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
         self.assertEqual(self.pending(), [])
 
+    def test_replace_of_a_retired_mirror_adds_a_new_candidate(self):
+        old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
+        new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
+        self.p.on_memory_write("add", "memory", old)
+        fact_id = self.pending()[0].split()[0]
+        self.memcue("retire", fact_id)
+        self.assertEqual(self.pending(), [])
+        # The note is edited after vet or a person retired its mirror: correct must not revive the retired fact.
+        self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
+        pending = self.pending()
+        self.assertEqual(len(pending), 1)
+        self.assertIn("55433", pending[0])
+        new_id = pending[0].split()[0]
+        self.assertNotEqual(new_id, fact_id)
+        self.assertEqual(self.written()[self.p._key("memory", new)], new_id)
+        self.assertIn(f"{fact_id} v2 retired", "\n".join(self.memcue("dump", self.p._facts)))
+
     def written(self) -> dict:
         return json.loads((Path(self.p._state) / "written.json").read_text(encoding="utf-8"))
 
