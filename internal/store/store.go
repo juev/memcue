@@ -105,6 +105,15 @@ type Meta struct {
 	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
 }
 
+// FactInput is one new fact for AddBatch: the same fields AddWith takes, without the generated id, author or time.
+type FactInput struct {
+	Content  string
+	Keywords []string
+	Origin   string
+	Expires  string
+	Meta
+}
+
 // ErrNotFound: no fact with that id.
 var ErrNotFound = errors.New("fact not found")
 
@@ -318,20 +327,55 @@ func (s *Store) AddExpiring(content string, keywords []string, origin, expires s
 // AddWith stores a new fact as version 1 with what it is and what it rests on. A fact with Review Candidate is not
 // recalled until it is approved.
 func (s *Store) AddWith(content string, keywords []string, origin, expires string, m Meta) (Fact, error) {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return Fact{}, errors.New("empty fact")
-	}
-	if err := ValidExpiry(expires); err != nil {
-		return Fact{}, err
-	}
-	id, err := ulid.New(ulid.Timestamp(s.now()), rand.Reader)
+	facts, err := s.AddBatch([]FactInput{{
+		Content: content, Keywords: keywords, Origin: origin, Expires: expires, Meta: m,
+	}})
 	if err != nil {
 		return Fact{}, err
 	}
-	f := Fact{ID: id.String(), Version: 1, Content: content, Keywords: keywords, Origin: origin,
-		Created: s.now().UTC(), Status: Active, Author: s.author, Expires: expires, Meta: m}
-	return f, s.write(f)
+	return facts[0], nil
+}
+
+// AddBatch stores several new facts in one transaction: either every fact is written and indexed, or none is. A
+// retry after a database error therefore sees the same base, not a half-applied extraction.
+func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
+	facts := make([]Fact, 0, len(inputs))
+	for _, in := range inputs {
+		content := strings.TrimSpace(in.Content)
+		if content == "" {
+			return nil, errors.New("empty fact")
+		}
+		if err := ValidExpiry(in.Expires); err != nil {
+			return nil, err
+		}
+		id, err := ulid.New(ulid.Timestamp(s.now()), rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		facts = append(facts, Fact{ID: id.String(), Version: 1, Content: content, Keywords: in.Keywords,
+			Origin: in.Origin, Created: s.now().UTC(), Status: Active, Author: s.author, Expires: in.Expires,
+			Meta: in.Meta})
+	}
+	if len(facts) == 0 {
+		return facts, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, f := range facts {
+		if err := insert(tx, f); err != nil {
+			return nil, err
+		}
+		if err := reindex(tx, f.ID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return facts, nil
 }
 
 // Correct adds a version with new content and keywords; the origin stays.
