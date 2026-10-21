@@ -217,6 +217,41 @@ func TestReviewUndoRefusesAnEditedFact(t *testing.T) {
 	}
 }
 
+// A candidate approved after the page was rendered is not retired by the stale rejection: RetireCandidate re-checks
+// the state under the write, and the page reports the failure as before.
+func TestReviewRejectAfterConcurrentApproval(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f := reviewCandidate(t, s, "Кандидат, которого одобрят до отказа.", "rule", "user")
+	logPath := filepath.Join(dir, "review.log")
+	rs, err := newReviewServer(s, logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := reviewGet(t, rs, "/"); code != http.StatusOK {
+		t.Fatalf("page %d", code)
+	}
+	approved, err := s.Approve(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := reviewPost(t, rs, "/reject", url.Values{"token": {rs.token}, "id": {f.ID}})
+	if rec.Code != http.StatusSeeOther || !strings.Contains(rec.Header().Get("Location"), "failed") {
+		t.Fatalf("stale reject %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	got, _ := s.Get(f.ID)
+	if got.Status != store.Active || got.Review != "" || got.Version != approved.Version {
+		t.Errorf("a stale reject changed the approved fact: %+v", got)
+	}
+	if _, err := os.Stat(logPath); !os.IsNotExist(err) {
+		t.Errorf("a refused reject wrote a log: %v", err)
+	}
+}
+
 func TestReviewRejectsForeignHost(t *testing.T) {
 	dir := env(t)
 	s, _ := store.Open(factsPath())
