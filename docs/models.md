@@ -82,9 +82,9 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_EMBED_KEY_ENV` | `MEMCUE_EMBED_KEY` | direct key, same shape as the other two models |
 | `MEMCUE_EMBED_MODE`, `_MARGIN`, `_MIN_SCORE`, `_MAX_FACTS` | removed | vector is a candidate generator, not a standalone reader; Jev decides |
 
-Operational flags stay: `MEMCUE_VET`, `MEMCUE_DREAM`, `MEMCUE_MEMORY_DIR`, `MEMCUE_MIN_COVERAGE`,
-`MEMCUE_EXTRACT`, `MEMCUE_FACTS`, `MEMCUE_RECALL_LOG`, `MEMCUE_HOST`, `CLAUDE_CONFIG_DIR`,
-`XDG_STATE_HOME`.
+Operational flags stay: `MEMCUE_VET`, `MEMCUE_VET_POLICY`, `MEMCUE_VET_TTL_DAYS`, `MEMCUE_DREAM`,
+`MEMCUE_MEMORY_DIR`, `MEMCUE_MIN_COVERAGE`, `MEMCUE_EXTRACT`, `MEMCUE_FACTS`, `MEMCUE_RECALL_LOG`,
+`MEMCUE_HOST`, `CLAUDE_CONFIG_DIR`, `XDG_STATE_HOME`.
 
 ## Recall flow
 
@@ -123,13 +123,12 @@ the rerank-gate issue.
 
 ## Other decisions and non-goals
 
-- **Review runs on the main model.** `MEMCUE_VET=1` remains off by default; do not enable it on a
-  dirty base until the contradiction policy is fixed (a contradiction with an approved fact is
-  currently `drop`, which entrenches a false approved fact).
-- **Duplicate check is one Jev role, but it is not exercised on this base.** The base has 2,571
-  approved facts and the duplicate request caps at 400 (1,700 with long context), so the stage is
-  skipped. It stays for small bases; do not claim a duplicate benefit on the 2.6k base until a
-  subset/split strategy is measured.
+- **Review runs on the main model.** `MEMCUE_VET=1` remains off by default. A contradiction with
+  an approved fact is `unsure` (not `drop`); with `MEMCUE_VET_POLICY=auto` it becomes
+  provisional for `MEMCUE_VET_TTL_DAYS`, recalled after approved facts.
+- **Duplicate check is one Jev role.** A base above 400 approved facts (1,700 with long context)
+  is split into chunks of `MEMCUE_JUDGE_DUP_MAX_FACTS`; the strongest "same claim" wins. The
+  2.6k base therefore costs several requests per candidate; precision on it is not measured yet.
 - **Triage is the same Jev role**; it is a cost filter for dream groups, not a fourth model.
 - **No Jev-as-retriever.** Whole-base Jev retrieval measured 12/120 useful top-1, worse than
   bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.
@@ -153,9 +152,9 @@ the rerank-gate issue.
 
 ## Open work
 
-- Implement the combined candidate flow and environment contract (this decision's issue).
-- Fix the hard ticket/coverage gate for the combined path (existing rerank-gate issue).
-- Fix the failed-write and concurrency problems in `vet` before enabling auto-vet.
+- Measure the chunked duplicate precision and cost on the full 2.6k base.
+- Random truth audit of the base; the 60-fact sample was not random.
+- Decide whether provisional facts should auto-promote after use or stay TTL-only.
 - ~~A/B the main model as the reranker.~~ Measured 2026-10-21: the main model is 4 useful top-1
   prompts behind Jev (108 vs 112 on 176 prompts) and about five times slower, despite labelling the
   sample; keep the judge. See [main-reranker-2026-10.md](research/main-reranker-2026-10.md).

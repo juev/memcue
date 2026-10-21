@@ -377,6 +377,56 @@ func TestApproveTakesACandidateIntoRecall(t *testing.T) {
 	}
 }
 
+func TestProvisionalIsRecallableButNotTrusted(t *testing.T) {
+	s, _ := open(t)
+	until := time.Now().AddDate(0, 0, 7).Format(time.DateOnly)
+	cand, err := s.AddWith("В контейнере gitea порт 3000.", []string{"gitea"}, "x", "",
+		Meta{Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.ApproveProvisional(cand.ID, until)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Review != Provisional || p.Expires != until || p.Version != 2 {
+		t.Errorf("provisional = %+v", p)
+	}
+	if _, ok := ids(t, s, "gitea")[cand.ID]; !ok {
+		t.Error("provisional fact missing from search")
+	}
+	active, err := s.Active()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range active {
+		if f.ID == cand.ID {
+			t.Error("provisional fact is in the trusted active set")
+		}
+	}
+	if cs, _ := s.Candidates(); len(cs) != 0 {
+		t.Errorf("provisional fact is back in the human queue: %+v", cs)
+	}
+	promoted, err := s.Approve(cand.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if promoted.Review != "" || promoted.Expires != "" {
+		t.Errorf("promoted = %+v, want an approved fact without the provisional TTL", promoted)
+	}
+	cand2, err := s.AddWith("В контейнере gitea порт 3001.", nil, "x", "", Meta{Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ApproveProvisional(cand2.ID, until); err != nil {
+		t.Fatal(err)
+	}
+	ret, err := s.RetireCandidate(cand2.ID)
+	if err != nil || ret.Status != Retired {
+		t.Fatalf("retire provisional = %+v %v", ret, err)
+	}
+}
+
 func TestRetireCandidateRefusesAnApprovedFact(t *testing.T) {
 	s, _ := open(t)
 	f, err := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "x", "", Meta{Review: Candidate})

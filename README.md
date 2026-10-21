@@ -136,9 +136,11 @@ decide first, without a model: a mirror of the built-in memory stays only while 
 mirror), an origin that starts with `test` is retired as a test trace, and a candidate whose words are all in an
 approved fact is retired as covered. The rest goes to the `keep / drop / unsure` judge, twelve candidates a call, each
 with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the answer.
-Everything else the judge cannot settle stays a candidate: `vet` never approves on a failed or empty answer, and
-`unsure` is an entry in the report, not a decision. Every verdict goes to `$XDG_STATE_HOME/memcue/vet.log` with the
-rule or model and its reason; the page, `approve`, `reopen` and its undo stay the manual way, unchanged.
+Everything else the judge cannot settle stays a candidate: `vet` never approves a failed or empty answer blind, and
+`unsure` is an entry in the report, not an approval. With `MEMCUE_VET_POLICY=auto` an `unsure` becomes **provisional**
+for `MEMCUE_VET_TTL_DAYS` instead: it is recalled after approved facts, marked in the log, and expires without a
+person. Every verdict goes to `$XDG_STATE_HOME/memcue/vet.log` with the rule or model and its reason; the page,
+`approve`, `reopen` and its undo stay the manual way, unchanged.
 
 The review runs on the main model. With `MEMCUE_VET=1` the facts a session just stored are reviewed in the
 extraction process, after storing them and before the dream; that process is already detached from the session, so a
@@ -243,6 +245,8 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
 | `MEMCUE_VET` | `1` decides the facts a session extracted, right after storing them and before the dream; needs `MEMCUE_API_URL` | off |
+| `MEMCUE_VET_POLICY` | `auto` turns `unsure` into provisional facts instead of the human queue | `quarantine` |
+| `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
@@ -269,8 +273,8 @@ about $5 per million characters of transcript; tool output is the bulk of it. So
 
 A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
-`claude -p` reports one; a rules-only run (`-no-model`) costs nothing. `MEMCUE_VET_MODEL` is the cheap way to keep a
-long queue cheap.
+`claude -p` reports one; a rules-only run (`-no-model`) costs nothing. The review uses `MEMCUE_MODEL` and
+`MEMCUE_API_URL`; there is no separate review model.
 
 ## Results
 

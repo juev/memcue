@@ -45,10 +45,11 @@ var Default = Params{
 // Hit is a fact chosen for the prompt.
 type Hit struct {
 	store.Fact
-	Coverage  float64
-	Matched   int
-	Displaced bool   // a fact of another host took a slot while a fact of this host was left out
-	Source    string // lexical or vector: which reader proposed the fact
+	Coverage    float64
+	Matched     int
+	Displaced   bool   // a fact of another host took a slot while a fact of this host was left out
+	Source      string // lexical or vector: which reader proposed the fact
+	Provisional bool   // auto-approved for a TTL, recalled after approved facts
 	// Meaning is the vector similarity of a vector candidate or the judge score after rerank; 0 for a lexical fact.
 	Meaning float64
 }
@@ -73,6 +74,9 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		return 3
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].Provisional != hits[j].Provisional {
+			return !hits[i].Provisional
+		}
 		if hits[i].Coverage != hits[j].Coverage {
 			return hits[i].Coverage > hits[j].Coverage
 		}
@@ -184,7 +188,8 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 			}
 		}
 		if cov := got / sum; matched >= minMatched && cov >= p.MinCoverage {
-			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical"})
+			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
+				Provisional: f.Review == store.Provisional})
 		}
 	}
 	return hits, nil

@@ -85,48 +85,70 @@ func configureJudge() {
 // vetLine is one decision as vet.log records it. The review page logs its own shape (time, fact, decision), so an
 // audit reads both with that difference in mind.
 type vetLine struct {
-	Time     string   `json:"time"`
-	ID       string   `json:"id"`
-	Decision string   `json:"decision"` // approve, retire, left; failed: … when the base refused the write
-	Applied  bool     `json:"applied"`
-	Verdict  string   `json:"verdict"`
-	P        *float64 `json:"p"`  // probability of the duplicate judge's "same claim"; null when another step decided
-	By       string   `json:"by"` // rule, judge or model
-	Reason   string   `json:"reason"`
-	Expires  string   `json:"expires,omitempty"`
-	Source   string   `json:"source,omitempty"`
-	Content  string   `json:"content,omitempty"`
+	Time        string   `json:"time"`
+	ID          string   `json:"id"`
+	Decision    string   `json:"decision"` // approve, retire, provisional, left; failed: … when the base refused the write
+	Applied     bool     `json:"applied"`
+	Provisional bool     `json:"provisional,omitempty"`
+	Verdict     string   `json:"verdict"`
+	P           *float64 `json:"p"`  // probability of the duplicate judge's "same claim"; null when another step decided
+	By          string   `json:"by"` // rule, judge or model
+	Reason      string   `json:"reason"`
+	Expires     string   `json:"expires,omitempty"`
+	Source      string   `json:"source,omitempty"`
+	Content     string   `json:"content,omitempty"`
 }
 
 // vetRecord is the summary line of a run.
 type vetRecord struct {
-	Time       string         `json:"time"`
-	Candidates int            `json:"candidates"`
-	Approved   int            `json:"approved"`
-	Retired    int            `json:"retired"`
-	Unsure     int            `json:"unsure"`
-	Failed     int            `json:"failed,omitempty"`
-	JudgeErrs  int            `json:"judge_errors,omitempty"`
-	JudgeCalls int            `json:"judge_calls,omitempty"`
-	DryRun     bool           `json:"dry_run,omitempty"`
-	CostUSD    float64        `json:"cost_usd,omitempty"`
-	Tokens     extract.Tokens `json:"tokens,omitempty"`
-	Error      string         `json:"error,omitempty"`
+	Time        string         `json:"time"`
+	Candidates  int            `json:"candidates"`
+	Approved    int            `json:"approved"`
+	Retired     int            `json:"retired"`
+	Unsure      int            `json:"unsure"`
+	Provisional int            `json:"provisional,omitempty"`
+	Failed      int            `json:"failed,omitempty"`
+	JudgeErrs   int            `json:"judge_errors,omitempty"`
+	JudgeCalls  int            `json:"judge_calls,omitempty"`
+	DryRun      bool           `json:"dry_run,omitempty"`
+	CostUSD     float64        `json:"cost_usd,omitempty"`
+	Tokens      extract.Tokens `json:"tokens,omitempty"`
+	Error       string         `json:"error,omitempty"`
 }
 
 // vetOptions is how a run was asked for.
 type vetOptions struct {
 	dry     bool
 	noModel bool
+	auto    bool
+	ttlDays int
 	memory  string // directory of the built-in memory notes; empty skips the mirror rule
 }
 
-// runVet decides the candidate queue: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR].
+// vetTTLDays is how long a provisional fact is recalled; the default is two weeks.
+func vetTTLDays() int {
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_VET_TTL_DAYS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 14
+}
+
+// vetAutoPolicy says whether unsure becomes provisional instead of waiting for review.
+func vetAutoPolicy() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("MEMCUE_VET_POLICY")), "auto")
+}
+
+// runVet decides the candidate queue: memcue vet [-dry-run] [-limit N] [-no-model] [-auto] [-ttl-days N] [-json]
+// [-memory DIR].
 func runVet(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("vet", flag.ContinueOnError)
 	dry := fs.Bool("dry-run", false, "print the verdicts and change nothing")
 	limit := fs.Int("limit", 0, "decide at most N candidates, newest first (0: the whole queue)")
 	noModel := fs.Bool("no-model", false, "run the deterministic rules only")
+	auto := fs.Bool("auto", false, "turn unsure into provisional facts instead of leaving them for review")
+	ttlDays := fs.Int("ttl-days", vetTTLDays(), "how long a provisional fact is recalled")
 	asJSON := fs.Bool("json", false, "print the decisions as JSON")
 	memory := fs.String("memory", os.Getenv("MEMCUE_MEMORY_DIR"),
 		"directory of the built-in memory notes the mirrors come from; empty skips the mirror rule")
@@ -134,7 +156,7 @@ func runVet(args []string, out io.Writer) error {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return errors.New("usage: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]")
+		return errors.New("usage: memcue vet [-dry-run] [-limit N] [-no-model] [-auto] [-ttl-days N] [-json] [-memory DIR]")
 	}
 	lock, err := acquireVetLock()
 	if err != nil {
@@ -151,7 +173,13 @@ func runVet(args []string, out io.Writer) error {
 		if *limit > 0 && len(cands) > *limit {
 			cands = cands[:*limit]
 		}
-		lines, rec = vetQueue(s, cands, vetOptions{dry: *dry, noModel: *noModel, memory: *memory})
+		policyAuto := *auto || vetAutoPolicy()
+		ttl := *ttlDays
+		if ttl <= 0 {
+			ttl = vetTTLDays()
+		}
+		lines, rec = vetQueue(s, cands, vetOptions{dry: *dry, noModel: *noModel, auto: policyAuto, ttlDays: ttl,
+			memory: *memory})
 		return nil
 	})
 	if err != nil {
@@ -260,26 +288,54 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		}
 	}
 
+	if o.auto {
+		days := o.ttlDays
+		if days <= 0 {
+			days = 14
+		}
+		until := time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
+		for i := range decided {
+			d := &decided[i]
+			if d.Verdict != vet.Unsure {
+				continue
+			}
+			expires := until
+			if d.Expires != "" && d.Expires < expires {
+				expires = d.Expires
+			}
+			reason := "provisional: the model was unsure"
+			if d.Reason != "" {
+				reason += " — " + d.Reason
+			}
+			d.Verdict, d.Provisional, d.By, d.Expires, d.Reason = vet.Keep, true, "policy", expires, reason
+		}
+	}
+
 	lines := make([]vetLine, 0, len(decided))
 	for _, d := range decided {
 		line := vetLine{Time: rec.Time, ID: d.Fact.ID, Verdict: string(d.Verdict), By: d.By,
-			Reason: d.Reason, Expires: d.Expires, Source: d.Fact.Source, Content: clip(d.Fact.Content, 200)}
+			Reason: d.Reason, Expires: d.Expires, Provisional: d.Provisional, Source: d.Fact.Source,
+			Content: clip(d.Fact.Content, 200)}
 		if p, ok := probs[d.Fact.ID]; ok {
 			line.P = &p
 		}
-		switch d.Verdict {
-		case vet.Keep:
+		switch {
+		case d.Provisional:
+			line.Decision = "provisional"
+		case d.Verdict == vet.Keep:
 			line.Decision = "approve"
-		case vet.Drop:
+		case d.Verdict == vet.Drop:
 			line.Decision = "retire"
 		default:
 			line.Decision = "left"
 		}
 		if o.dry {
-			switch d.Verdict {
-			case vet.Keep:
+			switch {
+			case d.Provisional:
+				rec.Provisional++
+			case d.Verdict == vet.Keep:
 				rec.Approved++
-			case vet.Drop:
+			case d.Verdict == vet.Drop:
 				rec.Retired++
 			default:
 				rec.Unsure++
@@ -294,9 +350,12 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 				rec.Failed++
 			} else {
 				line.Applied = true
-				if d.Verdict == vet.Keep {
+				switch {
+				case d.Provisional:
+					rec.Provisional++
+				case d.Verdict == vet.Keep:
 					rec.Approved++
-				} else {
+				default:
 					rec.Retired++
 				}
 			}
@@ -415,7 +474,11 @@ func applyVet(s *store.Store, d vet.Decision, decision string) string {
 	var err error
 	switch d.Verdict {
 	case vet.Keep:
-		_, err = s.ApproveExpiring(d.Fact.ID, d.Expires)
+		if d.Provisional {
+			_, err = s.ApproveProvisional(d.Fact.ID, d.Expires)
+		} else {
+			_, err = s.ApproveExpiring(d.Fact.ID, d.Expires)
+		}
 	case vet.Drop:
 		_, err = s.RetireCandidate(d.Fact.ID)
 	default:
@@ -526,6 +589,9 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 			expires = " expires=" + l.Expires
 		}
 		reason := l.Reason
+		if l.Provisional {
+			reason = "provisional until " + l.Expires + " — " + reason
+		}
 		if strings.HasPrefix(l.Decision, "failed:") {
 			reason += " [" + l.Decision + "]"
 		}
@@ -538,11 +604,12 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 		_, err := fmt.Fprintln(out, "Карантин memcue пуст.")
 		return err
 	}
-	line := fmt.Sprintf("Кандидатов %d: принято %d, отклонено %d, осталось решать %d", rec.Candidates, rec.Approved,
-		rec.Retired, rec.Unsure)
+	line := fmt.Sprintf("Кандидатов %d: принято %d, отклонено %d, временно принято %d, осталось решать %d",
+		rec.Candidates, rec.Approved, rec.Retired, rec.Provisional, rec.Unsure)
 	if rec.DryRun {
 		line = fmt.Sprintf("Пробный прогон, ничего не изменено. Кандидатов %d: к принятию %d, к отклонению %d, "+
-			"осталось решать %d", rec.Candidates, rec.Approved, rec.Retired, rec.Unsure)
+			"временно принять %d, осталось решать %d", rec.Candidates, rec.Approved, rec.Retired, rec.Provisional,
+			rec.Unsure)
 	}
 	if rec.Failed > 0 {
 		line += fmt.Sprintf("; ошибок записи %d", rec.Failed)
@@ -628,7 +695,8 @@ func maybeVet(ids []string) {
 		}
 		cands = append(cands, f)
 	}
-	lines, rec := vetQueue(s, cands, vetOptions{memory: os.Getenv("MEMCUE_MEMORY_DIR")})
+	lines, rec := vetQueue(s, cands, vetOptions{auto: vetAutoPolicy(), ttlDays: vetTTLDays(),
+		memory: os.Getenv("MEMCUE_MEMORY_DIR")})
 	if err := logVet(lines, rec); err != nil {
 		fmt.Fprintln(os.Stderr, "memcue:", err)
 	}

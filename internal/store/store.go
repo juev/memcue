@@ -76,7 +76,10 @@ const (
 
 // Candidate is the review state of an active fact that waits for the user's approval: it is stored but not indexed,
 // so recall never gives it.
-const Candidate = "candidate"
+const (
+	Candidate   = "candidate"   // extracted, waits for a decision, not recalled
+	Provisional = "provisional" // auto-approved for a TTL, recalled after approved facts
+)
 
 // Fact is one version of a fact.
 type Fact struct {
@@ -98,7 +101,7 @@ type Meta struct {
 	Scope         string // where it holds: global, host:<name>, repo:<name>
 	Source        string // who said it: user, user_confirmed, tool, agent, note, memory
 	Evidence      string // the words of the source the fact rests on, verbatim
-	Review        string // Candidate while it waits for approval, else empty
+	Review        string // Candidate while it waits, Provisional for the auto TTL, empty when approved
 	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
 }
 
@@ -244,7 +247,8 @@ func (s *Store) ensureColumns() error {
 // Search reads, so a base whose index row was lost must get it back before a prompt is answered.
 func (s *Store) ensureIndex() error {
 	const active = `SELECT count(*) FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = '' `
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
+			AND f.review IN ('', 'provisional') `
 	var facts, indexed, fts, missing, stale int
 	if err := s.db.QueryRow(active, Active).Scan(&facts); err != nil {
 		return err
@@ -262,7 +266,7 @@ func (s *Store) ensureIndex() error {
 		}
 		if err := s.db.QueryRow(`SELECT count(*) FROM fact_index i WHERE NOT EXISTS (
 			SELECT 1 FROM facts f WHERE f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
-			AND f.status = ? AND f.review = '')`, Active).Scan(&stale); err != nil {
+			AND f.status = ? AND f.review IN ('', 'provisional'))`, Active).Scan(&stale); err != nil {
 			return err
 		}
 		if missing == 0 && stale == 0 {
@@ -374,15 +378,39 @@ func Expired(expires, today string) bool {
 	return expires != "" && today != "" && expires < today
 }
 
-// Approve adds a version that takes a candidate into recall. A fact that is not a candidate is left alone: approving
-// an active fact again, or bringing a retired one back, is not what an approval means.
+// Approve adds a version that takes a candidate or provisional fact into recall. A fact that is neither is left
+// alone: approving an active fact again, or bringing a retired one back, is not what an approval means.
 func (s *Store) Approve(id string) (Fact, error) {
 	return s.ApproveExpiring(id, "")
 }
 
 // ApproveExpiring is Approve with a last day the fact is worth recalling, decided at approval time; an empty expires
-// keeps the candidate's own. It writes one version, not an approval followed by a correction.
+// keeps the candidate's own, while approving a provisional fact clears its TTL. It writes one version, not an approval
+// followed by a correction.
 func (s *Store) ApproveExpiring(id, expires string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Status != Active || (cur.Review != Candidate && cur.Review != Provisional) {
+		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
+	}
+	if err := ValidExpiry(expires); err != nil {
+		return Fact{}, err
+	}
+	f := cur
+	if expires != "" {
+		f.Expires = expires
+	} else if cur.Review == Provisional {
+		f.Expires = "" // the TTL belonged to the provisional state, not to a human approval
+	}
+	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
+	return f, s.write(f)
+}
+
+// ApproveProvisional records an unsure candidate as provisional: recalled after approved facts, until expires, and
+// not part of the trusted base for duplicate or coverage rules. It writes one version.
+func (s *Store) ApproveProvisional(id, expires string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
@@ -397,7 +425,7 @@ func (s *Store) ApproveExpiring(id, expires string) (Fact, error) {
 	if expires != "" {
 		f.Expires = expires
 	}
-	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
+	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, Provisional
 	return f, s.write(f)
 }
 
@@ -474,14 +502,14 @@ func (s *Store) Retire(id string) (Fact, error) {
 	return f, s.write(f)
 }
 
-// RetireCandidate retires a fact only while it still waits for approval. Unlike Retire, it refuses an approval
-// that a human or another run made in the meantime, so a stale vet decision cannot undo it.
+// RetireCandidate retires a fact while it still waits for approval or is provisional. Unlike Retire, it refuses an
+// approval that a human or another run made in the meantime, so a stale vet decision cannot undo it.
 func (s *Store) RetireCandidate(id string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
 	}
-	if cur.Status != Active || cur.Review != Candidate {
+	if cur.Status != Active || (cur.Review != Candidate && cur.Review != Provisional) {
 		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
 	}
 	f := cur
@@ -616,8 +644,9 @@ func (s *Store) Rows() ([]Fact, error) {
 	return s.query(`SELECT ` + columns + ` FROM facts ORDER BY id, version`)
 }
 
-// Active returns the latest version of every fact that is not retired and not a candidate. It reads the facts, not
-// the index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs the index.
+// Active returns the latest version of every approved fact: not retired, not a candidate and not provisional. It
+// reads the facts, not the index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs
+// the index.
 func (s *Store) Active() ([]Fact, error) {
 	return s.query(`SELECT `+qualified("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ''
