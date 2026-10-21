@@ -189,6 +189,10 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
         self._context = str(kwargs.get("agent_context") or "primary")
+        if self._writes:
+            # A batch that was in flight when the gateway stopped is still on disk: retry it on the next flush.
+            if saved := self._saved_pending(session_id):
+                self._pending[session_id] = (saved, time.monotonic())
 
     def system_prompt_block(self) -> str:
         return ("# Long-term memory (memcue)\n"
@@ -371,6 +375,65 @@ class MemcueMemoryProvider(MemoryProvider):
         tmp.write_text(json.dumps(seen), encoding="utf-8")
         tmp.replace(path)
 
+    # An extraction runs in its own process and can outlive the gateway. The batch is written to
+    # $HERMES_HOME/memcue/pending/<session>.json before the process starts and removed only after it exits 0, so a
+    # crash between the launch and the acknowledgement retries the batch instead of losing it.
+
+    def _pending_path(self, session: str) -> Path:
+        name = hashlib.sha256(session.encode()).hexdigest()[:32]
+        return Path(self._state) / "pending" / f"{name}.json"
+
+    def _saved_pending(self, session: str) -> list[dict[str, Any]]:
+        try:
+            saved = json.loads(self._pending_path(session).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        return [m for m in saved if isinstance(m, dict)]
+
+    def _write_saved_pending(self, session: str, messages: list[dict[str, Any]]) -> None:
+        path = self._pending_path(session)
+        if not messages:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError as e:
+                logger.debug("memcue pending batch: %s", e)
+            return
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(messages, ensure_ascii=False, default=str), encoding="utf-8")
+        try:
+            tmp.chmod(0o600)
+        except OSError:
+            pass  # Windows and exotic filesystems may not support the mode
+        tmp.replace(path)
+
+    @staticmethod
+    def _merge_messages(old: list[dict[str, Any]], new: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The union of two batches by fingerprint, keeping the larger occurrence count of each message."""
+        out = list(old)
+        left = Counter(_fingerprint(m) for m in old)
+        for m in new:
+            fp = _fingerprint(m)
+            if left[fp] > 0:
+                left[fp] -= 1
+            else:
+                out.append(m)
+        return out
+
+    def _add_saved_pending(self, session: str, messages: list[dict[str, Any]]) -> None:
+        self._write_saved_pending(session, self._merge_messages(self._saved_pending(session), messages))
+
+    def _forget_saved_pending(self, session: str, messages: list[dict[str, Any]]) -> None:
+        left = Counter(_fingerprint(m) for m in messages)
+        keep = []
+        for m in self._saved_pending(session):
+            fp = _fingerprint(m)
+            if left[fp] > 0:
+                left[fp] -= 1
+            else:
+                keep.append(m)
+        self._write_saved_pending(session, keep)
+
     def _new(self, session: str, messages: Optional[list[dict[str, Any]]]) -> list[dict[str, Any]]:
         """Messages not processed yet. Equal messages ("ok", "yes") share a fingerprint, so occurrences are counted:
         the third "ok" of a list is new when two were processed. A message in flight is not new either, so a turn
@@ -478,6 +541,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 return
             self._inflight.setdefault(session, Counter()).update(_fingerprint(m) for m in kept)
             ready = self._prepare(kept)
+            self._add_saved_pending(session, kept)  # survives a crash before _extracted
         self._extract_in_background(ready, event, session, on_done=lambda ok: self._extracted(session, kept, ok))
 
     def _extracted(self, session: str, messages: list[dict[str, Any]], ok: bool) -> None:
@@ -496,6 +560,7 @@ class MemcueMemoryProvider(MemoryProvider):
                     self._inflight.pop(session, None)
             if ok:
                 self._mark_seen(session, messages)
+                self._forget_saved_pending(session, messages)
             else:
                 cur, _ = self._pending.get(session, ([], 0.0))
                 have = Counter(_fingerprint(m) for m in cur)
@@ -575,6 +640,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 for session in (previous, new_session_id):
                     self._pending.pop(session, None)
                     self._inflight.pop(session, None)
+                    self._write_saved_pending(session, [])  # a reset drops the unacknowledged batch too
             for session in (previous, new_session_id):
                 self._delivered.pop(session, None)
                 self._warned.pop(session, None)
@@ -583,6 +649,7 @@ class MemcueMemoryProvider(MemoryProvider):
             with self._pending_lock:
                 self._pending.pop(new_session_id, None)
                 self._inflight.pop(new_session_id, None)
+                self._write_saved_pending(new_session_id, [])
             self._delivered.pop(new_session_id, None)
             self._warned.pop(new_session_id, None)
             try:

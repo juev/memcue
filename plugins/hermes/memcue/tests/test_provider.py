@@ -571,6 +571,38 @@ class AccumulationTest(unittest.TestCase):
         seen = self.p._seen("s1")
         self.assertIn(memcue_provider._fingerprint({"role": "user", "content": "a" * 1200}), seen)
 
+    def test_pending_batch_survives_a_restart(self):
+        """A crash between the launch and the acknowledgement leaves the batch on disk; the next process retries it."""
+        self.p._idle = 3600
+        captured = []
+
+        def crash(msgs, event, session="", on_done=None):
+            captured.append([m["content"] for m in msgs])  # the process dies before _extracted runs
+
+        self.p._extract_in_background = crash
+        self.turn("z" * 1200)
+        self.assertEqual(len(captured), 1)
+        pending = list((Path(self.p._state) / "pending").glob("*.json"))
+        self.assertEqual(len(pending), 1)
+        saved = json.loads(pending[0].read_text(encoding="utf-8"))
+        self.assertEqual([m["content"] for m in saved], ["z" * 1200, "ok"])
+
+        p2 = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
+        p2.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.assertIn("s1", p2._pending)
+        sent = []
+
+        def succeed(msgs, event, session="", on_done=None):
+            sent.append([m["content"] for m in msgs])
+            if on_done:
+                on_done(True)
+
+        p2._extract_in_background = succeed
+        p2.on_session_end([])
+        self.assertEqual([text for call in sent for text in call], ["z" * 1200, "ok"])
+        self.assertEqual(list((Path(self.p._state) / "pending").glob("*.json")), [])
+        p2._stop.set()
+
     def test_subagent_gathers_nothing(self):
         p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
         p.initialize("s2", hermes_home=self.home, agent_context="subagent")
