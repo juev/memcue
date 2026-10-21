@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/policy"
@@ -88,22 +89,79 @@ func contextTimeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 10*time.Minute)
 }
 
-// chunks splits text at paragraph breaks into pieces of at most n bytes; a paragraph longer than n is its own piece.
+// chunks splits text at paragraph breaks into pieces of at most n bytes; a paragraph longer than n is hard-split.
 func chunks(text string, n int) []string {
 	if strings.TrimSpace(text) == "" {
 		return nil
 	}
 	var out []string
 	var cur strings.Builder
-	for _, p := range strings.SplitAfter(text, "\n\n") {
-		if cur.Len() > 0 && cur.Len()+len(p) > n {
+	flush := func() {
+		if cur.Len() > 0 {
 			out = append(out, cur.String())
 			cur.Reset()
 		}
+	}
+	for _, p := range strings.SplitAfter(text, "\n\n") {
+		if len(p) > n {
+			flush()
+			out = append(out, splitLong(p, n)...)
+			continue
+		}
+		if cur.Len() > 0 && cur.Len()+len(p) > n {
+			flush()
+		}
 		cur.WriteString(p)
 	}
-	if cur.Len() > 0 {
-		out = append(out, cur.String())
+	flush()
+	return out
+}
+
+// splitLong cuts a paragraph longer than n bytes at line breaks first, then inside a line by runes.
+func splitLong(p string, n int) []string {
+	var out []string
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			out = append(out, cur.String())
+			cur.Reset()
+		}
+	}
+	for _, line := range strings.SplitAfter(p, "\n") {
+		if len(line) > n {
+			flush()
+			out = append(out, splitRunes(line, n)...)
+			continue
+		}
+		if cur.Len() > 0 && cur.Len()+len(line) > n {
+			flush()
+		}
+		cur.WriteString(line)
+	}
+	flush()
+	return out
+}
+
+// splitRunes cuts s into pieces of at most n bytes without splitting a UTF-8 rune. A piece can exceed n only when
+// n is smaller than the rune itself; n is 200_000 in practice.
+func splitRunes(s string, n int) []string {
+	if n <= 0 {
+		return []string{s}
+	}
+	var out []string
+	for len(s) > n {
+		cut := n
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		if cut == 0 {
+			_, cut = utf8.DecodeRuneInString(s)
+		}
+		out = append(out, s[:cut])
+		s = s[cut:]
+	}
+	if s != "" {
+		out = append(out, s)
 	}
 	return out
 }
