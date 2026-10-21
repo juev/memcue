@@ -305,6 +305,9 @@ type extractRecord struct {
 // runExtractSession extracts the part of a session read since the last run and stores its facts. Runs on one
 // session wait for each other on a lock, so a SessionEnd right after a PreCompact reads only what is new.
 func runExtractSession(args []string) error {
+	if os.Getenv("MEMCUE_EXTRACT") == "0" {
+		return nil
+	}
 	fs := flag.NewFlagSet("extract-session", flag.ContinueOnError)
 	session := fs.String("session", "", "session id")
 	path := fs.String("transcript", "", "transcript file")
@@ -501,6 +504,10 @@ func appendLog(path string, rec extractRecord) error { return appendJSON(path, r
 // of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-cwd DIR] [-session ID]
 // [-min-chars N]. Without -origin the origin is the repository of -cwd and today, the same as add -cwd.
 func runExtractMessages(args []string, in io.Reader) error {
+	if os.Getenv("MEMCUE_EXTRACT") == "0" {
+		// The switch the README documents is about automatic extraction, and every host calls this command directly.
+		return nil
+	}
 	fs := flag.NewFlagSet("extract-messages", flag.ContinueOnError)
 	origin := fs.String("origin", "", "where the facts were learnt, e.g. \"hermes 2026-10-19\" (default: from -cwd)")
 	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory)")

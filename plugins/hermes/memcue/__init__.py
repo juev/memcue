@@ -438,6 +438,8 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _extract_env(self) -> Optional[dict[str, str]]:
         url, model = str(self._config.get("extract_url") or ""), str(self._config.get("extract_model") or "")
+        if os.environ.get("MEMCUE_EXTRACT") == "0":
+            return None  # the global off switch wins over the provider config
         if not (url and model and self._writes and self._binary_ok()):
             return None
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")

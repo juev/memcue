@@ -181,6 +181,20 @@ class ProviderTest(unittest.TestCase):
         p._card_text()
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
 
+    def test_the_environment_off_switch_wins_over_the_endpoint(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": "http://127.0.0.1:9/v1",
+                                                  "extract_model": "m"})
+        p.initialize("s1", hermes_home=self.home)
+        previous = os.environ.get("MEMCUE_EXTRACT")
+        os.environ["MEMCUE_EXTRACT"] = "0"
+        try:
+            self.assertIsNone(p._extract_env())
+        finally:
+            if previous is None:
+                os.environ.pop("MEMCUE_EXTRACT", None)
+            else:
+                os.environ["MEMCUE_EXTRACT"] = previous
+
     def test_provider_matches_real_hermes_api(self):
         from agent.memory_provider import MemoryProvider
         if not hasattr(MemoryProvider, "on_session_switch"):

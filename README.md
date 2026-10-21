@@ -273,7 +273,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EMBED_TIMEOUT` | one embedding request | `2s` |
 | `MEMCUE_EMBED_SPACE` | label of the vector space when a server changes model under one name | empty |
 | `MEMCUE_VECTOR_POOL` | vectors of the most recent facts scored per prompt; `0` or less scores every vector | `2000` |
-| `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
+| `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
@@ -303,7 +303,7 @@ Extraction is the part that costs most. On ten recorded sessions it cost $0.18â€
 about $5 per million characters of transcript; tool output is the bulk of it. Sonnet was half the price but kept
 73 % of the facts worth keeping against 88 % for Opus, and nothing at all in two of the ten sessions. DeepSeek
 (`deepseek-flash` through `MEMCUE_API_URL`) cost $0.17 for all ten and kept 74 % against 87 % for Opus. Set
-`MEMCUE_EXTRACT=0` to keep recall and turn extraction off.
+`MEMCUE_EXTRACT=0` to keep recall and turn extraction off in every host.
 
 A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when

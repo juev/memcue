@@ -817,6 +817,28 @@ exit 0
 	}
 })
 
+test('MEMCUE_EXTRACT=0 turns extraction off even when the profile asks for it', async () => {
+	const previous = process.env.MEMCUE_EXTRACT
+	process.env.MEMCUE_EXTRACT = '0'
+	try {
+		await resetLog()
+		const { listeners } = mount({ extract: true })
+		const events = [
+			{ type: 'user/message', data: userMessage('remember the port') },
+			{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+		]
+		const session = fakeSession('s185', events, { header: { cwd: dir } })
+		const [listener] = listeners.get('session/event')
+		listener(session, events[events.length - 1])
+		await new Promise((resolve) => setTimeout(resolve, 200))
+		const logText = await readFile(log, 'utf8').catch(() => '')
+		assert.ok(!logText.includes('extract-input'), 'the off switch must win over extract: true')
+	} finally {
+		if (previous === undefined) delete process.env.MEMCUE_EXTRACT
+		else process.env.MEMCUE_EXTRACT = previous
+	}
+})
+
 test('a missing binary costs the facts, not the step', async () => {
 	const { listeners } = mount({ binary: join(dir, 'no-such-memcue') })
 	const decision = await preStep(listeners, [userMessage('what is the harness base?')])
