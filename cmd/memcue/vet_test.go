@@ -16,6 +16,12 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
+// quarantine keeps the old human queue when a test is about failed or unsure decisions specifically.
+func quarantine(t *testing.T) {
+	t.Helper()
+	t.Setenv("MEMCUE_VET_POLICY", "quarantine")
+}
+
 // fakeJudge answers every review call with verdicts for the ids it was given, and records the inputs.
 func fakeJudge(t *testing.T, answer func(input string) (extract.ReviewResult, error)) *[]string {
 	t.Helper()
@@ -170,6 +176,7 @@ func TestVetDryRunChangesNothing(t *testing.T) {
 // A judge that fails or says nothing approves nothing: those candidates wait for the next run.
 func TestVetJudgeFailureKeepsCandidates(t *testing.T) {
 	env(t)
+	quarantine(t)
 	id := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
 	fakeJudge(t, func(string) (extract.ReviewResult, error) {
 		return extract.ReviewResult{}, errors.New("endpoint returned no choices")
@@ -189,6 +196,7 @@ func TestVetJudgeFailureKeepsCandidates(t *testing.T) {
 // The rules alone need no endpoint and no model.
 func TestVetNoModel(t *testing.T) {
 	env(t)
+	quarantine(t)
 	trace := vetFact(t, "Проект demo: база PostgreSQL 18 слушает порт 55432.", "test 2026-10-19", "tool")
 	other := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
 	calls := fakeJudge(t, judgeByID(other))
@@ -289,6 +297,7 @@ func TestVetAppliesExpiryFromTheJudge(t *testing.T) {
 // A malformed expiry is not a write failure: the candidate becomes unsure and stays in the queue.
 func TestVetInvalidExpiryStaysCandidate(t *testing.T) {
 	env(t)
+	quarantine(t)
 	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
 	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
 		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.KeepVerdict,
@@ -343,9 +352,10 @@ func TestRunVetRefusesWhenAnotherRunHoldsTheLock(t *testing.T) {
 	}
 }
 
-// Without the auto policy an unsure model answer still waits for a person.
-func TestVetUnsureStaysCandidateWithoutAuto(t *testing.T) {
+// The default policy turns an unsure answer into a provisional fact.
+func TestVetDefaultsToProvisional(t *testing.T) {
 	env(t)
+	t.Setenv("MEMCUE_VET_POLICY", "")
 	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
 	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
 		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.UnsureVerdict}}}, nil
@@ -354,8 +364,27 @@ func TestVetUnsureStaysCandidateWithoutAuto(t *testing.T) {
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
+	if f := vetStatus(t, id); f.Review != store.Provisional || f.Expires == "" {
+		t.Errorf("default provisional = %+v", f)
+	}
+	if !strings.Contains(out.String(), "временно принято 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// An explicit quarantine keeps an unsure model answer for a person.
+func TestVetQuarantineKeepsUnsureCandidate(t *testing.T) {
+	env(t)
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.UnsureVerdict}}}, nil
+	})
+	var out bytes.Buffer
+	if err := runVet([]string{"-quarantine"}, &out); err != nil {
+		t.Fatal(err)
+	}
 	if f := vetStatus(t, id); f.Review != store.Candidate || f.Version != 1 {
-		t.Errorf("strict default changed the candidate: %+v", f)
+		t.Errorf("quarantine flag changed the candidate: %+v", f)
 	}
 	if !strings.Contains(out.String(), "осталось решать 1") {
 		t.Errorf("report:\n%s", out.String())
@@ -523,6 +552,7 @@ func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
 // the chat judge is not asked to answer the question the duplicate judge could not.
 func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
 	env(t)
+	quarantine(t)
 	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
 	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
 	fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {

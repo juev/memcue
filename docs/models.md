@@ -124,8 +124,9 @@ the rerank-gate issue.
 ## Other decisions and non-goals
 
 - **Review runs on the main model.** `MEMCUE_VET=1` remains off by default. A contradiction with
-  an approved fact is `unsure` (not `drop`); with `MEMCUE_VET_POLICY=auto` it becomes
-  provisional for `MEMCUE_VET_TTL_DAYS`, recalled after approved facts.
+  an approved fact is `unsure` (not `drop`); by default it becomes provisional for
+  `MEMCUE_VET_TTL_DAYS`, recalled after approved facts. `MEMCUE_VET_POLICY=quarantine` keeps the
+  human queue.
 - **Duplicate check is one Jev role.** A base above 400 approved facts (1,700 with long context)
   is split into chunks of `MEMCUE_JUDGE_DUP_MAX_FACTS`; the strongest "same claim" wins. The
   2.6k base therefore costs several requests per candidate; precision on it is not measured yet.

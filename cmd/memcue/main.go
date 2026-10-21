@@ -86,8 +86,9 @@ environment:
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs
-                  MEMCUE_API_URL; undecided ones stay candidates unless MEMCUE_VET_POLICY=auto
-  MEMCUE_VET_POLICY  auto turns an unsure candidate into a provisional fact for MEMCUE_VET_TTL_DAYS (default 14)
+                  MEMCUE_API_URL; undecided ones become provisional for MEMCUE_VET_TTL_DAYS
+  MEMCUE_VET_POLICY  provisional (default) turns an unsure candidate into a provisional fact; quarantine
+                  (or "memcue vet -quarantine") keeps the human queue
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes the mirrors are checked against; empty skips that rule
 `
 

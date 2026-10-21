@@ -135,19 +135,26 @@ func vetTTLDays() int {
 	return 14
 }
 
-// vetAutoPolicy says whether unsure becomes provisional instead of waiting for review.
+// vetAutoPolicy says whether unsure becomes provisional instead of waiting for review. Provisional is the default;
+// quarantine (or strict, or any unknown value) is the explicit opt-out.
 func vetAutoPolicy() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("MEMCUE_VET_POLICY")), "auto")
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MEMCUE_VET_POLICY"))) {
+	case "", "auto", "provisional":
+		return true
+	default:
+		return false
+	}
 }
 
-// runVet decides the candidate queue: memcue vet [-dry-run] [-limit N] [-no-model] [-auto] [-ttl-days N] [-json]
-// [-memory DIR].
+// runVet decides the candidate queue: memcue vet [-dry-run] [-limit N] [-no-model] [-auto|-quarantine] [-ttl-days N]
+// [-json] [-memory DIR].
 func runVet(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("vet", flag.ContinueOnError)
 	dry := fs.Bool("dry-run", false, "print the verdicts and change nothing")
 	limit := fs.Int("limit", 0, "decide at most N candidates, newest first (0: the whole queue)")
 	noModel := fs.Bool("no-model", false, "run the deterministic rules only")
-	auto := fs.Bool("auto", false, "turn unsure into provisional facts instead of leaving them for review")
+	auto := fs.Bool("auto", false, "turn unsure into provisional facts (the default)")
+	quarantine := fs.Bool("quarantine", false, "leave unsure candidates for review even if the default is provisional")
 	ttlDays := fs.Int("ttl-days", vetTTLDays(), "how long a provisional fact is recalled")
 	asJSON := fs.Bool("json", false, "print the decisions as JSON")
 	memory := fs.String("memory", os.Getenv("MEMCUE_MEMORY_DIR"),
@@ -156,7 +163,7 @@ func runVet(args []string, out io.Writer) error {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return errors.New("usage: memcue vet [-dry-run] [-limit N] [-no-model] [-auto] [-ttl-days N] [-json] [-memory DIR]")
+		return errors.New("usage: memcue vet [-dry-run] [-limit N] [-no-model] [-auto|-quarantine] [-ttl-days N] [-json] [-memory DIR]")
 	}
 	lock, err := acquireVetLock()
 	if err != nil {
@@ -173,7 +180,7 @@ func runVet(args []string, out io.Writer) error {
 		if *limit > 0 && len(cands) > *limit {
 			cands = cands[:*limit]
 		}
-		policyAuto := *auto || vetAutoPolicy()
+		policyAuto := (*auto || vetAutoPolicy()) && !*quarantine
 		ttl := *ttlDays
 		if ttl <= 0 {
 			ttl = vetTTLDays()
