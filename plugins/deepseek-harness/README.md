@@ -15,7 +15,8 @@ fact base:
   does not send the same text twice. Extraction reads only direct human messages: compaction summaries, cron and
   goal notices, hook contexts and subagent sessions are left out, and a forked session starts at its inherited
   prefix instead of re-extracting the parent's history. Tool calls travel with the assistant message and their
-  results follow as `RESULT`, the same pair Claude Code transcripts carry.
+  results follow as `RESULT`, the same pair Claude Code transcripts carry. When the session is disposed, the
+  remaining tail is sent even if it is below `minNewChars`: there will be no next turn to collect it.
 - **A system-prompt section** says the memory is memcue and names the fact tools; the built-in memory files are not
   written.
 - **Four tools**: `memcue_search` (facts by words, with their ids), `memcue_add` (one new fact), `memcue_correct`

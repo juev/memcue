@@ -401,47 +401,62 @@ export function apply(ctx, config) {
 	})
 
 	if (settings.extract) {
-		ctx.on('session/event', (session, event) => {
-			if (event?.type !== 'turn/end') return
+		const pendingFinal = new Set()
+
+		const extractSession = async (session, eventName, final) => {
 			// A subagent conversation is derived from the parent's work; extracting it duplicates the
 			// parent's facts and spends a model call on a transcript nobody asked to remember.
 			if (session.header?.origin === 'subagent') return
 			const sessionId = String(session.id)
-			if (busy.has(sessionId)) return
+			if (busy.has(sessionId)) {
+				if (final) pendingFinal.add(sessionId)
+				return
+			}
 			busy.add(sessionId)
-			void (async () => {
-				try {
-					const path = statePathFor(settings, sessionId)
-					const state = await readState(path)
-					let batch = state.pending
-					if (!batch) {
-						// A forked session carries the parent's prefix; it was already extracted there.
-						const from = state.seq > 0 ? state.seq : (session.inheritedEventCount ?? 0)
-						const messages = messagesSince(session, from, settings)
-						const chars = messages.reduce((total, message) => total + message.content.length, 0)
-						if (messages.length === 0 || chars < settings.minNewChars) return
-						// Persist the batch before the model call. A crash after this point retries the
-						// same text; an offset written before the call would lose it on a failed call.
-						batch = { seq: session.seq, messages }
-						await writeState(path, { seq: state.seq, pending: batch })
-					}
-					const { code, err } = await runMemcue(settings, [
-						'extract-messages',
-						'-session', sessionId,
-						'-event', 'turn-end',
-						'-origin', `dsh ${new Date().toISOString().slice(0, 10)}`,
-					], { input: JSON.stringify(batch.messages), timeoutMs: EXTRACT_TIMEOUT_MS })
-					if (code !== 0) {
-						console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
-						return // keep the pending batch for the next turn
-					}
-					await writeState(path, { seq: batch.seq, pending: null })
-				} catch (error) {
-					console.warn(`memcue: extraction failed: ${String(error)}`)
-				} finally {
-					busy.delete(sessionId)
+			try {
+				const path = statePathFor(settings, sessionId)
+				const state = await readState(path)
+				let batch = state.pending
+				if (!batch) {
+					// A forked session carries the parent's prefix; it was already extracted there.
+					const from = state.seq > 0 ? state.seq : (session.inheritedEventCount ?? 0)
+					const messages = messagesSince(session, from, settings)
+					const chars = messages.reduce((total, message) => total + message.content.length, 0)
+					if (messages.length === 0) return
+					// A normal turn waits for enough new text; a disposing session takes the tail even
+					// when it is short, because there will be no next turn to collect it.
+					if (!final && chars < settings.minNewChars) return
+					// Persist the batch before the model call. A crash after this point retries the
+					// same text; an offset written before the call would lose it on a failed call.
+					batch = { seq: session.seq, messages }
+					await writeState(path, { seq: state.seq, pending: batch })
 				}
-			})()
+				const { code, err } = await runMemcue(settings, [
+					'extract-messages',
+					'-session', sessionId,
+					'-event', eventName,
+					'-origin', `dsh ${new Date().toISOString().slice(0, 10)}`,
+				], { input: JSON.stringify(batch.messages), timeoutMs: EXTRACT_TIMEOUT_MS })
+				if (code !== 0) {
+					console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
+					return // keep the pending batch for the next attempt
+				}
+				await writeState(path, { seq: batch.seq, pending: null })
+			} catch (error) {
+				console.warn(`memcue: extraction failed: ${String(error)}`)
+			} finally {
+				busy.delete(sessionId)
+				if (pendingFinal.delete(sessionId)) void extractSession(session, 'session-end', true)
+			}
+		}
+
+		ctx.on('session/event', (session, event) => {
+			if (event?.type !== 'turn/end') return
+			void extractSession(session, 'turn-end', false)
+		})
+		ctx.on('session/disposed', (session) => {
+			cardSources.delete(String(session.id))
+			void extractSession(session, 'session-end', true)
 		})
 	}
 
