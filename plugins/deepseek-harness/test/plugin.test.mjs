@@ -24,6 +24,11 @@ const STUB = `#!/bin/sh
 printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
 printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
 case "$1" in
+  session-card)
+    payload=$(cat)
+    printf 'card-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
+    printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":""}}\\n'
+    ;;
   hook)
     payload=$(cat)
     printf 'hook-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
@@ -169,6 +174,49 @@ test('a matching fact reaches the step as a recall message', async () => {
 	assert.equal(recall.source.kind, 'memcue')
 	assert.equal(recall.source.form, 'recall')
 	assert.match(recall.content[0].text, /STUB-FACT-7743/)
+})
+
+test('the card comes once and again after compaction', async () => {
+	const cardLog = join(dir, 'card-85.log')
+	const cardBinary = join(dir, 'memcue-card-85.sh')
+	await writeFile(cardBinary, `#!/bin/sh
+case "$1" in
+  session-card)
+    payload=$(cat)
+    printf 'card-input: %s\\n' "$payload" >> "${cardLog}"
+    printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"memcue: rules card\\\\n"}}\\n'
+    ;;
+  hook)
+    payload=$(cat)
+    printf 'hook-input: %s\\n' "$payload" >> "${cardLog}"
+    printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"memcue: stored facts\\\\n- fact\\\\n"}}\\n'
+    ;;
+esac
+exit 0
+`)
+	await chmod(cardBinary, 0o755)
+	const { listeners } = mount({ binary: cardBinary })
+	const session = { id: 's85', header: { cwd: dir } }
+
+	const first = await preStep(listeners, [userMessage('question one')], session)
+	assert.equal(first.messages.length, 3)
+	assert.equal(first.messages[1].source.form, 'notice')
+	assert.equal(first.messages[2].source.form, 'recall')
+
+	const second = await preStep(listeners, [userMessage('question two')], session)
+	assert.equal(second.messages.length, 2)
+	let cardLines = (await readFile(cardLog, 'utf8')).split('\n').filter((line) => line.startsWith('card-input: '))
+	assert.equal(cardLines.length, 1)
+
+	for (const listener of listeners.get('session/event') ?? []) {
+		listener(session, { type: 'compaction/end', data: {} })
+	}
+	const third = await preStep(listeners, [userMessage('question three')], session)
+	assert.equal(third.messages.length, 3)
+	cardLines = (await readFile(cardLog, 'utf8')).split('\n').filter((line) => line.startsWith('card-input: '))
+	assert.equal(cardLines.length, 2)
+	const sources = cardLines.map((line) => JSON.parse(line.slice('card-input: '.length)).source)
+	assert.deepEqual(sources, ['startup', 'compact'])
 })
 
 test('the binary is asked with the real prompt, not with injected context', async () => {

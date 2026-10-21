@@ -38,6 +38,7 @@ const usage = `usage: memcue <command>
 commands:
   hook      UserPromptSubmit hook (reads the hook's JSON on stdin)
   session-start   SessionStart hook: tells the agent where its memory is
+  session-card    session-start without the note: the card for a host that has its own instructions
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin)
@@ -106,6 +107,8 @@ func main() {
 	switch os.Args[1] {
 	case "session-start":
 		err = runSessionStart(os.Stdin, os.Stdout)
+	case "session-card":
+		err = runSessionCard(os.Stdin, os.Stdout)
 	case "hook-extract":
 		err = runHookExtract(os.Stdin)
 		if err != nil { // like the recall hook: never block the session
