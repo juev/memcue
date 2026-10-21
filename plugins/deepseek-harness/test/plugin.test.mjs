@@ -95,10 +95,10 @@ function userMessage(text, source = { kind: 'user' }) {
 }
 
 /** Run this plugin's pre-step listener over one proposed batch. */
-async function preStep(listeners, messages) {
+async function preStep(listeners, messages, session = { id: 's1', header: { cwd: dir } }) {
 	const [listener] = listeners.get('agent/pre-step')
 	const payload = {
-		agent: { session: { id: 's1', cwd: dir } },
+		agent: { session },
 		messages,
 		turn: 1,
 		step: 1,
@@ -183,6 +183,18 @@ test('the binary is asked with the real prompt, not with injected context', asyn
 	assert.equal(input.prompt, 'what is the harness base?')
 	assert.equal(input.session_id, 's1')
 	assert.equal(input.cwd, dir)
+})
+
+test('the session header cwd wins over the process cwd', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const workspace = join(dir, 'session-workspace')
+	await preStep(listeners, [userMessage('what is the harness base?')], {
+		id: 's1',
+		header: { cwd: workspace },
+	})
+	const text = await waitForLog('hook-input')
+	assert.equal(JSON.parse(lastPayload(text, 'hook-input: ')).cwd, workspace)
 })
 
 test('no facts mean no message', async () => {
