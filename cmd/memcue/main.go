@@ -71,7 +71,7 @@ environment:
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
-  MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
+  MEMCUE_RECALL_LOG 1 logs what each prompt got (recall.log in the state directory; holds prompt text)
   MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
   MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage, recall rerank and the
                   duplicate check; off unless all three are set
@@ -89,7 +89,7 @@ environment:
   MEMCUE_EMBED_TIMEOUT  one embedding request (default 2s)
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_VECTOR_POOL  vectors of the most recent facts scored per prompt; 0 or less scores every vector (default 2000)
-  MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
+  MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs
                   MEMCUE_API_URL; undecided ones become provisional for MEMCUE_VET_TTL_DAYS
   MEMCUE_VET_POLICY  provisional (default) turns an unsure candidate into a provisional fact; quarantine
@@ -331,7 +331,7 @@ type recallFact struct {
 // logPrompt is how much of a prompt recall.log keeps: enough to judge what the prompt was about.
 const logPrompt = 500
 
-// logRecall appends what the hook decided to $XDG_STATE_HOME/memcue/recall.log, prompts that got nothing included.
+// logRecall appends what the hook decided to recall.log in the state directory, prompts that got nothing included.
 // It keeps the text of prompts, so it is off unless MEMCUE_RECALL_LOG=1. A failure to log never fails the hook.
 func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duration) {
 	if os.Getenv("MEMCUE_RECALL_LOG") != "1" {

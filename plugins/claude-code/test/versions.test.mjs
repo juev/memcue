@@ -39,3 +39,14 @@ test('the README describes the per-base state and the Hermes card', async () => 
 	assert.match(hermes, /session_card/)
 	assert.match(hermes, /session card/i)
 })
+
+test('the docs and the CLI help name the per-base state directory, not the flat pause path', async () => {
+	for (const path of ['docs/models.md', 'docs/rerank.md', 'docs/vectors.md']) {
+		const text = await readFile(new URL(path, root), 'utf8')
+		assert.ok(!text.includes('$XDG_STATE_HOME/memcue/judge.pause'), `${path} still names the flat judge.pause path`)
+		assert.ok(!text.includes('$XDG_STATE_HOME/memcue/embed.pause'), `${path} still names the flat embed.pause path`)
+	}
+	const main = await readFile(new URL('cmd/memcue/main.go', root), 'utf8')
+	assert.ok(!main.includes('$XDG_STATE_HOME/memcue/recall.log'), 'the CLI help still names the flat recall.log path')
+	assert.ok(!main.includes('$XDG_STATE_HOME/memcue/dream.log'), 'the CLI help still names the flat dream.log path')
+})

@@ -54,7 +54,8 @@ until `memcue embed` runs again, which is deliberate.
 
 A missing endpoint, a timeout or a wrong answer only removes the vector candidates; the lexical candidates and the
 judge still run. After a failure the endpoint is left alone for 60 s, doubling to 15 minutes, and the pause is kept in
-`$XDG_STATE_HOME/memcue/embed.pause` because the hook is a fresh process on every prompt.
+`embed.pause` in the binary's state directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base
+subdirectory otherwise, or `MEMCUE_STATE_DIR`) because the hook is a fresh process on every prompt.
 
 ## What the pilot measured
 

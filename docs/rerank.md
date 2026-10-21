@@ -41,7 +41,8 @@ lexical candidates (FTS5, gates)
 ```
 
 Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
-the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `$XDG_STATE_HOME/memcue/judge.pause`
+the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `judge.pause` in the binary's state
+directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or `MEMCUE_STATE_DIR`)
 and is shared by rerank, triage and duplicate, because the hook is a fresh process on every prompt.
 
 ## What it measured
