@@ -33,4 +33,6 @@ jobs:
         working-directory: plugins/deepseek-harness
         run: npm publish --access public --provenance
         env:
+          # Granular token with publish access to memcue-dsh. A token without
+          # the 2FA bypass must use `npm stage publish` plus manual approval.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

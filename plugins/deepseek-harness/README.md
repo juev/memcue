@@ -105,6 +105,23 @@ The suite mounts the plugin against a plain object context and a stub binary, so
 running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools` resolve. It also checks
 the bundle metadata and that the bundle patch points at the loadable ESM entry.
 
+## Releasing
+
+The standalone package is published as `memcue-dsh`. A maintainer can publish manually; npm asks for the 2FA code:
+
+```sh
+cd plugins/deepseek-harness
+npm publish --access public
+```
+
+CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. Set the repository
+secret `NPM_TOKEN` to a granular access token with read/write access to `memcue-dsh`.
+
+A granular token without the 2FA bypass cannot run `npm publish`: npm answers with `EOTP` or a `403` that asks for
+two-factor authentication. Either enable bypass on the token, switch the workflow to `npm stage publish` and approve
+the stage with `npm stage approve <id>`, or configure npm Trusted Publishing for the GitHub repository and workflow
+and drop `NPM_TOKEN` in favour of OIDC (`id-token: write` is already set).
+
 ## What differs from the Hermes plugin
 
 - Hermes' `MEMORY.md` mirror and its four memory tools have no counterpart here: dsh has no built-in memory files, so
