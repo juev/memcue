@@ -46,8 +46,11 @@ bumps all of them together.
 | 0.4.0 | 4 | 0.4.0 | 0.4.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.4.0 (`hermes-agent` 0.15.2) |
 
 The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
-tests ran against. The Claude Code plugin has no separate version negotiation: install the plugin and the binary from
-the same release.
+tests ran against. The binary and the adapters check each other's release: the DSH and Hermes plugins ask
+`memcue version -json` at startup and turn the session card and extraction off with one warning on a binary older
+than 0.4.0 (recall keeps working), and the Claude Code `SessionStart` hook checks `memcue version -minimum 0.4.0` and
+prints the same hint. A build from source reports a suffixed version and is treated as the current tree. Install the
+plugin and the binary from the same release.
 
 ## Install
 

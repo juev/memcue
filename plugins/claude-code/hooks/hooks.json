@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v memcue >/dev/null 2>&1 && memcue session-start || true",
+            "command": "command -v memcue >/dev/null 2>&1 && { if memcue version -minimum 0.4.0 >/dev/null 2>&1; then memcue session-start; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"memcue: the binary is older than 0.4.0; update memcue to get the session card and the facts again after a compaction.\"}}'; fi; } || true",
             "timeout": 10
           }
         ]

@@ -73,6 +73,24 @@ _WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
 _SHUTDOWN_GRACE = 20  # seconds shutdown waits for in-flight extractions; a pending batch survives a longer one
 _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail no later trigger will collect
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
+_MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared here
+
+
+def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
+    """A clean release only: a suffix means a source build (a pseudo-version, -dirty, a dsh- tag), which is the
+    working tree and passes. See parseVersion in cmd/memcue/main.go."""
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", (value or "").strip())
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
+def _version_at_least(current: str, minimum: str) -> bool:
+    """A `dev` build counts as new enough, and so does an unknown version: refuse only what names an old release."""
+    if current == "dev":
+        return True
+    have, want = _version_parts(current), _version_parts(minimum)
+    if not have or not want:
+        return True
+    return have >= want
 
 
 def _fingerprint(m: dict[str, Any]) -> str:
@@ -176,6 +194,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._pending_lock = threading.Lock()
         self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts the last prefetch injected
         self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
+        self._compat: Optional[bool] = None  # the binary has the commands this provider uses
+        self._warned_compat = False
         self._stop = threading.Event()
         self._watcher: Optional[threading.Thread] = None
         self._feeds: list[threading.Thread] = []
@@ -190,6 +210,31 @@ class MemcueMemoryProvider(MemoryProvider):
         if configured:
             return configured if os.access(configured, os.X_OK) else None
         return shutil.which("memcue")
+
+    def _binary_ok(self) -> bool:
+        """Whether the binary has session-card and extract-messages -min-chars. A plugin installed from this
+        repository runs beside a binary installed separately, so check once and say why instead of failing the card
+        and every extraction silently."""
+        if self._compat is not None:
+            return self._compat
+        self._compat = True
+        ok, out = self._run(["version", "-json"], timeout=_RECALL_TIMEOUT)
+        version = ""
+        if ok:
+            try:
+                version = str(json.loads(out).get("version") or "")
+            except (ValueError, AttributeError):
+                version = out.split()[0] if out else ""
+        else:
+            ok, out = self._run(["version"], timeout=_RECALL_TIMEOUT)
+            version = out.split()[0] if ok and out else ""
+        if not _version_at_least(version, _MIN_BINARY):
+            self._compat = False
+            if not self._warned_compat:
+                self._warned_compat = True
+                logger.warning("memcue %s is older than %s: the session card and extraction are off, recall still "
+                               "works; update memcue", version or "unknown", _MIN_BINARY)
+        return self._compat
 
     def is_available(self) -> bool:
         return self._binary() is not None and self._facts_ok()
@@ -259,7 +304,7 @@ class MemcueMemoryProvider(MemoryProvider):
         after a compression. It rides with the first prefetch, so it stays in the conversation instead of being
         repeated in every system prompt. A card is a view of the base: the next one reflects corrections and
         retirements."""
-        if not self._session_card or self._card_generation == self._generation:
+        if not self._session_card or self._card_generation == self._generation or not self._binary_ok():
             return ""
         if not self._facts or not Path(self._facts).exists():
             return ""
@@ -377,7 +422,7 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _extract_env(self) -> Optional[dict[str, str]]:
         url, model = str(self._config.get("extract_url") or ""), str(self._config.get("extract_model") or "")
-        if not (url and model and self._writes):
+        if not (url and model and self._writes and self._binary_ok()):
             return None
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)

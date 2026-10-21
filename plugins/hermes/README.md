@@ -95,6 +95,10 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 6. Restart Hermes (the gateway, if you run one).
 
+The provider asks the binary for its version when the card or extraction first runs: 0.4.0 or newer is required, and
+an older one turns those two paths off with a warning in the log while recall keeps working. A build from source
+reports a suffixed version and counts as the current tree.
+
 Check: `hermes memory status` should list `memcue` as available. Run the plugin's tests with the binary you
 installed:
 

@@ -28,6 +28,9 @@ printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
 printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
 printf 'facts: %s\\n' "$MEMCUE_FACTS" >> "$MEMCUE_STUB_LOG"
 case "$1" in
+  version)
+    printf '{"version":"0.4.0"}\\n'
+    ;;
   session-card)
     payload=$(cat)
     printf 'card-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
@@ -221,6 +224,9 @@ test('the card comes once and again after compaction', async () => {
 	const cardBinary = join(dir, 'memcue-card-85.sh')
 	await writeFile(cardBinary, `#!/bin/sh
 case "$1" in
+  version)
+    printf '{"version":"0.4.0"}\\n'
+    ;;
   session-card)
     payload=$(cat)
     printf 'card-input: %s\\n' "$payload" >> "${cardLog}"
@@ -711,6 +717,45 @@ test('a checkpoint is not reused for another fact base', async () => {
 	assert.equal(after, before + 1)
 	const stateText = await readFile(statePath, 'utf8')
 	assert.ok(stateText.includes(resolve(second)), stateText)
+})
+
+test('an older binary turns the card and extraction off with one warning', async () => {
+	const oldBinary = join(dir, 'memcue-old.sh')
+	await writeFile(oldBinary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"0.3.0"}\\n' ;;
+  hook) printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}\\n' ;;
+  session-card) printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"card"}}\\n' ;;
+esac
+exit 0
+`)
+	await chmod(oldBinary, 0o755)
+	const warnings = []
+	const original = console.warn
+	console.warn = (...args) => warnings.push(args.join(' '))
+	try {
+		await resetLog()
+		const { listeners } = mount({ binary: oldBinary, minNewChars: 1 })
+		const deadline = Date.now() + 5000
+		while (!warnings.some((warning) => warning.includes('older than 0.4.0')) && Date.now() < deadline) {
+			await new Promise((resolve) => setTimeout(resolve, 50))
+		}
+		const decision = await preStep(listeners, [userMessage('hello there')])
+		assert.equal(decision.messages.length, 1, 'the card must not be delivered')
+		const events = [
+			{ type: 'user/message', data: userMessage('remember the port') },
+			{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+		]
+		const session = fakeSession('s186', events, { header: { cwd: dir } })
+		const [listener] = listeners.get('session/event')
+		listener(session, events[events.length - 1])
+		await new Promise((resolve) => setTimeout(resolve, 200))
+		const logText = await readFile(log, 'utf8').catch(() => '')
+		assert.ok(!logText.includes('extract-input'), 'extraction must stay off')
+		assert.ok(warnings.some((warning) => warning.includes('older than 0.4.0')), warnings.join('\n'))
+	} finally {
+		console.warn = original
+	}
 })
 
 test('a missing binary costs the facts, not the step', async () => {

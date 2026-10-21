@@ -46,6 +46,9 @@ const HOOK_TIMEOUT_MS = 10_000
 /** Extraction is a model call in another process; it may outlive the turn. */
 const EXTRACT_TIMEOUT_MS = 300_000
 
+/** The oldest binary whose commands and flags this plugin uses: `session-card` and `extract-messages -min-chars`. */
+const MIN_BINARY = '0.4.0'
+
 /** Defaults used when the bundle patch supplies no config. */
 const DEFAULTS = Object.freeze({
 	binary: 'memcue',
@@ -214,6 +217,31 @@ function runMemcue(settings, args, options = {}) {
 		child.stdin?.on('error', () => {})
 		child.stdin?.end(options.input ?? '')
 	})
+}
+
+/**
+ * Whether the running binary is at least `minimum`. A `dev` build counts as new enough (it is the working tree); an
+ * unknown or unparsable version does not, because the plugin cannot then know that `session-card` exists.
+ * @param current - version reported by `memcue version -json`.
+ * @param minimum - required release.
+ * @returns true when the binary can run everything this plugin asks of it.
+ */
+function versionAtLeast(current, minimum) {
+	if (current === 'dev') return true
+	const parts = (value) => {
+		// A clean release only: a suffix means a source build (a pseudo-version, -dirty, a dsh- tag), which is the
+		// working tree and passes. See parseVersion in cmd/memcue/main.go.
+		const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(value ?? '').trim())
+		return match ? match.slice(1).map(Number) : null
+	}
+	const have = parts(current)
+	const want = parts(minimum)
+	// An unparsable version cannot be judged: block only a binary that names a version we know is too old.
+	if (!have || !want) return true
+	for (let i = 0; i < want.length; i += 1) {
+		if (have[i] !== want[i]) return have[i] > want[i]
+	}
+	return true
 }
 
 /** Text blocks of one message, joined; anything that is not text is ignored. */
@@ -468,6 +496,8 @@ export function apply(ctx, config) {
 		throw new Error('memcue: this dsh runtime lacks the event, tool or system-prompt service')
 	}
 	const settings = settingsOf(config)
+	let extraction = settings.extract
+	let compatible = true // cleared when the binary is older than MIN_BINARY
 	const busy = new Set()
 	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
 
@@ -477,6 +507,27 @@ export function apply(ctx, config) {
 		text: NOTE,
 		interpolate: false,
 	})
+
+	// The binary is installed separately from this package: check once that it has the commands the plugin uses, and
+	// turn the card and extraction off with one clear line instead of failing them every turn.
+	const checkBinary = async () => {
+		// `-json` is 0.4.0 too: an older binary answers the flag with an error, so ask for the plain form as well.
+		let { code, out } = await runMemcue(settings, ['version', '-json'], { timeoutMs: 5_000 })
+		if (code !== 0) ({ code, out } = await runMemcue(settings, ['version'], { timeoutMs: 5_000 }))
+		let reported = ''
+		if (code === 0) {
+			try {
+				reported = String(JSON.parse(out)?.version ?? '')
+			} catch {
+				reported = out.trim().split(/\s+/)[0] ?? ''
+			}
+		}
+		if (versionAtLeast(reported, MIN_BINARY)) return
+		compatible = false
+		extraction = false
+		console.warn(`memcue: binary ${reported || 'unknown'} is older than ${MIN_BINARY}; the session card and extraction are off, recall still works. Update memcue.`)
+	}
+	void checkBinary()
 
 	ctx.on('agent/pre-step', async (payload, next) => {
 		const decision = await next()
@@ -490,7 +541,7 @@ export function apply(ctx, config) {
 		// again after a compaction. session-card resets the fact's seen state for source "compact".
 		let card = ''
 		const cardSource = cardSources.get(sessionId) ?? 'startup'
-		if (cardSource !== 'done') {
+		if (compatible && cardSource !== 'done') {
 			const { code, out, err } = await runMemcue(settings, ['session-card'], {
 				input: JSON.stringify({ session_id: sessionId, cwd, source: cardSource }),
 				timeoutMs: HOOK_TIMEOUT_MS,
@@ -526,6 +577,7 @@ export function apply(ctx, config) {
 		const pendingFinal = new Set()
 
 		const extractSession = async (session, eventName, final) => {
+			if (!extraction) return
 			// A subagent conversation is derived from the parent's work; extracting it duplicates the
 			// parent's facts and spends a model call on a transcript nobody asked to remember.
 			if (session.header?.origin === 'subagent') return
@@ -613,6 +665,7 @@ export function apply(ctx, config) {
 		// A batch persisted before a model call survives a crash, but a disposed session never comes back to retry
 		// it. On load, finish every unacknowledged batch before a new turn can produce more work.
 		const retryPending = async () => {
+			if (!extraction) return
 			let names
 			try {
 				names = await readdir(settings.stateDir)
