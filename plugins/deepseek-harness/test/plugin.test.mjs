@@ -274,6 +274,93 @@ test('a state file with only seq is still accepted', async () => {
 	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'new message' }])
 })
 
+test('extraction sees only direct user messages', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const events = [
+		{ type: 'user/message', data: userMessage('the real prompt') },
+		{ type: 'user/message', data: userMessage('compacted summary body', { kind: 'compact-checkpoint', compactionId: 'c1' }) },
+		{ type: 'user/message', data: userMessage('scheduled reminder body', { kind: 'schedule' }) },
+		{ type: 'user/message', data: userMessage('goal round body', { kind: 'goal', goalId: 'g1' }) },
+		{ type: 'user/message', data: userMessage('hook context body', { kind: 'hooks-claude-code' }) },
+		{ type: 'user/message', data: userMessage('memcue recall body', { kind: 'memcue', form: 'recall' }) },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's82', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+
+	const text = await waitForLog('extract-input')
+	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'the real prompt' }])
+})
+
+test('promptOf ignores goal, schedule and checkpoint messages', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const decision = await preStep(listeners, [
+		userMessage('the real human question'),
+		userMessage('goal round body', { kind: 'goal', goalId: 'g1' }),
+		userMessage('scheduled reminder body', { kind: 'schedule' }),
+		userMessage('compacted summary body', { kind: 'compact-checkpoint', compactionId: 'c1' }),
+	])
+	const text = await waitForLog('hook-input')
+	assert.equal(JSON.parse(lastPayload(text, 'hook-input: ')).prompt, 'the real human question')
+	assert.equal(decision.messages.length, 5) // four inputs plus the recall message
+})
+
+test('a batch of only injected messages does not call recall', async () => {
+	await resetLog()
+	const { listeners } = mount()
+	const decision = await preStep(listeners, [
+		userMessage('goal round body', { kind: 'goal', goalId: 'g1' }),
+		userMessage('scheduled reminder body', { kind: 'schedule' }),
+	])
+	assert.equal(decision.messages.length, 2)
+	await new Promise((resolve) => setTimeout(resolve, 150))
+	assert.equal((await readFile(log, 'utf8')).includes('hook-input'), false)
+})
+
+test('a subagent session is not extracted', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-82-subagent')
+	const { listeners } = mount({ stateDir })
+	const events = [
+		{ type: 'user/message', data: userMessage('subagent work') },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = {
+		id: 's82sub',
+		seq: events.length,
+		header: { origin: 'subagent' },
+		eventAt: (seq) => events[seq],
+	}
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+	await new Promise((resolve) => setTimeout(resolve, 150))
+	await assert.rejects(readFile(join(stateDir, 's82sub.json'), 'utf8'), /ENOENT/)
+})
+
+test('a forked session starts at the inherited prefix', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-82-fork')
+	const { listeners } = mount({ stateDir })
+	const events = [
+		{ type: 'user/message', data: userMessage('parent message') },
+		{ type: 'user/message', data: userMessage('fork message') },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = {
+		id: 's82fork',
+		seq: events.length,
+		inheritedEventCount: 1,
+		eventAt: (seq) => events[seq],
+	}
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+	const text = await waitForLog('extract-input')
+	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'fork message' }])
+})
+
 test('tool output sent to extraction is capped', async () => {
 	await resetLog()
 	const { listeners } = mount({ maxToolResultChars: 10 })
