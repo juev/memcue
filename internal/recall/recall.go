@@ -54,6 +54,60 @@ type Hit struct {
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
 func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error) {
+	hits, err := recallCandidates(s, prompt, p)
+	if err != nil {
+		return nil, err
+	}
+	// Ties: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
+	// then the newer fact. The host only orders facts of equal coverage; it never excludes another host's fact.
+	place := func(h Hit) int {
+		switch {
+		case hostScope(h.Scope, p.Host):
+			return 0
+		case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
+			return 1
+		case strings.HasPrefix(h.Origin, tier.Global+" "):
+			return 2
+		}
+		return 3
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].Coverage != hits[j].Coverage {
+			return hits[i].Coverage > hits[j].Coverage
+		}
+		if pi, pj := place(hits[i]), place(hits[j]); pi != pj {
+			return pi < pj
+		}
+		return hits[i].ID > hits[j].ID
+	})
+	served := hits
+	if len(hits) > p.MaxFacts {
+		served = hits[:p.MaxFacts]
+	}
+	// Did another host take one of the slots while a fact of this host was left out? The log uses this to decide
+	// whether a hard filter is ever needed; it never changes the choice.
+	if p.Host != "" {
+		omitted := false
+		for _, h := range hits[len(served):] {
+			if hostScope(h.Scope, p.Host) {
+				omitted = true
+				break
+			}
+		}
+		if omitted {
+			for i := range served {
+				if otherHostScope(served[i].Scope, p.Host) {
+					served[i].Displaced = true
+				}
+			}
+		}
+	}
+	return served, nil
+}
+
+// recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the
+// MaxFacts cap. Recall adds the tie order and the cap; the rerank pass uses the same gates but lets the judge order.
+func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	terms := text.Terms(prompt)
 	var tickets []string
 	for _, t := range terms {
@@ -132,51 +186,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched})
 		}
 	}
-	// Ties: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
-	// then the newer fact. The host only orders facts of equal coverage; it never excludes another host's fact.
-	place := func(h Hit) int {
-		switch {
-		case hostScope(h.Scope, p.Host):
-			return 0
-		case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
-			return 1
-		case strings.HasPrefix(h.Origin, tier.Global+" "):
-			return 2
-		}
-		return 3
-	}
-	sort.SliceStable(hits, func(i, j int) bool {
-		if hits[i].Coverage != hits[j].Coverage {
-			return hits[i].Coverage > hits[j].Coverage
-		}
-		if pi, pj := place(hits[i]), place(hits[j]); pi != pj {
-			return pi < pj
-		}
-		return hits[i].ID > hits[j].ID
-	})
-	served := hits
-	if len(hits) > p.MaxFacts {
-		served = hits[:p.MaxFacts]
-	}
-	// Did another host take one of the slots while a fact of this host was left out? The log uses this to decide
-	// whether a hard filter is ever needed; it never changes the choice.
-	if p.Host != "" {
-		omitted := false
-		for _, h := range hits[len(served):] {
-			if hostScope(h.Scope, p.Host) {
-				omitted = true
-				break
-			}
-		}
-		if omitted {
-			for i := range served {
-				if otherHostScope(served[i].Scope, p.Host) {
-					served[i].Displaced = true
-				}
-			}
-		}
-	}
-	return served, nil
+	return hits, nil
 }
 
 // hostScope reports whether scope names this host.
