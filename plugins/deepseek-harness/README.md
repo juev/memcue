@@ -11,13 +11,15 @@ fact base:
 - **When a turn ends** the messages it added go to `memcue extract-messages` in the background, once
   `minNewChars` of new text has gathered. The checkpoint per session lives in `<stateDir>/<session>.json`: it holds
   fingerprints of messages already extracted and a pending batch, written atomically before the model call. A failed
-  extraction keeps the batch and retries it on the next turn; a successful one acknowledges its fingerprints, so a
-  turn boundary does not send the same text twice. Extraction reads only direct human messages: compaction summaries, cron and
+  extraction keeps the batch and retries it on the next turn and when the plugin loads; a successful one acknowledges
+  its fingerprints, so a turn boundary does not send the same text twice. Extraction reads only direct human
+  messages: compaction summaries, cron and
   goal notices, hook contexts and subagent sessions are left out, and a forked session starts at its inherited
   prefix instead of re-extracting the parent's history. Tool calls travel with the assistant message and their
   results follow as `RESULT`, the same pair Claude Code transcripts carry. When the session is disposed, the
-  remaining tail is sent even if it is below `minNewChars`; that call lowers memcue's own 2000-character transcript
-  minimum, so a short final tail can still produce candidates.
+  listener awaits the remaining tail even if it is below `minNewChars`; that call lowers memcue's own 2000-character
+  transcript minimum, so a short final tail can still produce candidates, and a batch left behind by a crash is
+  retried when the plugin loads.
 - **A system-prompt section** says the memory is memcue and names the fact tools; the built-in memory files are not
   written.
 - **Four tools**: `memcue_search` (facts by words, with their ids), `memcue_add` (one new fact), `memcue_correct`

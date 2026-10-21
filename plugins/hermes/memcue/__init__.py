@@ -68,6 +68,7 @@ _KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
 _MAX_MESSAGE = 4000  # characters of one message the extraction sees
 _TOOL_RESULT = 1500  # characters of one tool result the extraction sees; memcue cuts a RESULT to the same length
 _WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
+_SHUTDOWN_GRACE = 20  # seconds shutdown waits for in-flight extractions; a pending batch survives a longer one
 _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail no later trigger will collect
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 
@@ -162,6 +163,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
         self._stop = threading.Event()
         self._watcher: Optional[threading.Thread] = None
+        self._feeds: list[threading.Thread] = []
+        self._feeds_lock = threading.Lock()
 
     @property
     def name(self) -> str:
@@ -350,10 +353,18 @@ class MemcueMemoryProvider(MemoryProvider):
                 except OSError:
                     pass
             finally:
+                with self._feeds_lock:
+                    try:
+                        self._feeds.remove(thread)
+                    except ValueError:
+                        pass
                 if on_done:
                     on_done(ok)
 
-        threading.Thread(target=feed, name="memcue-extract", daemon=True).start()
+        thread = threading.Thread(target=feed, name="memcue-extract", daemon=True)
+        with self._feeds_lock:
+            self._feeds.append(thread)
+        thread.start()
 
     # The messages of a session reach the model once each: a message is new until its fingerprint is in the
     # session's seen list ($HERMES_HOME/memcue/sessions/<session>.json). Compression rewrites the list Hermes holds,
@@ -661,12 +672,22 @@ class MemcueMemoryProvider(MemoryProvider):
             self._generation += 1
 
     def shutdown(self) -> None:
-        """Stop the pause watcher and send what the turns gathered, so a gateway restart loses nothing."""
+        """Stop the pause watcher, send what the turns gathered and wait a bounded time for the in-flight model
+        calls, so a graceful gateway restart does not lose the last tail. A call that outlives the grace period keeps
+        its pending batch on disk for the next start."""
         self._stop.set()
         with self._pending_lock:
             sessions = list(self._pending)
         for session in sessions:
             self._flush(session, "shutdown")
+        with self._feeds_lock:
+            feeds = list(self._feeds)
+        deadline = time.monotonic() + _SHUTDOWN_GRACE
+        for feed in feeds:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            feed.join(remaining)
 
     def _origin(self, mirror: bool = False) -> str:
         """The origin of a fact: which producer wrote it and when. A mirrored built-in memory note says so, so recall

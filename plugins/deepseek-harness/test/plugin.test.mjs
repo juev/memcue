@@ -530,6 +530,25 @@ exit 0
 	assert.deepEqual(JSON.parse(calls[0]), JSON.parse(calls[1]))
 })
 
+test('a pending batch is retried when the plugin starts', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-retry-161')
+	await mkdir(stateDir, { recursive: true })
+	const path = join(stateDir, 's-retry.json')
+	await writeFile(path, JSON.stringify({
+		seen: {},
+		pending: {
+			messages: [{ role: 'user', content: 'a fact from the disposed session' }],
+			fingerprints: ['fp-retry'],
+		},
+		cwd: dir,
+	}))
+	mount({ stateDir, minNewChars: 1 })
+	const text = await waitForLog('extract-input')
+	assert.ok(text.includes(`arg: extract-messages -session s-retry -event retry -cwd ${dir} -min-chars 1`), text)
+	await waitForState(path, (state) => state.pending === null && Object.keys(state.seen).length === 1)
+})
+
 test('a legacy seq state is migrated without re-extracting the history', async () => {
 	await resetLog()
 	const stateDir = join(dir, 'state-81-old')
