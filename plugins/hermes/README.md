@@ -7,6 +7,9 @@ memcue fact base:
   Hermes puts them into the turn's `<memory-context>` block. Each fact comes once per session, and again after the
   context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
   notice, whose wrapper matches facts by accident.
+- **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
+  after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
+  truncated part can be extracted again.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
   fact (source `memory`) and waits for approval with `memcue review`/`approve`. With the default
   `suppress_mirrored: true`, an approved mirrored fact is still left out of `prefetch`, because the same entry already

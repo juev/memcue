@@ -16,6 +16,7 @@ import sys
 import tempfile
 import types
 import unittest
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
@@ -164,6 +165,30 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
         self.p.on_pre_compress([])  # the context loses what it got
         self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
+
+    def test_session_switch_rebinds_and_resets_state(self):
+        self.p._generation = 3
+        self.p._pending["s2"] = ([{"role": "user", "content": "x"}], 0.0)
+        self.p._delivered["s2"] = [{"tokens": ["x"], "chars": 1}]
+        self.p._inflight["s2"] = Counter({"fp": 1})
+        self.p._warned["s2"] = 1.0
+        self.p.on_session_switch("s2", reset=True)
+        self.assertEqual(self.p._session_id, "s2")
+        self.assertEqual(self.p._generation, 0)
+        self.assertNotIn("s2", self.p._pending)
+        self.assertNotIn("s2", self.p._inflight)
+        self.assertNotIn("s2", self.p._delivered)
+        self.assertNotIn("s2", self.p._warned)
+
+    def test_rewound_session_forgets_seen_fingerprints(self):
+        path = self.p._seen_path("s1")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(["old-fingerprint"]), encoding="utf-8")
+        self.p._pending["s1"] = ([{"role": "user", "content": "x"}], 0.0)
+        self.p.on_session_switch("s1", rewound=True)
+        self.assertEqual(self.p._seen("s1"), [])
+        self.assertNotIn("s1", self.p._pending)
+        self.assertGreaterEqual(self.p._generation, 1)
 
     def test_a_cron_turn_gets_no_facts(self):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
@@ -423,6 +448,17 @@ class AccumulationTest(unittest.TestCase):
         self.turn("h" * 100)
         self.p.shutdown()
         self.assertEqual(self.calls[-1], ("shutdown", "s1", ["h" * 100, "ok"]))
+
+    def test_session_end_after_switch_flushes_new_session(self):
+        self.p._idle = 3600
+        self.turn("a" * 1200)
+        self.p.on_session_end(list(self.msgs))
+        self.assertEqual([call[1] for call in self.calls], ["s1"])
+        self.p.on_session_switch("s2", reset=True)
+        self.msgs = [{"role": "user", "content": "b" * 1200}]
+        self.p.sync_turn("b" * 1200, "ok", session_id="s2", messages=list(self.msgs))
+        self.p.on_session_end(list(self.msgs))
+        self.assertEqual([call[1] for call in self.calls], ["s1", "s2"])
 
     def test_seen_survives_a_restart(self):
         self.p._idle = 3600
