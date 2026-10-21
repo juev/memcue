@@ -25,6 +25,7 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
+	VectorPool     int             // vectors of the most recent facts scored per prompt; <= 0 means every vector
 	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
 	Today          string          // "YYYY-MM-DD" the expired facts are judged by; empty means time.Now().UTC()
@@ -40,6 +41,7 @@ var Default = Params{
 	MinCoverage:    0.15,
 	MaxPromptTerms: 24,
 	MaxFacts:       2,
+	VectorPool:     2000,
 }
 
 // Hit is a fact chosen for the prompt.

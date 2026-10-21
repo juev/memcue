@@ -61,12 +61,28 @@ func (s *Store) TagVectors(tag string) (int, error) {
 // Vectors returns every vector of the model tag together with the active fact it belongs to. Vectors of retired
 // facts and candidates are left out; provisional facts are included because recall may give them after approved.
 func (s *Store) Vectors(tag string) ([]VectorRow, error) {
-	rows, err := s.db.Query(`SELECT v.dim, v.text_hash, v.vec, `+qualified("f")+`
+	return s.vectors(tag, 0)
+}
+
+// VectorsLimit returns the vectors of the limit most recently written active facts. A non-positive limit means every
+// vector: recall uses a pool so a large base is not decoded and scored on every prompt.
+func (s *Store) VectorsLimit(tag string, limit int) ([]VectorRow, error) {
+	return s.vectors(tag, limit)
+}
+
+func (s *Store) vectors(tag string, limit int) ([]VectorRow, error) {
+	q := `SELECT v.dim, v.text_hash, v.vec, ` + qualified("f") + `
 		FROM fact_vectors v JOIN facts f ON f.id = v.id
 		WHERE v.tag = ?
 			AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
 			AND f.status = ? AND f.review IN ('', 'provisional')
-		ORDER BY f.id`, tag, Active)
+		ORDER BY f.created DESC, f.id DESC`
+	args := []any{tag, Active}
+	if limit > 0 {
+		q += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

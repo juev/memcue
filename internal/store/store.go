@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS facts (
 	prompt_version INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS facts_created ON facts(created);
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS fact_fts USING fts5(stems, content='fact_index', content_rowid='rid',
 	tokenize='unicode61 remove_diacritics 0');

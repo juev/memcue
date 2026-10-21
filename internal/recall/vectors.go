@@ -77,10 +77,12 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 	return hits, nil
 }
 
-// vectorCandidates returns up to n active facts closest to the prompt by cosine. The stored text hash and dimension
-// decide whether a vector is comparable at all; a fact the session already saw is left out here, like lexical ones.
+// vectorCandidates returns up to n active facts closest to the prompt by cosine. Only the VectorPool most recently
+// written facts are read, so a large base is not decoded and scored on every prompt; the stored text hash and
+// dimension decide whether a vector is comparable at all, and a fact the session already saw is left out, like
+// lexical ones.
 func vectorCandidates(s *store.Store, prompt string, p Params, e Embedder, n int) ([]Hit, error) {
-	rows, err := s.Vectors(e.Tag())
+	rows, err := s.VectorsLimit(e.Tag(), p.VectorPool)
 	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
