@@ -58,9 +58,13 @@ func runEval(args []string, out io.Writer) error {
 	}
 	return withStore(func(s *store.Store) error {
 		vp := vectorParams()
+		r := ranker()
 		run := func(text, tier string) ([]recall.Hit, error) {
 			if r := []rune(text); len(r) > maxPrompt {
 				text = string(r[:maxPrompt])
+			}
+			if r != nil {
+				return recall.RecallRanked(s, text, tier, p, r)
 			}
 			return recall.RecallHybrid(s, text, tier, p, vp)
 		}

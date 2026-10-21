@@ -75,6 +75,9 @@ environment:
   MEMCUE_EMBED_MARGIN  standard deviations above the chance maximum a fact must stand to be recalled by meaning
                   alone (default 1.0); MEMCUE_EMBED_MIN_SCORE adds an absolute floor, MEMCUE_EMBED_MAX_FACTS a cap
   MEMCUE_EMBED_MODE  only makes the meaning pass the only reader: the words are read only when the endpoint fails
+  MEMCUE_RERANK_URL  typed decisions endpoint (Jev) that orders the facts the words found; unset keeps it off
+  MEMCUE_RERANK_MODEL, MEMCUE_RERANK_KEY  its model (default typesafe/jev-1.14) and key (or MEMCUE_RERANK_KEY_ENV,
+                  default OPENROUTER_API_KEY); MEMCUE_RERANK_MIN 0.5, _CANDIDATES 10, _TIMEOUT 2s
   MEMCUE_EMBED_TIMEOUT  one request, default 2s; MEMCUE_EMBED_SPACE labels the vector space of the model
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs an
@@ -203,7 +206,7 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]reca
 			p.MinCoverage = f
 		}
 	}
-	return recall.RecallHybrid(s, prompt, tier.Of(cwd, claudeDir()), p, vectorParams())
+	return recallFacts(s, prompt, tier.Of(cwd, claudeDir()), p)
 }
 
 // reHarness matches a prompt the harness wrote instead of the user: a background task's notice. Its words are file
