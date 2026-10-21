@@ -410,7 +410,11 @@ func runInstall(args []string, out io.Writer) error {
 	if exe, err = filepath.EvalSymlinks(exe); err != nil {
 		return err
 	}
-	q := shellQuote(exe)
+	driver, err := installDriver(top, exe)
+	if err != nil {
+		return err
+	}
+	q := shellQuote(driver)
 	for _, kv := range [][2]string{
 		{"merge.memcue.name", "memcue fact base"},
 		{"merge.memcue.driver", q + " merge %O %A %B"},
@@ -425,12 +429,44 @@ func runInstall(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	msg := fmt.Sprintf("merge driver registered in %s\n", top)
+	msg := fmt.Sprintf("merge driver registered in %s (driver script %s)\n", top, driver)
 	if added {
 		msg += fmt.Sprintf("added to .gitattributes: %s (commit it)\n", line)
 	}
 	_, err = fmt.Fprint(out, msg)
 	return err
+}
+
+// installDriver writes the small shell script git calls for a merge or a diff. Pinning the absolute path of the
+// running binary breaks the first time an upgrade moves it (a versioned Homebrew directory, a release unpacked into a
+// versioned folder), and git then reports a binary conflict with no hint. The script looks for the binary again:
+// MEMCUE_BIN, then PATH, then the path memcue had when install ran.
+func installDriver(top, exe string) (string, error) {
+	out, err := exec.Command("git", "-C", top, "rev-parse", "--git-path", "memcue-driver.sh").Output()
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse --git-path: %w", err)
+	}
+	path := strings.TrimSpace(string(out))
+	if path == "" {
+		return "", errors.New("git did not name the driver script path")
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(top, path)
+	}
+	script := "#!/bin/sh\n" +
+		"# Written by memcue install. The binary may move on upgrade, so look it up again before failing.\n" +
+		"for candidate in \"$MEMCUE_BIN\" \"$(command -v memcue 2>/dev/null)\" " + shellQuote(exe) + "; do\n" +
+		"\tif [ -n \"$candidate\" ] && [ -x \"$candidate\" ]; then exec \"$candidate\" \"$@\"; fi\n" +
+		"done\n" +
+		"echo 'memcue: no memcue binary found; set MEMCUE_BIN, put memcue on PATH, or re-run memcue install' >&2\n" +
+		"exit 1\n"
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // existingDir is dir or its nearest existing parent: the base may not exist yet.

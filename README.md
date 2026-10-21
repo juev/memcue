@@ -90,8 +90,10 @@ the same release.
    ```
 
    It registers the driver in the repository's git config and adds `memory/facts.db merge=memcue diff=memcue` to
-   `.gitattributes`. Without a repository memcue works the same; the base is just not synced. A merge carries the
-   vectors whose text hash still matches the merged fact; `memcue embed` fills any missing or stale ones.
+   `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
+   then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
+   Without a repository memcue works the same; the base is just not synced. A merge carries the vectors whose text
+   hash still matches the merged fact; `memcue embed` fills any missing or stale ones.
 
 The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin first is harmless.
 

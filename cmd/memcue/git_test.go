@@ -134,3 +134,79 @@ func TestInstallOutsideGitDoesNothing(t *testing.T) {
 		t.Errorf("got %q", out)
 	}
 }
+
+// install must not pin the binary it happens to run from: a driver script in .git finds it again, so an upgrade that
+// moves the binary does not turn the next merge into a binary conflict.
+func TestInstallWritesStableDriverScript(t *testing.T) {
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	env := gitEnv(dir)
+	repo := filepath.Join(dir, "repo")
+	if err := os.MkdirAll(filepath.Join(repo, "memory"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, env, "git", "init", "-q", "-b", "main", repo)
+	base := filepath.Join(repo, "memory", "facts.db")
+	run(t, repo, append(env, "MEMCUE_FACTS="+base), bin, "add", "-origin", "x 2026-10-19", "Fact for install.")
+	run(t, repo, append(env, "MEMCUE_FACTS="+base), bin, "install")
+
+	driver := run(t, repo, env, "git", "config", "--get", "merge.memcue.driver")
+	script := filepath.Join(repo, ".git", "memcue-driver.sh")
+	if !strings.Contains(driver, script) {
+		t.Fatalf("driver %q does not call %s", driver, script)
+	}
+	if strings.Contains(driver, bin) {
+		t.Fatalf("driver pins the running binary: %s", driver)
+	}
+	fi, err := os.Stat(script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&0o111 == 0 {
+		t.Fatalf("driver script mode %v is not executable", fi.Mode())
+	}
+	body, err := os.ReadFile(script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "command -v memcue") || !strings.Contains(string(body), bin) {
+		t.Fatalf("driver script does not look the binary up again:\n%s", body)
+	}
+
+	// MEMCUE_BIN wins and the arguments reach memcue unchanged.
+	fake := filepath.Join(dir, "fake-memcue")
+	if err := os.WriteFile(fake, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out := run(t, repo, []string{"MEMCUE_BIN=" + fake}, script, "merge", "base", "ours", "theirs")
+	if strings.TrimSpace(out) != "merge base ours theirs" {
+		t.Fatalf("driver passed %q", out)
+	}
+
+	// PATH is enough when MEMCUE_BIN is not set.
+	pathDir := filepath.Join(dir, "path-bin")
+	if err := os.MkdirAll(pathDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	onPath := filepath.Join(pathDir, "memcue")
+	if err := os.WriteFile(onPath, []byte("#!/bin/sh\nprintf 'path:%s\\n' \"$*\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out = run(t, repo, []string{"MEMCUE_BIN=", "PATH=" + pathDir}, script, "dump", "facts.db")
+	if strings.TrimSpace(out) != "path:dump facts.db" {
+		t.Fatalf("driver with PATH passed %q", out)
+	}
+
+	// With no binary anywhere the script says what to do instead of git failing to exec a missing path.
+	moved := bin + ".moved"
+	if err := os.Rename(bin, moved); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(script, "merge", "base", "ours", "theirs")
+	cmd.Dir = repo
+	cmd.Env = []string{"MEMCUE_BIN=", "PATH=" + filepath.Join(dir, "empty"), "HOME=" + dir}
+	failed, _ := cmd.CombinedOutput()
+	if !strings.Contains(string(failed), "no memcue binary found") {
+		t.Fatalf("driver without a binary said %q", failed)
+	}
+}
