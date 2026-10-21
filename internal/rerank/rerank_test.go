@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/juev/memcue/internal/judge"
 )
 
 // stub answers like the decisions API: one noul per fact, the first fact always the most useful.
@@ -140,5 +142,16 @@ func TestFromEnvIsOffWithoutEndpointOrKey(t *testing.T) {
 	t.Setenv("MEMCUE_JUDGE_RERANK_CANDIDATES", "4")
 	if s := FromEnv(); s.Min != 0.7 || s.Candidates != 4 {
 		t.Fatalf("FromEnv = %+v", s)
+	}
+}
+
+// A shared breaker stops the ranker before it opens a connection.
+func TestSharedBreakerStopsRerank(t *testing.T) {
+	b := judge.New("")
+	_ = b.Fail(errors.New("down"))
+	r := New(&Settings{URL: "http://127.0.0.1:1", Model: "m", Key: "k", Timeout: time.Second,
+		Min: DefaultMin, Candidates: DefaultCandidates, Breaker: b})
+	if _, err := r.Scores(context.Background(), "p", []string{"a", "b"}); !errors.Is(err, ErrPaused) {
+		t.Fatalf("Scores = %v, want ErrPaused", err)
 	}
 }

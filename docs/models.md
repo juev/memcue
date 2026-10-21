@@ -111,13 +111,12 @@ the rerank-gate issue.
 
 ## Operational details
 
-- One judge client should own one HTTP client, one key and one pause/health state. Today the
-  rerank pass has a pause file, embeddings have their own, and triage/duplicate have none; a
-  dead Jev endpoint should pause all three judge roles for the same interval.
-- `recall.log` and the CLI should record the candidate source (lexical/vector) and the judge
-  score separately. `Hit.Meaning` currently conflates vector similarity with a Jev probability,
-  which makes the logs hard to compare.
-- `memcue eval` should exercise the combined flow and report the source mix, so the measured
+- One judge endpoint owns one key and one pause/health state. Triage, rerank and
+  duplicate share `internal/judge` and `$XDG_STATE_HOME/memcue/judge.pause`; embeddings keep
+  their own pause because they are a different endpoint.
+- `recall.log` records the candidate source (lexical/vector) and the judge score separately;
+  `Hit.Meaning` is the vector similarity before the judge and the judge score after it.
+- `memcue eval` exercises the combined flow and reports the source mix, so the measured
   129/180 mode is reproducible after the refactor.
 - The old variable names should fail with a message naming the replacement, or be rejected at
   startup; silently ignoring them would leave a 0.3.0 setup half-configured.

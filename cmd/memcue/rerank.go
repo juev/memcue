@@ -1,8 +1,7 @@
 package main
 
 import (
-	"path/filepath"
-
+	judgepkg "github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/rerank"
 	"github.com/juev/memcue/internal/store"
@@ -15,10 +14,8 @@ func ranker() recall.Ranker {
 	if set == nil {
 		return nil
 	}
-	// The hook is a fresh process on every prompt, so a pause after a failure is remembered in a file.
-	if dir, err := stateDir(); err == nil {
-		set.StateFile = filepath.Join(dir, "judge.pause")
-	}
+	// Triage, rerank and duplicate share one breaker and one state file.
+	set.Breaker = judgepkg.Shared
 	return rerank.New(set)
 }
 

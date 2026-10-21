@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/juev/memcue/internal/decisions"
+	"github.com/juev/memcue/internal/judge"
 )
 
 // Triage is the threshold for the judge's triage role: most dream groups need no action, and the same Jev model can
@@ -32,6 +33,9 @@ type TriageResult struct {
 
 // TriageGroup asks whether a group of facts, given by their texts, needs a cleanup action.
 func TriageGroup(ctx context.Context, facts []string) (TriageResult, error) {
+	if err := judge.Shared.Check(); err != nil {
+		return TriageResult{}, err
+	}
 	var list strings.Builder
 	for i, f := range facts {
 		_, _ = fmt.Fprintf(&list, "%d) %s\n", i+1, strings.Join(strings.Fields(f), " "))
@@ -48,11 +52,12 @@ func TriageGroup(ctx context.Context, facts []string) (TriageResult, error) {
 			},
 		}})
 	if err != nil {
-		return TriageResult{}, err
+		return TriageResult{}, judge.Shared.Fail(err)
 	}
 	a, ok := res.Answers["q"]
 	if !ok || a.Type != "choice" || len(a.Probabilities) == 0 {
-		return TriageResult{}, fmt.Errorf("triage returned no choice")
+		return TriageResult{}, judge.Shared.Fail(fmt.Errorf("triage returned no choice"))
 	}
+	judge.Shared.OK()
 	return TriageResult{PAct: a.Probabilities["duplicate"] + a.Probabilities["outdated"], Input: res.Input}, nil
 }
