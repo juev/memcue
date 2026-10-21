@@ -298,7 +298,7 @@ func runExtractSession(args []string) error {
 	}
 	rec := extractRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: *session, Event: *event}
 	rec.From = readOffset(lock)
-	err = extractSession(*path, &rec)
+	err = extractSession(*path, &rec, extractionMinChars(*event))
 	if err != nil {
 		rec.Error = err.Error()
 	} else if rec.Skipped == "" {
@@ -313,7 +313,16 @@ func runExtractSession(args []string) error {
 	return err
 }
 
-func extractSession(path string, rec *extractRecord) error {
+// extractionMinChars is the least text worth a model call for an event. A SessionEnd run is the last chance to
+// extract what the session gathered, so it takes even a short tail; every other trigger waits for more text.
+func extractionMinChars(event string) int {
+	if event == "SessionEnd" {
+		return 1
+	}
+	return minNew
+}
+
+func extractSession(path string, rec *extractRecord, minChars int) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -325,7 +334,7 @@ func extractSession(path string, rec *extractRecord) error {
 	}
 	rec.To, rec.Chars = sess.Lines, len(sess.Text)
 	rec.Origin = strings.TrimSpace(tier.Of(sess.CWD, claudeDir()) + " " + sess.Start)
-	return storeExtracted(sess.Text, rec, minNew)
+	return storeExtracted(sess.Text, rec, minChars)
 }
 
 // storeExtracted runs the extraction over rendered text and stores the facts that pass the policy as candidates with

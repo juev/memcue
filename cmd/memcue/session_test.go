@@ -429,6 +429,41 @@ func TestExtractSessionKeepsOffsetOnFailure(t *testing.T) {
 	}
 }
 
+// SessionEnd is the last trigger: a short tail that PreCompact would wait on must still reach the model.
+func TestExtractSessionEndExtractsAShortTail(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state")
+	t.Setenv("XDG_STATE_HOME", state)
+	calls := 0
+	extractFn = func(string, string) (extracted, error) {
+		calls++
+		return extracted{Facts: []extract.Fact{{Content: "Порт demo 55432.", Keywords: []string{"порт"},
+			Kind: "environment", Source: "user", Scope: "service:demo", Evidence: "реплика 0"}}}, nil
+	}
+	t.Cleanup(func() { extractFn = extractText })
+	tr := filepath.Join(dir, "s.jsonl")
+	transcriptLinesIn(t, tr, dir, 3) // ~1700 chars, below minNew
+	args := []string{"-session", "sess-end", "-transcript", tr, "-event", "SessionEnd"}
+	if err := runExtractSession(args); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("short SessionEnd tail did not reach the model: %d calls", calls)
+	}
+	recs := readLog(t, state)
+	if len(recs) != 1 || recs[0].To != 3 || recs[0].Facts != 1 || recs[0].Skipped != "" {
+		t.Fatalf("log %+v", recs)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if fs, err := s.Candidates(); err != nil || len(fs) != 1 {
+		t.Errorf("candidates %+v %v", fs, err)
+	}
+}
+
 // One empty fact from the model must not lose the valid facts of the same extraction or stall the session offset.
 func TestExtractSessionStoresValidFactsDespiteAnEmptyOne(t *testing.T) {
 	dir := env(t)

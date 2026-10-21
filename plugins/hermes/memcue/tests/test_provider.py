@@ -11,6 +11,7 @@ import json
 import threading
 import time
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -374,6 +375,30 @@ class ProviderTest(unittest.TestCase):
         self.assertIn(" hermes ", facts[0])
         self.assertEqual((seen["model"], seen["auth"]), ("m1", "Bearer k1"))
         self.assertNotIn("SYSTEM", seen["text"])
+
+    def test_final_flushes_pass_min_chars(self):
+        """session_end, pre_compress and shutdown are the last chance for a tail; threshold and idle wait."""
+        for event, final in (("session_end", True), ("pre_compress", True), ("shutdown", True),
+                             ("threshold", False), ("idle", False)):
+            with self.subTest(event=event):
+                calls = Path(self.home) / f"args-{event}"
+                script = Path(self.home) / f"bin-{event}"
+                script.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" >> {shlex.quote(str(calls))}\n"
+                                  "cat >/dev/null\nexit 0\n", encoding="utf-8")
+                script.chmod(0o755)
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "extract_url": "http://x",
+                                                           "extract_model": "m"})
+                p.initialize("s1", hermes_home=self.home, agent_context="primary")
+                done = threading.Event()
+                p._extract_in_background([{"role": "user", "content": "x"}], event, "s1",
+                                         on_done=lambda ok: done.set())
+                self.assertTrue(done.wait(5), event)
+                args = calls.read_text(encoding="utf-8").splitlines()
+                if final:
+                    self.assertIn("-min-chars", args, event)
+                    self.assertEqual(args[args.index("-min-chars") + 1], "1", event)
+                else:
+                    self.assertNotIn("-min-chars", args, event)
 
     def test_no_endpoint_no_extraction(self):
         self.p.on_session_end([{"role": "user", "content": "x " * 3000}])
