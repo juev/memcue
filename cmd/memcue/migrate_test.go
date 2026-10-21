@@ -170,6 +170,72 @@ func TestNamedNoteIsMigratedAgainButFoundOneIsSkipped(t *testing.T) {
 	}
 }
 
+// A note named on the command line and found by -all is sent to the model once, not twice.
+func TestMigrateAllDeduplicatesNamedNote(t *testing.T) {
+	dir := env(t)
+	notePath := filepath.Join(dir, "claude", "memory", "lists", "a.md")
+	write(t, notePath, "note a\n")
+	var calls int
+	noteFn = func(context.Context, string, string) (extract.Result, error) {
+		calls++
+		return extract.Result{Facts: []extract.Fact{{Content: "Факт из заметки a.", Keywords: []string{"a"}}}}, nil
+	}
+	t.Cleanup(func() { noteFn = extract.Note })
+	var out strings.Builder
+	if err := runMigrate([]string{"-all", notePath}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	act, err := s.Active()
+	if calls != 1 || err != nil || len(act) != 1 {
+		t.Errorf("%d model calls, facts %+v, %v", calls, act, err)
+	}
+}
+
+// The same file under two paths is one note: a named symlink and the real note that -all finds resolve to one path.
+func TestMigrateAllDeduplicatesNamedSymlink(t *testing.T) {
+	dir := env(t)
+	real := filepath.Join(dir, "notes", "a.md")
+	write(t, real, "note a\n")
+	found := filepath.Join(dir, "claude", "memory", "lists", "a.md")
+	if err := os.MkdirAll(filepath.Dir(found), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, found); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(dir, "alias", "a.md")
+	if err := os.MkdirAll(filepath.Dir(alias), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatal(err)
+	}
+	var calls int
+	noteFn = func(context.Context, string, string) (extract.Result, error) {
+		calls++
+		return extract.Result{Facts: []extract.Fact{{Content: "Факт из заметки a.", Keywords: []string{"a"}}}}, nil
+	}
+	t.Cleanup(func() { noteFn = extract.Note })
+	var out strings.Builder
+	if err := runMigrate([]string{"-all", alias}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	act, err := s.Active()
+	if calls != 1 || err != nil || len(act) != 1 {
+		t.Errorf("%d model calls, facts %+v, %v", calls, act, err)
+	}
+}
+
 func TestNamedNoteOfBuiltInLayoutGetsItsRepository(t *testing.T) {
 	dir := t.TempDir()
 	claude := filepath.Join(dir, "claude")

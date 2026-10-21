@@ -55,7 +55,7 @@ func runMigrate(args []string, out io.Writer) error {
 			return err
 		}
 	}
-	notes := append(named, found...)
+	notes := dedupeNotes(named, found)
 	if *list {
 		for _, n := range notes {
 			if _, err := fmt.Fprintln(out, n.ref(), n.path); err != nil {
@@ -138,6 +138,30 @@ func (n note) ref() string { return n.tier + "/" + filepath.Base(n.path) }
 
 func (n note) origin() string {
 	return strings.TrimSpace(n.tier + " " + noteDate(n.path) + " (" + n.ref() + ")")
+}
+
+// dedupeNotes merges named and found notes, keeping one note per real path. A named note comes first, so a note named
+// on the command line is still migrated again when -all also finds it.
+func dedupeNotes(named, found []note) []note {
+	out := make([]note, 0, len(named)+len(found))
+	seen := map[string]bool{}
+	for _, group := range [][]note{named, found} {
+		for _, n := range group {
+			p := n.path
+			if abs, err := filepath.Abs(p); err == nil {
+				p = abs
+			}
+			if real, err := filepath.EvalSymlinks(p); err == nil {
+				p = real
+			}
+			if seen[p] {
+				continue
+			}
+			seen[p] = true
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // noteTier names the repository of a note given by path: the project's repository for a note of the built-in layout
