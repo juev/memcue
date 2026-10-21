@@ -3,7 +3,9 @@ package extract
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/juev/memcue/internal/decisions"
 	"github.com/juev/memcue/internal/judge"
@@ -14,12 +16,14 @@ import (
 // nearest approved facts; this one sees the whole base in one request. Numbers and limits: docs/research/
 // jev-judge-2026-10.md. It is off unless the URL, the model and the key are all set.
 var JevJudge struct {
-	URL         string  // e.g. https://openrouter.ai/api/alpha/decisions
-	Model       string  // e.g. typesafe/jev-1.14
-	Key         string  // bearer token
-	Min         float64 // probability of "same claim" that retires a candidate
-	MaxFacts    int     // approved facts the base may hold and still fit one request
-	LongContext bool    // TypeSafe-Danger-Zone-Long-Context, 262k instead of 64k
+	URL           string        // e.g. https://openrouter.ai/api/alpha/decisions
+	Model         string        // e.g. typesafe/jev-1.14
+	Key           string        // bearer token
+	Min           float64       // probability of "same claim" that retires a candidate
+	MaxFacts      int           // approved facts the base may hold and still fit one request
+	LongContext   bool          // TypeSafe-Danger-Zone-Long-Context, 262k instead of 64k
+	TriageTimeout time.Duration // one triage request; zero uses DefaultTriageTimeout
+	DupTimeout    time.Duration // one duplicate request; zero uses DefaultDupTimeout
 }
 
 // Defaults measured on one base of 235 approved facts and 41 candidates the review model had already labelled, in two
@@ -31,6 +35,31 @@ const (
 	jevMin      = 0.5
 	jevMaxFacts = 400
 )
+
+// Judge request timeouts. Rerank gives ten candidates 2 s; triage asks about a group of at most six facts, so it gets
+// the same bound. The duplicate check carries the whole base (up to 400 facts, 1 700 with the long-context header),
+// where the measured call is 1.2–1.3 s, so it gets 10 s. Both are far below the ten-minute context the callers pass:
+// a hung endpoint costs seconds and then the shared breaker pauses it, not a held vet lock and dream.
+const (
+	DefaultTriageTimeout = 2 * time.Second
+	DefaultDupTimeout    = 10 * time.Second
+)
+
+// JevJudgeTriageTimeout is the timeout of one triage request, with the default when the settings carry none.
+func JevJudgeTriageTimeout() time.Duration {
+	if JevJudge.TriageTimeout > 0 {
+		return JevJudge.TriageTimeout
+	}
+	return DefaultTriageTimeout
+}
+
+// JevJudgeDupTimeout is the timeout of one duplicate request, with the default when the settings carry none.
+func JevJudgeDupTimeout() time.Duration {
+	if JevJudge.DupTimeout > 0 {
+		return JevJudge.DupTimeout
+	}
+	return DefaultDupTimeout
+}
 
 // JevJudgeOn says whether the duplicate judge is configured.
 func JevJudgeOn() bool { return JevJudge.URL != "" && JevJudge.Model != "" && JevJudge.Key != "" }
@@ -108,7 +137,11 @@ func JudgeDuplicate(ctx context.Context, cand JudgeFact, approved []JudgeFact) (
 			Criteria:     jevDupLevels,
 		}
 	}
-	c := decisions.Client{URL: JevJudge.URL, Model: JevJudge.Model, Key: JevJudge.Key, LongContext: JevJudge.LongContext}
+	timeout := JevJudgeDupTimeout()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	c := decisions.Client{URL: JevJudge.URL, Model: JevJudge.Model, Key: JevJudge.Key, LongContext: JevJudge.LongContext,
+		HTTP: &http.Client{Timeout: timeout}}
 	res, err := c.Ask(ctx, map[string]string{
 		"policy":    jevDupPolicy,
 		"candidate": strings.Join(strings.Fields(cand.Text), " "),

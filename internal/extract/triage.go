@@ -3,6 +3,7 @@ package extract
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/juev/memcue/internal/decisions"
@@ -40,7 +41,11 @@ func TriageGroup(ctx context.Context, facts []string) (TriageResult, error) {
 	for i, f := range facts {
 		_, _ = fmt.Fprintf(&list, "%d) %s\n", i+1, strings.Join(strings.Fields(f), " "))
 	}
-	c := decisions.Client{URL: JevJudge.URL, Model: JevJudge.Model, Key: JevJudge.Key}
+	timeout := JevJudgeTriageTimeout()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	c := decisions.Client{URL: JevJudge.URL, Model: JevJudge.Model, Key: JevJudge.Key,
+		HTTP: &http.Client{Timeout: timeout}}
 	res, err := c.Ask(ctx, map[string]string{"policy": triagePolicy, "facts": strings.TrimSpace(list.String())},
 		map[string]decisions.Question{"q": {
 			Type:         "choice",

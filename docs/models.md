@@ -62,7 +62,9 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_JUDGE_RERANK_MIN` | 0.5 | Jev probability below which a candidate is not given |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | 10 | candidates taken from each source (lexical and vector) |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | 2 s | one rerank request |
+| `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | 2 s | one triage request |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | 0.2 | probability of an action that sends a dream group to the main model |
+| `MEMCUE_JUDGE_DUP_TIMEOUT` | 10 s | one duplicate request |
 | `MEMCUE_JUDGE_DUP_MIN` | 0.5 | probability of "same claim" that retires a candidate |
 | `MEMCUE_JUDGE_DUP_MAX_FACTS` | 400 | approved facts that still fit one duplicate request |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | off | send the 262k danger-zone header for the duplicate check |

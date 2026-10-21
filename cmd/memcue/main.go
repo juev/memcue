@@ -77,7 +77,9 @@ environment:
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
   MEMCUE_JUDGE_RERANK_CANDIDATES  candidates taken from each source (default 10)
   MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
+  MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
   MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
+  MEMCUE_JUDGE_DUP_TIMEOUT  one duplicate request (default 10s)
   MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
   MEMCUE_JUDGE_DUP_MAX_FACTS  approved facts that fit one duplicate request (default 400)
   MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
