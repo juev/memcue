@@ -130,7 +130,8 @@ node --test plugins/deepseek-harness/test/*.test.mjs
 
 The suite mounts the plugin against a plain object context and a stub binary, so it needs no model, no base and no
 running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools` resolve. It also checks
-the bundle metadata and that the bundle patch points at the loadable ESM entry.
+the bundle metadata and that the bundle patch points at the loadable ESM entry. `make test` runs it together with the
+Go and Hermes suites when those packages are installed, and skips it with the install command otherwise.
 
 ## Releasing
 
