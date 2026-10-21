@@ -137,7 +137,9 @@ function settingsOf(config) {
 		binary: expandHome(textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary)) || DEFAULTS.binary,
 		facts,
 		factsKey: resolve(facts || defaultFacts()),
-		extract: flagOf(raw.extract, 'extract', DEFAULTS.extract),
+		// The global off switch wins over the profile: it is the one setting a user adds to a container or a launcher
+		// environment without editing every host.
+		extract: process.env.MEMCUE_EXTRACT === '0' ? false : flagOf(raw.extract, 'extract', DEFAULTS.extract),
 		minNewChars: countOf(raw.minNewChars, 'minNewChars', DEFAULTS.minNewChars, 0),
 		stateDir,
 		searchLimit: countOf(raw.searchLimit, 'searchLimit', DEFAULTS.searchLimit, 1),

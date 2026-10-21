@@ -683,3 +683,30 @@ func TestExtractMessagesOriginFromCwd(t *testing.T) {
 		t.Errorf("explicit origin = %q", got)
 	}
 }
+
+// MEMCUE_EXTRACT=0 is the documented off switch; a host that calls extract-messages directly must honour it too.
+func TestExtractMessagesHonoursTheOffSwitch(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_EXTRACT", "0")
+	calls := 0
+	extractFn = func(origin, text string) (extracted, error) {
+		calls++
+		return extracted{}, nil
+	}
+	t.Cleanup(func() { extractFn = extractText })
+	msgs := `[{"role":"user","content":"Порт demo 55432."}]`
+	if err := runExtractMessages([]string{"-min-chars", "0"}, strings.NewReader(msgs)); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 {
+		t.Fatalf("the model was called %d times with MEMCUE_EXTRACT=0", calls)
+	}
+}
+
+func TestExtractSessionHonoursTheOffSwitch(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_EXTRACT", "0")
+	if err := runExtractSession([]string{"-session", "s1", "-transcript", "/nonexistent"}); err != nil {
+		t.Fatalf("the switch did not stop extraction before reading the transcript: %v", err)
+	}
+}

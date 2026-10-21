@@ -25,7 +25,8 @@ memcue fact base:
   `memcue_search` takes an optional `limit`; `memcue_correct` can set `keywords` and an `expires` date, as the CLI
   does. Search is lexical, like `memcue search`: the host and repository preference belongs to recall, not the tool.
   Subagents, cron and flush runs get only `memcue_search` and do not write.
-- **Session extraction** (optional): the new messages of a session go to `memcue extract-messages` in the
+- **Session extraction** (optional): `MEMCUE_EXTRACT=0` in the gateway's environment turns it off and wins over
+  `extract_url`; otherwise the new messages of a session go to `memcue extract-messages` in the
   background, which sends them to an OpenAI-compatible model with the same prompt Claude Code sessions get, and adds
   the facts it finds as candidates for review. A chat of a messaging gateway can stay one session for days, so the messages are not held until
   the session ends: they go once 20 000 characters of new text gather (`extract_threshold`), after 30 minutes without
