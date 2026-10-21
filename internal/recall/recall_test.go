@@ -3,6 +3,7 @@ package recall
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/store"
 )
@@ -29,6 +30,49 @@ func setup(t *testing.T) *store.Store {
 		}
 	}
 	return s
+}
+
+// A provisional fact is available only after the approved facts, and an expired one is not recalled at all.
+func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	approved, err := s.Add("Caddy config.", nil, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cand, err := s.AddWith("Caddy reload path for the public config.", nil, "x", "",
+		store.Meta{Review: store.Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	until := time.Now().AddDate(0, 0, 7).Format(time.DateOnly)
+	if _, err := s.ApproveProvisional(cand.ID, until); err != nil {
+		t.Fatal(err)
+	}
+	expired, err := s.AddWith("Caddy reload path from an old note.", nil, "x", "",
+		store.Meta{Review: store.Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ApproveProvisional(expired.ID, time.Now().AddDate(0, 0, -1).Format(time.DateOnly)); err != nil {
+		t.Fatal(err)
+	}
+	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 1, MinCoverage: 0.1, MaxFacts: 3}
+	hits, err := Recall(s, "caddy reload path", "", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) < 2 || hits[0].ID != approved.ID || !hits[1].Provisional {
+		t.Fatalf("hits = %+v, want approved first and provisional second", hits)
+	}
+	for _, h := range hits {
+		if h.ID == expired.ID {
+			t.Fatalf("expired provisional fact was recalled: %+v", h)
+		}
+	}
 }
 
 func splitKW(s string) []string {

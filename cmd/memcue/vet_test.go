@@ -343,6 +343,64 @@ func TestRunVetRefusesWhenAnotherRunHoldsTheLock(t *testing.T) {
 	}
 }
 
+// Without the auto policy an unsure model answer still waits for a person.
+func TestVetUnsureStaysCandidateWithoutAuto(t *testing.T) {
+	env(t)
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.UnsureVerdict}}}, nil
+	})
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, id); f.Review != store.Candidate || f.Version != 1 {
+		t.Errorf("strict default changed the candidate: %+v", f)
+	}
+	if !strings.Contains(out.String(), "осталось решать 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// With -auto an unsure model answer becomes a provisional fact for the TTL instead of a human task.
+func TestVetAutoTurnsUnsureIntoProvisional(t *testing.T) {
+	env(t)
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.UnsureVerdict,
+			Reason: "не хватает уверенности"}}}, nil
+	})
+	var out bytes.Buffer
+	if err := runVet([]string{"-auto", "-ttl-days", "7"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	f := vetStatus(t, id)
+	if f.Review != store.Provisional || f.Expires == "" || f.Version != 2 {
+		t.Errorf("auto provisional = %+v", f)
+	}
+	if !strings.Contains(out.String(), "provisional until") || !strings.Contains(out.String(), "временно принято 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// The same policy is used by the detached extraction hook through MEMCUE_VET_POLICY=auto.
+func TestMaybeVetAutoPolicy(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_VET", "1")
+	t.Setenv("MEMCUE_VET_POLICY", "auto")
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
+	extract.API.URL = "http://127.0.0.1:1"
+	id := vetFact(t, "Проверить, как прошёл ночной dream на живой базе.", "hermes 2026-10-21", "tool")
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
+		return extract.ReviewResult{Decisions: []extract.ReviewDecision{{ID: id, Verdict: extract.UnsureVerdict}}}, nil
+	})
+	maybeVet([]string{id})
+	if f := vetStatus(t, id); f.Review != store.Provisional {
+		t.Errorf("maybeVet did not apply the auto policy: %+v", f)
+	}
+}
+
 // fakeDupJudge stands in for the duplicate judge: it answers by candidate text and counts the calls.
 func fakeDupJudge(t *testing.T, answer func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error)) *[]extract.JudgeFact {
 	t.Helper()

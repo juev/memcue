@@ -59,13 +59,13 @@ func (s *Store) TagVectors(tag string) (int, error) {
 }
 
 // Vectors returns every vector of the model tag together with the active fact it belongs to. Vectors of retired
-// facts and of facts waiting for approval are left out: recall never gives those.
+// facts and candidates are left out; provisional facts are included because recall may give them after approved.
 func (s *Store) Vectors(tag string) ([]VectorRow, error) {
 	rows, err := s.db.Query(`SELECT v.dim, v.text_hash, v.vec, `+qualified("f")+`
 		FROM fact_vectors v JOIN facts f ON f.id = v.id
 		WHERE v.tag = ?
 			AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
-			AND f.status = ? AND f.review = ''
+			AND f.status = ? AND f.review IN ('', 'provisional')
 		ORDER BY f.id`, tag, Active)
 	if err != nil {
 		return nil, err
@@ -98,12 +98,12 @@ func (s *Store) Vectors(tag string) ([]VectorRow, error) {
 }
 
 // MissingVectors returns active facts (never candidates) whose vector for the model is absent or was made from
-// another text. limit <= 0 means no limit.
+// another text. Provisional facts are included: they are recallable. limit <= 0 means no limit.
 func (s *Store) MissingVectors(tag string, limit int) ([]Pending, error) {
 	rows, err := s.db.Query(`SELECT f.id, f.content, v.dim, v.text_hash
 		FROM facts f LEFT JOIN fact_vectors v ON v.id = f.id AND v.tag = ?
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id)
-			AND f.status = ? AND f.review = ''
+			AND f.status = ? AND f.review IN ('', 'provisional')
 		ORDER BY f.created, f.id`, tag, Active)
 	if err != nil {
 		return nil, err

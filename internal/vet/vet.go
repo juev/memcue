@@ -29,11 +29,12 @@ const (
 
 // Decision is one verdict, with why and who made it.
 type Decision struct {
-	Fact    store.Fact
-	Verdict Verdict
-	Reason  string
-	Expires string // last day the fact is worth recalling, when the decision came with one
-	By      string // rule or model
+	Fact        store.Fact
+	Verdict     Verdict
+	Reason      string
+	Expires     string // last day the fact is worth recalling, when the decision came with one
+	By          string // rule, model or policy
+	Provisional bool   // keep it for a TTL instead of approving it
 }
 
 // Rules decides what code can decide and returns the candidates it left for the model.

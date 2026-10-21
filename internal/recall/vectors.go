@@ -54,7 +54,13 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 	for i := range order {
 		order[i] = i
 	}
-	sort.SliceStable(order, func(i, j int) bool { return scores[order[i]] > scores[order[j]] })
+	sort.SliceStable(order, func(i, j int) bool {
+		pi, pj := candidates[order[i]].Provisional, candidates[order[j]].Provisional
+		if pi != pj {
+			return !pi
+		}
+		return scores[order[i]] > scores[order[j]]
+	})
 	maxFacts := p.MaxFacts
 	if maxFacts <= 0 {
 		maxFacts = len(order)
@@ -107,7 +113,8 @@ func vectorCandidates(s *store.Store, prompt string, p Params, e Embedder, n int
 	}
 	out := make([]Hit, 0, len(found))
 	for _, c := range found {
-		out = append(out, Hit{Fact: c.row.Fact, Source: "vector", Meaning: c.sim})
+		out = append(out, Hit{Fact: c.row.Fact, Source: "vector", Provisional: c.row.Review == store.Provisional,
+			Meaning: c.sim})
 	}
 	return out, nil
 }

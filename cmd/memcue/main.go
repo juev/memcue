@@ -86,7 +86,8 @@ environment:
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs
-                  MEMCUE_API_URL; undecided ones stay candidates
+                  MEMCUE_API_URL; undecided ones stay candidates unless MEMCUE_VET_POLICY=auto
+  MEMCUE_VET_POLICY  auto turns an unsure candidate into a provisional fact for MEMCUE_VET_TTL_DAYS (default 14)
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes the mirrors are checked against; empty skips that rule
 `
 
@@ -305,12 +306,13 @@ type recallRecord struct {
 }
 
 type recallFact struct {
-	ID        string  `json:"id"`
-	Coverage  float64 `json:"coverage"`
-	Source    string  `json:"source,omitempty"`
-	Meaning   float64 `json:"meaning,omitempty"` // vector similarity or judge score
-	Scope     string  `json:"scope,omitempty"`
-	Displaced bool    `json:"displaced,omitempty"`
+	ID          string  `json:"id"`
+	Coverage    float64 `json:"coverage"`
+	Source      string  `json:"source,omitempty"`
+	Provisional bool    `json:"provisional,omitempty"`
+	Meaning     float64 `json:"meaning,omitempty"` // vector similarity or judge score
+	Scope       string  `json:"scope,omitempty"`
+	Displaced   bool    `json:"displaced,omitempty"`
 }
 
 // logPrompt is how much of a prompt recall.log keeps: enough to judge what the prompt was about.
@@ -333,7 +335,8 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,
-			Source: h.Source, Meaning: math.Round(h.Meaning*1000) / 1000, Scope: h.Scope, Displaced: h.Displaced})
+			Source: h.Source, Provisional: h.Provisional, Meaning: math.Round(h.Meaning*1000) / 1000,
+			Scope: h.Scope, Displaced: h.Displaced})
 		if h.Displaced {
 			rec.Displaced = true
 		}
@@ -386,8 +389,12 @@ func runRecall(args []string, out io.Writer) error {
 			if h.Scope != "" {
 				scope = " scope=" + h.Scope
 			}
-			if _, err := fmt.Fprintf(out, "%.2f %d %s%s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
-				meaning(h.Meaning), strings.Join(strings.Fields(h.Content), " ")); err != nil {
+			prov := ""
+			if h.Provisional {
+				prov = " provisional"
+			}
+			if _, err := fmt.Fprintf(out, "%.2f %d %s%s%s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
+				prov, meaning(h.Meaning), strings.Join(strings.Fields(h.Content), " ")); err != nil {
 				return err
 			}
 		}
