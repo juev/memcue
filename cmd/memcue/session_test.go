@@ -598,3 +598,57 @@ func TestExtractMessagesMinCharsLetsAFinalTailThrough(t *testing.T) {
 		t.Error("negative -min-chars accepted")
 	}
 }
+
+// Two bases on one machine get separate state directories, so a dream on one does not mark the other as dreamt.
+func TestStateDirIsKeyedByBase(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
+	t.Setenv("MEMCUE_STATE_DIR", "")
+	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "a.db"))
+	a, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "b.db"))
+	b, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b {
+		t.Fatalf("two bases share the state directory %s", a)
+	}
+	if !strings.HasPrefix(a, filepath.Join(dir, "state", "memcue")) {
+		t.Errorf("state dir %s is outside XDG_STATE_HOME", a)
+	}
+}
+
+// The default base keeps the historical path, so an existing Claude Code/DSH install loses neither offsets nor the
+// dream schedule after the upgrade.
+func TestStateDirKeepsTheDefaultBase(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
+	t.Setenv("MEMCUE_STATE_DIR", "")
+	t.Setenv("MEMCUE_FACTS", "")
+	got, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "state", "memcue"); got != want {
+		t.Errorf("default state dir = %s, want %s", got, want)
+	}
+}
+
+// An explicit directory wins, which is what a host with several bases or an unusual XDG layout needs.
+func TestStateDirHonoursOverride(t *testing.T) {
+	want := filepath.Join(t.TempDir(), "explicit")
+	t.Setenv("MEMCUE_STATE_DIR", want)
+	got, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Errorf("state dir = %s, want %s", got, want)
+	}
+}

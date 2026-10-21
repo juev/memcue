@@ -246,6 +246,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | Variable | Meaning | Default |
 |---|---|---|
 | `MEMCUE_FACTS` | the fact base | `$CLAUDE_CONFIG_DIR/memory/facts.db`, else `~/.claude/memory/facts.db` |
+| `MEMCUE_STATE_DIR` | state directory for logs, locks, the dream schedule and session offsets; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
 | `MEMCUE_MODEL` | model of the extraction and review | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
@@ -342,10 +343,14 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as candidates |
 | Candidate review and vet | binary | binary | binary |
 
-State and logs live in `$XDG_STATE_HOME/memcue` for Claude Code and in `$XDG_STATE_HOME/memcue/dsh` for DSH; Hermes
-keeps its state under `$HERMES_HOME/memcue`. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db` (or
-`~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH unless
-`facts` is configured. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the same file.
+State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
+`$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule, a vet lock or a judge
+pause. `MEMCUE_STATE_DIR` overrides the whole path. DSH keeps its extraction checkpoints in
+`$XDG_STATE_HOME/memcue/dsh`, and Hermes keeps its mirror, seen and pending files under `$HERMES_HOME/memcue`; the
+binary's logs, locks and dream schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
+(or `~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH
+unless `facts` is configured. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the
+same file.
 
 ## DeepSeek Harness
 
