@@ -9,7 +9,8 @@ memcue fact base:
   notice, whose wrapper matches facts by accident.
 - **The session card** (global rules and the decisions of the current repository) rides with the first turn and
   again after a compression, through the same `memcue session-card` call Claude Code and DSH use. It stays in the
-  conversation instead of being repeated in the system prompt; `session_card: false` turns it off.
+  conversation instead of being repeated in the system prompt; `session_card: false` turns it off. A failed card
+  is retried after five minutes, not on every turn, and reported to the log at most every ten minutes.
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.

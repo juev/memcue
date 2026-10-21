@@ -500,6 +500,8 @@ export function apply(ctx, config) {
 	let compatible = true // cleared when the binary is older than MIN_BINARY
 	const busy = new Set()
 	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
+	const warnedRecall = new Set() // a broken base must not print a warning on every step
+	const warnedCard = new Set()
 
 	ctx.systemPrompt.section({
 		name,
@@ -546,16 +548,25 @@ export function apply(ctx, config) {
 				input: JSON.stringify({ session_id: sessionId, cwd, source: cardSource }),
 				timeoutMs: HOOK_TIMEOUT_MS,
 			})
-			if (code !== 0) console.warn(`memcue: session-card exited ${code}: ${err.trim().slice(0, 500)}`)
-			else card = contextOf(out)
-			cardSources.set(sessionId, 'done')
+			if (code === 0) {
+				card = contextOf(out)
+				cardSources.set(sessionId, 'done')
+			} else if (!warnedCard.has(sessionId)) {
+				// Do not mark the card as delivered: a lock or a timeout is often transient, and the next step retries.
+				warnedCard.add(sessionId)
+				console.warn(`memcue: session-card failed for session ${sessionId}: ${err.trim().slice(0, 500)}`)
+			}
 		}
 
-		const { out } = await runMemcue(settings, ['hook'], {
+		const { code, out, err } = await runMemcue(settings, ['hook'], {
 			input: JSON.stringify({ prompt, cwd, session_id: sessionId }),
 			timeoutMs: HOOK_TIMEOUT_MS,
 		})
-		const text = contextOf(out)
+		if (code !== 0 && !warnedRecall.has(sessionId)) {
+			warnedRecall.add(sessionId)
+			console.warn(`memcue: recall failed for session ${sessionId}: ${err.trim().slice(0, 500)}`)
+		}
+		const text = code === 0 ? contextOf(out) : ''
 		if (!card && !text) return decision
 		const messages = [...decision.messages]
 		if (card) {
@@ -720,7 +731,10 @@ export function apply(ctx, config) {
 			void extractSession(session, 'turn-end', false)
 		})
 		ctx.on('session/disposed', async (session) => {
-			cardSources.delete(memcueSessionId(session.id))
+			const id = memcueSessionId(session.id)
+			cardSources.delete(id)
+			warnedRecall.delete(id)
+			warnedCard.delete(id)
 			await extractSession(session, 'session-end', true)
 		})
 	}

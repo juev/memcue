@@ -70,6 +70,7 @@ _KEEP_SEEN = 5000  # fingerprints of processed messages kept per session
 _MAX_MESSAGE = 4000  # characters of one message the extraction sees
 _TOOL_RESULT = 1500  # characters of one tool result the extraction sees; memcue cuts a RESULT to the same length
 _WARN_EVERY = 600  # seconds between two "recall failed" warnings of a session
+_CARD_RETRY = 300  # seconds before a failed session-card call is tried again
 _SHUTDOWN_GRACE = 20  # seconds shutdown waits for in-flight extractions; a pending batch survives a longer one
 _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail no later trigger will collect
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
@@ -196,6 +197,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
         self._compat: Optional[bool] = None  # the binary has the commands this provider uses
         self._warned_compat = False
+        self._warned_card: dict[str, float] = {}  # session -> when its last card failure was reported
+        self._card_retry_at = 0.0  # monotonic time before which a failed card is not asked for again
         self._stop = threading.Event()
         self._watcher: Optional[threading.Thread] = None
         self._feeds: list[threading.Thread] = []
@@ -308,6 +311,8 @@ class MemcueMemoryProvider(MemoryProvider):
             return ""
         if not self._facts or not Path(self._facts).exists():
             return ""
+        if time.monotonic() < self._card_retry_at:
+            return ""  # a lock or a timeout is often transient; do not spawn a failing process every turn
         session = (self._session_id or "").strip()
         payload: dict[str, Any] = {"cwd": self._workspace,
                                    "source": "compact" if self._generation else "startup"}
@@ -316,12 +321,15 @@ class MemcueMemoryProvider(MemoryProvider):
             payload["session_id"] = scope
         ok, out = self._run(["session-card"], stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
         if not ok or not out:
+            self._card_retry_at = time.monotonic() + _CARD_RETRY
+            self._warn_card_failure(session, out)
             return ""
         try:
             card = json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
         except (ValueError, KeyError, TypeError):
             return ""
         self._card_generation = self._generation
+        self._card_retry_at = 0.0
         return card
 
     # -- memcue calls -------------------------------------------------------
@@ -390,6 +398,14 @@ class MemcueMemoryProvider(MemoryProvider):
         if now - self._warned.get(session, 0.0) >= _WARN_EVERY:
             self._warned[session] = now
             logger.warning("memcue recall failed (session %s): %s", session or "-", reason)
+
+    def _warn_card_failure(self, session: str, reason: str) -> None:
+        """A failed card is a missing set of rules, not a broken turn: say it once every ten minutes instead of on
+        every prefetch, and retry it after _CARD_RETRY."""
+        now = time.monotonic()
+        if now - self._warned_card.get(session, 0.0) >= _WARN_EVERY:
+            self._warned_card[session] = now
+            logger.warning("memcue session card failed (session %s): %s", session or "-", reason)
 
     def _keep_useful_lines(self, text: str) -> list[str]:
         """Drop facts that only repeat the built-in memory block: those notes ride with every turn anyway, and a
