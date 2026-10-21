@@ -32,8 +32,8 @@ memcue fact base:
   also survives compression rewriting the message list. Tool output goes too, cut to
   `extract_tool_result_chars` (1500 characters, the same cut memcue applies to a `RESULT` block): a fact sourced from
   a tool can quote its evidence only from tool output, and the write policy drops such a fact without the quote. Each
-  run is a line in memcue's `extract.log`
-  (`$XDG_STATE_HOME/memcue`, by default `~/.local/state/memcue`).
+  run is a line in memcue's `extract.log`, in the binary's state directory: `$XDG_STATE_HOME/memcue/<hash>` for the
+  Hermes base (a non-default base gets its own subdirectory), or `MEMCUE_STATE_DIR` when set.
 
 ## Review and vet
 
@@ -105,7 +105,8 @@ MEMCUE_BIN="$HERMES_HOME/bin/memcue" python3 "$HERMES_HOME/plugins/memcue/tests/
 By default the base is `$HERMES_HOME/memcue/facts.db`, inside Hermes' home, so `hermes backup` covers it. Set
 `memory.memcue.facts` (or `MEMCUE_FACTS` in Hermes' environment) to use another file, for example one shared with
 Claude Code. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
-repository that holds it.
+repository that holds it. The binary's logs, locks and dream schedule follow the base: the default Hermes base gets
+its own `$XDG_STATE_HOME/memcue/<hash>` directory, so it does not share a dream clock with a Claude Code/DSH base.
 
 Entries written to `MEMORY.md`/`USER.md` before the provider was switched on are not copied. Add the ones worth
 keeping with `memcue add`, or let the agent do it with `memcue_add`.

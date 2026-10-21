@@ -26,3 +26,16 @@ test('the README compatibility table names the same release', async () => {
 	assert.match(readme, /\| 0\.4\.0 \| 4 \| 0\.4\.0 \| 0\.4\.0 /)
 	assert.match(readme, /0\.4\.0 \(`hermes-agent` 0\.15\.2\)/)
 })
+
+test('the README describes the per-base state and the Hermes card', async () => {
+	const readme = await readFile(new URL('README.md', root), 'utf8')
+	assert.match(readme, /MEMCUE_STATE_DIR/)
+	assert.match(readme, /per-base subdirectory/)
+	assert.match(readme, /first turn and after compression/)
+	assert.ok(!readme.includes('version 0.1'), 'README still says version 0.1')
+	assert.ok(!readme.includes('no separate card'), 'README still says Hermes has no card')
+
+	const hermes = await readFile(new URL('plugins/hermes/README.md', root), 'utf8')
+	assert.match(hermes, /session_card/)
+	assert.match(hermes, /session card/i)
+})

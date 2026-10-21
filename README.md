@@ -26,7 +26,7 @@ The base can live in a git repository and be synced between machines; memcue shi
 base works for [Hermes Agent](plugins/hermes/README.md) and for
 [DeepSeek Harness](plugins/deepseek-harness/README.md).
 
-memcue is young: version 0.1 has been measured on one developer's memory and sessions (see [Results](#results)) and
+memcue is young: the 0.4 line has been measured on one developer's memory and sessions (see [Results](#results)) and
 not yet run for long in daily work.
 
 ## Requirements
@@ -140,9 +140,9 @@ memcue audit -apply audit.json             # carry out the retire decisions afte
 
 `memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
 evidence, origin and date; filters by kind and source; approves or rejects several at once; and undoes the last
-action. Rejecting retires the fact and writes `rejected in review` to `$XDG_STATE_HOME/memcue/review.log`; an
-approval is logged there too. The page has no external assets and works offline. `-addr` must stay a loopback
-address, and `-no-open` only prints the URL.
+action. Rejecting retires the fact and writes `rejected in review` to `review.log` in the state directory
+(`$XDG_STATE_HOME/memcue` for the default base); an approval is logged there too. The page has no external assets and
+works offline. `-addr` must stay a loopback address, and `-no-open` only prints the URL.
 
 `memcue add` and `memcue correct` refuse text that looks like a token or a password; `-force` stores it anyway.
 `migrate` and `import` skip such facts and report them without echoing the value, because the base may be synced
@@ -161,9 +161,9 @@ an approval. A failed or empty answer does not: `vet` never turns a call that di
 so the candidate waits for the next run. A provisional fact is recalled after approved
 facts, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
 `MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue, and `-no-model` keeps
-every candidate the rules cannot decide in that queue as well. Every verdict goes to
-`$XDG_STATE_HOME/memcue/vet.log` with the rule or model and its reason; the page, the `approve` command and the
-page's undo (`store.Reopen`) stay the manual way, unchanged.
+every candidate the rules cannot decide in that queue as well. Every verdict goes to `vet.log` in the state
+directory with the rule or model and its reason; the page, the `approve` command and the page's undo (`store.Reopen`)
+stay the manual way, unchanged.
 
 The review runs on the main model. With `MEMCUE_VET=1` the facts a session just stored are reviewed in the
 extraction process, after storing them and before the dream; that process is already detached from the session, so a
