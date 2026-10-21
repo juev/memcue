@@ -207,13 +207,10 @@ function promptOf(messages) {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i]
 		if (message?.role !== 'user') continue
-		if (message.source?.kind !== 'user') continue // runtime context, recall and other injected messages are not the prompt
-		const text = textOfMessage(message).trim()
-		if (text) return text
-	}
-	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const message = messages[i]
-		if (message?.role !== 'user' || message.source?.form) continue
+		const source = message.source
+		// Only a direct human prompt has kind "user" and no context form. Runtime snapshots,
+		// recall, goal rounds, schedules and compaction checkpoints carry another kind or a form.
+		if (source?.kind !== 'user' || source.form) continue
 		const text = textOfMessage(message).trim()
 		if (text) return text
 	}
@@ -292,7 +289,10 @@ function messagesSince(session, from, settings) {
 		const event = session.eventAt(seq)
 		if (!event) continue
 		if (event.type === 'user/message') {
-			if (event.data?.source?.form) continue // injected context (runtime snapshot, recall) is not the user's words
+			const source = event.data?.source
+			// Only a direct human prompt has kind "user" and no context form. Compaction
+			// checkpoints, schedules, goal rounds and injected contexts are not the user's words.
+			if (source?.kind !== 'user' || source.form) continue
 			const text = textOfMessage(event.data).trim()
 			if (text) messages.push({ role: 'user', content: text })
 		} else if (event.type === 'assistant/message') {
@@ -352,6 +352,9 @@ export function apply(ctx, config) {
 	if (settings.extract) {
 		ctx.on('session/event', (session, event) => {
 			if (event?.type !== 'turn/end') return
+			// A subagent conversation is derived from the parent's work; extracting it duplicates the
+			// parent's facts and spends a model call on a transcript nobody asked to remember.
+			if (session.header?.origin === 'subagent') return
 			const sessionId = String(session.id)
 			if (busy.has(sessionId)) return
 			busy.add(sessionId)
@@ -361,7 +364,9 @@ export function apply(ctx, config) {
 					const state = await readState(path)
 					let batch = state.pending
 					if (!batch) {
-						const messages = messagesSince(session, state.seq, settings)
+						// A forked session carries the parent's prefix; it was already extracted there.
+						const from = state.seq > 0 ? state.seq : (session.inheritedEventCount ?? 0)
+						const messages = messagesSince(session, from, settings)
 						const chars = messages.reduce((total, message) => total + message.content.length, 0)
 						if (messages.length === 0 || chars < settings.minNewChars) return
 						// Persist the batch before the model call. A crash after this point retries the
