@@ -700,6 +700,8 @@ export function apply(ctx, config) {
 			keywords: { type: 'string', description: 'Comma-separated words someone would ask with, synonyms included.' },
 			origin: { type: 'string', description: 'Where the fact was learnt. Defaults to the repository of the session workspace and today.' },
 			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD (for a one-off reminder).' },
+			kind: { type: 'string', description: 'Optional: rule, decision, pitfall or environment. A rule the user stated belongs on the session card.' },
+			scope: { type: 'string', description: 'Optional: global, host:<name>, repo:<name> or service:<name>. Use global for a rule of every project.' },
 		},
 		output: factResult,
 		async execute(args, exec) {
@@ -709,6 +711,8 @@ export function apply(ctx, config) {
 			if (args.origin) flags.push('-origin', String(args.origin))
 			if (args.keywords) flags.push('-keywords', String(args.keywords))
 			if (args.expires) flags.push('-expires', String(args.expires))
+			if (args.kind) flags.push('-kind', String(args.kind))
+			if (args.scope) flags.push('-scope', String(args.scope))
 			flags.push('--', text)
 			const { code, out, err } = await runMemcue(settings, flags, { timeoutMs: 15_000 })
 			if (code !== 0) return { stored: false, message: `memcue add exited ${code}: ${(err || out).trim().slice(0, 500)}` }

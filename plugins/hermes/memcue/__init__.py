@@ -123,7 +123,9 @@ ADD_SCHEMA = _schema(
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
     {"content": "The fact.", "keywords": "Comma-separated words someone would ask with, synonyms included.",
      "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
-                "omit for a fact that stays true."},
+                "omit for a fact that stays true.",
+     "kind": "Optional: rule, decision, pitfall or environment. A rule the user stated belongs on the session card.",
+     "scope": "Optional: global, host:<name>, repo:<name> or service:<name>. Use global for a rule of every project."},
     ["content"])
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",
@@ -797,6 +799,10 @@ class MemcueMemoryProvider(MemoryProvider):
                 cmd += ["-keywords", arg("keywords")]
             if arg("expires"):
                 cmd += ["-expires", arg("expires")]
+            if arg("kind"):
+                cmd += ["-kind", arg("kind")]
+            if arg("scope"):
+                cmd += ["-scope", arg("scope")]
             ok, out = self._run(cmd + ["--", arg("content")])
         elif tool_name == "memcue_correct":
             if not arg("id") or not arg("content"):

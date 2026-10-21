@@ -21,6 +21,10 @@ memcue add -keywords "word1, word2, синоним" -origin "<repository> <YYYY-
 - Only what the user said or a command confirmed; no guesses.
 - Keywords: 3–8 words someone would ask with, including synonyms and the other language.
 - Origin: the repository directory name and today's date.
+- Session card: add `-kind rule -scope global` for a rule the user stated for every project, and
+  `-kind decision -scope repo:<name>` for a choice of this repository. The card carries exactly these two combinations,
+  newest first, so a durable rule or decision reaches the agent even when a prompt shares no word with it.
+- Other values: `-kind pitfall` or `-kind environment`; `-scope host:<name>` or `-scope service:<name>`.
 
 ## Correct or forget
 

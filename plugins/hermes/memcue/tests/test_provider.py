@@ -316,6 +316,15 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {})))
         self.assertIn("error", json.loads(self.p.handle_tool_call("nope", {})))
 
+    def test_add_carries_kind_and_scope(self):
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Всегда отвечай пользователю по-русски.",
+            "kind": "rule", "scope": "global"}))
+        fact_id = added["result"].split()[0]
+        line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
+        self.assertIn("kind=rule", line)
+        self.assertIn("scope=global", line)
+
     def test_search_returns_facts_with_ids(self):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера.",
