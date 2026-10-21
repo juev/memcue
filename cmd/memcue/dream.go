@@ -398,11 +398,26 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 		return rec, err
 	}
 	defer func() { _ = s.Close() }()
-	active, err := s.Active()
-	if err != nil {
-		return rec, err
+	// The snapshot must name every fact of the plan, including provisional and retired ones: store.Active leaves
+	// provisional facts out, and a group with a provisional neighbour would otherwise look changed and be refused
+	// although nothing happened since the dry run.
+	now := make(map[string]int)
+	for _, g := range plan.Groups {
+		for id := range g.Facts {
+			if _, ok := now[id]; ok {
+				continue
+			}
+			f, err := s.Get(id)
+			if errors.Is(err, store.ErrNotFound) {
+				now[id] = 0
+				continue
+			}
+			if err != nil {
+				return rec, err
+			}
+			now[id] = f.Version
+		}
 	}
-	now := versions(active)
 	saw := maps.Clone(plan.Seen)
 	for _, g := range plan.Groups {
 		changed := ""
