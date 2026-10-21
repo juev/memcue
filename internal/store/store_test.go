@@ -377,6 +377,32 @@ func TestApproveTakesACandidateIntoRecall(t *testing.T) {
 	}
 }
 
+func TestRetireCandidateRefusesAnApprovedFact(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "x", "", Meta{Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Approve(f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RetireCandidate(f.ID); !errors.Is(err, ErrNotCandidate) {
+		t.Errorf("retiring an approved fact: %v", err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil || got.Status != Active || got.Review != "" || got.Version != 2 {
+		t.Errorf("a refused candidate retirement changed the fact: %+v %v", got, err)
+	}
+	cand, err := s.AddWith("Другой кандидат.", nil, "", "", Meta{Review: Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ret, err := s.RetireCandidate(cand.ID)
+	if err != nil || ret.Status != Retired || ret.Version != 2 {
+		t.Errorf("retiring a candidate: %+v %v", ret, err)
+	}
+}
+
 func TestApproveRefusesWhatIsNotACandidate(t *testing.T) {
 	s, _ := open(t)
 	act, _ := s.Add("Активный факт.", nil, "")

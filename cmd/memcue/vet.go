@@ -25,6 +25,9 @@ import (
 // answer, and a failed call costs a batch, not the queue.
 const vetBatch = 12
 
+// errVetBusy means another vet run holds stateDir/vet.lock.
+var errVetBusy = errors.New("another vet run is in progress")
+
 // vetJudgeParallel is how many candidates the duplicate judge asks about at once. Each call carries the whole base, so
 // the limit is the endpoint's queue, not the network.
 const vetJudgeParallel = 4
@@ -123,9 +126,14 @@ func runVet(args []string, out io.Writer) error {
 	if fs.NArg() != 0 {
 		return errors.New("usage: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]")
 	}
+	lock, err := acquireVetLock()
+	if err != nil {
+		return err
+	}
+	defer releaseVetLock(lock)
 	var lines []vetLine
 	var rec vetRecord
-	err := withStore(func(s *store.Store) error {
+	err = withStore(func(s *store.Store) error {
 		cands, err := s.Candidates()
 		if err != nil {
 			return err
@@ -362,7 +370,7 @@ func applyVet(s *store.Store, d vet.Decision, decision string) string {
 	case vet.Keep:
 		_, err = s.ApproveExpiring(d.Fact.ID, d.Expires)
 	case vet.Drop:
-		_, err = s.Retire(d.Fact.ID)
+		_, err = s.RetireCandidate(d.Fact.ID)
 	default:
 		return decision
 	}
@@ -502,6 +510,32 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 	return err
 }
 
+// acquireVetLock takes the stateDir/vet.lock without waiting. Both the manual command and maybeVet use it, so a
+// stale decision from one process cannot overlap a decision from another.
+func acquireVetLock() (*os.File, error) {
+	dir, err := stateDir()
+	if err != nil {
+		return nil, err
+	}
+	lock, err := os.OpenFile(filepath.Join(dir, "vet.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = lock.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errVetBusy
+		}
+		return nil, fmt.Errorf("vet lock: %w", err)
+	}
+	return lock, nil
+}
+
+func releaseVetLock(lock *os.File) {
+	_ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	_ = lock.Close()
+}
+
 // logVet appends the decisions and the summary to vet.log. The log is the record a human checks the automatic
 // decisions by, so a failure to write it is reported rather than swallowed.
 func logVet(lines []vetLine, rec vetRecord) error {
@@ -528,19 +562,11 @@ func maybeVet(ids []string) {
 	if os.Getenv("MEMCUE_VET") != "1" || len(ids) == 0 || !extract.ReviewOn() {
 		return
 	}
-	dir, err := stateDir()
+	lock, err := acquireVetLock()
 	if err != nil {
-		return
-	}
-	lock, err := os.OpenFile(filepath.Join(dir, "vet.lock"), os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return
-	}
-	defer func() { _ = lock.Close() }()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		return // another run is deciding this queue
 	}
-	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) }()
+	defer releaseVetLock(lock)
 
 	s, err := store.Open(factsPath())
 	if err != nil {
