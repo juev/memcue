@@ -647,6 +647,27 @@ func TestVetJudgeChunksABaseAboveTheCap(t *testing.T) {
 	}
 }
 
+func TestVetBaseReadFailureIsAnError(t *testing.T) {
+	env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.AddWith("20 октября 2026 обновили demo.", nil, "x 2026-10-20", "",
+		store.Meta{Review: store.Candidate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	_, rec := vetQueue(s, []store.Fact{f}, vetOptions{}) // Active() on the closed base
+	if rec.Error == "" {
+		t.Fatal("the base read error was not recorded")
+	}
+	if err := vetFailure(rec); err == nil || !strings.Contains(err.Error(), rec.Error) {
+		t.Errorf("exit error %v, want the base error %q", err, rec.Error)
+	}
+}
+
 func TestDuplicateChunks(t *testing.T) {
 	base := []extract.JudgeFact{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}, {ID: "5"}}
 	got := duplicateChunks(base, 2)
