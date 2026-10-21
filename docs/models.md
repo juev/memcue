@@ -157,7 +157,9 @@ the rerank-gate issue.
 - Implement the combined candidate flow and environment contract (this decision's issue).
 - Fix the hard ticket/coverage gate for the combined path (existing rerank-gate issue).
 - Fix the failed-write and concurrency problems in `vet` before enabling auto-vet.
-- A/B the main model as the reranker, to test whether the judge can be removed later.
+- ~~A/B the main model as the reranker.~~ Measured 2026-10-21: the main model is 4 useful top-1
+  prompts behind Jev (108 vs 112 on 176 prompts) and about five times slower, despite labelling the
+  sample; keep the judge. See [main-reranker-2026-10.md](research/main-reranker-2026-10.md).
 - Decide whether vector candidates are added on every prompt or only on lexical misses; the
   pilot used every prompt, which is the measured 129/180 mode.
 - Measure the chunked duplicate precision and cost on the full 2.6k base, not only the 41-candidate sample.
