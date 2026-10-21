@@ -21,7 +21,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
@@ -133,6 +133,7 @@ function settingsOf(config) {
 	return {
 		binary: expandHome(textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary)) || DEFAULTS.binary,
 		facts,
+		factsKey: resolve(facts || defaultFacts()),
 		extract: flagOf(raw.extract, 'extract', DEFAULTS.extract),
 		minNewChars: countOf(raw.minNewChars, 'minNewChars', DEFAULTS.minNewChars, 0),
 		stateDir,
@@ -148,6 +149,12 @@ function settingsOf(config) {
 function defaultStateDir() {
 	const base = process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state')
 	return join(base, 'memcue', 'dsh')
+}
+
+/** The base memcue uses when `facts` is not configured: its own default, resolved the way the binary resolves it. */
+function defaultFacts() {
+	const claude = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+	return join(claude, 'memory', 'facts.db')
 }
 
 /**
@@ -361,9 +368,10 @@ async function readState(path) {
 			pending: pendingOf(parsed?.pending),
 			legacy: !hasSeen && Number.isInteger(parsed?.seq),
 			cwd: typeof parsed?.cwd === 'string' ? parsed.cwd : '',
+			base: typeof parsed?.base === 'string' ? parsed.base : '',
 		}
 	} catch {
-		return { seen: {}, pending: null, legacy: false, cwd: '' }
+		return { seen: {}, pending: null, legacy: false, cwd: '', base: '' }
 	}
 }
 
@@ -531,13 +539,20 @@ export function apply(ctx, config) {
 			try {
 				const path = statePathFor(settings, sessionId)
 				const state = await readState(path)
+				if (state.base && state.base !== settings.factsKey) {
+					// The checkpoint belongs to another base: its fingerprints would hide messages from this one, and
+					// its pending batch would be stored here. Start the session again for the new base.
+					console.warn(`memcue: session checkpoint ${path} belongs to ${state.base}; starting fresh for ${settings.factsKey}`)
+					state.seen = {}
+					state.pending = null
+				}
 				let batch = state.pending
 				if (state.legacy) {
 					const entries = messagesFromSession(session, settings)
 					if (!batch) {
 						// The old state was an event offset, unusable without the deprecated event reader.
 						// Mark the current history seen instead of extracting it a second time.
-						await writeState(path, { seen: capSeen(countEntries(entries)), pending: null, cwd })
+						await writeState(path, { seen: capSeen(countEntries(entries)), pending: null, cwd, base: settings.factsKey })
 						return
 					}
 					// Keep the pending batch and seed the rest of the current history as seen, so the
@@ -552,7 +567,7 @@ export function apply(ctx, config) {
 						seed[entry.fingerprint] = (seed[entry.fingerprint] ?? 0) + 1
 					}
 					state.seen = seed
-					await writeState(path, { seen: seed, pending: batch, cwd })
+					await writeState(path, { seen: seed, pending: batch, cwd, base: settings.factsKey })
 				}
 				if (!batch) {
 					const entries = messagesFromSession(session, settings)
@@ -568,7 +583,7 @@ export function apply(ctx, config) {
 						messages: fresh.map((entry) => entry.message),
 						fingerprints: fresh.map((entry) => entry.fingerprint),
 					}
-					await writeState(path, { seen: state.seen, pending: batch, cwd })
+					await writeState(path, { seen: state.seen, pending: batch, cwd, base: settings.factsKey })
 				}
 				const { code, err } = await runMemcue(settings, [
 					'extract-messages',
@@ -586,7 +601,7 @@ export function apply(ctx, config) {
 				}
 				const seen = { ...state.seen }
 				for (const fingerprint of batch.fingerprints) seen[fingerprint] = (seen[fingerprint] ?? 0) + 1
-				await writeState(path, { seen: capSeen(seen), pending: null, cwd })
+				await writeState(path, { seen: capSeen(seen), pending: null, cwd, base: settings.factsKey })
 			} catch (error) {
 				console.warn(`memcue: extraction failed: ${String(error)}`)
 			} finally {
@@ -610,6 +625,16 @@ export function apply(ctx, config) {
 				if (busy.has(sessionId)) continue
 				const path = join(settings.stateDir, name)
 				const state = await readState(path)
+				if (state.base && state.base !== settings.factsKey) {
+					// A batch saved for another base: it must not be stored into this one. The file is cleared so the
+					// next load does not look at it again; a failure here only means the next load tries once more.
+					try {
+						await writeState(path, { seen: {}, pending: null, cwd: state.cwd, base: settings.factsKey })
+					} catch (error) {
+						console.warn(`memcue: could not clear the checkpoint of ${sessionId}: ${String(error)}`)
+					}
+					continue
+				}
 				if (!state.pending) continue
 				busy.add(sessionId)
 				try {
@@ -627,7 +652,7 @@ export function apply(ctx, config) {
 					}
 					const seen = { ...state.seen }
 					for (const fingerprint of state.pending.fingerprints) seen[fingerprint] = (seen[fingerprint] ?? 0) + 1
-					await writeState(path, { seen: capSeen(seen), pending: null, cwd })
+					await writeState(path, { seen: capSeen(seen), pending: null, cwd, base: settings.factsKey })
 				} catch (error) {
 					console.warn(`memcue: retry of ${sessionId} failed: ${String(error)}`)
 				} finally {
@@ -635,7 +660,7 @@ export function apply(ctx, config) {
 				}
 			}
 		}
-		void retryPending()
+		void retryPending().catch((error) => console.warn(`memcue: retry of saved batches failed: ${String(error)}`))
 
 		ctx.on('session/event', (session, event) => {
 			if (event?.type !== 'turn/end') return

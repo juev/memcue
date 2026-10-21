@@ -116,6 +116,8 @@ A configured field wins over the environment.
 - `extract` — `false` turns session extraction off (default `true`).
 - `minNewChars` — new text a turn must add before extraction runs (default `2000`).
 - `stateDir` — where this plugin keeps per-session extraction checkpoints (default `$XDG_STATE_HOME/memcue/dsh`).
+  A checkpoint records the base it was written for; pointing `facts` at another base starts that session fresh and
+  says so, instead of hiding its messages or retrying a batch into the wrong base.
 - `searchLimit` — default for `memcue_search` (default `5`).
 - `maxToolResultChars` — how much of one tool result goes to extraction (default `1500`). Tool output is kept on
   purpose: a fact sourced from a tool can only quote its evidence from a `RESULT` block, and memcue's write policy

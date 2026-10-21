@@ -110,6 +110,9 @@ Claude Code. A leading `~/` or `$HOME/` is expanded; the path must be absolute, 
 than one per process working directory. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
 repository that holds it. The binary's logs, locks and dream schedule follow the base: the default Hermes base gets
 its own `$XDG_STATE_HOME/memcue/<hash>` directory, so it does not share a dream clock with a Claude Code/DSH base.
+The provider's own state (seen fingerprints, pending batches, the `written.json` mirror map) names the base in a
+`base` file: changing `facts` drops that state for the old base and starts the new one fresh, with a warning in the
+log.
 
 Entries written to `MEMORY.md`/`USER.md` before the provider was switched on are not copied. Add the ones worth
 keeping with `memcue add`, or let the agent do it with `memcue_add`.
