@@ -742,6 +742,35 @@ func TestOpeningAnOldBaseRebuildsTicketStems(t *testing.T) {
 	}
 }
 
+// A base already at the current schema still gets an additive index: a new index must reach existing installations,
+// not only a fresh file. This is the regression from #151, where facts_created was created only by migrate().
+func TestOpeningACurrentBaseAddsMissingIndexes(t *testing.T) {
+	s, path := open(t)
+	if _, err := s.db.Exec(`DROP INDEX facts_created`); err != nil {
+		t.Fatal(err)
+	}
+	var version int
+	if err := s.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
+		t.Fatalf("setup: schema %d, want %d (%v)", version, schemaVersion, err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	var n int
+	if err := s.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'facts_created'`).
+		Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("facts_created after reopening a current base: %d, want 1", n)
+	}
+}
+
 // A version-3 base has no fact_vectors; opening it must create the table and leave it usable.
 func TestOpeningAVersion3BaseCreatesFactVectors(t *testing.T) {
 	s, path := open(t)

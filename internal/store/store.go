@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS facts (
 	prompt_version INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS facts_created ON facts(created);
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
 CREATE VIRTUAL TABLE IF NOT EXISTS fact_fts USING fts5(stems, content='fact_index', content_rowid='rid',
 	tokenize='unicode61 remove_diacritics 0');
@@ -67,6 +66,12 @@ CREATE TABLE IF NOT EXISTS fact_vectors (
 	vec       BLOB NOT NULL,
 	PRIMARY KEY (id, tag)
 ) WITHOUT ROWID;
+`
+
+// indexDDL holds the add-only indexes. Open runs it on every base, not only when the schema version changes, so a
+// base created by an older memcue gets an index added without a version bump and without a full Rebuild.
+const indexDDL = `
+CREATE INDEX IF NOT EXISTS facts_created ON facts(created);
 `
 
 // Status of a fact version.
@@ -161,6 +166,10 @@ func Open(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := s.ensureIndexes(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := s.ensureIndex(); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -251,6 +260,13 @@ func (s *Store) ensureColumns() error {
 		}
 	}
 	return nil
+}
+
+// ensureIndexes adds the indexes an older base may lack. Every statement is idempotent, so this runs on each Open;
+// it deliberately does not depend on the schema version, which only changes when the table layout or the stems do.
+func (s *Store) ensureIndexes() error {
+	_, err := s.db.Exec(indexDDL)
+	return err
 }
 
 // ensureIndex repairs an index that no longer matches the active facts. The index is derived and the only thing
