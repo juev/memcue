@@ -8,6 +8,12 @@ data.
 Labelling was done blind by separate Claude agents, not by people: each got the transcript or the prompt and the
 candidate facts without knowing which system produced them, and labelled every fact against the source.
 
+**One limit of this file.** Every pair labelled here was proposed by the lexical reader, so these numbers say how good
+that reader is and cannot say whether another reader is better — a semantic reader can only keep or lose these wins.
+Comparing readers needs a pool that all of them propose into; that experiment is in
+[gold-set-2026-10.md](research/gold-set-2026-10.md), and it is the one that changed the design (the words choose the
+candidates, a judge orders them).
+
 ## Recall: what reaches the agent
 
 **Setup.** The starting point was Claude Code's built-in memory of one user: 312 notes in files, indexed by
