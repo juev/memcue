@@ -66,6 +66,7 @@ commands:
 
 environment:
   MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
+  MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base
   MEMCUE_MODEL    model of the extraction (default claude-opus-5-5)
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_API_KEY  key for MEMCUE_API_URL

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -235,19 +237,48 @@ func validSession(id string) bool {
 	return reSession.MatchString(id) && id != "." && id != ".."
 }
 
-// stateDir holds the read offsets of sessions and the extraction log: $XDG_STATE_HOME/memcue or
-// ~/.local/state/memcue. Not a cache: losing an offset means extracting a session again.
+// stateDir holds the read offsets of sessions and the extraction log. It is not a cache: losing an offset means
+// extracting a session again. MEMCUE_STATE_DIR wins; otherwise the default base keeps the historical
+// $XDG_STATE_HOME/memcue, and any other base gets a subdirectory named after its absolute path. Two bases on one
+// machine must not share a dream schedule, a vet lock or a judge pause.
 func stateDir() (string, error) {
-	base := os.Getenv("XDG_STATE_HOME")
-	if base == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
+	dir := strings.TrimSpace(os.Getenv("MEMCUE_STATE_DIR"))
+	if dir == "" {
+		base := os.Getenv("XDG_STATE_HOME")
+		if base == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return "", err
+			}
+			base = filepath.Join(home, ".local", "state")
 		}
-		base = filepath.Join(home, ".local", "state")
+		dir = filepath.Join(base, "memcue")
+		if !isDefaultBase() {
+			dir = filepath.Join(dir, baseKey(factsPath()))
+		}
 	}
-	dir := filepath.Join(base, "memcue")
 	return dir, os.MkdirAll(filepath.Join(dir, "sessions"), 0o700)
+}
+
+// isDefaultBase says whether the active base is memcue's own default. That base keeps the pre-0.5 state directory,
+// so an existing Claude Code or DSH install does not lose its session offsets or its dream schedule.
+func isDefaultBase() bool {
+	base, err := filepath.Abs(factsPath())
+	if err != nil {
+		return false
+	}
+	def, err := filepath.Abs(filepath.Join(claudeDir(), "memory", "facts.db"))
+	return err == nil && base == def
+}
+
+// baseKey names a state subdirectory for a base path: 12 hex characters of SHA-256 are enough to separate the bases
+// on one machine and keep the directory readable.
+func baseKey(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	sum := sha256.Sum256([]byte(path))
+	return hex.EncodeToString(sum[:6])
 }
 
 // extractRecord is one line of extract.log, the record the pilot is judged by.

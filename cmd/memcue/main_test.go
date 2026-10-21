@@ -19,6 +19,8 @@ func env(t *testing.T) string {
 	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "facts.db"))
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	// The tests pin the historical layout; the per-base subdirectory has its own test.
+	t.Setenv("MEMCUE_STATE_DIR", filepath.Join(dir, "state", "memcue"))
 	return dir
 }
 
