@@ -541,6 +541,40 @@ class MemcueMemoryProvider(MemoryProvider):
         self._generation += 1  # the context loses the facts it got: they may come once more
         return ""
 
+    def on_session_switch(self, new_session_id: str, *, parent_session_id: str = "", reset: bool = False,
+                          rewound: bool = False, **kwargs) -> None:
+        """Rebind when Hermes rotates the session id without teardown (/new, /reset, /branch, /resume).
+
+        The manager calls on_session_end(old) first, then this hook. Keeping the old _session_id would make the
+        next pre-compress and session-end flush the wrong session; reset must also drop per-session buffers.
+        """
+        if not new_session_id:
+            return
+        previous = self._session_id
+        self._session_id = new_session_id
+        if previous != new_session_id:
+            self._generation = 0
+        if reset:
+            with self._pending_lock:
+                for session in (previous, new_session_id):
+                    self._pending.pop(session, None)
+                    self._inflight.pop(session, None)
+            for session in (previous, new_session_id):
+                self._delivered.pop(session, None)
+                self._warned.pop(session, None)
+            self._generation = 0
+        if rewound:
+            with self._pending_lock:
+                self._pending.pop(new_session_id, None)
+                self._inflight.pop(new_session_id, None)
+            self._delivered.pop(new_session_id, None)
+            self._warned.pop(new_session_id, None)
+            try:
+                self._seen_path(new_session_id).unlink(missing_ok=True)
+            except OSError as e:
+                logger.warning("memcue could not reset the seen file of %s: %s", new_session_id, e)
+            self._generation += 1
+
     def shutdown(self) -> None:
         """Stop the pause watcher and send what the turns gathered, so a gateway restart loses nothing."""
         self._stop.set()
