@@ -706,10 +706,12 @@ test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
 		text: 'A new fact.',
 		keywords: 'new, fact',
 		expires: '2026-10-21',
+		kind: 'rule',
+		scope: 'global',
 	}, exec)
 	assert.equal(result.stored, true)
 	const text = await waitForLog('arg: add ')
-	assert.match(text, /arg: add -source agent -cwd \/repo\/demo -keywords new, fact -expires 2026-10-21 -- A new fact\./)
+	assert.match(text, /arg: add -source agent -cwd \/repo\/demo -keywords new, fact -expires 2026-10-21 -kind rule -scope global -- A new fact\./)
 })
 
 test('memcue_add stores a fact that starts with a dash', async () => {

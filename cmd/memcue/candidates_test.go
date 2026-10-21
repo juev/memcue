@@ -115,3 +115,34 @@ func TestImportUsesTheReviewFlag(t *testing.T) {
 		t.Errorf("candidates %+v", candidates)
 	}
 }
+
+// kind and scope are what put a fact on the session card, so add rejects values the card cannot use.
+func TestAddValidatesKindAndScope(t *testing.T) {
+	env(t)
+	for _, args := range [][]string{
+		{"-kind", "event", "x"},
+		{"-scope", "planet", "x"},
+		{"-scope", "host:", "x"},
+		{"-scope", "repo:a b", "x"},
+	} {
+		if err := runAdd(args, &bytes.Buffer{}); err == nil {
+			t.Errorf("add accepted %v", args)
+		}
+	}
+	var out bytes.Buffer
+	if err := runAdd([]string{"-kind", "rule", "-scope", "global", "Всегда отвечай по-русски."}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Get(strings.TrimSpace(out.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Kind != "rule" || f.Scope != "global" {
+		t.Errorf("stored %+v", f)
+	}
+}

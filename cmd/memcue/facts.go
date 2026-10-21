@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,6 +34,24 @@ func splitKeywords(s string) []string {
 		}
 	}
 	return out
+}
+
+var (
+	// kinds are the fact kinds the base understands; the card uses rule and decision.
+	kinds = map[string]bool{"rule": true, "decision": true, "pitfall": true, "environment": true}
+	// reScope is where a fact holds: global, or a named host, repository or service.
+	reScope = regexp.MustCompile(`^(global|host:[^ ]+|repo:[^ ]+|service:[^ ]+)$`)
+)
+
+// validKindScope checks the values a caller may pass to add. An empty value means "not stated" and is allowed.
+func validKindScope(kind, scope string) error {
+	if kind != "" && !kinds[kind] {
+		return fmt.Errorf("add: unknown -kind %q; use rule, decision, pitfall or environment", kind)
+	}
+	if scope != "" && !reScope.MatchString(scope) {
+		return fmt.Errorf("add: -scope %q must be global, host:<name>, repo:<name> or service:<name>", scope)
+	}
+	return nil
 }
 
 // hasSecret says whether a fact's text or keywords looks like a credential. Extraction applies the same policy; this
@@ -66,6 +85,9 @@ func runAdd(args []string, out io.Writer) error {
 	}
 	if !sources[*source] {
 		return fmt.Errorf("add: unknown -source %q", *source)
+	}
+	if err := validKindScope(*kind, *scope); err != nil {
+		return err
 	}
 	content, keywordsList := strings.Join(fs.Args(), " "), splitKeywords(*keywords)
 	if !*force && hasSecret(content, keywordsList) {
