@@ -302,12 +302,13 @@ func runMerge(args []string, out io.Writer) error {
 	return err
 }
 
-// runDump is git's textconv: memcue dump FILE.
+// runDump is git's textconv: memcue dump FILE. It opens the base read-only: a diff of a historical file must not
+// migrate it, change its mode or rebuild its index.
 func runDump(args []string, out io.Writer) error {
 	if len(args) != 1 {
 		return errors.New("usage: memcue dump FILE")
 	}
-	s, err := store.Open(args[0])
+	s, err := store.OpenReadOnly(args[0])
 	if err != nil {
 		return err
 	}

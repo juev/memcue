@@ -180,15 +180,58 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
+// OpenReadOnly opens an existing base for reading without creating it, tightening its mode, migrating it or
+// rebuilding its index. It is for the git textconv: a historical file must not be changed by a diff. A missing file,
+// a file that is not a memcue base, and a base from a newer memcue are errors. An older base is read as it is, so a
+// command that needs columns added later may still fail on it.
+func OpenReadOnly(path string) (*Store, error) {
+	dsn, _, err := readOnlyDataSource(path)
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+	var version int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("open %s read-only: %w", path, err)
+	}
+	if version == 0 {
+		_ = db.Close()
+		return nil, fmt.Errorf("%s is not a memcue fact base", path)
+	}
+	if version > schemaVersion {
+		_ = db.Close()
+		return nil, fmt.Errorf("fact base has schema %d, this memcue knows %d: update memcue", version, schemaVersion)
+	}
+	host, _ := os.Hostname()
+	return &Store{db: db, author: host, now: time.Now}, nil
+}
+
 // dataSource returns the SQLite data source for path and the file it names, or "" for an in-memory base. A file path
 // is made absolute and escaped as a URI, so characters that are special in a URI stay part of the name. A "file:" URI
 // is refused: a base must be a path this process can own and tighten, and a half-parsed URI used to create a directory
 // named "file:" in the working directory.
 func dataSource(path string) (dsn, file string, err error) {
+	return sqliteSource(path, false)
+}
+
+// readOnlyDataSource is dataSource with mode=ro: the file must exist and SQLite must not write to it.
+func readOnlyDataSource(path string) (dsn, file string, err error) {
+	return sqliteSource(path, true)
+}
+
+func sqliteSource(path string, readOnly bool) (dsn, file string, err error) {
 	switch {
 	case path == "":
 		return "", "", errors.New("store: empty base path")
 	case path == ":memory:":
+		if readOnly {
+			return "", "", errors.New("store: a read-only base must be a file")
+		}
 		return "file::memory:?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)", "", nil
 	case strings.HasPrefix(path, "file:"):
 		return "", "", fmt.Errorf("store: %q is a URI: give the base as a file path", path)
@@ -198,7 +241,11 @@ func dataSource(path string) (dsn, file string, err error) {
 		return "", "", err
 	}
 	u := url.URL{Scheme: "file", Path: file}
-	u.RawQuery = "_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)"
+	if readOnly {
+		u.RawQuery = "_pragma=busy_timeout(5000)&mode=ro"
+	} else {
+		u.RawQuery = "_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)"
+	}
 	return u.String(), file, nil
 }
 
