@@ -465,6 +465,7 @@ func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
 // the chat judge is not asked to answer the question the duplicate judge could not.
 func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
 	env(t)
+	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
 	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
 	fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
 		return extract.DuplicateVerdict{}, errors.New("decisions 500: boom")
@@ -486,28 +487,49 @@ func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
 	}
 }
 
-// A base larger than one request is not judged: the review model with its neighbours stays in charge, unchanged.
-func TestVetJudgeSkippedWhenTheBaseDoesNotFit(t *testing.T) {
+// A base above one request is split into chunks: every chunk is asked, and a duplicate found in any of them retires
+// the candidate; the review model is not asked afterwards.
+func TestVetJudgeChunksABaseAboveTheCap(t *testing.T) {
 	env(t)
-	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
-	approvedFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.")
-	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
+	for _, text := range []string{
+		"В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.",
+		"Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.",
+		"Скрипт крона должен лежать в HERMES_HOME/scripts.",
+	} {
+		approvedFact(t, text)
+	}
+	cand := vetFact(t, "Скрипт крона лежит в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
 	calls := fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
 		return extract.DuplicateVerdict{P: 0.99}, nil
 	})
 	extract.JevJudge.MaxFacts = 1
 	reviewCalls := fakeJudge(t, judgeByID(cand))
 
-	if err := runVet(nil, &bytes.Buffer{}); err != nil {
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) != 0 {
-		t.Errorf("the judge ran on a base that does not fit: %d calls", len(*calls))
+	if len(*calls) != 3 {
+		t.Errorf("duplicate judge calls = %d, want one per chunk", len(*calls))
 	}
-	if len(*reviewCalls) != 1 {
-		t.Fatalf("review calls %d", len(*reviewCalls))
+	if len(*reviewCalls) != 0 {
+		t.Errorf("the review model was asked after a duplicate: %d calls", len(*reviewCalls))
 	}
-	if f := vetStatus(t, cand); f.Review != "" {
-		t.Errorf("the model did not decide: %+v", f)
+	if f := vetStatus(t, cand); f.Status != store.Retired {
+		t.Errorf("the duplicate was not retired: %+v", f)
+	}
+}
+
+func TestDuplicateChunks(t *testing.T) {
+	base := []extract.JudgeFact{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}, {ID: "5"}}
+	got := duplicateChunks(base, 2)
+	if len(got) != 3 || len(got[0]) != 2 || len(got[1]) != 2 || len(got[2]) != 1 {
+		t.Fatalf("chunks = %v", got)
+	}
+	if all := duplicateChunks(base, 10); len(all) != 1 || len(all[0]) != 5 {
+		t.Fatalf("one chunk = %v", all)
+	}
+	if none := duplicateChunks(nil, 2); none != nil {
+		t.Fatalf("empty base = %v", none)
 	}
 }

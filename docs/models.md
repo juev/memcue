@@ -160,5 +160,5 @@ the rerank-gate issue.
 - A/B the main model as the reranker, to test whether the judge can be removed later.
 - Decide whether vector candidates are added on every prompt or only on lexical misses; the
   pilot used every prompt, which is the measured 129/180 mode.
-- Measure the duplicate check on a 400-fact subset, or split large bases.
+- Measure the chunked duplicate precision and cost on the full 2.6k base, not only the 41-candidate sample.
 - Complete the random 160-fact truth audit if a base false-rate estimate is needed.

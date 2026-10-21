@@ -103,6 +103,7 @@ type vetRecord struct {
 	Unsure     int            `json:"unsure"`
 	Failed     int            `json:"failed,omitempty"`
 	JudgeErrs  int            `json:"judge_errors,omitempty"`
+	JudgeCalls int            `json:"judge_calls,omitempty"`
 	DryRun     bool           `json:"dry_run,omitempty"`
 	CostUSD    float64        `json:"cost_usd,omitempty"`
 	Tokens     extract.Tokens `json:"tokens,omitempty"`
@@ -192,11 +193,12 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 	memory, haveMemory := memoryNotes(o.memory)
 	decided, rest := vet.Rules(cands, approved, memory, haveMemory)
 
-	// The duplicate judge runs before the chat one and over the whole approved base: a duplicate is the one verdict
-	// that needs no reading of a candidate, only a comparison. It never decides that a candidate is worth keeping, so
-	// everything it does not call a duplicate still goes to the model.
+	// The duplicate judge runs before the chat one and over the approved base: a duplicate is the one verdict that
+	// needs no reading of a candidate, only a comparison. A base above one request is split into chunks; the judge
+	// never decides that a candidate is worth keeping, so everything it does not call a duplicate still goes to the
+	// model.
 	probs := map[string]float64{}
-	if !o.noModel && extract.JevJudgeOn() && len(approved) <= extract.JevJudgeMaxFacts() {
+	if !o.noModel && extract.JevJudgeOn() {
 		stage := jevDuplicates(rest, approved)
 		decided = append(decided, stage.Retired...)
 		decided = append(decided, stage.Failed...)
@@ -204,6 +206,7 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		rec.Tokens.Add(stage.Tokens)
 		rec.CostUSD += stage.CostUSD
 		rec.JudgeErrs += stage.Errors
+		rec.JudgeCalls += stage.Calls
 		for id, p := range stage.P {
 			probs[id] = p
 		}
@@ -312,20 +315,24 @@ type duplicateStage struct {
 	Tokens  extract.Tokens
 	CostUSD float64
 	Errors  int
+	Calls   int
 }
 
-// jevDuplicates asks the judge whether each candidate already exists in the base. One call per candidate, in
-// parallel: the base itself is the state, so a candidate costs a request of its own. A candidate above the threshold
-// is retired here; everything else goes to the chat judge, which decides whether a fact is worth keeping at all. A
-// call that fails decides nothing, so its candidate waits for the next run rather than being approved blind.
+// jevDuplicates asks the judge whether each candidate already exists in the base. The base is split into chunks
+// that fit one request; a candidate is compared with every chunk and keeps its strongest "same claim". One chunk
+// that fails decides nothing for that candidate, so it waits for the next run rather than being approved blind.
 func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 	base := make([]extract.JudgeFact, 0, len(approved))
 	for _, f := range approved {
 		base = append(base, extract.JudgeFact{ID: f.ID, Text: f.Content})
 	}
+	chunks := duplicateChunks(base, extract.JevJudgeMaxFacts())
 	type answer struct {
-		v   extract.DuplicateVerdict
-		err error
+		v      extract.DuplicateVerdict
+		err    error
+		tokens extract.Tokens
+		cost   float64
+		calls  int
 	}
 	got := make([]answer, len(cands))
 	sem := make(chan struct{}, vetJudgeParallel)
@@ -335,10 +342,23 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 		sem <- struct{}{}
 		go func(i int, f store.Fact) {
 			defer func() { <-sem; wg.Done() }()
-			ctx, cancel := contextTimeout()
-			defer cancel()
-			v, err := judgeDupFn(ctx, extract.JudgeFact{ID: f.ID, Text: f.Content}, base)
-			got[i] = answer{v: v, err: err}
+			a := answer{}
+			for _, chunk := range chunks {
+				ctx, cancel := contextTimeout()
+				v, err := judgeDupFn(ctx, extract.JudgeFact{ID: f.ID, Text: f.Content}, chunk)
+				cancel()
+				a.calls++
+				a.tokens.Add(v.Tokens)
+				a.cost += v.Cost
+				if err != nil {
+					a.err = err
+					break
+				}
+				if v.P > a.v.P {
+					a.v = v
+				}
+			}
+			got[i] = a
 		}(i, f)
 	}
 	wg.Wait()
@@ -347,10 +367,9 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 	min := extract.JevJudgeMin()
 	for i, f := range cands {
 		a := got[i]
-		out.Tokens.Input += a.v.Tokens.Input
-		out.Tokens.Cached += a.v.Tokens.Cached
-		out.Tokens.Output += a.v.Tokens.Output
-		out.CostUSD += a.v.Cost
+		out.Calls += a.calls
+		out.Tokens.Add(a.tokens)
+		out.CostUSD += a.cost
 		switch {
 		case a.err != nil:
 			out.Errors++
@@ -364,6 +383,25 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 			out.Left = append(out.Left, f)
 			out.P[f.ID] = a.v.P // below the threshold, but a reader of vet.log should still see how close it was
 		}
+	}
+	return out
+}
+
+// duplicateChunks splits the approved base into requests of at most max facts. A nil or empty base needs no call;
+// a max below one uses the judge's own default.
+func duplicateChunks(base []extract.JudgeFact, max int) [][]extract.JudgeFact {
+	if len(base) == 0 {
+		return nil
+	}
+	if max <= 0 {
+		max = extract.JevJudgeMaxFacts()
+	}
+	if max <= 0 || max >= len(base) {
+		return [][]extract.JudgeFact{base}
+	}
+	out := make([][]extract.JudgeFact, 0, (len(base)+max-1)/max)
+	for start := 0; start < len(base); start += max {
+		out = append(out, base[start:min(start+max, len(base))])
 	}
 	return out
 }
