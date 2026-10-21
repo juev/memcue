@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -407,6 +407,24 @@ test('a short tail is flushed on session/disposed', async () => {
 	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'short tail' }])
 	await waitForState(join(stateDir, 's88.json'),
 		(state) => state.pending === null && Object.keys(state.seen).length === 1)
+})
+
+test('the extraction checkpoint is private', { skip: process.platform === 'win32' }, async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-modes')
+	const { listeners } = mount({ stateDir, minNewChars: 1 })
+	const events = [{ type: 'user/message', data: userMessage('private batch') }]
+	const session = fakeSession('smodes', events)
+
+	const [turnEnd] = listeners.get('session/event')
+	turnEnd(session, { type: 'turn/end', data: { turn: 1, reason: 'stop' } })
+	const path = join(stateDir, 'smodes.json')
+	await waitForState(path, (state) => state.pending === null && Object.keys(state.seen).length === 1)
+
+	const file = await stat(path)
+	assert.equal(file.mode & 0o777, 0o600)
+	const folder = await stat(stateDir)
+	assert.equal(folder.mode & 0o777, 0o700)
 })
 
 test('tool calls travel with the assistant message', async () => {

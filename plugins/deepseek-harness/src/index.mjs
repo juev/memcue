@@ -349,11 +349,12 @@ async function readState(path) {
 	}
 }
 
-/** Write the checkpoint atomically: a crash leaves the old file or the new one, never a half-written one. */
+/** Write the checkpoint atomically: a crash leaves the old file or the new one, never a half-written one.
+ * The batch holds raw messages, so the directory and file are private to the user. */
 async function writeState(path, state) {
-	await mkdir(dirname(path), { recursive: true })
+	await mkdir(dirname(path), { recursive: true, mode: 0o700 })
 	const tmp = `${path}.tmp`
-	await writeFile(tmp, JSON.stringify(state))
+	await writeFile(tmp, JSON.stringify(state), { mode: 0o600 })
 	await rename(tmp, path)
 }
 

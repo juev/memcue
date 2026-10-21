@@ -35,6 +35,15 @@ type evalSet struct {
 	} `json:"labels"`
 }
 
+// evalPair is one recalled pair the set has no label for.
+type evalPair struct {
+	Prompt  string `json:"prompt"`
+	Fact    string `json:"fact"`
+	Content string `json:"content"`
+	Origin  string `json:"origin"`
+}
+
+// runEval is the evaluation command: measure recall over a prepared set, optionally writing the unlabelled pairs.
 func runEval(args []string, out io.Writer) error {
 	fl := flag.NewFlagSet("eval", flag.ContinueOnError)
 	set := fl.String("set", "", "eval.json")
@@ -99,15 +108,9 @@ func runEval(args []string, out io.Writer) error {
 		for _, l := range ev.Labels {
 			label[[2]string{l.Prompt, l.Fact}] = l.Label
 		}
-		type pair struct {
-			Prompt  string `json:"prompt"`
-			Fact    string `json:"fact"`
-			Content string `json:"content"`
-			Origin  string `json:"origin"`
-		}
 		counts := map[string]int{}
 		withUseful, withAny, noMem := 0, 0, 0
-		var unl []pair
+		var unl []evalPair
 		for _, pr := range ev.Prompts {
 			hs, err := run(pr.Text, pr.Tier)
 			if err != nil {
@@ -118,7 +121,7 @@ func runEval(args []string, out io.Writer) error {
 				l, ok := label[[2]string{pr.ID, h.ID}]
 				if !ok {
 					l = "UNLABELED"
-					unl = append(unl, pair{pr.ID, h.ID, h.Content, h.Origin})
+					unl = append(unl, evalPair{pr.ID, h.ID, h.Content, h.Origin})
 				}
 				counts[l]++
 				useful = useful || l == "USEFUL"
@@ -143,10 +146,15 @@ func runEval(args []string, out io.Writer) error {
 			return nil
 		}
 		sort.Slice(unl, func(i, j int) bool { return unl[i].Prompt+unl[i].Fact < unl[j].Prompt+unl[j].Fact })
-		b, err := json.MarshalIndent(unl, "", " ")
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(*unlabeled, b, 0o644)
+		return writeEvalPairs(*unlabeled, unl)
 	})
+}
+
+// writeEvalPairs writes the unlabelled pairs with mode 0600: the file holds user prompts and private fact text.
+func writeEvalPairs(path string, pairs []evalPair) error {
+	b, err := json.MarshalIndent(pairs, "", " ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o600)
 }
