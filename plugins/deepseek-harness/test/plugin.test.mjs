@@ -3,7 +3,7 @@
  * the Cordis context, so nothing here needs a model, a base, or a running harness.
  *
  * Run from a checkout that can resolve @deepseek-ai/dsh-llm and @deepseek-ai/dsh-tools:
- *   node --test plugins/deepseek-harness/test/
+ *   node --test plugins/deepseek-harness/test/*.test.mjs
  */
 import assert from 'node:assert/strict'
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 
-import { apply } from '../src/index.ts'
+import { apply } from '../src/index.mjs'
 
 const FACT = 'The harness base is STUB-FACT-7743.'
 
@@ -22,6 +22,7 @@ let log
 /** A stub memcue: records each call, answers `hook` and `search`, accepts `add`. */
 const STUB = `#!/bin/sh
 printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
+printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
 case "$1" in
   hook)
     payload=$(cat)
@@ -230,4 +231,68 @@ test('memcue_add reports success and writes nothing itself', async () => {
 	assert.equal(result.stored, true)
 	const text = await waitForLog('arg: add ')
 	assert.match(text, /arg: add -origin dsh \d{4}-\d{2}-\d{2} -keywords new, fact A new fact\./)
+})
+
+test('model, endpoint and key from config reach the memcue child', async () => {
+	await resetLog()
+	const { listeners } = mount({
+		model: 'deepseek-flash',
+		apiUrl: 'https://api.deepseek.com',
+		apiKey: 'sk-test',
+	})
+	await preStep(listeners, [userMessage('what is the harness base?')])
+	const text = await waitForLog('env: ')
+	assert.match(text, /env: deepseek-flash\|https:\/\/api\.deepseek\.com\|sk-test/)
+})
+
+test('a configured model wins over the ambient one', async () => {
+	const previous = process.env.MEMCUE_MODEL
+	process.env.MEMCUE_MODEL = 'ambient-model'
+	try {
+		await resetLog()
+		const { listeners } = mount({ model: 'configured-model' })
+		await preStep(listeners, [userMessage('what is the harness base?')])
+		const text = await waitForLog('env: ')
+		assert.match(text, /env: configured-model\|/)
+	} finally {
+		if (previous === undefined) delete process.env.MEMCUE_MODEL
+		else process.env.MEMCUE_MODEL = previous
+	}
+})
+
+test('an absent model leaves the ambient one in place', async () => {
+	const previous = process.env.MEMCUE_MODEL
+	process.env.MEMCUE_MODEL = 'ambient-model'
+	try {
+		await resetLog()
+		const { listeners } = mount()
+		await preStep(listeners, [userMessage('what is the harness base?')])
+		const text = await waitForLog('env: ')
+		assert.match(text, /env: ambient-model\|/)
+	} finally {
+		if (previous === undefined) delete process.env.MEMCUE_MODEL
+		else process.env.MEMCUE_MODEL = previous
+	}
+})
+
+test('a bad searchLimit names the field instead of falling back', () => {
+	assert.throws(() => mount({ searchLimit: 0 }), /searchLimit/)
+})
+
+test('a non-boolean extract is rejected', () => {
+	assert.throws(() => mount({ extract: 'no' }), /extract/)
+})
+
+test('a non-string model is rejected', () => {
+	assert.throws(() => mount({ model: 42 }), /model/)
+})
+
+test('the package is a dsh bundle with a loadable entry', async () => {
+	const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+	assert.equal(pkg.dsh?.bundle?.patch, './cordis.patch.yml')
+	assert.equal(pkg.exports, './src/index.mjs')
+	const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+	assert.match(patch, /- id: memcue/)
+	assert.match(patch, /name: \.\/src\/index\.mjs/)
+	await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
 })

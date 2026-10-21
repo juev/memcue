@@ -10,6 +10,11 @@
  * - a short system-prompt section tells the model its memory is memcue;
  * - `memcue_search` and `memcue_add` let the model look facts up and write one.
  *
+ * The file is plain ESM on purpose: dsh installs a bundle under `node_modules`, where
+ * Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an
+ * installed package. Configuration is validated here, at load time, so a typo names
+ * its field instead of silently falling back to a default.
+ *
  * @module memcue-dsh
  */
 import { spawn } from 'node:child_process'
@@ -21,13 +26,6 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'memcue'
-
-declare module '@deepseek-ai/dsh-llm' {
-	interface MessageSourceMap {
-		/** Facts this plugin lifted out of the fact base for one step. */
-		memcue: { kind: 'memcue' }
-	}
-}
 
 /** Services this plugin registers against; the framework waits for them. */
 export const inject = ['tools', 'systemPrompt']
@@ -47,28 +45,108 @@ const HOOK_TIMEOUT_MS = 10_000
 /** Extraction is a model call in another process; it may outlive the turn. */
 const EXTRACT_TIMEOUT_MS = 300_000
 
-/** Resolved plugin configuration with defaults applied. */
+/** Defaults used when the bundle patch supplies no config. */
+const DEFAULTS = Object.freeze({
+	binary: 'memcue',
+	facts: '',
+	extract: true,
+	minNewChars: MIN_NEW_CHARS,
+	searchLimit: 5,
+	maxToolResultChars: 1500,
+	model: '',
+	apiUrl: '',
+	apiKey: '',
+})
+
+/**
+ * Read a string field, with an optional fallback; `null` and `undefined` mean "not set".
+ * @param value - raw config value.
+ * @param field - field name for the diagnostic.
+ * @param fallback - value when the field is absent.
+ * @returns the trimmed string.
+ * @throws when the value is not a string.
+ */
+function textOf(value, field, fallback = '') {
+	if (value === undefined || value === null) return fallback
+	if (typeof value !== 'string') throw new Error(`memcue: ${field} must be a string`)
+	return value.trim()
+}
+
+/**
+ * Read a boolean field, with a fallback.
+ * @param value - raw config value.
+ * @param field - field name for the diagnostic.
+ * @param fallback - value when the field is absent.
+ * @returns the boolean.
+ * @throws when the value is not a boolean.
+ */
+function flagOf(value, field, fallback) {
+	if (value === undefined || value === null) return fallback
+	if (typeof value !== 'boolean') throw new Error(`memcue: ${field} must be a boolean`)
+	return value
+}
+
+/**
+ * Read a whole-number field, with a fallback and a lower bound.
+ * @param value - raw config value.
+ * @param field - field name for the diagnostic.
+ * @param fallback - value when the field is absent.
+ * @param min - smallest accepted value.
+ * @returns the integer.
+ * @throws when the value is not a safe integer at or above `min`.
+ */
+function countOf(value, field, fallback, min) {
+	if (value === undefined || value === null) return fallback
+	if (!Number.isSafeInteger(value) || value < min) {
+		throw new Error(`memcue: ${field} must be an integer >= ${min}`)
+	}
+	return value
+}
+
+/**
+ * Resolve the plugin configuration with defaults applied.
+ * @param config - raw config from the loader entry.
+ * @returns the resolved settings.
+ */
 function settingsOf(config) {
+	const raw = config ?? {}
+	const fallbackStateDir = defaultStateDir()
+	const stateDir = textOf(raw.stateDir, 'stateDir', fallbackStateDir) || fallbackStateDir
 	return {
-		binary: config?.binary || process.env.MEMCUE_BIN || 'memcue',
-		facts: config?.facts || process.env.MEMCUE_FACTS || '',
-		extract: config?.extract !== false,
-		minNewChars: Number.isFinite(config?.minNewChars) ? config.minNewChars : MIN_NEW_CHARS,
-		stateDir: config?.stateDir || stateDir(),
-		searchLimit: Number.isFinite(config?.searchLimit) ? config.searchLimit : 5,
-		maxToolResultChars: Number.isFinite(config?.maxToolResultChars) ? config.maxToolResultChars : 1500,
+		binary: textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary) || DEFAULTS.binary,
+		facts: textOf(raw.facts, 'facts', process.env.MEMCUE_FACTS || DEFAULTS.facts),
+		extract: flagOf(raw.extract, 'extract', DEFAULTS.extract),
+		minNewChars: countOf(raw.minNewChars, 'minNewChars', DEFAULTS.minNewChars, 0),
+		stateDir,
+		searchLimit: countOf(raw.searchLimit, 'searchLimit', DEFAULTS.searchLimit, 1),
+		maxToolResultChars: countOf(raw.maxToolResultChars, 'maxToolResultChars', DEFAULTS.maxToolResultChars, 1),
+		model: textOf(raw.model, 'model', DEFAULTS.model),
+		apiUrl: textOf(raw.apiUrl, 'apiUrl', DEFAULTS.apiUrl),
+		apiKey: textOf(raw.apiKey, 'apiKey', DEFAULTS.apiKey),
 	}
 }
 
 /** Directory of this plugin's own state: read offsets per session, next to memcue's own logs. */
-function stateDir() {
+function defaultStateDir() {
 	const base = process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state')
 	return join(base, 'memcue', 'dsh')
 }
 
-/** Environment every memcue child process gets: the base from config wins over the process one. */
+/**
+ * Environment every memcue child process gets.
+ *
+ * A configured value wins over the process environment. A field left out keeps the
+ * ambient `MEMCUE_*` value, so an existing setup keeps working; when neither is set,
+ * memcue's own default applies.
+ * @param settings - resolved plugin configuration.
+ * @returns the child environment.
+ */
 function childEnv(settings) {
-	const env = { ...process.env, ...(settings.facts ? { MEMCUE_FACTS: settings.facts } : {}) }
+	const env = { ...process.env }
+	if (settings.facts) env.MEMCUE_FACTS = settings.facts
+	if (settings.model) env.MEMCUE_MODEL = settings.model
+	if (settings.apiUrl) env.MEMCUE_API_URL = settings.apiUrl
+	if (settings.apiKey) env.MEMCUE_API_KEY = settings.apiKey
 	return env
 }
 
@@ -114,7 +192,7 @@ function runMemcue(settings, args, options = {}) {
 }
 
 /** Text blocks of one message, joined; anything that is not text is ignored. */
-function textOf(message) {
+function textOfMessage(message) {
 	const content = message?.content
 	if (typeof content === 'string') return content
 	if (!Array.isArray(content)) return ''
@@ -130,13 +208,13 @@ function promptOf(messages) {
 		const message = messages[i]
 		if (message?.role !== 'user') continue
 		if (message.source?.kind !== 'user') continue // runtime context, recall and other injected messages are not the prompt
-		const text = textOf(message).trim()
+		const text = textOfMessage(message).trim()
 		if (text) return text
 	}
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
 		const message = messages[i]
 		if (message?.role !== 'user' || message.source?.form) continue
-		const text = textOf(message).trim()
+		const text = textOfMessage(message).trim()
 		if (text) return text
 	}
 	return ''
@@ -193,15 +271,15 @@ function messagesSince(session, from, settings) {
 		if (!event) continue
 		if (event.type === 'user/message') {
 			if (event.data?.source?.form) continue // injected context (runtime snapshot, recall) is not the user's words
-			const text = textOf(event.data).trim()
+			const text = textOfMessage(event.data).trim()
 			if (text) messages.push({ role: 'user', content: text })
 		} else if (event.type === 'assistant/message') {
-			const text = textOf(event.data?.message).trim()
+			const text = textOfMessage(event.data?.message).trim()
 			if (text) messages.push({ role: 'assistant', content: text })
 		} else if (event.type === 'tool/result') {
 			// Tool output is the only place a tool-sourced fact can quote its evidence, and memcue's
 			// write policy rejects such a fact without it. Keep it short: the binary cuts it again.
-			const text = textOf(event.data?.message).trim()
+			const text = textOfMessage(event.data?.message).trim()
 			if (text) messages.push({ role: 'tool', content: text.slice(0, settings.maxToolResultChars) })
 		}
 	}
@@ -211,7 +289,8 @@ function messagesSince(session, from, settings) {
 /**
  * Register recall, extraction, the memory note, and the two fact tools.
  * @param ctx - plugin context; every registration is undone when it unloads.
- * @param config - `binary`, `facts`, `extract`, `minNewChars`, `stateDir`, `searchLimit`.
+ * @param config - `binary`, `facts`, `extract`, `minNewChars`, `stateDir`, `searchLimit`,
+ * `maxToolResultChars`, `model`, `apiUrl`, `apiKey`.
  */
 export function apply(ctx, config) {
 	const settings = settingsOf(config)

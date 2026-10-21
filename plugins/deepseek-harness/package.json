@@ -1,10 +1,17 @@
 {
   "name": "memcue-dsh",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "memcue long-term memory for DeepSeek Harness (dsh): facts recalled before a step, extracted when a turn ends",
   "type": "module",
   "license": "MIT",
+  "main": "./src/index.mjs",
+  "exports": "./src/index.mjs",
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -15,11 +22,16 @@
     "url": "git+https://github.com/juev/memcue.git",
     "directory": "plugins/deepseek-harness"
   },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*",
     "@deepseek-ai/dsh-tools": "*"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   }
 }
