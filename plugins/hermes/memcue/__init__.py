@@ -125,7 +125,8 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 
 SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
-    "Use it to find a fact before correcting or retiring it.", {"query": "Words of the fact."}, ["query"])
+    "Use it to find a fact before correcting or retiring it.",
+    {"query": "Words of the fact.", "limit": "Optional maximum number of facts (default 10)."}, ["query"])
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory: one self-contained statement in one to three sentences, "
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
@@ -137,7 +138,9 @@ ADD_SCHEMA = _schema(
     ["content"])
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",
-    {"id": "Fact ID from memcue_search.", "content": "The corrected fact."}, ["id", "content"])
+    {"id": "Fact ID from memcue_search.", "content": "The corrected fact.",
+     "keywords": "Comma-separated keywords; omit to keep the current ones.",
+     "expires": "Optional new last day the fact is worth recalling, YYYY-MM-DD."}, ["id", "content"])
 RETIRE_SCHEMA = _schema(
     "memcue_retire", "Stop recalling a stored fact that no longer holds (the history keeps it).",
     {"id": "Fact ID from memcue_search."}, ["id"])
@@ -825,7 +828,16 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_search":
             if not arg("query"):
                 return tool_error("query is required")
-            ok, out = self._run(["search", "-json", "--", arg("query")], timeout=_RECALL_TIMEOUT)
+            cmd = ["search", "-json"]
+            if arg("limit"):
+                try:
+                    limit = int(arg("limit"))
+                except ValueError:
+                    return tool_error("limit must be a positive integer")
+                if limit <= 0:
+                    return tool_error("limit must be a positive integer")
+                cmd += ["-n", str(limit)]
+            ok, out = self._run(cmd + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
                 try:
                     return json.dumps({"facts": json.loads(out)}, ensure_ascii=False)
@@ -854,7 +866,12 @@ class MemcueMemoryProvider(MemoryProvider):
         elif tool_name == "memcue_correct":
             if not arg("id") or not arg("content"):
                 return tool_error("id and content are required")
-            ok, out = self._run(["correct", "--", arg("id"), arg("content")])
+            cmd = ["correct"]
+            if arg("keywords"):
+                cmd += ["-keywords", arg("keywords")]
+            if arg("expires"):
+                cmd += ["-expires", arg("expires")]
+            ok, out = self._run(cmd + ["--", arg("id"), arg("content")])
         else:
             if not arg("id"):
                 return tool_error("id is required")
