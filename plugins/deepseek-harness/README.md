@@ -33,9 +33,9 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
    No `path:` parameter and no local directory are needed. From a local checkout, `dsh plugin add /path/to/memcue`
    installs the same root package.
 
-   The plugin directory is also a standalone package. After publishing it to npm, `dsh plugin add memcue-dsh`
-   installs it without the repository; a local checkout can use
-   `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
+   The plugin directory is also a standalone package, published as
+   [`memcue-dsh`](https://www.npmjs.com/package/memcue-dsh). `dsh plugin add memcue-dsh` installs it without the
+   repository; a local checkout can use `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
 
    The plugin manager adds the package to the profile's `dsh.profile.bundles`; the install dialog's **Enable now**
    switches the bundle on. A repository install is a Git dependency, so a `git pull` reaches the next start without
