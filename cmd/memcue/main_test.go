@@ -462,3 +462,24 @@ func TestFactsPathExpandsHome(t *testing.T) {
 		}
 	}
 }
+
+// Outside a repository the origin names the directory, not a bare date: a container workspace has no .git, and a date
+// alone loses where the fact was learnt and the repository tie-break with it.
+func TestOriginNameFallsBackToTheDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "workspace")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := originName(dir), "workspace"; got != want {
+		t.Errorf("originName(%q) = %q, want %q", dir, got, want)
+	}
+	if got, want := defaultOriginAt(dir), "workspace "+time.Now().Format(time.DateOnly); got != want {
+		t.Errorf("defaultOriginAt(%q) = %q, want %q", dir, got, want)
+	}
+	if got := originName(""); got != "" {
+		t.Errorf("originName(\"\") = %q, want empty", got)
+	}
+	if got := originName(string(filepath.Separator)); got != "" {
+		t.Errorf("originName(root) = %q, want empty", got)
+	}
+}

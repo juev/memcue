@@ -186,7 +186,28 @@ func defaultOriginAt(dir string) string {
 			return time.Now().Format(time.DateOnly)
 		}
 	}
-	return strings.TrimSpace(tier.Of(dir, claudeDir()) + " " + time.Now().Format(time.DateOnly))
+	return strings.TrimSpace(originName(dir) + " " + time.Now().Format(time.DateOnly))
+}
+
+// originName names the place a fact was learnt for its origin: the repository tier inside a repository, the
+// directory's own name outside one (a container workspace, a mounted volume), and "" when dir is unknown or is the
+// filesystem root. A bare date is not an origin: it matches no repository and hides where the fact came from.
+func originName(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	if name := tier.Of(dir, claudeDir()); name != "" {
+		return name
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	base := filepath.Base(abs)
+	if base == "." || base == string(filepath.Separator) {
+		return ""
+	}
+	return base
 }
 
 func runCorrect(args []string, out io.Writer) error {
