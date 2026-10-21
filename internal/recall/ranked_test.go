@@ -36,6 +36,15 @@ func (f *fakeRanker) Scores(_ context.Context, _ string, facts []string) ([]floa
 	return out, nil
 }
 
+// rankedParams relaxes the coverage gate for the synthetic facts in this file; the gate itself is tested in
+// recall_test.go and in TestRankedKeepsTheTicketGate.
+func rankedParams() Params {
+	p := Default
+	p.MinMatched = 1
+	p.MinCoverage = 0.1
+	return p
+}
+
 func contains(haystack, needle string) bool {
 	return len(needle) == 0 || (len(haystack) >= len(needle) && indexOf(haystack, needle) >= 0)
 }
@@ -47,6 +56,38 @@ func indexOf(haystack, needle string) int {
 		}
 	}
 	return -1
+}
+
+// The rerank path must keep the ticket exactness rule: PROJ-1235 cannot reach PROJ-1234 through a shared keyword.
+func TestRankedKeepsTheTicketGate(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	a, err := s.AddWith("Тикет PROJ-1234: берём в работу.", []string{"PROJ", "postgres", "port"},
+		"x 2026-10-20", "", store.Meta{Kind: "decision", Scope: "repo:x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.AddWith("Тикет PROJ-1235: отложен.", []string{"PROJ", "postgres", "port"},
+		"x 2026-10-20", "", store.Meta{Kind: "decision", Scope: "repo:x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"": 0.9}}
+	hits, err := RecallRanked(s, "PROJ-1235 postgres port", "x", rankedParams(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].ID != b.ID {
+		t.Fatalf("hits = %v, want %s", ids(hits), b.ID)
+	}
+	for _, h := range hits {
+		if h.ID == a.ID {
+			t.Fatalf("a prompt for PROJ-1235 recalled PROJ-1234: %v", ids(hits))
+		}
+	}
 }
 
 func rankedBase(t *testing.T) (*store.Store, map[string]string) {
@@ -75,7 +116,7 @@ func rankedBase(t *testing.T) (*store.Store, map[string]string) {
 func TestRankedPutsTheUsefulFactFirst(t *testing.T) {
 	s, ids := rankedBase(t)
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"JAVA_HOME": 0.93, "Caddy": 0.2, "mihomo": 0.4}}
-	hits, err := RecallRanked(s, "почему сборка падает и что не так с конфигом caddy", "", Default, r)
+	hits, err := RecallRanked(s, "почему сборка падает и что не так с конфигом caddy", "", rankedParams(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +137,7 @@ func TestRankedPutsTheUsefulFactFirst(t *testing.T) {
 func TestRankedDropsWhatIsBelowTheThreshold(t *testing.T) {
 	s, _ := rankedBase(t)
 	r := &fakeRanker{min: 0.8, scores: map[string]float64{"Caddy": 0.2, "mihomo": 0.4}}
-	hits, err := RecallRanked(s, "какой путь нужен для конфига caddy и почему сборка падает", "", Default, r)
+	hits, err := RecallRanked(s, "какой путь нужен для конфига caddy и почему сборка падает", "", rankedParams(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +173,7 @@ func TestDeadRankerLeavesTheWords(t *testing.T) {
 func TestRankedSkipsWhatTheSessionSaw(t *testing.T) {
 	s, _ := rankedBase(t)
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"JAVA_HOME": 0.93}}
-	p := Default
+	p := rankedParams()
 	first, err := RecallRanked(s, "почему сборка падает и что не так с конфигом caddy", "", p, r)
 	if err != nil || len(first) == 0 {
 		t.Fatalf("first = %v, %v", ids(first), err)

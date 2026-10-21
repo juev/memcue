@@ -3,10 +3,8 @@ package recall
 import (
 	"context"
 	"sort"
-	"time"
 
 	"github.com/juev/memcue/internal/store"
-	"github.com/juev/memcue/internal/text"
 )
 
 // Ranker scores how much each of the facts the words found would help answer the prompt, on 0..1. A nil Ranker turns
@@ -36,25 +34,16 @@ func ranked(s *store.Store, prompt string, p Params, r Ranker) ([]Hit, bool) {
 	if r == nil {
 		return nil, false
 	}
-	found, err := s.Search(text.Terms(prompt), r.Candidates())
-	if err != nil || len(found) < minRankCandidates {
+	facts, err := recallCandidates(s, prompt, p)
+	if err != nil || len(facts) < minRankCandidates {
 		return nil, false
 	}
-	today := p.Today
-	if today == "" {
-		today = time.Now().UTC().Format(time.DateOnly)
+	if n := r.Candidates(); n > 0 && len(facts) > n {
+		facts = facts[:n]
 	}
-	var facts []store.Hit
-	var contents []string
-	for _, f := range found {
-		if p.Seen[f.ID] || store.Expired(f.Expires, today) {
-			continue
-		}
-		facts = append(facts, f)
-		contents = append(contents, f.Content)
-	}
-	if len(facts) < minRankCandidates {
-		return nil, false
+	contents := make([]string, len(facts))
+	for i, f := range facts {
+		contents[i] = f.Content
 	}
 	scores, err := r.Scores(context.Background(), prompt, contents)
 	if err != nil || len(scores) != len(facts) {
@@ -77,7 +66,8 @@ func ranked(s *store.Store, prompt string, p Params, r Ranker) ([]Hit, bool) {
 		if scores[i] < r.Min() {
 			break
 		}
-		hits = append(hits, Hit{Fact: facts[i].Fact, Meaning: scores[i]})
+		hits = append(hits, Hit{Fact: facts[i].Fact, Coverage: facts[i].Coverage, Matched: facts[i].Matched,
+			Meaning: scores[i]})
 	}
 	return hits, true
 }
