@@ -21,6 +21,8 @@ memcue fact base:
   kept in `$HERMES_HOME/memcue/written.json`. An explicit `memcue_correct` of an approved fact stays active: it is a
   correction, not a new candidate.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
+  `memcue_search` takes an optional `limit`; `memcue_correct` can set `keywords` and an `expires` date, as the CLI
+  does. Search is lexical, like `memcue search`: the host and repository preference belongs to recall, not the tool.
   Subagents, cron and flush runs get only `memcue_search` and do not write.
 - **Session extraction** (optional): the new messages of a session go to `memcue extract-messages` in the
   background, which sends them to an OpenAI-compatible model with the same prompt Claude Code sessions get, and adds

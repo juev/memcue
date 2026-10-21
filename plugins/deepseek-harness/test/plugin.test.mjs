@@ -700,6 +700,14 @@ test('memcue_search returns facts with their ids', async () => {
 	assert.deepEqual(result.facts, [{ id: 'f1', content: FACT, origin: 'test 2026-10-20' }])
 })
 
+test('memcue_search passes a limit and a leading dash safely', async () => {
+	await resetLog()
+	const { tools } = mount()
+	await tools.get('memcue_search').execute({ query: '-dash query', limit: 3 }, {})
+	const text = await waitForLog('arg: search ')
+	assert.match(text, /arg: search -json -n 3 -- -dash query/)
+})
+
 test('memcue_search passes a leading dash as a query', async () => {
 	await resetLog()
 	const { tools } = mount()

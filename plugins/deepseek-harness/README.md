@@ -22,8 +22,10 @@ fact base:
   retried when the plugin loads.
 - **A system-prompt section** says the memory is memcue and names the fact tools; the built-in memory files are not
   written.
-- **Four tools**: `memcue_search` (facts by words, with their ids), `memcue_add` (one new fact), `memcue_correct`
-  (a new version of a stored fact) and `memcue_retire` (stop recalling a fact; the history keeps it).
+- **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact),
+  `memcue_correct` (a new version of a stored fact, with optional `keywords` and `expires`) and `memcue_retire` (stop
+  recalling a fact; the history keeps it). Search is lexical, like `memcue search`: the host and repository preference
+  is part of recall, not of the tool.
 
 The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
 the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and

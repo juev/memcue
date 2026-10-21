@@ -4,6 +4,7 @@ Run: python3 plugins/hermes/memcue/tests/test_provider.py (MEMCUE_BIN=/path/to/m
 Inside Hermes the real agent modules are used; elsewhere they are stubbed.
 """
 
+import datetime
 import http.server
 import importlib.util
 import inspect
@@ -362,6 +363,29 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(len(found["facts"]), 1)
         self.assertEqual(found["facts"][0]["id"], fact_id)
         self.assertTrue(found["facts"][0]["content"].startswith("Сервер server1"))
+
+    def test_search_takes_a_limit(self):
+        for i in range(3):
+            json.loads(self.p.handle_tool_call("memcue_add", {
+                "content": f"Сервер server{i}: Caddy перечитывает Caddyfile после пересоздания контейнера.",
+                "keywords": "caddy"}))
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": "2"}))
+        self.assertEqual(len(found["facts"]), 2)
+        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": "x"})))
+
+    def test_correct_sets_keywords_and_expiry(self):
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера.",
+            "keywords": "caddy"}))
+        fact_id = added["result"].split()[0]
+        until = (datetime.date.today() + datetime.timedelta(days=3)).isoformat()
+        corrected = json.loads(self.p.handle_tool_call("memcue_correct", {
+            "id": fact_id, "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера, "
+                                      "теперь с новым ключом.", "keywords": "caddy, пересоздание", "expires": until}))
+        self.assertIn("v2", corrected["result"])
+        line = next(l for l in self.memcue("facts") if l.startswith(fact_id))
+        self.assertIn(f"expires={until}", line)
+        self.assertIn("пересоздание", line)
 
     def test_add_with_expiry_keeps_the_expiry(self):
         json.loads(self.p.handle_tool_call("memcue_add", {
