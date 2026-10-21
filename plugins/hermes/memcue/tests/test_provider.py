@@ -116,6 +116,22 @@ class ProviderTest(unittest.TestCase):
     def test_base_lives_in_hermes_home(self):
         self.assertEqual(self.p._facts, str(Path(self.home) / "memcue" / "facts.db"))
 
+    def test_a_new_base_drops_the_old_checkpoint_and_mirror(self):
+        first = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": str(Path(self.home) / "a.db")})
+        first.initialize("s1", hermes_home=self.home)
+        first.on_memory_write("add", "memory", "Факт первой базы.")
+        self.assertTrue(first._written())
+        Path(first._state, "sessions").mkdir(parents=True, exist_ok=True)
+        Path(first._state, "sessions", "seed.json").write_text("[]", encoding="utf-8")
+
+        second = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": str(Path(self.home) / "b.db")})
+        second.initialize("s1", hermes_home=self.home)
+        self.assertEqual(second._written(), {})
+        self.assertFalse(Path(second._state, "sessions").exists())
+        self.assertFalse(Path(second._state, "pending").exists())
+        self.assertEqual(Path(second._state, "base").read_text(encoding="utf-8").strip(),
+                         str(Path(self.home) / "b.db"))
+
     def test_facts_path_expands_home(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": "~/memcue/facts.db"})
         self.assertEqual(p._facts, str(Path(os.path.expanduser("~")) / "memcue" / "facts.db"))

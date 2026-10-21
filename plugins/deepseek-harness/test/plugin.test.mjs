@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { after, before, test } from 'node:test'
 
 import { apply, memcueSessionId } from '../src/index.mjs'
@@ -678,6 +678,39 @@ test('a ~ in facts is expanded and a relative facts path is rejected', async () 
 	const text = await waitForLog('facts: ')
 	assert.ok(text.includes(`facts: ${join(homedir(), 'memcue', 'facts.db')}`), text)
 	assert.throws(() => mount({ facts: 'relative/facts.db' }), /facts must be an absolute path/)
+})
+
+test('a checkpoint is not reused for another fact base', async () => {
+	const state = join(dir, 'state-187')
+	const first = join(dir, 'base-a.db')
+	const second = join(dir, 'base-b.db')
+	const statePath = join(state, 's187.json')
+	const extract = async (facts) => {
+		const { listeners } = mount({ facts, stateDir: state })
+		const events = [
+			{ type: 'user/message', data: userMessage('remember the base port') },
+			{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+		]
+		const session = fakeSession('s187', events, { header: { cwd: dir } })
+		const [listener] = listeners.get('session/event')
+		listener(session, events[events.length - 1])
+	}
+	await resetLog()
+	await extract(first)
+	await waitForText(statePath, '"base"')
+	const before = ((await readFile(log, 'utf8')).match(/extract-input:/g) ?? []).length
+	assert.equal(before, 1)
+	// The same session against another base must send its messages again: the fingerprints belonged to the first base.
+	await extract(second)
+	const deadline = Date.now() + 5000
+	let after = before
+	while (Date.now() < deadline && after === before) {
+		after = ((await readFile(log, 'utf8')).match(/extract-input:/g) ?? []).length
+		await new Promise((resolve) => setTimeout(resolve, 50))
+	}
+	assert.equal(after, before + 1)
+	const stateText = await readFile(statePath, 'utf8')
+	assert.ok(stateText.includes(resolve(second)), stateText)
 })
 
 test('a missing binary costs the facts, not the step', async () => {

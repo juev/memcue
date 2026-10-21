@@ -207,9 +207,10 @@ class MemcueMemoryProvider(MemoryProvider):
     def initialize(self, session_id: str, **kwargs) -> None:
         home = Path(str(kwargs.get("hermes_home") or os.environ.get("HERMES_HOME") or Path.home() / ".hermes"))
         self._state = str(home / "memcue")
-        Path(self._state).mkdir(parents=True, exist_ok=True)
         if not self._facts:
             self._facts = str(Path(self._state) / "facts.db")
+        self._keep_state_for_base()
+        Path(self._state).mkdir(parents=True, exist_ok=True)
         self._workspace = str(kwargs.get("agent_workspace") or "")
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
@@ -219,6 +220,33 @@ class MemcueMemoryProvider(MemoryProvider):
             # A batch that was in flight when the gateway stopped is still on disk: retry it on the next flush.
             if saved := self._saved_pending(session_id):
                 self._pending[session_id] = (saved, time.monotonic())
+
+    def _keep_state_for_base(self) -> None:
+        """sessions/, pending/ and written.json describe the facts of one base. When `facts` changes they describe
+        another base: keeping them would hide a session's messages from the new base and point mirror edits at ids
+        that are not there. A marker file names the base, so the switch is detected once and old files are dropped."""
+        if not self._facts:
+            return
+        key = os.path.abspath(self._facts)
+        marker = Path(self._state) / "base"
+        try:
+            previous = marker.read_text(encoding="utf-8").strip()
+        except OSError:
+            previous = ""
+        if previous and previous != key:
+            logger.warning("memcue base changed from %s to %s: dropping the old session, pending and mirror state",
+                           previous, key)
+            for name in ("sessions", "pending"):
+                shutil.rmtree(Path(self._state) / name, ignore_errors=True)
+            try:
+                (Path(self._state) / "written.json").unlink(missing_ok=True)
+            except OSError as e:
+                logger.debug("memcue mirror state: %s", e)
+        Path(self._state).mkdir(parents=True, exist_ok=True)
+        try:
+            marker.write_text(key, encoding="utf-8")
+        except OSError as e:
+            logger.debug("memcue base marker: %s", e)
 
     def system_prompt_block(self) -> str:
         return ("# Long-term memory (memcue)\n"
