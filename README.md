@@ -124,7 +124,7 @@ memcue retire ID                     # no longer recalled; history keeps it
 memcue candidates                    # extracted facts waiting for approval, newest first (-json for a JSON array)
 memcue vet -dry-run                  # what the rules and the judge would decide about the queue
 memcue vet                           # decide it: approve what belongs in the base, retire what does not
-memcue vet -no-model                 # only the deterministic rules, no model call
+memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
 memcue approve ID [ID ...]           # take candidates into recall
 memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
@@ -150,10 +150,13 @@ mirror), an origin whose tier is exactly `test` (as in `test 2026-10-19`; a repo
 test run) is retired as a test trace, and a candidate whose words are all in an
 approved fact is retired as covered. The rest goes to the `keep / drop / unsure` judge, twelve candidates a call, each
 with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the answer.
-Everything else the judge cannot settle stays **provisional** by default: `vet` never approves a failed or empty
-answer blind, and `unsure` is an entry in the report, not an approval. A provisional fact is recalled after approved
+Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
+answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
+an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
+so the candidate waits for the next run. A provisional fact is recalled after approved
 facts, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
-`MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue. Every verdict goes to
+`MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue, and `-no-model` keeps
+every candidate the rules cannot decide in that queue as well. Every verdict goes to
 `$XDG_STATE_HOME/memcue/vet.log` with the rule or model and its reason; the page, the `approve` command and the
 page's undo (`store.Reopen`) stay the manual way, unchanged.
 
