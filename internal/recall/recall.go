@@ -10,7 +10,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
@@ -28,7 +27,7 @@ type Params struct {
 	VectorPool     int             // vectors of the most recent facts scored per prompt; <= 0 means every vector
 	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
-	Today          string          // "YYYY-MM-DD" the expired facts are judged by; empty means time.Now().UTC()
+	Today          string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
 }
 
 // Default holds the values chosen on the dev set of facts (2026-10-19, 2335 facts migrated from the notes, 180 real
@@ -190,7 +189,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	}
 	today := p.Today
 	if today == "" {
-		today = time.Now().UTC().Format(time.DateOnly)
+		today = store.Today()
 	}
 	var hits []Hit
 	for _, f := range found {

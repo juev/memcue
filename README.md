@@ -197,8 +197,8 @@ and every applied or refused decision go to `audit.log`. Usage only orders the r
 itself.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
-skips it, so a one-off reminder does not keep coming back months later. A correction keeps the expiry unless it names
-a new one.
+skips it, so a one-off reminder does not keep coming back months later. The date is the local calendar day of the
+machine that judges it. A correction keeps the expiry unless it names a new one.
 
 Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it.
 `memcue dream` groups each fact the last dream did not see with the stored facts close to it in words and asks

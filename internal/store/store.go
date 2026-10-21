@@ -498,6 +498,14 @@ func Expired(expires, today string) bool {
 	return expires != "" && today != "" && expires < today
 }
 
+// Today returns the local calendar date ("YYYY-MM-DD") that expiries and the provisional TTL are judged by. An expiry
+// is a day on the user's calendar, not a UTC instant: a fact that expires "today" is still recalled this evening in
+// every time zone.
+func Today() string { return TodayAt(time.Now()) }
+
+// TodayAt returns the calendar date of t in t's own location. It is split from Today for tests that pin a time zone.
+func TodayAt(t time.Time) string { return t.Format(time.DateOnly) }
+
 // Approve adds a version that takes a candidate or provisional fact into recall. A fact that is neither is left
 // alone: approving an active fact again, or bringing a retired one back, is not what an approval means.
 func (s *Store) Approve(id string) (Fact, error) {
@@ -566,10 +574,10 @@ func (s *Store) Candidates() ([]Fact, error) {
 
 // CardFacts returns the facts a session-start card carries: global rules and the decisions of the given repository,
 // newest first, skipping facts whose expiry has passed. It is a view of the active facts, not a second store: a fact
-// appears only while it is active and unexpired. today is a "YYYY-MM-DD" date; empty means today in UTC.
+// appears only while it is active and unexpired. today is a local "YYYY-MM-DD" date; empty means today.
 func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 	if today == "" {
-		today = time.Now().UTC().Format(time.DateOnly)
+		today = Today()
 	}
 	active, err := s.Active()
 	if err != nil {
