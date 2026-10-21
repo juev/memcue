@@ -45,7 +45,7 @@ commands:
   search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
   recall    print what a prompt would recall: memcue recall [-cwd DIR] TEXT
   eval      measure recall and noise against labelled sets
-  add       store a fact: memcue add [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] TEXT
+  add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] -- TEXT
   candidates list the facts that wait for approval: memcue candidates [-json]
   vet       decide the candidates without asking: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]
   approve   take candidates into recall: memcue approve ID...

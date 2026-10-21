@@ -452,19 +452,74 @@ test('the memory note is registered as a system-prompt section', () => {
 	assert.match(sections[0].text, /memcue_search/)
 })
 
-test('memcue_search returns the facts the binary printed', async () => {
+test('memcue_search returns facts with their ids', async () => {
 	const { tools } = mount()
 	const result = await tools.get('memcue_search').execute({ query: 'harness base' }, {})
-	assert.deepEqual(result.facts, [`${FACT} (learnt: test 2026-10-20)`])
+	assert.deepEqual(result.facts, [{ id: 'f1', content: FACT, origin: 'test 2026-10-20' }])
 })
 
-test('memcue_add reports success and writes nothing itself', async () => {
+test('memcue_search passes a leading dash as a query', async () => {
 	await resetLog()
 	const { tools } = mount()
-	const result = await tools.get('memcue_add').execute({ text: 'A new fact.', keywords: 'new, fact' }, {})
+	await tools.get('memcue_search').execute({ query: '-v' }, {})
+	const text = await waitForLog('arg: search ')
+	assert.match(text, /arg: search -json -n 5 -- -v/)
+})
+
+test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
+	await resetLog()
+	const { tools } = mount()
+	const exec = { agent: { session: { header: { cwd: '/repo/demo' } } } }
+	const result = await tools.get('memcue_add').execute({
+		text: 'A new fact.',
+		keywords: 'new, fact',
+		expires: '2026-10-21',
+	}, exec)
 	assert.equal(result.stored, true)
 	const text = await waitForLog('arg: add ')
-	assert.match(text, /arg: add -origin dsh \d{4}-\d{2}-\d{2} -keywords new, fact A new fact\./)
+	assert.match(text, /arg: add -source agent -cwd \/repo\/demo -keywords new, fact -expires 2026-10-21 -- A new fact\./)
+})
+
+test('memcue_add stores a fact that starts with a dash', async () => {
+	await resetLog()
+	const { tools } = mount()
+	await tools.get('memcue_add').execute({ text: '-v prints the version' }, {})
+	const text = await waitForLog('arg: add ')
+	assert.match(text, /-- -v prints the version/)
+})
+
+test('memcue_add takes an explicit origin', async () => {
+	await resetLog()
+	const { tools } = mount()
+	await tools.get('memcue_add').execute({ text: 'A fact.', origin: 'demo 2026-10-21' }, {})
+	const text = await waitForLog('arg: add ')
+	assert.match(text, /-origin demo 2026-10-21/)
+})
+
+test('memcue_add rejects an empty text', async () => {
+	const { tools } = mount()
+	const result = await tools.get('memcue_add').execute({ text: '  ' }, {})
+	assert.equal(result.stored, false)
+	assert.match(result.message, /text is required/)
+})
+
+test('memcue_correct and memcue_retire pass the id and text', async () => {
+	await resetLog()
+	const { tools } = mount()
+	const corrected = await tools.get('memcue_correct').execute({
+		id: 'f1',
+		text: 'Corrected fact.',
+		keywords: 'fixed',
+		expires: '2026-10-21',
+	}, {})
+	assert.equal(corrected.stored, true)
+	let text = await waitForLog('arg: correct ')
+	assert.match(text, /arg: correct -keywords fixed -expires 2026-10-21 -- f1 Corrected fact\./)
+
+	const retired = await tools.get('memcue_retire').execute({ id: 'f1' }, {})
+	assert.equal(retired.stored, true)
+	text = await waitForLog('arg: retire ')
+	assert.match(text, /arg: retire -- f1/)
 })
 
 test('model, endpoint and key from config reach the memcue child', async () => {

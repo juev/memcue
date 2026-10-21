@@ -353,6 +353,33 @@ func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
 	}
 }
 
+func TestAddUsesCwdForDefaultOrigin(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runAdd([]string{"-cwd", repo, "-source", "agent", "--", "факт из сессии"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Get(strings.TrimSpace(out.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "shop " + time.Now().Format(time.DateOnly); f.Origin != want {
+		t.Errorf("origin %q, want %q", f.Origin, want)
+	}
+	if f.Source != "agent" {
+		t.Errorf("source %q, want agent", f.Source)
+	}
+}
+
 func TestHookRecallsOnATwoWordPrompt(t *testing.T) {
 	dir := env(t)
 	seed(t)

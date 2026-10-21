@@ -46,7 +46,8 @@ func withStore(fn func(*store.Store) error) error {
 func runAdd(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
-	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of the working directory)")
+	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory)")
+	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
@@ -59,7 +60,7 @@ func runAdd(args []string, out io.Writer) error {
 		return fmt.Errorf("add: unknown -source %q", *source)
 	}
 	if *origin == "" {
-		*origin = defaultOrigin()
+		*origin = defaultOriginAt(*cwd)
 	}
 	m := store.Meta{Kind: *kind, Scope: *scope, Source: *source}
 	if *candidate {
@@ -122,13 +123,17 @@ func runApprove(args []string, out io.Writer) error {
 	})
 }
 
-// defaultOrigin names the repository of the working directory and today, the way extracted facts are named.
-func defaultOrigin() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return time.Now().Format(time.DateOnly)
+// defaultOriginAt names the repository of dir and today, the way extracted facts are named. An empty dir means
+// the process working directory; a caller that knows the session workspace passes it explicitly.
+func defaultOriginAt(dir string) string {
+	if dir == "" {
+		var err error
+		dir, err = os.Getwd()
+		if err != nil {
+			return time.Now().Format(time.DateOnly)
+		}
 	}
-	return strings.TrimSpace(tier.Of(cwd, claudeDir()) + " " + time.Now().Format(time.DateOnly))
+	return strings.TrimSpace(tier.Of(dir, claudeDir()) + " " + time.Now().Format(time.DateOnly))
 }
 
 func runCorrect(args []string, out io.Writer) error {
