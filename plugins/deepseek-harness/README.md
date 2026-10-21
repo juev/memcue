@@ -17,37 +17,68 @@ the harness, so everything that works for Claude Code and Hermes works here on t
 
 ## Install
 
+The repository root is a dsh bundle wrapper: its `package.json` declares `dsh.bundle.patch`, pointing at this
+directory's `cordis.patch.yml`. The plugin directory is also its own package, for npm publication and local
+development. The entry is plain ESM (`src/index.mjs`) on purpose: dsh installs a bundle under `node_modules`, where
+Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an installed package.
+
 1. Put the `memcue` binary where the dsh process can run it and note its absolute path.
 
-2. Add the plugin to a profile patch — an absolute path to `src/index.ts` is what the loader takes:
+2. Install the bundle from the repository:
+
+   - **Desktop / Web:** open **Plugins** in the sidebar, choose **Add plugin → Install a third-party plugin**, and
+     enter `github:juev/memcue`.
+   - **CLI:** `dsh plugin --profile web add github:juev/memcue`.
+
+   No `path:` parameter and no local directory are needed. From a local checkout, `dsh plugin add /path/to/memcue`
+   installs the same root package.
+
+   The plugin directory is also a standalone package, published as
+   [`memcue-dsh`](https://www.npmjs.com/package/memcue-dsh). `dsh plugin add memcue-dsh` installs it without the
+   repository; a local checkout can use `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
+
+   The plugin manager adds the package to the profile's `dsh.profile.bundles`; the install dialog's **Enable now**
+   switches the bundle on. A repository install is a Git dependency, so a `git pull` reaches the next start without
+   reinstalling.
+
+3. Configure the row by id in the profile's own patch layer, `$DSH_HOME/profiles/<name>/cordis.patch.yml`:
 
    ```yaml
-   - insert:
-       - id: memcue
-         name: '/absolute/path/to/memcue/plugins/deepseek-harness/src/index.ts'
-         config:
-           binary: '/usr/local/bin/memcue'
-           facts: '/home/you/.local/share/memcue/facts.db'
+   - id: memcue
+     config:
+       binary: /Users/you/.local/bin/memcue
+       facts: /Users/you/.claude/memory/facts.db
+       model: deepseek-flash
+       apiUrl: https://api.deepseek.com
+       apiKey: sk-...
    ```
 
-   Write it into `$DSH_HOME/profiles/<name>/cordis.patch.yml` for one profile or `$DSH_HOME/cordis.patch.yml` for
-   all of them; `--patch ./extra.yml` applies one overlay to a single run. `cordis.patch.yml` in this directory is a
-   template.
+   `binary` is worth setting explicitly: an application launched from Finder may not have `~/.local/bin` on `PATH`.
+   `facts` may be omitted when the base is memcue's default (`~/.claude/memory/facts.db`).
 
-3. Extraction needs a model. memcue calls an OpenAI-compatible endpoint when one is configured, which is the cheap
-   route inside dsh — export before starting the harness:
+## Choosing the extraction model
 
-   ```sh
-   export MEMCUE_API_URL=https://api.deepseek.com
-   export MEMCUE_MODEL=deepseek-flash
-   export MEMCUE_API_KEY=...            # read by the binary, never by this plugin
-   ```
+`model` is the model memcue uses for the extraction. No `MEMCUE_*` environment variable needs to be exported: the
+plugin forwards the configured values to every memcue child process as `MEMCUE_MODEL`, `MEMCUE_API_URL` and
+`MEMCUE_API_KEY`.
 
-   Without it memcue falls back to `claude -p`, which wants a Claude Code install.
+- **With `apiUrl`** memcue calls an OpenAI-compatible `/chat/completions` endpoint: `model: deepseek-flash`,
+  `apiUrl: https://api.deepseek.com`, `apiKey: sk-...`.
+- **Without `apiUrl`** memcue falls back to `claude -p --model <model>`: `model: claude-opus-5-5` uses the Claude
+  Code login already on the machine and needs no API key.
+
+A field left out falls back to the process environment, then to memcue's own default. A configured value wins over
+the ambient one, so a stale `MEMCUE_MODEL` in the launching environment does not override the profile patch. With
+neither set, memcue's default `claude-opus-5-5` runs through `claude -p`.
+
+`apiKey` is stored in the profile patch under the private `$DSH_HOME` directory, but it is still a secret in a
+configuration file: keep that file out of version control. To avoid storing it, omit `apiKey` and keep
+`MEMCUE_API_KEY` in the environment that launches dsh, or use the `claude -p` route with no key at all.
 
 ## Configuration
 
-All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment are the fallbacks.
+All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment are still the ambient fallbacks.
+A configured field wins over the environment.
 
 - `binary` — path or name of the memcue executable (default `memcue`).
 - `facts` — the fact base; set as `MEMCUE_FACTS` for every child process (default: the binary's own default).
@@ -58,15 +89,41 @@ All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment ar
 - `maxToolResultChars` — how much of one tool result goes to extraction (default `1500`). Tool output is kept on
   purpose: a fact sourced from a tool can only quote its evidence from a `RESULT` block, and memcue's write policy
   drops such a fact when the quote is missing.
+- `model` — extraction model; forwarded as `MEMCUE_MODEL` (default: memcue's own, `claude-opus-5-5`).
+- `apiUrl` — OpenAI-compatible base URL; forwarded as `MEMCUE_API_URL` (default: unset, so `claude -p` runs).
+- `apiKey` — key for `apiUrl`; forwarded as `MEMCUE_API_KEY` (default: unset, so the ambient value or no key is used).
+
+Bad values are rejected at load time with the field name, so a typo does not silently fall back to a default.
 
 ## Testing
 
 ```sh
-node --test plugins/deepseek-harness/test/
+node --test plugins/deepseek-harness/test/*.test.mjs
 ```
 
 The suite mounts the plugin against a plain object context and a stub binary, so it needs no model, no base and no
-running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools` resolve.
+running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools` resolve. It also checks
+the bundle metadata and that the bundle patch points at the loadable ESM entry.
+
+## Releasing
+
+The standalone package is published as `memcue-dsh`.
+
+CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. It uses npm
+Trusted Publishing (OIDC): the workflow has `id-token: write`, no token, and no `NPM_TOKEN` secret. The trusted
+publisher is configured for the `juev/memcue` repository and the `publish-dsh.yml` workflow, with direct publish and
+stage-publish allowed.
+
+A maintainer can still publish manually; npm asks for the 2FA code:
+
+```sh
+cd plugins/deepseek-harness
+npm publish --access public
+```
+
+A fork needs its own trusted publisher, or a granular `NPM_TOKEN` on a `NODE_AUTH_TOKEN` environment variable. A
+granular token without the 2FA bypass cannot run `npm publish`: use `npm stage publish` and approve the stage with
+`npm stage approve <id>`.
 
 ## What differs from the Hermes plugin
 

@@ -1,0 +1,36 @@
+name: Publish dsh plugin
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "dsh-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check the tag names the package version
+        if: startsWith(github.ref, 'refs/tags/dsh-v')
+        working-directory: plugins/deepseek-harness
+        run: test "dsh-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Check the entry syntax
+        working-directory: plugins/deepseek-harness
+        run: node --check src/index.mjs
+
+      # npm Trusted Publishing: the OIDC token comes from id-token: write, so
+      # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
+      - name: Publish
+        working-directory: plugins/deepseek-harness
+        run: npm publish --access public

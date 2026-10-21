@@ -1,0 +1,24 @@
+{
+  "name": "memcue-dsh",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Repository-root dsh bundle for the memcue plugin in plugins/deepseek-harness",
+  "type": "module",
+  "license": "MIT",
+  "main": "./plugins/deepseek-harness/src/index.mjs",
+  "exports": "./plugins/deepseek-harness/src/index.mjs",
+  "files": [
+    "plugins/deepseek-harness/src",
+    "plugins/deepseek-harness/cordis.patch.yml",
+    "plugins/deepseek-harness/README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juev/memcue.git"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "plugins/deepseek-harness/cordis.patch.yml"
+    }
+  }
+}
