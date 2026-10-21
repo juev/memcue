@@ -112,7 +112,8 @@ The standalone package is published as `memcue-dsh`.
 CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. It uses npm
 Trusted Publishing (OIDC): the workflow has `id-token: write`, no token, and no `NPM_TOKEN` secret. The trusted
 publisher is configured for the `juev/memcue` repository and the `publish-dsh.yml` workflow, with direct publish and
-stage-publish allowed.
+stage-publish allowed. Manual dispatch has a `dry_run` input: it packs a throwaway prerelease with `--dry-run` and
+uploads nothing.
 
 A maintainer can still publish manually; npm asks for the 2FA code:
 
