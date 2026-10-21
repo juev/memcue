@@ -510,6 +510,14 @@ func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, err
 			return nil, err
 		}
 		for _, h := range hits {
+			// Recall returns provisional facts too: they are indexed and active, but store.Active leaves them out.
+			// Take the hit's own fact, so a provisional neighbour is a real group member rather than a zero fact.
+			if _, ok := byID[h.ID]; !ok {
+				if h.Review != store.Provisional {
+					continue
+				}
+				byID[h.ID] = h.Fact
+			}
 			union(f.ID, h.ID)
 		}
 	}
