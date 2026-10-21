@@ -318,7 +318,9 @@ Facts written by extraction, and facts mirrored from Hermes' built-in memory, ar
 visible in `memcue candidates`, but recall ignores them until someone approves them. `memcue vet` applies the
 deterministic rules and the review model to the queue, `memcue approve ID...` takes candidates into recall, and
 `memcue review` serves the local batch page; `memcue retire ID` rejects one. A fact written by `memcue add` is active at
-once, and an explicit `correct` of an approved fact writes a new active version. The full rules are in [Use](#use).
+once, and an explicit `correct` of an approved fact writes a new active version. A retired fact cannot be corrected:
+retirement is final, so a changed fact is added as a new fact, and the review page's undo remains the way back from a
+rejection. The full rules are in [Use](#use).
 
 ## Harness support
 

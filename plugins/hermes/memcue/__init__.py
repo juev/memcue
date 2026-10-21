@@ -715,6 +715,14 @@ class MemcueMemoryProvider(MemoryProvider):
                     if ok:  # a failed correct keeps the old entry: its fact id is the only link to the fact
                         written.pop(previous_key, None)
                         written[self._key(target, content)] = fact_id
+                    elif "is retired" in out:
+                        # A retired fact is final: the edited note becomes a new candidate, and the entry is linked
+                        # to it, so a later edit or remove reaches the live fact instead of the history.
+                        ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin",
+                                             self._origin(mirror=True), "--", content.strip()])
+                        if ok:
+                            written.pop(previous_key, None)
+                            written[self._key(target, content)] = out.split()[0]
                 else:
                     ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
                                      content.strip()])

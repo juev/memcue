@@ -193,11 +193,11 @@ func TestRetireTakesFactOutOfSearchButKeepsHistory(t *testing.T) {
 	if err != nil || cur.Status != Retired || cur.Content != f.Content {
 		t.Errorf("get %+v %v", cur, err)
 	}
-	if _, err := s.Correct(f.ID, "Vaultwarden снова работает", nil); err != nil {
-		t.Fatal(err)
+	if _, err := s.Correct(f.ID, "Vaultwarden снова работает", nil); !errors.Is(err, ErrRetired) {
+		t.Fatalf("correcting a retired fact: %v, want ErrRetired", err)
 	}
-	if len(ids(t, s, "vaultwarden работает")) != 1 {
-		t.Error("revived fact not found")
+	if len(ids(t, s, "vaultwarden работает")) != 0 {
+		t.Error("a refused correction put the retired fact back into the index")
 	}
 }
 
@@ -575,6 +575,31 @@ func TestCorrectingACandidateKeepsItACandidate(t *testing.T) {
 	}
 	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
 		t.Error("a correction took a candidate into recall")
+	}
+}
+
+// Retirement is final: a correction must not revive a fact a vet, a review rejection or a person retired.
+func TestCorrectingARetiredFactIsRefused(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.Add("Факт про порт gitea 3000.", nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Retire(f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(f.ID, "Факт про порт gitea 3001.", nil); !errors.Is(err, ErrRetired) {
+		t.Fatalf("correcting a retired fact: %v, want ErrRetired", err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != Retired || got.Version != 2 || got.Content != "Факт про порт gitea 3000." {
+		t.Errorf("a refused correction changed the fact: %+v", got)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
+		t.Error("a refused correction put a retired fact back into the index")
 	}
 }
 

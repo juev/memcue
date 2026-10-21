@@ -126,6 +126,9 @@ var ErrNotFound = errors.New("fact not found")
 // ErrNotCandidate: the fact is not waiting for approval (it is active already, or retired).
 var ErrNotCandidate = errors.New("fact is not a candidate")
 
+// ErrRetired: the fact was retired; a correction cannot bring it back.
+var ErrRetired = errors.New("fact is retired")
+
 // ErrAlreadyCandidate: undo would put a fact back into review when it is already there.
 var ErrAlreadyCandidate = errors.New("fact is already a candidate")
 
@@ -406,11 +409,15 @@ func (s *Store) Correct(id, content string, keywords []string) (Fact, error) {
 }
 
 // CorrectExpiring adds a version with new content, keywords and optionally a new expiry: nil keeps the current one, a
-// pointer to "" clears it.
+// pointer to "" clears it. A retired fact cannot be corrected: retirement is final, and bringing it back would undo a
+// decision (a vet verdict, a review rejection or an explicit retire) without review. Add a new fact instead.
 func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
+	}
+	if cur.Status == Retired {
+		return Fact{}, fmt.Errorf("%w: %s; add a new fact instead", ErrRetired, id)
 	}
 	content = strings.TrimSpace(content)
 	if content == "" {
