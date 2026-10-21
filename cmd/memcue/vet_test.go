@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/juev/memcue/internal/extract"
@@ -321,6 +322,27 @@ func TestPrintVetShowsFailedWrite(t *testing.T) {
 	}
 }
 
+// A manual run must not overlap a session run: both take the same lock.
+func TestRunVetRefusesWhenAnotherRunHoldsTheLock(t *testing.T) {
+	env(t)
+	dir, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.OpenFile(filepath.Join(dir, "vet.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = lock.Close() }()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) }()
+	if err := runVet(nil, &bytes.Buffer{}); !errors.Is(err, errVetBusy) {
+		t.Fatalf("runVet = %v, want errVetBusy", err)
+	}
+}
+
 // fakeDupJudge stands in for the duplicate judge: it answers by candidate text and counts the calls.
 func fakeDupJudge(t *testing.T, answer func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error)) *[]extract.JudgeFact {
 	t.Helper()
@@ -407,6 +429,35 @@ func TestVetJudgeRetiresDuplicateAndLeavesTheRestToTheModel(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "отклонено 1") || !strings.Contains(out.String(), "$0.005") {
 		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// A stale Drop must not undo an approval made while the judge was thinking.
+func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
+	env(t)
+	_ = approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
+	cand := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
+	fakeDupJudge(t, func(c extract.JudgeFact, _ []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		s, err := store.Open(factsPath())
+		if err != nil {
+			return extract.DuplicateVerdict{}, err
+		}
+		_, err = s.Approve(c.ID)
+		_ = s.Close()
+		if err != nil {
+			return extract.DuplicateVerdict{}, err
+		}
+		return extract.DuplicateVerdict{P: 0.99}, nil
+	})
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err == nil || !strings.Contains(err.Error(), "failed to apply") {
+		t.Fatalf("runVet = %v, want a failed write", err)
+	}
+	if f := vetStatus(t, cand); f.Review != "" || f.Status != store.Active {
+		t.Errorf("a stale drop retired an approved fact: %+v", f)
+	}
+	if !strings.Contains(out.String(), "failed:") || !strings.Contains(out.String(), "ошибок записи 1") {
+		t.Errorf("report hides the stale drop:\n%s", out.String())
 	}
 }
 

@@ -474,6 +474,21 @@ func (s *Store) Retire(id string) (Fact, error) {
 	return f, s.write(f)
 }
 
+// RetireCandidate retires a fact only while it still waits for approval. Unlike Retire, it refuses an approval
+// that a human or another run made in the meantime, so a stale vet decision cannot undo it.
+func (s *Store) RetireCandidate(id string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Status != Active || cur.Review != Candidate {
+		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
+	}
+	f := cur
+	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
+	return f, s.write(f)
+}
+
 func (s *Store) write(f Fact) error {
 	tx, err := s.db.Begin()
 	if err != nil {
