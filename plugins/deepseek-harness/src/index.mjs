@@ -18,9 +18,9 @@
  * @module memcue-dsh
  */
 import { spawn } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
@@ -253,14 +253,36 @@ function statePathFor(settings, sessionId) {
 	return join(settings.stateDir, `${String(sessionId).replace(/[^A-Za-z0-9._-]/g, '_')}.json`)
 }
 
-/** How far the last extraction of this session got, in session events. */
-async function readOffset(path) {
+/**
+ * The extraction checkpoint of one session: the last event sequence whose facts were stored, and a
+ * batch that has not been acknowledged yet. A plain `{ seq }` file from an older plugin version is
+ * still accepted.
+ * @param path - the session's state file.
+ * @returns the checkpoint.
+ */
+async function readState(path) {
 	try {
 		const parsed = JSON.parse(await readFile(path, 'utf8'))
-		return Number.isInteger(parsed?.seq) ? parsed.seq : 0
+		const seq = Number.isInteger(parsed?.seq) ? parsed.seq : 0
+		const pending = parsed?.pending
+		if (!pending || !Number.isInteger(pending.seq) || pending.seq <= seq || !Array.isArray(pending.messages)) {
+			return { seq, pending: null }
+		}
+		const messages = pending.messages.filter((message) => message
+			&& typeof message.role === 'string'
+			&& typeof message.content === 'string')
+		return { seq, pending: messages.length > 0 ? { seq: pending.seq, messages } : null }
 	} catch {
-		return 0
+		return { seq: 0, pending: null }
 	}
+}
+
+/** Write the checkpoint atomically: a crash leaves the old file or the new one, never a half-written one. */
+async function writeState(path, state) {
+	await mkdir(dirname(path), { recursive: true })
+	const tmp = `${path}.tmp`
+	await writeFile(tmp, JSON.stringify(state))
+	await rename(tmp, path)
 }
 
 /** Model-shaped messages out of the session log since the last extraction. */
@@ -336,21 +358,28 @@ export function apply(ctx, config) {
 			void (async () => {
 				try {
 					const path = statePathFor(settings, sessionId)
-					const from = await readOffset(path)
-					const messages = messagesSince(session, from, settings)
-					const chars = messages.reduce((total, message) => total + message.content.length, 0)
-					if (chars < settings.minNewChars) return
-					const seq = session.seq
-					const run = runMemcue(settings, [
+					const state = await readState(path)
+					let batch = state.pending
+					if (!batch) {
+						const messages = messagesSince(session, state.seq, settings)
+						const chars = messages.reduce((total, message) => total + message.content.length, 0)
+						if (messages.length === 0 || chars < settings.minNewChars) return
+						// Persist the batch before the model call. A crash after this point retries the
+						// same text; an offset written before the call would lose it on a failed call.
+						batch = { seq: session.seq, messages }
+						await writeState(path, { seq: state.seq, pending: batch })
+					}
+					const { code, err } = await runMemcue(settings, [
 						'extract-messages',
 						'-session', sessionId,
 						'-event', 'turn-end',
 						'-origin', `dsh ${new Date().toISOString().slice(0, 10)}`,
-					], { input: JSON.stringify(messages), timeoutMs: EXTRACT_TIMEOUT_MS })
-					await mkdir(settings.stateDir, { recursive: true })
-					await writeFile(path, JSON.stringify({ seq }))
-					const { code, err } = await run
-					if (code !== 0) console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
+					], { input: JSON.stringify(batch.messages), timeoutMs: EXTRACT_TIMEOUT_MS })
+					if (code !== 0) {
+						console.warn(`memcue: extraction exited ${code}: ${err.trim().slice(0, 500)}`)
+						return // keep the pending batch for the next turn
+					}
+					await writeState(path, { seq: batch.seq, pending: null })
 				} catch (error) {
 					console.warn(`memcue: extraction failed: ${String(error)}`)
 				} finally {
