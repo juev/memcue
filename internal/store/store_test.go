@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -66,6 +67,61 @@ func TestAddBatchStoresEveryFact(t *testing.T) {
 	for _, f := range facts {
 		if _, ok := got[f.ID]; !ok {
 			t.Errorf("fact %s not searchable", f.ID)
+		}
+	}
+}
+
+// Facts written in one batch get increasing ids, so a reader that orders by id cannot reverse their creation order.
+func TestAddBatchIDsIncrease(t *testing.T) {
+	s, _ := open(t)
+	inputs := make([]FactInput, 0, 20)
+	for i := 0; i < 20; i++ {
+		inputs = append(inputs, FactInput{Content: fmt.Sprintf("Факт номер %d о демо-базе.", i), Origin: "test"})
+	}
+	facts, err := s.AddBatch(inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i < len(facts); i++ {
+		if facts[i-1].ID >= facts[i].ID {
+			t.Fatalf("ids of one batch are not increasing: %s then %s", facts[i-1].ID, facts[i].ID)
+		}
+	}
+}
+
+// A base written before the monotonic ids can hold same-millisecond facts whose ids are in random order. Candidates
+// must still come newest first by created, not by the accidental id order.
+func TestCandidatesOrderByCreatedNotID(t *testing.T) {
+	s, _ := open(t)
+	facts, err := s.AddBatch([]FactInput{
+		{Content: "Первый кандидат.", Meta: Meta{Review: Candidate}},
+		{Content: "Второй кандидат.", Meta: Meta{Review: Candidate}},
+		{Content: "Третий кандидат.", Meta: Meta{Review: Candidate}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The smallest id gets the newest created time, the largest id the oldest: an id-only ORDER BY would reverse this.
+	created := []string{
+		"2026-10-21T12:00:00Z",
+		"2026-10-20T12:00:00Z",
+		"2026-10-19T12:00:00Z",
+	}
+	for i, f := range facts {
+		if _, err := s.db.Exec(`UPDATE facts SET created = ? WHERE id = ?`, created[i], f.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cands, err := s.Candidates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cands) != 3 {
+		t.Fatalf("candidates = %d, want 3", len(cands))
+	}
+	for i, want := range []string{facts[0].ID, facts[1].ID, facts[2].ID} {
+		if cands[i].ID != want {
+			t.Fatalf("candidate %d = %s, want %s (order: %v)", i, cands[i].ID, want, cands)
 		}
 	}
 }

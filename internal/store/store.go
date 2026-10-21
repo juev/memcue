@@ -353,6 +353,11 @@ func (s *Store) AddWith(content string, keywords []string, origin, expires strin
 	return facts[0], nil
 }
 
+// entropy makes the random part of a ULID increase, so facts written in the same millisecond still order by creation.
+// It is safe for concurrent use. A base written without it can hold same-millisecond facts in random order, so the
+// readers that mean "newest" also order by created.
+var entropy = ulid.Monotonic(rand.Reader, 0)
+
 // AddBatch stores several new facts in one transaction: either every fact is written and indexed, or none is. A
 // retry after a database error therefore sees the same base, not a half-applied extraction.
 func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
@@ -365,7 +370,7 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 		if err := ValidExpiry(in.Expires); err != nil {
 			return nil, err
 		}
-		id, err := ulid.New(ulid.Timestamp(s.now()), rand.Reader)
+		id, err := ulid.New(ulid.Timestamp(s.now()), entropy)
 		if err != nil {
 			return nil, err
 		}
@@ -497,11 +502,12 @@ func state(f Fact) string {
 	return f.Status
 }
 
-// Candidates returns the latest version of every fact that waits for approval, newest first.
+// Candidates returns the latest version of every fact that waits for approval, newest first. Created comes first
+// because a base written before the monotonic ids can hold same-millisecond facts in random id order.
 func (s *Store) Candidates() ([]Fact, error) {
 	return s.query(`SELECT `+qualified("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
-		ORDER BY f.id DESC`, Active, Candidate)
+		ORDER BY f.created DESC, f.id DESC`, Active, Candidate)
 }
 
 // CardFacts returns the facts a session-start card carries: global rules and the decisions of the given repository,

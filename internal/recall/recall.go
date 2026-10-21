@@ -85,7 +85,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		if pi, pj := place(hits[i]), place(hits[j]); pi != pj {
 			return pi < pj
 		}
-		return hits[i].ID > hits[j].ID
+		return newer(hits[i], hits[j])
 	})
 	served := hits
 	if maxFacts := capFacts(p.MaxFacts, len(hits)); len(hits) > maxFacts {
@@ -110,6 +110,15 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		}
 	}
 	return served, nil
+}
+
+// newer orders two facts of the same rank: by creation time first, because a base written before the monotonic ids
+// can hold same-millisecond facts whose ids are in random order, then by id for a stable order.
+func newer(a, b Hit) bool {
+	if !a.Created.Equal(b.Created) {
+		return a.Created.After(b.Created)
+	}
+	return a.ID > b.ID
 }
 
 // capFacts returns how many of the available facts a pass may serve. A non-positive MaxFacts means no cap: every
