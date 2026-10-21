@@ -274,6 +274,25 @@ test('a turn end sends the new messages to extract-messages', async () => {
 	])
 })
 
+test('a short tail is flushed on session/disposed', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-88')
+	const { listeners } = mount({ stateDir, minNewChars: 1000 })
+	const events = [{ type: 'user/message', data: userMessage('short tail') }]
+	const session = { id: 's88', seq: events.length, eventAt: (seq) => events[seq] }
+
+	const [turnEnd] = listeners.get('session/event')
+	turnEnd(session, { type: 'turn/end', data: { turn: 1, reason: 'stop' } })
+	await new Promise((resolve) => setTimeout(resolve, 150))
+	assert.equal((await readFile(log, 'utf8')).includes('extract-input'), false)
+
+	const [disposed] = listeners.get('session/disposed')
+	disposed(session)
+	const text = await waitForLog('extract-input')
+	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'short tail' }])
+	await waitForState(join(stateDir, 's88.json'), (state) => state.seq === 1 && state.pending === null)
+})
+
 test('tool calls travel with the assistant message', async () => {
 	await resetLog()
 	const { listeners } = mount()
