@@ -27,6 +27,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway,
           even after approval (default true; mirrored facts carry the origin ``hermes-memory``)
+  session_card: deliver the session card (global rules and repository decisions) with the first turn of a session
+          and again after a compression (default true; the card stays in the conversation, not the system prompt)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
   usage_log: write ``usage.log``, whether a reply used the facts it was given (default false; MEMCUE_USAGE_LOG=1 in
@@ -147,6 +149,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._writes = True
         self._context = "primary"
         self._generation = 0  # grows with every compression: the facts of an earlier context may come again
+        self._session_card = _on(self._config.get("session_card", True))
+        self._card_generation = -1  # the generation whose card has already been delivered
         self._lock = threading.Lock()
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
@@ -194,6 +198,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
         self._context = str(kwargs.get("agent_context") or "primary")
+        self._card_generation = -1
         if self._writes:
             # A batch that was in flight when the gateway stopped is still on disk: retry it on the next flush.
             if saved := self._saved_pending(session_id):
@@ -204,6 +209,31 @@ class MemcueMemoryProvider(MemoryProvider):
                 "Stored facts that match a message arrive with it; they may be out of date and say when they were "
                 "learnt. Your memory tool writes are copied into memcue. To fix a stored fact, find it with "
                 "memcue_search, then memcue_correct or memcue_retire.")
+
+    def _card_text(self) -> str:
+        """The session card: global rules and the decisions of the current repository, once per session and again
+        after a compression. It rides with the first prefetch, so it stays in the conversation instead of being
+        repeated in every system prompt. A card is a view of the base: the next one reflects corrections and
+        retirements."""
+        if not self._session_card or self._card_generation == self._generation:
+            return ""
+        if not self._facts or not Path(self._facts).exists():
+            return ""
+        session = (self._session_id or "").strip()
+        payload: dict[str, Any] = {"cwd": self._workspace,
+                                   "source": "compact" if self._generation else "startup"}
+        scope = self._scope(session)
+        if scope:
+            payload["session_id"] = scope
+        ok, out = self._run(["session-card"], stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
+        if not ok or not out:
+            return ""
+        try:
+            card = json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
+        except (ValueError, KeyError, TypeError):
+            return ""
+        self._card_generation = self._generation
+        return card
 
     # -- memcue calls -------------------------------------------------------
 
@@ -244,8 +274,9 @@ class MemcueMemoryProvider(MemoryProvider):
     def prefetch(self, query: str, *, session_id: str = "") -> str:
         if self._context == "cron":
             return ""  # a cron turn is a background task's notice: its wrapper matches facts, not a request of a user
+        card = self._card_text()
         if not query or not query.strip() or not Path(self._facts).exists():
-            return ""
+            return card + ("\n" if card else "")
         payload: dict[str, Any] = {"prompt": query, "cwd": self._workspace}
         scope = self._scope((session_id or self._session_id).strip())
         if scope:
@@ -254,14 +285,15 @@ class MemcueMemoryProvider(MemoryProvider):
         if not ok or not out:
             if not ok:
                 self._warn_recall_failure(session_id or self._session_id, out)
-            return ""
+            return card + ("\n" if card else "")
         try:
             text = json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
         except (ValueError, KeyError, TypeError):
-            return ""
+            return card + ("\n" if card else "")
         kept = self._keep_useful_lines(text)
         self._remember_delivered(session_id or self._session_id, kept)
-        return "\n".join(kept) + ("\n" if kept else "")
+        parts = [part for part in (card, "\n".join(kept)) if part]
+        return "\n".join(parts) + ("\n" if parts else "")
 
     def _warn_recall_failure(self, session: str, reason: str) -> None:
         """A failed recall is silent memory loss: say it once a session rather than on every turn."""
@@ -650,6 +682,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = new_session_id
         if previous != new_session_id:
             self._generation = 0
+            self._card_generation = -1
         if reset:
             with self._pending_lock:
                 for session in (previous, new_session_id):
@@ -660,6 +693,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 self._delivered.pop(session, None)
                 self._warned.pop(session, None)
             self._generation = 0
+            self._card_generation = -1
         if rewound:
             with self._pending_lock:
                 self._pending.pop(new_session_id, None)

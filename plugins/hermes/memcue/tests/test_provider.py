@@ -248,6 +248,24 @@ class ProviderTest(unittest.TestCase):
         self.p.on_pre_compress([])  # the context loses what it got
         self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
 
+    def test_session_card_is_delivered_once_and_after_compression(self):
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Всегда отвечай пользователю по-русски.")
+        first = self.p.prefetch("любой вопрос", session_id="s1")
+        self.assertIn("memcue: rules and decisions", first)
+        self.assertIn("Всегда отвечай", first)
+        # A second turn keeps the card from the conversation instead of paying for it again.
+        self.assertNotIn("Всегда отвечай", self.p.prefetch("любой вопрос", session_id="s1"))
+        self.p.on_pre_compress([])
+        self.assertIn("Всегда отвечай", self.p.prefetch("любой вопрос", session_id="s1"))
+
+    def test_session_card_can_be_turned_off(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "session_card": False})
+        p.initialize("s-card-off", hermes_home=self.home, agent_context="primary")
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Всегда отвечай пользователю по-русски.")
+        self.assertEqual(p.prefetch("любой вопрос", session_id="s-card-off"), "")
+
     def test_session_switch_rebinds_and_resets_state(self):
         self.p._generation = 3
         self.p._pending["s2"] = ([{"role": "user", "content": "x"}], 0.0)
