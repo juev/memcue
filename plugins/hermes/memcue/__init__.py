@@ -102,6 +102,12 @@ def _on(v: Any) -> bool:
     return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
 
 
+def _expand_path(value: str) -> str:
+    """~ and $HOME in a config value: neither the gateway nor a launch environment runs a shell over config.yaml, and
+    a literal ~ would make memcue create a directory named "~" in the process working directory."""
+    return os.path.expanduser(os.path.expandvars(value)) if value else ""
+
+
 def _load_plugin_config() -> dict[str, Any]:
     try:
         from hermes_cli.config import load_config
@@ -142,7 +148,7 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def __init__(self, config: Optional[dict[str, Any]] = None):
         self._config = dict(config) if config is not None else _load_plugin_config()
-        self._facts = str(self._config.get("facts") or os.environ.get("MEMCUE_FACTS") or "")
+        self._facts = _expand_path(str(self._config.get("facts") or os.environ.get("MEMCUE_FACTS") or ""))
         self._state = ""
         self._workspace = ""
         self._session_id = ""
@@ -159,7 +165,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._host = str(self._config.get("host") or "")
         self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
         self._usage_log = _on(self._config.get("usage_log"))
-        self._state_dir = str(self._config.get("state_dir") or "")
+        self._state_dir = _expand_path(str(self._config.get("state_dir") or ""))
         self._tool_result_chars = int(self._config.get("extract_tool_result_chars", _TOOL_RESULT))
         self._max_message = int(self._config.get("extract_max_message_chars", _MAX_MESSAGE))
         self._pending: dict[str, tuple[list[dict[str, Any]], float]] = {}  # session -> new messages, last turn
@@ -177,16 +183,23 @@ class MemcueMemoryProvider(MemoryProvider):
         return "memcue"
 
     def _binary(self) -> Optional[str]:
-        configured = str(self._config.get("binary") or "")
+        configured = _expand_path(str(self._config.get("binary") or ""))
         if configured:
             return configured if os.access(configured, os.X_OK) else None
         return shutil.which("memcue")
 
     def is_available(self) -> bool:
-        return self._binary() is not None
+        return self._binary() is not None and self._facts_ok()
 
     def unavailable_reason(self) -> str:
+        if not self._facts_ok():
+            return f"memcue facts must be an absolute path: {self._facts}"
         return "memcue binary not found: put it on PATH or set memory.memcue.binary"
+
+    def _facts_ok(self) -> bool:
+        """An empty paths means "the binary's default"; anything else must be absolute, so every host resolves the same
+        file instead of one relative to its own working directory."""
+        return not self._facts or os.path.isabs(self._facts)
 
     def initialize(self, session_id: str, **kwargs) -> None:
         home = Path(str(kwargs.get("hermes_home") or os.environ.get("HERMES_HOME") or Path.home() / ".hermes"))

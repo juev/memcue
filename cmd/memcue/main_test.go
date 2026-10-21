@@ -443,3 +443,22 @@ func TestAddExpiresAndFactsShowsIt(t *testing.T) {
 		t.Error("bad date accepted")
 	}
 }
+
+// A ~ in MEMCUE_FACTS is expanded rather than becoming a directory named "~" in the working directory: a YAML profile
+// or a launcher sets the variable without a shell.
+func TestFactsPathExpandsHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, tc := range []struct{ in, want string }{
+		{"~/memory/facts.db", filepath.Join(home, "memory", "facts.db")},
+		{"$HOME/memory/facts.db", filepath.Join(home, "memory", "facts.db")},
+		{"~", home},
+		{"/absolute/facts.db", "/absolute/facts.db"},
+		{"relative/facts.db", "relative/facts.db"},
+	} {
+		t.Setenv("MEMCUE_FACTS", tc.in)
+		if got := factsPath(); got != tc.want {
+			t.Errorf("factsPath(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

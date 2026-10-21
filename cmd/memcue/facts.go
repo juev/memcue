@@ -21,9 +21,28 @@ import (
 
 func factsPath() string {
 	if p := os.Getenv("MEMCUE_FACTS"); p != "" {
-		return p
+		return expandHome(p)
 	}
 	return filepath.Join(claudeDir(), "memory", "facts.db")
+}
+
+// expandHome resolves a leading ~/ or $HOME/ that a shell would have expanded but an env set by a launcher or a YAML
+// profile does not. A bare ~ is the home directory. Anything else is returned as it is; a path that still starts with
+// ~ is a configuration mistake the caller reports rather than a directory named "~" in the working directory.
+func expandHome(p string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return p
+	}
+	switch {
+	case p == "~":
+		return home
+	case strings.HasPrefix(p, "~/"):
+		return filepath.Join(home, p[len("~/"):])
+	case strings.HasPrefix(p, "$HOME/"):
+		return filepath.Join(home, p[len("$HOME/"):])
+	}
+	return p
 }
 
 func splitKeywords(s string) []string {

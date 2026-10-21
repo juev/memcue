@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 
@@ -26,6 +26,7 @@ let log
 const STUB = `#!/bin/sh
 printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
 printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
+printf 'facts: %s\\n' "$MEMCUE_FACTS" >> "$MEMCUE_STUB_LOG"
 case "$1" in
   session-card)
     payload=$(cat)
@@ -668,6 +669,15 @@ test('tool output sent to extraction is capped', async () => {
 	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
 	assert.equal(sent[1].role, 'tool')
 	assert.equal(sent[1].content.length, 10)
+})
+
+test('a ~ in facts is expanded and a relative facts path is rejected', async () => {
+	await resetLog()
+	const { listeners } = mount({ facts: '~/memcue/facts.db' })
+	await preStep(listeners, [userMessage('hello there')])
+	const text = await waitForLog('facts: ')
+	assert.ok(text.includes(`facts: ${join(homedir(), 'memcue', 'facts.db')}`), text)
+	assert.throws(() => mount({ facts: 'relative/facts.db' }), /facts must be an absolute path/)
 })
 
 test('a missing binary costs the facts, not the step', async () => {
