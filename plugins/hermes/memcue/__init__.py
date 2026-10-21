@@ -305,10 +305,12 @@ class MemcueMemoryProvider(MemoryProvider):
         return env
 
     def _extract_command(self, binary: str, event: str, session: str) -> list[str]:
-        """The command that extracts one batch. A final flush is the last chance for this tail, so it lowers memcue's
-        minimum; a threshold or idle run waits for the next trigger instead."""
-        cmd = [binary, "extract-messages", "-origin", self._origin(), "-session", session or self._session_id,
-               "-event", event]
+        """The command that extracts one batch. The workspace names the repository in origin, as it does for Claude
+        Code and DSH. A final flush is the last chance for this tail, so it lowers memcue's minimum; a threshold or
+        idle run waits for the next trigger instead."""
+        cmd = [binary, "extract-messages", "-session", session or self._session_id, "-event", event]
+        if self._workspace:
+            cmd += ["-cwd", self._workspace]
         if event in _FINAL_EVENTS:
             cmd += ["-min-chars", "1"]
         return cmd
@@ -767,7 +769,9 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_add":
             if not arg("content"):
                 return tool_error("content is required")
-            cmd = ["add", "-source", "agent", "-origin", self._origin()]  # the model writes it, not the user
+            cmd = ["add", "-source", "agent"]  # the model writes it, not the user
+            if self._workspace:
+                cmd += ["-cwd", self._workspace]
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]
             if arg("expires"):
