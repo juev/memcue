@@ -130,7 +130,7 @@ func sessionCard(cwd string) (string, []string, error) {
 		return "", nil, err
 	}
 	defer func() { _ = s.Close() }()
-	facts, err := s.CardFacts(tier.Of(cwd, claudeDir()), time.Now().UTC().Format(time.DateOnly))
+	facts, err := s.CardFacts(tier.Of(cwd, claudeDir()), store.Today())
 	if err != nil {
 		return "", nil, err
 	}

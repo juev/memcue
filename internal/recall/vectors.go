@@ -3,7 +3,6 @@ package recall
 import (
 	"context"
 	"sort"
-	"time"
 
 	"github.com/juev/memcue/internal/store"
 )
@@ -119,7 +118,7 @@ func vectorCandidates(s *store.Store, prompt string, p Params, e Embedder, n int
 	}
 	today := p.Today
 	if today == "" {
-		today = time.Now().UTC().Format(time.DateOnly)
+		today = store.Today()
 	}
 	type candidate struct {
 		row store.VectorRow

@@ -320,7 +320,7 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		if days <= 0 {
 			days = 14
 		}
-		until := time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
+		until := time.Now().AddDate(0, 0, days).Format(time.DateOnly)
 		for i := range decided {
 			d := &decided[i]
 			// Only a model that read the candidate and said "unsure" may become provisional. A failed or empty

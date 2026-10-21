@@ -353,6 +353,17 @@ func TestBadExpiryIsRejected(t *testing.T) {
 	}
 }
 
+// An expiry is a local calendar day: the same instant is 21 October in UTC and 22 October in a +03:00 zone.
+func TestTodayAtUsesTheTimesLocation(t *testing.T) {
+	instant := time.Date(2026, 10, 21, 23, 30, 0, 0, time.UTC)
+	if got := TodayAt(instant); got != "2026-10-21" {
+		t.Errorf("UTC date = %s, want 2026-10-21", got)
+	}
+	if got := TodayAt(instant.In(time.FixedZone("MSK", 3*3600))); got != "2026-10-22" {
+		t.Errorf("+03:00 date = %s, want 2026-10-22", got)
+	}
+}
+
 func TestBaseWithoutExpiresColumnStillOpens(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "old.db")
 	db, err := sql.Open("sqlite", "file:"+path)
