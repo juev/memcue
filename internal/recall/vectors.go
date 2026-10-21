@@ -59,22 +59,49 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 		if pi != pj {
 			return !pi
 		}
-		return scores[order[i]] > scores[order[j]]
-	})
-	maxFacts := capFacts(p.MaxFacts, len(order))
-	var hits []Hit
-	for _, i := range order {
-		if len(hits) >= maxFacts {
-			break
+		if scores[order[i]] != scores[order[j]] {
+			return scores[order[i]] > scores[order[j]]
 		}
+		// Equal score: the same tie-break as the lexical pass, so enabling the judge does not silently drop the
+		// host or repository preference.
+		if pi, pj := place(candidates[order[i]], sessionTier, p.Host),
+			place(candidates[order[j]], sessionTier, p.Host); pi != pj {
+			return pi < pj
+		}
+		return candidates[order[i]].ID > candidates[order[j]].ID
+	})
+	// Keep every fact above the threshold first, then cut: the omitted tail is what the displacement flag is about.
+	var eligible []Hit
+	for _, i := range order {
 		if scores[i] < r.Min() {
 			break
 		}
 		h := candidates[i]
 		h.Meaning = scores[i]
-		hits = append(hits, h)
+		eligible = append(eligible, h)
 	}
-	return hits, nil
+	maxFacts := capFacts(p.MaxFacts, len(eligible))
+	served := eligible
+	if len(eligible) > maxFacts {
+		served = eligible[:maxFacts]
+	}
+	if p.Host != "" {
+		omitted := false
+		for _, h := range eligible[len(served):] {
+			if hostScope(h.Scope, p.Host) {
+				omitted = true
+				break
+			}
+		}
+		if omitted {
+			for i := range served {
+				if otherHostScope(served[i].Scope, p.Host) {
+					served[i].Displaced = true
+				}
+			}
+		}
+	}
+	return served, nil
 }
 
 // vectorCandidates returns up to n active facts closest to the prompt by cosine. Only the VectorPool most recently

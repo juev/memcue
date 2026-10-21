@@ -292,3 +292,82 @@ func ids(hits []Hit) []string {
 	}
 	return out
 }
+
+// Enabling the judge must not drop the host tie-break: two facts with the same score are ordered by place, and the
+// displacement flag names the host fact left out behind another host's fact.
+func TestRecallJudgeKeepsTheHostTieBreak(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	const text = "Порог покрытия поднят до 0.25 для поиска фактов."
+	other, err := s.AddWith(text, nil, "demo 2026-10-20", "", store.Meta{Scope: "host:other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := s.AddWith(text, nil, "demo 2026-10-21", "", store.Meta{Scope: "host:box"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Порог": 0.9}}
+	p := rankedParams()
+	p.MaxFacts = 1
+
+	p.Host = "box"
+	hits, err := RecallJudge(s, "порог покрытия поиск фактов", "", p, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != current.ID {
+		t.Fatalf("hits = %v, want the fact of this host %s", ids(hits), current.ID)
+	}
+	if hits[0].Displaced {
+		t.Error("a served fact of this host is marked displaced")
+	}
+
+	p.Host = "other"
+	hits, err = RecallJudge(s, "порог покрытия поиск фактов", "", p, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != other.ID {
+		t.Fatalf("hits = %v, want the fact of this host %s", ids(hits), other.ID)
+	}
+	if hits[0].Displaced {
+		t.Error("a served fact of this host is marked displaced")
+	}
+}
+
+// A foreign fact with a higher score wins on rank, not on place; when it takes the last slot while a fact of this
+// host is left out, the log must say so.
+func TestRecallJudgeMarksDisplacement(t *testing.T) {
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	foreign, err := s.AddWith("Порог покрытия поднят до 0.95 для поиска фактов.", nil, "demo 2026-10-20", "",
+		store.Meta{Scope: "host:other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Порог покрытия поднят до 0.25 для поиска фактов.", nil, "demo 2026-10-21", "",
+		store.Meta{Scope: "host:box"}); err != nil {
+		t.Fatal(err)
+	}
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"0.95": 0.95, "0.25": 0.8}}
+	p := rankedParams()
+	p.MaxFacts = 1
+	p.Host = "box"
+	hits, err := RecallJudge(s, "порог покрытия поиск фактов", "", p, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != foreign.ID {
+		t.Fatalf("hits = %v, want the higher-scored foreign fact %s", ids(hits), foreign.ID)
+	}
+	if !hits[0].Displaced {
+		t.Error("the omitted fact of this host did not mark the served foreign fact as displaced")
+	}
+}

@@ -64,17 +64,6 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	}
 	// Ties: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
 	// then the newer fact. The host only orders facts of equal coverage; it never excludes another host's fact.
-	place := func(h Hit) int {
-		switch {
-		case hostScope(h.Scope, p.Host):
-			return 0
-		case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
-			return 1
-		case strings.HasPrefix(h.Origin, tier.Global+" "):
-			return 2
-		}
-		return 3
-	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		if hits[i].Provisional != hits[j].Provisional {
 			return !hits[i].Provisional
@@ -82,7 +71,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		if hits[i].Coverage != hits[j].Coverage {
 			return hits[i].Coverage > hits[j].Coverage
 		}
-		if pi, pj := place(hits[i]), place(hits[j]); pi != pj {
+		if pi, pj := place(hits[i], sessionTier, p.Host), place(hits[j], sessionTier, p.Host); pi != pj {
 			return pi < pj
 		}
 		return newer(hits[i], hits[j])
@@ -110,6 +99,20 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		}
 	}
 	return served, nil
+}
+
+// place ranks a fact for a tie of equal coverage: this host first, then the session's repository, then a global
+// origin, then everything else. The host only orders facts; it never excludes another host's fact.
+func place(h Hit, sessionTier, host string) int {
+	switch {
+	case hostScope(h.Scope, host):
+		return 0
+	case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
+		return 1
+	case strings.HasPrefix(h.Origin, tier.Global+" "):
+		return 2
+	}
+	return 3
 }
 
 // newer orders two facts of the same rank: by creation time first, because a base written before the monotonic ids
