@@ -86,8 +86,8 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		return hits[i].ID > hits[j].ID
 	})
 	served := hits
-	if len(hits) > p.MaxFacts {
-		served = hits[:p.MaxFacts]
+	if maxFacts := capFacts(p.MaxFacts, len(hits)); len(hits) > maxFacts {
+		served = hits[:maxFacts]
 	}
 	// Did another host take one of the slots while a fact of this host was left out? The log uses this to decide
 	// whether a hard filter is ever needed; it never changes the choice.
@@ -108,6 +108,15 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		}
 	}
 	return served, nil
+}
+
+// capFacts returns how many of the available facts a pass may serve. A non-positive MaxFacts means no cap: every
+// caller takes that as "all of them", so a zero never serves nothing and a negative one never slices past the start.
+func capFacts(maxFacts, available int) int {
+	if maxFacts <= 0 {
+		return available
+	}
+	return maxFacts
 }
 
 // recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the

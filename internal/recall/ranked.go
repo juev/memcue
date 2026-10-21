@@ -54,10 +54,7 @@ func ranked(s *store.Store, prompt string, p Params, r Ranker) ([]Hit, bool) {
 		order[i] = i
 	}
 	sort.SliceStable(order, func(a, b int) bool { return scores[order[a]] > scores[order[b]] })
-	maxFacts := p.MaxFacts
-	if maxFacts <= 0 {
-		maxFacts = len(order)
-	}
+	maxFacts := capFacts(p.MaxFacts, len(order))
 	var hits []Hit
 	for _, i := range order {
 		if len(hits) >= maxFacts {
