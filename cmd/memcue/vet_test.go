@@ -218,6 +218,44 @@ func TestVetNoModel(t *testing.T) {
 	}
 }
 
+// A note file that cannot be read must skip the mirror rule, not apply it to the notes that were readable: those are
+// not the whole note, and a mirror they do not hold is not a deleted one. This file already needs POSIX for
+// syscall.Flock; the mode check only has to skip root, which reads a mode-000 file anyway.
+func TestVetUnreadableNoteSkipsMirrors(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read a mode-000 file")
+	}
+	dir := env(t)
+	notes := filepath.Join(dir, "notes")
+	if err := os.MkdirAll(notes, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(notes, "MEMORY.md"), []byte("Пользователь предпочитает короткие ответы."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	locked := filepath.Join(notes, "PRIVATE.md")
+	if err := os.WriteFile(locked, []byte("Пользователь пишет коммиты по-английски."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o600) })
+
+	quarantine(t) // keep an undecided mirror a candidate rather than turning it provisional
+	mirror := vetFact(t, "Пользователь пишет коммиты по-английски.", "hermes-memory 2026-10-20", "memory")
+	var out bytes.Buffer
+	if err := runVet([]string{"-memory", notes, "-no-model"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, mirror); f.Status != store.Active {
+		t.Errorf("an unreadable note retired its mirror: %+v", f)
+	}
+	if !strings.Contains(out.String(), "осталось решать 1") {
+		t.Errorf("report:\n%s", out.String())
+	}
+}
+
 // A session reviews only the ids it stored, and only when MEMCUE_VET=1 and an endpoint is set: the extraction path
 // must not start a model call on its own.
 func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
