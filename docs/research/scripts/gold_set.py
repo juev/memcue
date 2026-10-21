@@ -167,6 +167,7 @@ def stage_label(args):
 
 
 def decisions(url, model, key, prompt, facts):
+    """Ask one noul per fact. facts is a list of (id, text) pairs, in order."""
     state = ["Prompt: " + prompt, "Candidate facts:"] + ["[%d] %s" % (i, t) for i, t in enumerate(facts, 1)]
     questions = {"f%d" % i: {"type": "noul", "instructions": "Would fact [%d] help answer the prompt?" % i}
                  for i in range(1, len(facts) + 1)}
@@ -192,7 +193,7 @@ def stage_rerank(args):
             facts = [(c["id"], text[c["id"]]) for c in cands]
             started = time.perf_counter()
             try:
-                scores, usage = decisions(args.url, args.model, key, prompt["text"], [t for _, t in facts])
+                scores, usage = decisions(args.url, args.model, key, prompt["text"], facts)
             except (urllib.error.HTTPError, ValueError, KeyError) as err:
                 print("%s: rerank failed: %s" % (prompt["id"], err), file=sys.stderr)
                 continue
