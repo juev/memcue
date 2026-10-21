@@ -107,20 +107,23 @@ the bundle metadata and that the bundle patch points at the loadable ESM entry.
 
 ## Releasing
 
-The standalone package is published as `memcue-dsh`. A maintainer can publish manually; npm asks for the 2FA code:
+The standalone package is published as `memcue-dsh`.
+
+CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. It uses npm
+Trusted Publishing (OIDC): the workflow has `id-token: write`, no token, and no `NPM_TOKEN` secret. The trusted
+publisher is configured for the `juev/memcue` repository and the `publish-dsh.yml` workflow, with direct publish and
+stage-publish allowed.
+
+A maintainer can still publish manually; npm asks for the 2FA code:
 
 ```sh
 cd plugins/deepseek-harness
 npm publish --access public
 ```
 
-CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. Set the repository
-secret `NPM_TOKEN` to a granular access token with read/write access to `memcue-dsh`.
-
-A granular token without the 2FA bypass cannot run `npm publish`: npm answers with `EOTP` or a `403` that asks for
-two-factor authentication. Either enable bypass on the token, switch the workflow to `npm stage publish` and approve
-the stage with `npm stage approve <id>`, or configure npm Trusted Publishing for the GitHub repository and workflow
-and drop `NPM_TOKEN` in favour of OIDC (`id-token: write` is already set).
+A fork needs its own trusted publisher, or a granular `NPM_TOKEN` on a `NODE_AUTH_TOKEN` environment variable. A
+granular token without the 2FA bypass cannot run `npm publish`: use `npm stage publish` and approve the stage with
+`npm stage approve <id>`.
 
 ## What differs from the Hermes plugin
 

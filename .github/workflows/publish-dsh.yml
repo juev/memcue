@@ -19,6 +19,7 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Check the tag names the package version
         if: startsWith(github.ref, 'refs/tags/dsh-v')
@@ -29,10 +30,8 @@ jobs:
         working-directory: plugins/deepseek-harness
         run: node --check src/index.mjs
 
+      # npm Trusted Publishing: the OIDC token comes from id-token: write, so
+      # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
       - name: Publish
         working-directory: plugins/deepseek-harness
-        run: npm publish --access public --provenance
-        env:
-          # Granular token with publish access to memcue-dsh. A token without
-          # the 2FA bypass must use `npm stage publish` plus manual approval.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
