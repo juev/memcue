@@ -500,3 +500,32 @@ func TestExtractMessagesStoresFactsWithOrigin(t *testing.T) {
 		t.Error("want error for bad input")
 	}
 }
+
+func TestExtractMessagesMinCharsLetsAFinalTailThrough(t *testing.T) {
+	dir := env(t)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	calls := 0
+	extractFn = func(origin, text string) (extracted, error) {
+		calls++
+		return extracted{Facts: []extract.Fact{{Content: "Порт demo 55432.", Keywords: []string{"порт"},
+			Kind: "environment", Source: "user", Scope: "service:demo", Evidence: "Порт demo 55432."}}}, nil
+	}
+	t.Cleanup(func() { extractFn = extractText })
+	short := `[{"role":"user","content":"Порт demo 55432."}]`
+
+	if err := runExtractMessages(nil, strings.NewReader(short)); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 {
+		t.Fatalf("short text reached the model without an override: %d calls", calls)
+	}
+	if err := runExtractMessages([]string{"-min-chars", "1"}, strings.NewReader(short)); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("short text did not reach the model with -min-chars 1: %d calls", calls)
+	}
+	if err := runExtractMessages([]string{"-min-chars", "-1"}, strings.NewReader(short)); err == nil {
+		t.Error("negative -min-chars accepted")
+	}
+}

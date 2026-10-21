@@ -41,7 +41,7 @@ commands:
   session-card    session-start without the note: the card for a host that has its own instructions
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
-  extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin)
+  extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-session ID] [-event E] [-min-chars N]
   search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
   recall    print what a prompt would recall: memcue recall [-cwd DIR] TEXT
   eval      measure recall and noise against labelled sets

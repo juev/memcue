@@ -325,13 +325,18 @@ func extractSession(path string, rec *extractRecord) error {
 	}
 	rec.To, rec.Chars = sess.Lines, len(sess.Text)
 	rec.Origin = strings.TrimSpace(tier.Of(sess.CWD, claudeDir()) + " " + sess.Start)
-	return storeExtracted(sess.Text, rec)
+	return storeExtracted(sess.Text, rec, minNew)
 }
 
 // storeExtracted runs the extraction over rendered text and stores the facts that pass the policy as candidates with
-// rec.Origin: recall gives them only after the user approves them. Too little text waits.
-func storeExtracted(text string, rec *extractRecord) error {
-	if rec.Chars < minNew {
+// rec.Origin: recall gives them only after the user approves them. Too little text waits: minChars is chosen by the
+// caller, so a host that flushes a final short tail can lower it without changing the transcript path.
+func storeExtracted(text string, rec *extractRecord, minChars int) error {
+	if rec.Chars == 0 {
+		rec.Skipped = "no text"
+		return nil
+	}
+	if rec.Chars < minChars {
 		rec.Skipped = "too little new text"
 		return nil
 	}
@@ -448,14 +453,18 @@ func writeOffset(f *os.File, n int) error {
 func appendLog(path string, rec extractRecord) error { return appendJSON(path, rec) }
 
 // runExtractMessages extracts and stores the facts of chat messages in the OpenAI shape read from stdin: the session
-// of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-session ID].
+// of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-session ID] [-min-chars N].
 func runExtractMessages(args []string, in io.Reader) error {
 	fs := flag.NewFlagSet("extract-messages", flag.ContinueOnError)
 	origin := fs.String("origin", "", "where the facts were learnt, e.g. \"hermes 2026-10-19\"")
 	session := fs.String("session", "", "session id, for the log")
 	event := fs.String("event", "", "what started the run, for the log")
+	minChars := fs.Int("min-chars", minNew, "least rendered text worth a model call")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *minChars < 0 {
+		return errors.New("extract-messages: -min-chars must be >= 0")
 	}
 	var msgs []transcript.Message
 	if err := json.NewDecoder(in).Decode(&msgs); err != nil {
@@ -464,7 +473,7 @@ func runExtractMessages(args []string, in io.Reader) error {
 	text := transcript.RenderMessages(msgs)
 	rec := extractRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: *session, Event: *event,
 		Origin: *origin, To: len(msgs), Chars: len(text)}
-	err := storeExtracted(text, &rec)
+	err := storeExtracted(text, &rec, *minChars)
 	if err != nil {
 		rec.Error = err.Error()
 	}
