@@ -214,8 +214,8 @@ func TestVetNoModel(t *testing.T) {
 // must not start a model call on its own.
 func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	env(t)
-	old := extract.Judge.URL
-	t.Cleanup(func() { extract.Judge.URL = old })
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
 	newer := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
 	older := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-20", "tool")
 	calls := fakeJudge(t, judgeByID(newer))
@@ -229,7 +229,7 @@ func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	if len(*calls) != 0 {
 		t.Fatal("a missing endpoint reviewed the queue")
 	}
-	extract.Judge.URL = "http://127.0.0.1:1"
+	extract.API.URL = "http://127.0.0.1:1"
 	maybeVet([]string{newer})
 	if len(*calls) != 1 {
 		t.Fatalf("review calls %d", len(*calls))

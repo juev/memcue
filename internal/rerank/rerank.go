@@ -2,7 +2,7 @@
 // prompt. It is the cheap half of the earlier idea: the candidates come from FTS5, so nothing has to be embedded, and
 // one request carries ten facts instead of the whole base.
 //
-// Off unless MEMCUE_RERANK_URL names an endpoint and a key is at hand; recall then keeps its lexical answer whenever
+// Off unless MEMCUE_JUDGE_URL, _MODEL and _KEY are set; recall then keeps its lexical answer whenever
 // the call fails, times out or finds nothing above the threshold.
 package rerank
 
@@ -39,47 +39,40 @@ type Settings struct {
 	URL        string
 	Model      string
 	Key        string
-	KeyEnv     string
 	Timeout    time.Duration
 	Min        float64
 	Candidates int
 	StateFile  string // where the pause is remembered between processes
 }
 
-// FromEnv reads MEMCUE_RERANK_URL, _MODEL, _KEY (or _KEY_ENV, default OPENROUTER_API_KEY), _TIMEOUT, _MIN and
-// _CANDIDATES. It returns nil when no endpoint is named, which is the default.
+// FromEnv reads the one judge endpoint and the rerank knobs: MEMCUE_JUDGE_URL, _MODEL and _KEY, then
+// MEMCUE_JUDGE_RERANK_TIMEOUT, _MIN and _CANDIDATES. It returns nil when the judge is not fully configured.
 func FromEnv() *Settings {
-	raw := strings.TrimSpace(os.Getenv("MEMCUE_RERANK_URL"))
-	if raw == "" {
+	raw := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_URL"))
+	model := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_MODEL"))
+	key := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_KEY"))
+	if raw == "" || model == "" || key == "" {
 		return nil
 	}
 	s := &Settings{
 		URL:        raw,
-		Model:      envOr("MEMCUE_RERANK_MODEL", DefaultModel),
-		KeyEnv:     envOr("MEMCUE_RERANK_KEY_ENV", "OPENROUTER_API_KEY"),
+		Model:      model,
+		Key:        key,
 		Timeout:    DefaultTimeout,
 		Min:        DefaultMin,
 		Candidates: DefaultCandidates,
 	}
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_RERANK_KEY")); v != "" {
-		s.Key = v
-	} else if v := strings.TrimSpace(os.Getenv(s.KeyEnv)); v != "" {
-		s.Key = v
-	}
-	if s.Key == "" {
-		return nil
-	}
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_RERANK_MIN")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_RERANK_MIN")); v != "" {
 		if f, err := parseFloat(v); err == nil && f > 0 && f <= 1 {
 			s.Min = f
 		}
 	}
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_RERANK_CANDIDATES")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_RERANK_CANDIDATES")); v != "" {
 		if n, err := parseInt(v); err == nil && n >= 2 && n <= 50 {
 			s.Candidates = n
 		}
 	}
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_RERANK_TIMEOUT")); v != "" {
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_RERANK_TIMEOUT")); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 10*time.Second {
 			s.Timeout = d
 		}
@@ -232,10 +225,3 @@ func (r *Ranker) left() time.Duration {
 func parseFloat(s string) (float64, error) { return strconv.ParseFloat(s, 64) }
 
 func parseInt(s string) (int, error) { return strconv.Atoi(s) }
-
-func envOr(name, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
-		return v
-	}
-	return fallback
-}

@@ -6,9 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/juev/memcue/internal/embed"
@@ -16,26 +14,19 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// vectorParams reads the meaning-pass settings from the environment. Without MEMCUE_EMBED_URL and
-// MEMCUE_EMBED_MODEL the returned params have no embedder, and recall is exactly what it was before.
-func vectorParams() recall.VectorParams {
-	vp := recall.VectorParams{
-		Margin:   embed.ParseMargin("MEMCUE_EMBED_MARGIN", recall.DefaultVectorMargin),
-		MinScore: embed.ParseScore("MEMCUE_EMBED_MIN_SCORE"),
-		MaxFacts: embed.ParseCount("MEMCUE_EMBED_MAX_FACTS"),
-		Only:     strings.EqualFold(strings.TrimSpace(os.Getenv("MEMCUE_EMBED_MODE")), "only"),
-	}
+// embedder builds the optional vector candidate source from the environment. A nil Embedder, the default, means
+// recall is lexical (or lexical + judge) without vector candidates.
+func embedder() recall.Embedder {
 	set := embed.FromEnv()
 	if set == nil {
-		return vp
+		return nil
 	}
 	// The hook runs as a fresh process on every prompt, so the pause after a failure is remembered in a file rather
 	// than being paid again by each of the next turns.
 	if dir, err := stateDir(); err == nil {
 		set.StateFile = filepath.Join(dir, "embed.pause")
 	}
-	vp.Embedder = embed.New(set)
-	return vp
+	return embed.New(set)
 }
 
 // meaning marks a fact the vector pass added: the words never found it, so its coverage and matched count say

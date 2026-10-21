@@ -1,7 +1,7 @@
 # Three models: main, judge, embeddings
 
-Status: **accepted 2026-10-21**, target for 0.4.0. The 0.3.0 code still uses the old opt-in
-endpoint names; this document is the contract the implementation and the README will move to.
+Status: **accepted 2026-10-21 and implemented in 0.4.0.** The old opt-in endpoint names are removed;
+this document is the contract the code and the README follow.
 Implementation: [#62](https://github.com/juev/memcue/issues/62).
 
 ## Decision

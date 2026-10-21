@@ -17,16 +17,17 @@ func ranker() recall.Ranker {
 	}
 	// The hook is a fresh process on every prompt, so a pause after a failure is remembered in a file.
 	if dir, err := stateDir(); err == nil {
-		set.StateFile = filepath.Join(dir, "rerank.pause")
+		set.StateFile = filepath.Join(dir, "judge.pause")
 	}
 	return rerank.New(set)
 }
 
-// recallFacts is the one way recall is decided: by the words alone, by the words plus the meaning pass, or by the words
-// with a judge choosing the order. Every extra reader is off unless its endpoint is named.
+// recallFacts is the one way recall is decided: the words, plus vector candidates, plus the judge when it is
+// configured. A missing judge keeps the lexical answer; a missing embedder only removes the vector candidates.
 func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall.Hit, error) {
-	if r := ranker(); r != nil {
-		return recall.RecallRanked(s, prompt, tier, p, r)
+	r := ranker()
+	if r == nil {
+		return recall.Recall(s, prompt, tier, p)
 	}
-	return recall.RecallHybrid(s, prompt, tier, p, vectorParams())
+	return recall.RecallJudge(s, prompt, tier, p, r, embedder())
 }

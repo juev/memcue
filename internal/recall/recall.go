@@ -47,8 +47,9 @@ type Hit struct {
 	store.Fact
 	Coverage  float64
 	Matched   int
-	Displaced bool // a fact of another host took a slot while a fact of this host was left out
-	// Meaning is the prompt similarity of a fact the vector pass added; 0 for a fact the words found.
+	Displaced bool   // a fact of another host took a slot while a fact of this host was left out
+	Source    string // lexical or vector: which reader proposed the fact
+	// Meaning is the vector similarity of a vector candidate or the judge score after rerank; 0 for a lexical fact.
 	Meaning float64
 }
 
@@ -183,7 +184,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 			}
 		}
 		if cov := got / sum; matched >= minMatched && cov >= p.MinCoverage {
-			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched})
+			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical"})
 		}
 	}
 	return hits, nil
