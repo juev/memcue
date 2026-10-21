@@ -247,7 +247,9 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | candidates taken from each source, lexical and vector | `10` |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
+| `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
+| `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request | `10s` |
 | `MEMCUE_JUDGE_DUP_MIN` | probability of "same claim" that retires a candidate | `0.5` |
 | `MEMCUE_JUDGE_DUP_MAX_FACTS` | approved facts that fit one duplicate request | `400` |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | `1` sends the danger-zone header for the duplicate check | off |

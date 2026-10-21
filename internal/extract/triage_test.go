@@ -3,11 +3,13 @@ package extract
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/judge"
 )
@@ -40,6 +42,31 @@ func triageEndpoint(t *testing.T, status int, answer string) {
 	old := JevJudge
 	JevJudge.URL, JevJudge.Model, JevJudge.Key = srv.URL+"/api/v1/decisions", "jev", "k"
 	t.Cleanup(func() { JevJudge = old })
+}
+
+// A hung triage endpoint costs its own timeout, not the ten-minute context the dream passes, and the shared breaker
+// then refuses the next call without opening a connection.
+func TestTriageGroupTimesOutAndPausesTheEndpoint(t *testing.T) {
+	judge.Shared.Reset()
+	t.Cleanup(judge.Shared.Reset)
+	srv := hungEndpoint(t)
+	old := JevJudge
+	t.Cleanup(func() { JevJudge = old })
+	JevJudge.URL, JevJudge.Model, JevJudge.Key = srv.URL, "jev", "k"
+	JevJudge.TriageTimeout = 150 * time.Millisecond
+
+	start := time.Now()
+	_, err := TriageGroup(context.Background(), []string{"факт"})
+	elapsed := time.Since(start)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want a timeout", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("triage waited %v, want about %v", elapsed, JevJudgeTriageTimeout())
+	}
+	if _, err := TriageGroup(context.Background(), []string{"факт"}); !errors.Is(err, judge.ErrPaused) {
+		t.Errorf("after a timeout = %v, want ErrPaused", err)
+	}
 }
 
 func TestTriageGroupSumsActionProbabilities(t *testing.T) {

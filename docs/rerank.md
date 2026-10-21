@@ -16,8 +16,8 @@ the answer stays capped by `MaxFacts`.
 - **dream triage** — `MEMCUE_JUDGE_TRIAGE_MIN`;
 - **duplicate check in vet** — `MEMCUE_JUDGE_DUP_MIN`, `_DUP_MAX_FACTS`, `_DUP_LONG_CONTEXT`.
 
-There is no `MEMCUE_RERANK_*` or `MEMCUE_TRIAGE_*` endpoint pair. The role-specific variables are only thresholds and
-request limits under the judge namespace.
+There is no `MEMCUE_RERANK_*` or `MEMCUE_TRIAGE_*` endpoint pair. The role-specific variables are only thresholds,
+request limits and timeouts under the judge namespace.
 
 | Variable | Meaning |
 |---|---|
@@ -26,7 +26,9 @@ request limits under the judge namespace.
 | `MEMCUE_JUDGE_KEY` | bearer token |
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a fact is not given (default 0.5) |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | candidates taken from each source (default 10) |
-| `MEMCUE_JUDGE_RERANK_TIMEOUT` | one request (default 2 s) |
+| `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request (default 2 s) |
+| `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request (default 2 s) |
+| `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request (default 10 s) |
 
 ## Flow
 

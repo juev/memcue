@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/judge"
 )
@@ -134,6 +135,63 @@ func TestJudgeDuplicateWithoutApprovedFacts(t *testing.T) {
 	v, err := JudgeDuplicate(context.Background(), JudgeFact{ID: "c", Text: "x"}, nil)
 	if err != nil || v.P != 0 || called {
 		t.Errorf("verdict %+v err %v called %v", v, err, called)
+	}
+}
+
+// hungEndpoint accepts a request and never answers it: the client has to give up on its own.
+func hungEndpoint(t *testing.T) *httptest.Server {
+	t.Helper()
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(func() {
+		close(release)
+		srv.Close()
+	})
+	return srv
+}
+
+// A hung duplicate endpoint costs its own timeout, not the ten-minute context the caller passes, and the shared
+// breaker then refuses the next call without opening a connection.
+func TestJudgeDuplicateTimesOutAndPausesTheEndpoint(t *testing.T) {
+	judge.Shared.Reset()
+	t.Cleanup(judge.Shared.Reset)
+	srv := hungEndpoint(t)
+	old := JevJudge
+	t.Cleanup(func() { JevJudge = old })
+	JevJudge.URL, JevJudge.Model, JevJudge.Key = srv.URL, "typesafe/jev-1.14", "k"
+	JevJudge.DupTimeout = 150 * time.Millisecond
+
+	start := time.Now()
+	_, err := JudgeDuplicate(context.Background(), JudgeFact{ID: "c", Text: "x"},
+		[]JudgeFact{{ID: "f1", Text: "y"}})
+	elapsed := time.Since(start)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want a timeout", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("duplicate waited %v, want about %v", elapsed, JevJudgeDupTimeout())
+	}
+	if _, err := JudgeDuplicate(context.Background(), JudgeFact{ID: "c", Text: "x"},
+		[]JudgeFact{{ID: "f1", Text: "y"}}); !errors.Is(err, judge.ErrPaused) {
+		t.Errorf("after a timeout = %v, want ErrPaused", err)
+	}
+}
+
+func TestJevJudgeTimeouts(t *testing.T) {
+	old := JevJudge
+	t.Cleanup(func() { JevJudge = old })
+	JevJudge.TriageTimeout, JevJudge.DupTimeout = 0, 0
+	if JevJudgeTriageTimeout() != DefaultTriageTimeout || JevJudgeDupTimeout() != DefaultDupTimeout {
+		t.Errorf("defaults %v %v", JevJudgeTriageTimeout(), JevJudgeDupTimeout())
+	}
+	JevJudge.TriageTimeout, JevJudge.DupTimeout = 750*time.Millisecond, 5*time.Second
+	if JevJudgeTriageTimeout() != 750*time.Millisecond || JevJudgeDupTimeout() != 5*time.Second {
+		t.Errorf("configured %v %v", JevJudgeTriageTimeout(), JevJudgeDupTimeout())
 	}
 }
 

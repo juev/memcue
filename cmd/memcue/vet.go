@@ -48,7 +48,7 @@ const (
 )
 
 // configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage, rerank and the
-// duplicate check; only the thresholds and request limits stay role-specific.
+// duplicate check; only the thresholds, request limits and timeouts stay role-specific.
 func configureJudge() {
 	if dir, err := stateDir(); err == nil {
 		judgepkg.Configure(filepath.Join(dir, "judge.pause"))
@@ -59,6 +59,18 @@ func configureJudge() {
 	extract.JevJudge.Min = judgeMin
 	extract.JevJudge.MaxFacts = judgeMaxFacts
 	extract.JevJudge.LongContext = os.Getenv("MEMCUE_JUDGE_DUP_LONG_CONTEXT") == "1"
+	extract.JevJudge.TriageTimeout = extract.DefaultTriageTimeout
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 10*time.Second {
+			extract.JevJudge.TriageTimeout = d
+		}
+	}
+	extract.JevJudge.DupTimeout = extract.DefaultDupTimeout
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_DUP_TIMEOUT")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 30*time.Second {
+			extract.JevJudge.DupTimeout = d
+		}
+	}
 
 	extract.Triage.Min = triageMin
 	extract.Triage.Enabled = extract.JevJudgeOn()

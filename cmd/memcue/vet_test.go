@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
@@ -657,5 +658,42 @@ func TestDuplicateChunks(t *testing.T) {
 	}
 	if none := duplicateChunks(nil, 2); none != nil {
 		t.Fatalf("empty base = %v", none)
+	}
+}
+
+// The role timeouts come from their own variables; an unset, malformed or out-of-range value keeps the default.
+func TestConfigureJudgeTimeouts(t *testing.T) {
+	env(t)
+	old := extract.JevJudge
+	t.Cleanup(func() { extract.JevJudge = old })
+	t.Setenv("MEMCUE_JUDGE_URL", "https://judge.example/decisions")
+	t.Setenv("MEMCUE_JUDGE_MODEL", "m")
+	t.Setenv("MEMCUE_JUDGE_KEY", "k")
+	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "")
+	t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", "")
+	configureJudge()
+	if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout ||
+		extract.JevJudge.DupTimeout != extract.DefaultDupTimeout {
+		t.Fatalf("defaults = %v %v", extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+	}
+
+	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "750ms")
+	t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", "25s")
+	configureJudge()
+	if extract.JevJudge.TriageTimeout != 750*time.Millisecond ||
+		extract.JevJudge.DupTimeout != 25*time.Second {
+		t.Fatalf("configured = %v %v", extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+	}
+
+	for name, value := range map[string]string{"malformed": "much", "too short": "1ms", "too long": "1m"} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", value)
+			t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", value)
+			configureJudge()
+			if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout ||
+				extract.JevJudge.DupTimeout != extract.DefaultDupTimeout {
+				t.Errorf("bad value %q = %v %v", value, extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+			}
+		})
 	}
 }
