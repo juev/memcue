@@ -422,7 +422,10 @@ class ProviderTest(unittest.TestCase):
         os.environ["TEST_MEMCUE_KEY"] = "k1"
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": f"http://127.0.0.1:{srv.server_port}",
                                                   "extract_model": "m1", "extract_key_env": "TEST_MEMCUE_KEY"})
-        p.initialize("sess-9", hermes_home=self.home, agent_context="primary")
+        workspace = Path(self.home) / "demo"
+        workspace.mkdir()
+        (workspace / ".git").mkdir()
+        p.initialize("sess-9", hermes_home=self.home, agent_workspace=str(workspace), agent_context="primary")
         p.on_session_end([{"role": "system", "content": "prompt"},
                           {"role": "user",
                            "content": "на server1 у hermes модель по умолчанию deepseek-flash. " * 60},
@@ -434,7 +437,7 @@ class ProviderTest(unittest.TestCase):
         facts = self.facts_of(p)
         self.assertEqual(len(facts), 1)
         self.assertIn("deepseek-flash", facts[0])
-        self.assertIn(" hermes ", facts[0])
+        self.assertIn(" demo ", facts[0])
         self.assertEqual((seen["model"], seen["auth"]), ("m1", "Bearer k1"))
         self.assertNotIn("SYSTEM", seen["text"])
 

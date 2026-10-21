@@ -376,11 +376,11 @@ test('a turn end sends the new messages to extract-messages', async () => {
 		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'PORT=55432\nsecond line' }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = fakeSession('s2', events)
+	const session = fakeSession('s2', events, { header: { cwd: dir } })
 	const [listener] = listeners.get('session/event')
 	listener(session, events[events.length - 1])
 	const text = await waitForLog('extract-input')
-	assert.match(text, /arg: extract-messages -session s2 -event turn-end -origin dsh \d{4}-\d{2}-\d{2} -min-chars 1/)
+	assert.ok(text.includes(`arg: extract-messages -session s2 -event turn-end -cwd ${dir} -min-chars 1`), text)
 	const sent = JSON.parse(lastPayload(text, 'extract-input: '))
 	assert.deepEqual(sent, [
 		{ role: 'user', content: 'remember the base port' },

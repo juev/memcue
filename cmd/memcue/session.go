@@ -498,10 +498,12 @@ func writeOffset(f *os.File, n int) error {
 func appendLog(path string, rec extractRecord) error { return appendJSON(path, rec) }
 
 // runExtractMessages extracts and stores the facts of chat messages in the OpenAI shape read from stdin: the session
-// of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-session ID] [-min-chars N].
+// of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-cwd DIR] [-session ID]
+// [-min-chars N]. Without -origin the origin is the repository of -cwd and today, the same as add -cwd.
 func runExtractMessages(args []string, in io.Reader) error {
 	fs := flag.NewFlagSet("extract-messages", flag.ContinueOnError)
-	origin := fs.String("origin", "", "where the facts were learnt, e.g. \"hermes 2026-10-19\"")
+	origin := fs.String("origin", "", "where the facts were learnt, e.g. \"hermes 2026-10-19\" (default: from -cwd)")
+	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory)")
 	session := fs.String("session", "", "session id, for the log")
 	event := fs.String("event", "", "what started the run, for the log")
 	minChars := fs.Int("min-chars", minNew, "least rendered text worth a model call")
@@ -510,6 +512,9 @@ func runExtractMessages(args []string, in io.Reader) error {
 	}
 	if *minChars < 0 {
 		return errors.New("extract-messages: -min-chars must be >= 0")
+	}
+	if *origin == "" {
+		*origin = defaultOriginAt(*cwd)
 	}
 	var msgs []transcript.Message
 	if err := json.NewDecoder(in).Decode(&msgs); err != nil {

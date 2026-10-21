@@ -652,3 +652,34 @@ func TestStateDirHonoursOverride(t *testing.T) {
 		t.Errorf("state dir = %s, want %s", got, want)
 	}
 }
+
+// extract-messages names the repository in origin when the plugin passes the workspace, and an explicit -origin
+// still wins for callers that need the old format.
+func TestExtractMessagesOriginFromCwd(t *testing.T) {
+	env(t)
+	repo := filepath.Join(t.TempDir(), "demo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	old := extractFn
+	extractFn = func(origin, _ string) (extracted, error) {
+		got = origin
+		return extracted{}, nil
+	}
+	t.Cleanup(func() { extractFn = old })
+	msgs := `[{"role":"user","content":"Факт про порт 3000."}]`
+	if err := runExtractMessages([]string{"-cwd", repo, "-min-chars", "0"}, strings.NewReader(msgs)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "demo ") {
+		t.Errorf("origin = %q, want the repository tier and a date", got)
+	}
+	if err := runExtractMessages([]string{"-cwd", repo, "-origin", "explicit 2026-10-21", "-min-chars", "0"},
+		strings.NewReader(msgs)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "explicit ") {
+		t.Errorf("explicit origin = %q", got)
+	}
+}

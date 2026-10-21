@@ -555,7 +555,8 @@ export function apply(ctx, config) {
 					'extract-messages',
 					'-session', sessionId,
 					'-event', eventName,
-					'-origin', `dsh ${new Date().toISOString().slice(0, 10)}`,
+					// The session workspace names the repository in origin, the same way Claude Code does.
+					'-cwd', session.header?.cwd ?? process.cwd(),
 					// The plugin owns the turn threshold; the binary must not apply its larger transcript
 					// minimum, or the final short tail from session/disposed would be skipped.
 					'-min-chars', '1',
