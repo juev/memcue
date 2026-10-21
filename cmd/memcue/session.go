@@ -322,12 +322,17 @@ func storeExtracted(text string, rec *extractRecord) error {
 		return err
 	}
 	defer func() { _ = s.Close() }()
+	batch := make([]store.FactInput, 0, len(keep))
 	for _, fact := range keep {
-		sf, err := s.AddWith(fact.Content, fact.Keywords, rec.Origin, "", store.Meta{Kind: fact.Kind,
-			Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence, Review: store.Candidate})
-		if err != nil {
-			return err
-		}
+		batch = append(batch, store.FactInput{Content: fact.Content, Keywords: fact.Keywords, Origin: rec.Origin,
+			Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
+				Review: store.Candidate}})
+	}
+	stored, err := s.AddBatch(batch)
+	if err != nil {
+		return err
+	}
+	for _, sf := range stored {
 		rec.IDs = append(rec.IDs, sf.ID)
 	}
 	return nil

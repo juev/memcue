@@ -50,6 +50,43 @@ func TestAddStoresVersionOneAndIsFound(t *testing.T) {
 	}
 }
 
+func TestAddBatchStoresEveryFact(t *testing.T) {
+	s, _ := open(t)
+	facts, err := s.AddBatch([]FactInput{
+		{Content: "Первая партия: очередь RabbitMQ на порту 5672.", Keywords: []string{"rabbitmq", "queue"}, Origin: "test"},
+		{Content: "Вторая партия: кеш Redis на порту 6379.", Keywords: []string{"redis", "cache"}, Origin: "test"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(facts) != 2 {
+		t.Fatalf("got %d facts", len(facts))
+	}
+	got := ids(t, s, "rabbitmq redis")
+	for _, f := range facts {
+		if _, ok := got[f.ID]; !ok {
+			t.Errorf("fact %s not searchable", f.ID)
+		}
+	}
+}
+
+func TestAddBatchIsAllOrNothing(t *testing.T) {
+	s, _ := open(t)
+	if _, err := s.AddBatch([]FactInput{
+		{Content: "Этот факт не должен сохраниться.", Origin: "test"},
+		{Content: "  ", Origin: "test"},
+	}); err == nil {
+		t.Fatal("expected an error for the empty fact")
+	}
+	rows, err := s.Rows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("a failed batch left %d rows", len(rows))
+	}
+}
+
 func TestKeywordsAreSearchable(t *testing.T) {
 	s, _ := open(t)
 	f, err := s.Add("Путь к JDK задаётся переменной окружения.", []string{"openjdk", "android"}, "")
