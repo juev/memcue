@@ -17,23 +17,29 @@ the harness, so everything that works for Claude Code and Hermes works here on t
 
 ## Install
 
-The plugin is a dsh bundle: `package.json` declares `dsh.bundle.patch`, and the bundle patch inserts the `memcue` row
-with the plugin's defaults. The entry is plain ESM (`src/index.mjs`) on purpose: dsh installs a bundle under
-`node_modules`, where Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an installed
-package.
+The repository root is a dsh bundle wrapper: its `package.json` declares `dsh.bundle.patch`, pointing at this
+directory's `cordis.patch.yml`. The plugin directory is also its own package, for npm publication and local
+development. The entry is plain ESM (`src/index.mjs`) on purpose: dsh installs a bundle under `node_modules`, where
+Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an installed package.
 
 1. Put the `memcue` binary where the dsh process can run it and note its absolute path.
 
-2. Install the bundle into a profile:
+2. Install the bundle from the repository:
 
    - **Desktop / Web:** open **Plugins** in the sidebar, choose **Add plugin → Install a third-party plugin**, and
-     enter the absolute path to this directory, for example
-     `/Users/you/src/github.com/juev/memcue/plugins/deepseek-harness`.
-   - **CLI:** `dsh plugin --profile web add /Users/you/src/github.com/juev/memcue/plugins/deepseek-harness`.
+     enter `github:juev/memcue`.
+   - **CLI:** `dsh plugin --profile web add github:juev/memcue`.
+
+   No `path:` parameter and no local directory are needed. From a local checkout, `dsh plugin add /path/to/memcue`
+   installs the same root package.
+
+   The plugin directory is also a standalone package. After publishing it to npm, `dsh plugin add memcue-dsh`
+   installs it without the repository; a local checkout can use
+   `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
 
    The plugin manager adds the package to the profile's `dsh.profile.bundles`; the install dialog's **Enable now**
-   switches the bundle on. A local path is recorded as a `link:` dependency, so a `git pull` in the checkout reaches
-   the next start without reinstalling.
+   switches the bundle on. A repository install is a Git dependency, so a `git pull` reaches the next start without
+   reinstalling.
 
 3. Configure the row by id in the profile's own patch layer, `$DSH_HOME/profiles/<name>/cordis.patch.yml`:
 

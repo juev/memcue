@@ -296,3 +296,13 @@ test('the package is a dsh bundle with a loadable entry', async () => {
 	assert.match(patch, /name: \.\/src\/index\.mjs/)
 	await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
 })
+
+test('the repository root is installable without a path parameter', async () => {
+	const rootUrl = new URL('../../../package.json', import.meta.url)
+	const root = JSON.parse(await readFile(rootUrl, 'utf8'))
+	const rootDir = new URL('./', rootUrl)
+	assert.equal(root.dsh?.bundle?.patch, 'plugins/deepseek-harness/cordis.patch.yml')
+	assert.equal(root.exports, './plugins/deepseek-harness/src/index.mjs')
+	await readFile(new URL(root.dsh.bundle.patch, rootDir), 'utf8')
+	await readFile(new URL(root.exports, rootDir), 'utf8')
+})
