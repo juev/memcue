@@ -348,6 +348,11 @@ func storeExtracted(text string, rec *extractRecord, minChars int) error {
 	}
 	var keep []extract.Fact
 	for _, fact := range x.Facts {
+		// The policy rejects empty content too; skipping it here keeps one bad fact from poisoning the batch.
+		if strings.TrimSpace(fact.Content) == "" {
+			rec.Rejected = append(rec.Rejected, "empty content")
+			continue
+		}
 		if ok, why := policy.Check(fact, text); !ok {
 			rec.Rejected = append(rec.Rejected, why+": "+clip(fact.Content, 80))
 			continue
