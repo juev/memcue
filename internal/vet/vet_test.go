@@ -95,6 +95,28 @@ func TestRulesLeaveShortFactsToTheModel(t *testing.T) {
 	}
 }
 
+// A mirror is present only when its words appear as whole words: "Go" must not match "Django" or "Golang".
+func TestRulesMirrorMatchesWholeWords(t *testing.T) {
+	cands := []store.Fact{
+		fact("01go", "Go", "hermes-memory 2026-10-20", "memory"),
+		fact("01django", "Django", "hermes-memory 2026-10-20", "memory"),
+	}
+	decided, rest := Rules(cands, nil, "Проект на Django и Golang.", true)
+	got := map[string]Decision{}
+	for _, d := range decided {
+		got[d.Fact.ID] = d
+	}
+	if d := got["01go"]; d.Verdict != Drop {
+		t.Errorf("a mirror inside Django/Golang was kept: %+v", d)
+	}
+	if d := got["01django"]; d.Verdict != Keep {
+		t.Errorf("a mirror of a whole word was dropped: %+v", d)
+	}
+	if len(rest) != 0 {
+		t.Errorf("rest = %+v", rest)
+	}
+}
+
 func TestRulesTreatEqualTextAsDuplicate(t *testing.T) {
 	approved := []store.Fact{fact("01a", "Gradle требует JAVA_HOME=/opt/jdk-21, иначе сборка не находит JDK.", "x 2026-10-19", "user")}
 	cands := []store.Fact{fact("01b", "gradle требует JAVA_HOME=/opt/jdk-21, иначе сборка не находит JDK", "y 2026-10-20", "user")}

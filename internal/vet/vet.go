@@ -56,7 +56,8 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 	for _, c := range cands {
 		switch {
 		case c.Source == "memory" && haveMemory:
-			if key := norm(c.Content); key != "" && strings.Contains(notes, key) {
+			// Word boundaries: a one-word mirror such as "Go" must not match "Django" or "Golang".
+			if key := norm(c.Content); key != "" && strings.Contains(" "+notes+" ", " "+key+" ") {
 				decided = append(decided, Decision{Fact: c, Verdict: Keep, By: "rule",
 					Reason: "mirror of the built-in memory, the note still holds it"})
 			} else {
