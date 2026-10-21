@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -58,6 +59,17 @@ func TestReviewEndpointDoesNotLeakTheExtractionKeyToAnotherHost(t *testing.T) {
 	Judge.Key = "k2"
 	if ep := reviewEndpoint(); ep.Key != "k2" {
 		t.Errorf("the review key should win: %+v", ep)
+	}
+}
+
+// A contradiction with an approved fact is a question for a human, not an automatic drop: the approved fact can
+// itself be false or stale.
+func TestReviewPromptSendsContradictionsToUnsure(t *testing.T) {
+	if !strings.Contains(reviewPrompt, "противоречие") || !strings.Contains(reviewPrompt, "`unsure`") {
+		t.Error("review prompt must send a contradiction to unsure")
+	}
+	if strings.Contains(reviewPrompt, "противоречие одобренному факту — тоже\n  `drop`") {
+		t.Error("review prompt still drops a contradiction")
 	}
 }
 
