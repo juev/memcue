@@ -61,6 +61,8 @@ func TestCheck(t *testing.T) {
 		"secret in content": {extract.Fact{Kind: "environment", Source: "tool", Scope: "host:db1",
 			Content: "Пароль базы на db1: password=hunter2secret", Evidence: "port 5432 failed"}, false,
 			"looks like a secret"},
+		"whitespace-only content": {extract.Fact{Kind: "pitfall", Source: "tool", Scope: "host:db1",
+			Content: " \n\t ", Evidence: "port 5432 failed"}, false, "empty content"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if tc.fact.Content == "" {
@@ -71,6 +73,17 @@ func TestCheck(t *testing.T) {
 				t.Errorf("Check = %v %q, want %v %q", ok, reason, tc.ok, tc.reason)
 			}
 		})
+	}
+}
+
+// An empty fact is never storable: one model output must not block the rest of its extraction.
+func TestCheckRejectsEmptyContent(t *testing.T) {
+	f := extract.Fact{Kind: "pitfall", Source: "tool", Scope: "host:db1", Evidence: "port 5432 failed"}
+	for _, content := range []string{"", " ", "\n\t"} {
+		f.Content = content
+		if ok, reason := Check(f, record); ok || reason != "empty content" {
+			t.Errorf("Check(%q) = %v %q, want false %q", content, ok, reason, "empty content")
+		}
 	}
 }
 

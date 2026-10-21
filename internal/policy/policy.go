@@ -40,6 +40,8 @@ func Check(f extract.Fact, record string) (ok bool, reason string) {
 		return false, "a " + f.Kind + " needs the user's words, source is " + quote(f.Source)
 	case !known:
 		return false, "source " + quote(f.Source) + " is not the user or a tool"
+	case strings.TrimSpace(f.Content) == "":
+		return false, "empty content"
 	case strings.TrimSpace(f.Evidence) == "":
 		return false, "no evidence"
 	case !quoted(record, role, f.Evidence):

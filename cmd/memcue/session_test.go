@@ -429,6 +429,40 @@ func TestExtractSessionKeepsOffsetOnFailure(t *testing.T) {
 	}
 }
 
+// One empty fact from the model must not lose the valid facts of the same extraction or stall the session offset.
+func TestExtractSessionStoresValidFactsDespiteAnEmptyOne(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state")
+	t.Setenv("XDG_STATE_HOME", state)
+	extractFn = func(string, string) (extracted, error) {
+		return extracted{Facts: []extract.Fact{
+			{Content: "Порт demo 55432.", Keywords: []string{"порт"}, Kind: "environment", Source: "user",
+				Scope: "service:demo", Evidence: "реплика 0"},
+			{Content: "  ", Kind: "pitfall", Source: "user", Scope: "global", Evidence: "реплика 0"},
+		}}, nil
+	}
+	t.Cleanup(func() { extractFn = extractText })
+	tr := filepath.Join(dir, "s.jsonl")
+	transcriptLines(t, tr, 10)
+	args := []string{"-session", "sess-empty", "-transcript", tr}
+	if err := runExtractSession(args); err != nil {
+		t.Fatal(err)
+	}
+	recs := readLog(t, state)
+	if len(recs) != 1 || recs[0].To != 10 || recs[0].Facts != 1 || len(recs[0].Rejected) != 1 ||
+		recs[0].Rejected[0] != "empty content" {
+		t.Fatalf("log %+v", recs)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if fs, err := s.Candidates(); err != nil || len(fs) != 1 || fs[0].Content != "Порт demo 55432." {
+		t.Errorf("candidates %+v %v", fs, err)
+	}
+}
+
 // The policy keeps what may be trusted and logs the rest with the reason; the model is told the host of the session.
 func TestExtractedFactsPassThePolicy(t *testing.T) {
 	dir := env(t)
