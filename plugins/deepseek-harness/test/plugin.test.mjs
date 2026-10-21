@@ -99,6 +99,30 @@ function userMessage(text, source = { kind: 'user' }) {
 	return { id: `m-${text.length}`, role: 'user', content: [{ type: 'text', text }], source }
 }
 
+/** The messages a real Session.deriveMessages() would return for a fixture event list. */
+function derivedMessages(events) {
+	const messages = []
+	for (const event of events) {
+		if (event.type === 'user/message') messages.push(event.data)
+		else if (event.type === 'assistant/message' || event.type === 'tool/result') messages.push(event.data.message)
+	}
+	return messages
+}
+
+/** A fake session with the supported derived-message and surface API, without deprecated eventAt. */
+function fakeSession(id, events, extra = {}) {
+	const messageEvents = events.filter((event) => event.type === 'user/message'
+		|| event.type === 'assistant/message'
+		|| event.type === 'tool/result')
+	return {
+		id,
+		seq: events.length,
+		deriveMessages: () => derivedMessages(messageEvents),
+		surface: { nodes: messageEvents.map((event) => events.indexOf(event)) },
+		...extra,
+	}
+}
+
 /** Run this plugin's pre-step listener over one proposed batch. */
 async function preStep(listeners, messages, session = { id: 's1', header: { cwd: dir } }) {
 	const [listener] = listeners.get('agent/pre-step')
@@ -262,7 +286,7 @@ test('a turn end sends the new messages to extract-messages', async () => {
 		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'PORT=55432\nsecond line' }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's2', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s2', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events[events.length - 1])
 	const text = await waitForLog('extract-input')
@@ -279,7 +303,7 @@ test('a short tail is flushed on session/disposed', async () => {
 	const stateDir = join(dir, 'state-88')
 	const { listeners } = mount({ stateDir, minNewChars: 1000 })
 	const events = [{ type: 'user/message', data: userMessage('short tail') }]
-	const session = { id: 's88', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s88', events)
 
 	const [turnEnd] = listeners.get('session/event')
 	turnEnd(session, { type: 'turn/end', data: { turn: 1, reason: 'stop' } })
@@ -290,7 +314,8 @@ test('a short tail is flushed on session/disposed', async () => {
 	disposed(session)
 	const text = await waitForLog('extract-input')
 	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'short tail' }])
-	await waitForState(join(stateDir, 's88.json'), (state) => state.seq === 1 && state.pending === null)
+	await waitForState(join(stateDir, 's88.json'),
+		(state) => state.pending === null && Object.keys(state.seen).length === 1)
 })
 
 test('tool calls travel with the assistant message', async () => {
@@ -315,7 +340,7 @@ test('tool calls travel with the assistant message', async () => {
 		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'a.txt' }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's87', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s87', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
 	const text = await waitForLog('extract-input')
@@ -346,7 +371,7 @@ test('a tool-only assistant message is kept', async () => {
 		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'contents' }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's87b', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s87b', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
 	const text = await waitForLog('extract-input')
@@ -378,24 +403,25 @@ exit 0
 		{ type: 'user/message', data: userMessage('remember the durable fact') },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's81', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s81', events)
 	const [listener] = listeners.get('session/event')
 
 	listener(session, events.at(-1))
 	await waitForText(failLog, 'remember the durable fact')
 	const pending = JSON.parse(await readFile(join(stateDir, 's81.json'), 'utf8'))
-	assert.equal(pending.seq, 0)
-	assert.equal(pending.pending.seq, events.length)
+	assert.deepEqual(pending.seen, {})
 	assert.equal(pending.pending.messages[0].content, 'remember the durable fact')
+	assert.equal(pending.pending.fingerprints.length, 1)
 
 	listener(session, events.at(-1))
-	await waitForState(join(stateDir, 's81.json'), (state) => state.seq === events.length && state.pending === null)
+	await waitForState(join(stateDir, 's81.json'),
+		(state) => state.pending === null && Object.keys(state.seen).length === 1)
 	const calls = (await readFile(failLog, 'utf8')).trim().split('\n')
 	assert.equal(calls.length, 2)
 	assert.deepEqual(JSON.parse(calls[0]), JSON.parse(calls[1]))
 })
 
-test('a state file with only seq is still accepted', async () => {
+test('a legacy seq state is migrated without re-extracting the history', async () => {
 	await resetLog()
 	const stateDir = join(dir, 'state-81-old')
 	await mkdir(stateDir, { recursive: true })
@@ -407,12 +433,19 @@ test('a state file with only seq is still accepted', async () => {
 		{ type: 'user/message', data: userMessage('new message') },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's81old', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s81old', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
+	await waitForState(join(stateDir, 's81old.json'),
+		(state) => state.pending === null && Object.keys(state.seen).length === 2)
+	assert.equal((await readFile(log, 'utf8')).includes('extract-input'), false)
 
+	const nextEvents = [...events, { type: 'user/message', data: userMessage('third message') },
+		{ type: 'turn/end', data: { turn: 2, reason: 'stop' } }]
+	const next = fakeSession('s81old', nextEvents)
+	listener(next, nextEvents.at(-1))
 	const text = await waitForLog('extract-input')
-	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'new message' }])
+	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'third message' }])
 })
 
 test('extraction sees only direct user messages', async () => {
@@ -427,7 +460,7 @@ test('extraction sees only direct user messages', async () => {
 		{ type: 'user/message', data: userMessage('memcue recall body', { kind: 'memcue', form: 'recall' }) },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's82', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s82', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
 
@@ -469,12 +502,7 @@ test('a subagent session is not extracted', async () => {
 		{ type: 'user/message', data: userMessage('subagent work') },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = {
-		id: 's82sub',
-		seq: events.length,
-		header: { origin: 'subagent' },
-		eventAt: (seq) => events[seq],
-	}
+	const session = fakeSession('s82sub', events, { header: { origin: 'subagent' } })
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
 	await new Promise((resolve) => setTimeout(resolve, 150))
@@ -490,12 +518,7 @@ test('a forked session starts at the inherited prefix', async () => {
 		{ type: 'user/message', data: userMessage('fork message') },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = {
-		id: 's82fork',
-		seq: events.length,
-		inheritedEventCount: 1,
-		eventAt: (seq) => events[seq],
-	}
+	const session = fakeSession('s82fork', events, { inheritedEventCount: 1 })
 	const [listener] = listeners.get('session/event')
 	listener(session, events.at(-1))
 	const text = await waitForLog('extract-input')
@@ -510,7 +533,7 @@ test('tool output sent to extraction is capped', async () => {
 		{ type: 'tool/result', data: { turn: 1, step: 1, message: { role: 'tool', content: [{ type: 'text', text: 'x'.repeat(500) }] } } },
 		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
 	]
-	const session = { id: 's3', seq: events.length, eventAt: (seq) => events[seq] }
+	const session = fakeSession('s3', events)
 	const [listener] = listeners.get('session/event')
 	listener(session, events[events.length - 1])
 	const text = await waitForLog('extract-input')
@@ -670,7 +693,8 @@ test('the package is a dsh bundle with a loadable entry', async () => {
 	const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 	assert.match(patch, /- id: memcue/)
 	assert.match(patch, /name: \.\/src\/index\.mjs/)
-	await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
+	const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
+	assert.doesNotMatch(source, /\.eventAt\(|snapshotEvents/)
 })
 
 test('the repository root is installable without a path parameter', async () => {
