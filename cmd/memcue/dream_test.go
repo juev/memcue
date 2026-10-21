@@ -653,3 +653,60 @@ func TestDreamSeenFile(t *testing.T) {
 		t.Error("bad line read without error")
 	}
 }
+
+// A clean plan whose group holds a provisional neighbour applies: the staleness check must see the provisional fact,
+// which store.Active leaves out, or the whole group is refused without any change since the dry run.
+func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	approved, err := s.AddWith("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"},
+		"x 2026-10-19", "", store.Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prov, err := s.AddWith("Демо-база Postgres на db1 слушает порт 5432.", []string{"postgres", "порт"},
+		"x 2026-10-19", "", store.Meta{Review: store.Provisional})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	plan := dreamPlan{Start: time.Now().Add(-time.Hour), Seen: map[string]int{},
+		Groups: []dreamPlanGroup{{
+			Facts:   map[string]int{approved.ID: approved.Version, prov.ID: prov.Version},
+			Actions: []extract.Action{{Op: "retire", ID: approved.ID, By: prov.ID, Kind: "duplicate", Reason: "duplicate"}},
+		}}}
+	b, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "plan.json")
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	rec, err := applyPlan(state, path, &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.Refused) != 0 {
+		t.Fatalf("clean plan refused: %v", rec.Refused)
+	}
+	if len(rec.Actions) != 1 {
+		t.Fatalf("actions = %d, want 1 (%q)", len(rec.Actions), out.String())
+	}
+	s, err = store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(approved.ID); f.Status != store.Retired {
+		t.Fatalf("approved fact not retired: %+v", f)
+	}
+}
