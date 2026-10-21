@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -404,9 +405,10 @@ func (s *Store) AddWith(content string, keywords []string, origin, expires strin
 }
 
 // entropy makes the random part of a ULID increase, so facts written in the same millisecond still order by creation.
-// It is safe for concurrent use. A base written without it can hold same-millisecond facts in random order, so the
-// readers that mean "newest" also order by created.
-var entropy = ulid.Monotonic(rand.Reader, 0)
+// The source is locked: ulid.Monotonic is not safe for concurrent use, and AddBatch generates its ids before the
+// transaction, outside the single connection's serialization. A base written without it can hold same-millisecond
+// facts in random order, so the readers that mean "newest" also order by created.
+var entropy io.Reader = &ulid.LockedMonotonicReader{MonotonicReader: ulid.Monotonic(rand.Reader, 0)}
 
 // AddBatch stores several new facts in one transaction: either every fact is written and indexed, or none is. A
 // retry after a database error therefore sees the same base, not a half-applied extraction.
