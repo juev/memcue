@@ -1,73 +1,75 @@
-# Ordering the words' facts with a judge
+# The judge: order the facts the words and the vectors found
 
-The words find the facts; they do not order them well. Measured on a gold set built for the purpose, FTS5 puts a
-USEFUL fact first for 44 of 120 prompts, and a semantic retriever does worse, not better: bge-m3 21, Jev over the
-whole base 12. Yet a useful fact was among the candidates for 95 prompts — so the loss was in the ranking, not in
-finding.
+The words find the facts; they do not order them well. On a gold set built for the purpose, FTS5 put a useful fact
+first for 44 of 120 prompts. A semantic retriever alone did worse (bge-m3 21, Jev over the whole base 12), but a useful
+fact was among the candidates for 95 prompts: the loss was in the ranking, not in candidate generation.
 
 This pass asks a typed decisions model (Jev) one yes/no question per candidate: *would this fact help answer the
-prompt*. It changes the order and nothing else: the candidates are still the words', the answer is still capped by
-`MaxFacts`, and a fact below `MEMCUE_RERANK_MIN` is not given at all.
+prompt*. It orders the lexical candidates and, when an embeddings endpoint is configured, the vector candidates too;
+the answer stays capped by `MaxFacts`.
 
-```sh
-export MEMCUE_RERANK_URL=https://openrouter.ai/api/alpha/decisions
-export MEMCUE_RERANK_MODEL=typesafe/jev-1.14
-export MEMCUE_RERANK_KEY_ENV=OPENROUTER_API_KEY     # or MEMCUE_RERANK_KEY with the key itself
-```
+## One judge for three roles
+
+`MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` configure one Jev endpoint. The same endpoint serves:
+
+- **recall rerank** — this document;
+- **dream triage** — `MEMCUE_JUDGE_TRIAGE_MIN`;
+- **duplicate check in vet** — `MEMCUE_JUDGE_DUP_MIN`, `_DUP_MAX_FACTS`, `_DUP_LONG_CONTEXT`.
+
+There is no `MEMCUE_RERANK_*` or `MEMCUE_TRIAGE_*` endpoint pair. The role-specific variables are only thresholds and
+request limits under the judge namespace.
 
 | Variable | Meaning |
 |---|---|
-| `MEMCUE_RERANK_URL` | the decisions endpoint; unset keeps the pass off |
-| `MEMCUE_RERANK_MODEL` | default `typesafe/jev-1.14` |
-| `MEMCUE_RERANK_KEY_ENV` / `_KEY` | where the key is; the pass stays off if neither is set |
-| `MEMCUE_RERANK_MIN` | probability below which a fact is not given (default 0.5) |
-| `MEMCUE_RERANK_CANDIDATES` | facts the words hand over (default 10) |
-| `MEMCUE_RERANK_TIMEOUT` | one request (default 2 s) |
+| `MEMCUE_JUDGE_URL` | decisions endpoint, e.g. `https://openrouter.ai/api/alpha/decisions` |
+| `MEMCUE_JUDGE_MODEL` | e.g. `typesafe/jev-1.14` |
+| `MEMCUE_JUDGE_KEY` | bearer token |
+| `MEMCUE_JUDGE_RERANK_MIN` | probability below which a fact is not given (default 0.5) |
+| `MEMCUE_JUDGE_RERANK_CANDIDATES` | candidates taken from each source (default 10) |
+| `MEMCUE_JUDGE_RERANK_TIMEOUT` | one request (default 2 s) |
+
+## Flow
+
+```
+lexical candidates (FTS5, gates)
+  + vector top-N (when MEMCUE_EMBED_* is configured)
+  -> deduplicate, apply the ticket exactness rule
+  -> Jev: one noul per candidate
+  -> keep >= MEMCUE_JUDGE_RERANK_MIN, sort, cap MaxFacts
+```
+
+Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. A failure pauses the
+endpoint for 60 s, doubling to 15 minutes, with the pause in `$XDG_STATE_HOME/memcue/judge.pause` because the hook is
+a fresh process on every prompt.
 
 ## What it measured
 
-Gold set: the 120 real prompts used for `docs/evaluation.md`, candidates from three retrievers (lexical top-10,
-bge-m3 top-10, Jev-top-10-over-the-base), 2538 pairs, shuffled, labelled blind by a judge that never saw which
-retriever proposed a fact.
+Gold set: 120 real prompts, candidates from three retrievers (lexical top-10, bge-m3 top-10, Jev-top-10-over-the-base),
+2,538 pairs, shuffled, labelled blind by a judge that never saw which retriever proposed a fact.
 
-| reader, top-1 | prompts with a USEFUL fact | USEFUL / RELATED / NOISE |
-|---|---|---|
-| words (FTS5, BM25 order) | 43 / 118 | 43 / 38 / 37 |
-| words + this pass | **70 / 118** | 70 / 25 / 23 |
-| bge-m3 over the base | 21 / 120 | 21 / 37 / 62 |
-| Jev over the whole base | 12 / 120 | 12 / 34 / 56 |
+| reader, top-1 | prompts with a USEFUL fact |
+|---|---:|
+| words (FTS5, BM25 order) | 43 / 118 |
+| words + this pass | **70 / 118** |
+| bge-m3 over the base | 21 / 120 |
+| Jev over the whole base | 12 / 120 |
 
-At top-2 the pass takes 56 to 72 prompts. See [the gold-set study](research/gold-set-2026-10.md) for the protocol and what was measured wrong along the way. It changes the first fact for 77 of 118 prompts: 29 better, 2 worse.
+The 0.3.0 pilot on a 2,571-fact copy of the Claude Code base and 180 prompts measured the combined flow:
 
-Cost and time: 203k input tokens and **$0.009** for all 120 prompts, **0.7 s** at the median (2 s timeout). The
-whole-base variant costs $0.164 and 1.2 s for the same set and ranks worse.
+| reader, top-1 | useful prompts |
+|---|---:|
+| lexical only | 75 / 180 |
+| Jev over lexical | 112 / 177 |
+| **Jev over lexical + vector** | **129 / 180** |
 
-## Failure and cost behaviour
-
-Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged — the same rule as the
-meaning pass. After a failure the endpoint is left alone for 60 s, doubling to 15 minutes, and the pause is kept in
-`$XDG_STATE_HOME/memcue/rerank.pause` because the hook is a fresh process on every prompt.
-
-The pass runs on every prompt while it is configured, so its 0.7 s is paid per turn. On a laptop without a key it is
-off; on the server it is a deliberate trade of latency for precision, not a free improvement.
-
-## On the older labelled set
-
-The eval set of `docs/evaluation.md` labels only the pairs the lexical run produced, so it cannot show the pass's
-gain — but it does show what the pass stops doing. Same 120 prompts, same base:
-
-| run | prompts with a fact | facts | NOISE | into prompts needing no memory |
-|---|---|---|---|---|
-| words alone | 73 | 127 | 43 | 45 |
-| words + this pass | 75 | 127 | **1** | **24** |
-
-94 of the 127 facts the pass served were not in that label set at all, which is the expected consequence of a
-different candidate list; the labelled part of its output is 13 USEFUL, 19 RELATED and one NOISE. That run is a
-consistency check, not a measurement of the gain — the gain is the gold set above.
+The combined run rescued 18 prompts over Jev-over-lexical and lost 2; all 18 rescued top-1 facts were vector-only.
+It cost 669k input tokens, $0.0281 and 0.87 s median for 180 prompts. The lexical-only judge run was 396k tokens,
+$0.0166 and 0.79 s median.
 
 ## Known limits
 
-- The gold labels were produced by DeepSeek asking the same question the pass asks Jev; the pass is therefore measured
-  on how well it predicts another model's usefulness verdict, not on ground truth.
-- Single judge, no inter-judge agreement check on this set.
-- One request carries ten facts; a much longer candidate list costs more tokens per prompt and has not been measured.
+- Cost and latency are paid per prompt while the judge is configured; on a laptop without a key it is off.
+- The labels are one model's opinion; the later 60-fact truth sample was 52 TRUE_NOW / 8 STALE, but it was not random.
+- A base larger than the duplicate cap (400 facts, 1,700 with the long-context header) skips the duplicate stage;
+  that is a separate follow-up, not a rerank property.
+- Jev is a judge, not a retriever: do not ask it to search the whole base.

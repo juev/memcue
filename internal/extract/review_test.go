@@ -10,55 +10,17 @@ import (
 	"testing"
 )
 
-// The judge runs on the extraction endpoint and model unless it is given its own: the default is one model for both,
-// and a cheaper one is a setting away.
-func TestReviewEndpointFallsBackToTheExtraction(t *testing.T) {
-	oldAPI, oldModel, oldJudge := API, Model, Judge
-	t.Cleanup(func() { API, Model, Judge = oldAPI, oldModel, oldJudge })
+// Review uses the main model; there is no separate review endpoint.
+func TestReviewUsesTheExtractionEndpoint(t *testing.T) {
+	oldAPI, oldModel := API, Model
+	t.Cleanup(func() { API, Model = oldAPI, oldModel })
 	API.URL, API.Key, Model = "https://api.example", "k1", "main-model"
-	Judge = struct {
-		URL   string
-		Model string
-		Key   string
-	}{}
-	if ep := reviewEndpoint(); ep.URL != "https://api.example" || ep.Model != "main-model" || ep.Key != "k1" {
-		t.Errorf("default endpoint %+v", ep)
-	}
 	if !ReviewOn() {
 		t.Error("an endpoint is configured but ReviewOn is false")
 	}
-	Judge.URL, Judge.Model, Judge.Key = "https://judge.example", "cheap", "k2"
-	if ep := reviewEndpoint(); ep.URL != "https://judge.example" || ep.Model != "cheap" || ep.Key != "k2" {
-		t.Errorf("own endpoint %+v", ep)
-	}
-
 	API.URL, API.Key = "", ""
-	Judge = struct {
-		URL   string
-		Model string
-		Key   string
-	}{}
 	if ReviewOn() {
 		t.Error("no endpoint, but ReviewOn is true")
-	}
-}
-
-// A review endpoint on another host must not receive the extraction key just because Judge.Key is empty.
-func TestReviewEndpointDoesNotLeakTheExtractionKeyToAnotherHost(t *testing.T) {
-	oldAPI, oldModel, oldJudge := API, Model, Judge
-	t.Cleanup(func() { API, Model, Judge = oldAPI, oldModel, oldJudge })
-	API.URL, API.Key, Model = "https://api.example/v1", "k1", "main-model"
-	Judge.URL, Judge.Model, Judge.Key = "https://judge.example/v1", "cheap", ""
-	if ep := reviewEndpoint(); ep.Key != "" {
-		t.Errorf("another host received the extraction key: %+v", ep)
-	}
-	Judge.URL = "https://api.example/v2"
-	if ep := reviewEndpoint(); ep.Key != "k1" {
-		t.Errorf("same host should keep the extraction key: %+v", ep)
-	}
-	Judge.Key = "k2"
-	if ep := reviewEndpoint(); ep.Key != "k2" {
-		t.Errorf("the review key should win: %+v", ep)
 	}
 }
 
@@ -75,8 +37,8 @@ func TestReviewPromptSendsContradictionsToUnsure(t *testing.T) {
 
 // Review reads the verdicts it knows and folds the rest to unsure: a word the code cannot place never approves a fact.
 func TestReviewReadsDecisions(t *testing.T) {
-	oldAPI, oldModel, oldJudge := API, Model, Judge
-	t.Cleanup(func() { API, Model, Judge = oldAPI, oldModel, oldJudge })
+	oldAPI, oldModel := API, Model
+	t.Cleanup(func() { API, Model = oldAPI, oldModel })
 	answer, _ := json.Marshal("```json\n{\"decisions\":[" +
 		"{\"id\":\"01a\",\"verdict\":\" KEEP \",\"reason\":\"rule with a cause\"}," +
 		"{\"id\":\"01b\",\"verdict\":\"MAYBE\",\"reason\":\"?\"}," +
@@ -95,8 +57,7 @@ func TestReviewReadsDecisions(t *testing.T) {
 			`"usage":{"prompt_tokens":700,"completion_tokens":40}}`)
 	}))
 	t.Cleanup(srv.Close)
-	API.URL, API.Key, Model = "", "", "main-model"
-	Judge.URL, Judge.Model, Judge.Key = srv.URL, "cheap", "k"
+	API.URL, API.Key, Model = srv.URL, "k", "cheap"
 
 	r, err := Review(context.Background(), `{"candidates":[{"id":"01a","text":"x"}]}`)
 	if err != nil {

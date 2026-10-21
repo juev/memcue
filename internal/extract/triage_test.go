@@ -33,9 +33,9 @@ func triageEndpoint(t *testing.T, status int, answer string) {
 		_, _ = io.WriteString(w, answer)
 	}))
 	t.Cleanup(srv.Close)
-	old := Triage
-	Triage.URL, Triage.Model, Triage.Key = srv.URL+"/api/v1/decisions", "jev", "k"
-	t.Cleanup(func() { Triage = old })
+	old := JevJudge
+	JevJudge.URL, JevJudge.Model, JevJudge.Key = srv.URL+"/api/v1/decisions", "jev", "k"
+	t.Cleanup(func() { JevJudge = old })
 }
 
 func TestTriageGroupSumsActionProbabilities(t *testing.T) {
@@ -67,18 +67,5 @@ func TestTriageGroupErrors(t *testing.T) {
 				t.Errorf("err %v, want %q", err, tc.want)
 			}
 		})
-	}
-}
-
-func TestTriageOnNeedsAllThree(t *testing.T) {
-	old := Triage
-	t.Cleanup(func() { Triage = old })
-	Triage.URL, Triage.Model, Triage.Key = "u", "m", ""
-	if TriageOn() {
-		t.Error("on without a key")
-	}
-	Triage.Key = "k"
-	if !TriageOn() {
-		t.Error("off with all three")
 	}
 }

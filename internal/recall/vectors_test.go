@@ -75,58 +75,42 @@ func meaningBase(t *testing.T) (*store.Store, string) {
 	return s, target.ID
 }
 
-func TestMeaningPassAddsWhatTheWordsMiss(t *testing.T) {
+func TestVectorCandidatesFindTheParaphrase(t *testing.T) {
 	s, target := meaningBase(t)
-	vp := VectorParams{Embedder: fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}, Margin: DefaultVectorMargin}
-	// The words of this prompt share nothing with any fact: the lexical pass would find no candidate at all.
-	hits, err := byMeaning(s, "почему стало меньше ерунды в подсказках", Default, vp, nil)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	hits, err := vectorCandidates(s, "почему стало меньше ерунды в подсказках", Default, e, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hits) != 1 || hits[0].ID != target {
+	if len(hits) == 0 || hits[0].ID != target {
 		t.Fatalf("hits = %v, want the one paraphrase", ids(hits))
 	}
-	if hits[0].Meaning < 0.9 {
-		t.Errorf("Meaning = %.3f, want the similarity", hits[0].Meaning)
+	if hits[0].Source != "vector" || hits[0].Meaning < 0.9 {
+		t.Errorf("hit = %+v, want source=vector and a high similarity", hits[0])
 	}
 }
 
-func TestMeaningPassYieldsToTheWords(t *testing.T) {
-	s, _ := meaningBase(t)
-	vp := VectorParams{Embedder: fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}, Margin: DefaultVectorMargin}
-	existing := []Hit{
-		{Fact: store.Fact{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}, Coverage: 0.5, Matched: 3},
-		{Fact: store.Fact{ID: "01ARZ3NDEKTSV4RRFFQ69G5FAW"}, Coverage: 0.4, Matched: 3},
-	}
-	hits, err := byMeaning(s, "любой вопрос", Default, vp, existing)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) != len(existing) {
-		t.Fatalf("hits = %v: the vector pass must not take a slot the words filled", ids(hits))
-	}
-}
-
-func TestMeaningPassNeedsAComparableVector(t *testing.T) {
+func TestVectorCandidatesSkipAnotherText(t *testing.T) {
 	s, target := meaningBase(t)
-	// The fact was corrected after its vector was made: the text hash no longer matches, so the vector is foreign.
 	if _, err := s.Correct(target, "Совсем другой текст факта, исправленный позже.", nil); err != nil {
 		t.Fatal(err)
 	}
-	vp := VectorParams{Embedder: fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}, Margin: DefaultVectorMargin}
-	hits, err := byMeaning(s, "почему стало меньше ерунды в подсказках", Default, vp, nil)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	hits, err := vectorCandidates(s, "почему стало меньше ерунды в подсказках", Default, e, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hits) != 0 {
-		t.Fatalf("hits = %v: a vector of another text must never be compared", ids(hits))
+	for _, h := range hits {
+		if h.ID == target {
+			t.Fatalf("a vector of another text was compared: %v", ids(hits))
+		}
 	}
 }
 
-func TestMeaningPassIgnoresAnotherModel(t *testing.T) {
+func TestVectorCandidatesIgnoreAnotherModel(t *testing.T) {
 	s, _ := meaningBase(t)
-	vp := VectorParams{Embedder: fakeEmbedder{tag: "https://routerai.ru/api/v1/qwen3-embedding-8b"}, Margin: DefaultVectorMargin}
-	hits, err := byMeaning(s, "почему стало меньше ерунды в подсказках", Default, vp, nil)
+	e := fakeEmbedder{tag: "https://routerai.ru/api/v1/qwen3-embedding-8b", vec: []float32{1, 0}}
+	hits, err := vectorCandidates(s, "почему стало меньше ерунды в подсказках", Default, e, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,55 +119,94 @@ func TestMeaningPassIgnoresAnotherModel(t *testing.T) {
 	}
 }
 
-func TestMeaningPassSkipsWhatTheSessionSaw(t *testing.T) {
+func TestVectorCandidatesSkipSeenFacts(t *testing.T) {
 	s, target := meaningBase(t)
 	p := Default
 	p.Seen = map[string]bool{target: true}
-	vp := VectorParams{Embedder: fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}, Margin: DefaultVectorMargin}
-	hits, err := byMeaning(s, "почему стало меньше ерунды в подсказках", p, vp, nil)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	hits, err := vectorCandidates(s, "почему стало меньше ерунды в подсказках", p, e, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hits) != 0 {
-		t.Fatalf("hits = %v: a fact the session already got must not come again", ids(hits))
-	}
-}
-
-func TestFailedEndpointLeavesRecallAsItWas(t *testing.T) {
-	s, _ := meaningBase(t)
-	prompt := "Настройки approvals.deny блокируют пуш?"
-	plain, err := Recall(s, prompt, "", Default)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vp := VectorParams{Embedder: fakeEmbedder{tag: modelTag, err: errors.New("endpoint is down")}}
-	hybrid, err := RecallHybrid(s, prompt, "", Default, vp)
-	if err != nil {
-		t.Fatalf("a dead endpoint must not fail recall: %v", err)
-	}
-	if len(hybrid) != len(plain) {
-		t.Fatalf("hybrid = %v, lexical = %v", ids(hybrid), ids(plain))
-	}
-	for i := range plain {
-		if hybrid[i].ID != plain[i].ID {
-			t.Fatalf("hybrid = %v, lexical = %v", ids(hybrid), ids(plain))
+	for _, h := range hits {
+		if h.ID == target {
+			t.Fatalf("a seen fact was returned: %v", ids(hits))
 		}
 	}
 }
 
-func TestNoEmbedderIsTheOldBehaviour(t *testing.T) {
+func TestVectorCandidatesFailOpen(t *testing.T) {
 	s, _ := meaningBase(t)
-	prompt := "почему стало меньше ерунды в подсказках"
+	e := fakeEmbedder{tag: modelTag, err: errors.New("endpoint is down")}
+	if _, err := vectorCandidates(s, "любой вопрос", Default, e, 10); err == nil {
+		t.Fatal("a dead endpoint must return an error for the caller to ignore")
+	}
+}
+
+func TestRecallJudgeCanPromoteAVectorCandidate(t *testing.T) {
+	s, target := meaningBase(t)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Порог": 0.95}}
+	hits, err := RecallJudge(s, "почему шумно в ответах", "", rankedParams(), r, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].ID != target || hits[0].Source != "vector" {
+		t.Fatalf("hits = %v, want the vector fact first", ids(hits))
+	}
+	if hits[0].Meaning < 0.9 {
+		t.Errorf("Meaning = %v, want the judge score", hits[0].Meaning)
+	}
+}
+
+func TestRecallJudgeWithoutARankerStaysLexical(t *testing.T) {
+	s, _ := meaningBase(t)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
 	plain, err := Recall(s, prompt, "", Default)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hybrid, err := RecallHybrid(s, prompt, "", Default, VectorParams{})
+	hits, err := RecallJudge(s, prompt, "", Default, nil, e)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hybrid) != len(plain) {
-		t.Fatalf("hybrid = %v, lexical = %v", ids(hybrid), ids(plain))
+	if len(hits) != len(plain) || (len(hits) > 0 && hits[0].ID != plain[0].ID) {
+		t.Fatalf("hits = %v, lexical = %v", ids(hits), ids(plain))
+	}
+}
+
+func TestRecallJudgeFallsBackWhenTheJudgeFails(t *testing.T) {
+	s, _ := meaningBase(t)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
+	plain, err := Recall(s, prompt, "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hits, err := RecallJudge(s, prompt, "", Default, &fakeRanker{min: 0.5, err: errors.New("down")}, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != len(plain) || (len(hits) > 0 && hits[0].ID != plain[0].ID) {
+		t.Fatalf("hits = %v, lexical = %v", ids(hits), ids(plain))
+	}
+}
+
+func TestRecallJudgeFallsBackWhenEmbeddingsFail(t *testing.T) {
+	s, _ := meaningBase(t)
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
+	plain, err := Recall(s, prompt, "", Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := fakeEmbedder{tag: modelTag, err: errors.New("down")}
+	hits, err := RecallJudge(s, prompt, "", Default, &fakeRanker{min: 0.5, scores: map[string]float64{"Gradle": 0.9}}, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != len(plain) || (len(hits) > 0 && hits[0].ID != plain[0].ID) {
+		t.Fatalf("hits = %v, lexical = %v", ids(hits), ids(plain))
 	}
 }
 
@@ -193,60 +216,4 @@ func ids(hits []Hit) []string {
 		out[i] = h.ID
 	}
 	return out
-}
-
-func TestOnlyModeIgnoresTheWords(t *testing.T) {
-	s, _ := meaningBase(t)
-	// The words alone would find this fact; the vector gate finds nothing for the prompt, and in only mode that
-	// nothing is the answer.
-	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
-	lexical, err := Recall(s, prompt, "", Default)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(lexical) == 0 {
-		t.Fatal("the test needs a prompt the words do find")
-	}
-	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: modelTag, vec: []float32{0, 1}}}
-	hits, err := RecallHybrid(s, prompt, "", Default, vp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) != 0 {
-		t.Fatalf("hits = %v: only mode must not consult the words", ids(hits))
-	}
-}
-
-func TestOnlyModeFallsBackWhenTheEndpointFails(t *testing.T) {
-	s, _ := meaningBase(t)
-	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
-	lexical, err := Recall(s, prompt, "", Default)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: modelTag, err: errors.New("down")}}
-	hits, err := RecallHybrid(s, prompt, "", Default, vp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) != len(lexical) || (len(hits) > 0 && hits[0].ID != lexical[0].ID) {
-		t.Fatalf("a dead endpoint must leave the words: %v vs %v", ids(hits), ids(lexical))
-	}
-}
-
-func TestOnlyModeWithoutVectorsFallsBack(t *testing.T) {
-	s, _ := meaningBase(t)
-	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
-	lexical, err := Recall(s, prompt, "", Default)
-	if err != nil {
-		t.Fatal(err)
-	}
-	vp := VectorParams{Only: true, Embedder: fakeEmbedder{tag: "https://elsewhere/v1/other-model", vec: []float32{1, 0}}}
-	hits, err := RecallHybrid(s, prompt, "", Default, vp)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) != len(lexical) {
-		t.Fatalf("hits = %v, want the words %v", ids(hits), ids(lexical))
-	}
 }

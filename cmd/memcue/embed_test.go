@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/juev/memcue/internal/embed"
-	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 )
 
@@ -61,7 +59,7 @@ func TestEmbedFillsTheVectorsOfActiveFacts(t *testing.T) {
 	defer srv.Close()
 	t.Setenv("MEMCUE_EMBED_URL", srv.URL)
 	t.Setenv("MEMCUE_EMBED_MODEL", "test-model")
-	t.Setenv("MEMCUE_EMBED_KEY_ENV", "MEMCUE_TEST_KEY")
+	t.Setenv("MEMCUE_EMBED_KEY", "test-key")
 
 	var out, errOut bytes.Buffer
 	if err := runEmbed(nil, &out, &errOut); err != nil {
@@ -78,7 +76,7 @@ func TestEmbedFillsTheVectorsOfActiveFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	client := embed.New(&embed.Settings{URL: srv.URL, Model: "test-model", KeyEnv: "MEMCUE_TEST_KEY"})
+	client := embed.New(&embed.Settings{URL: srv.URL, Model: "test-model", Key: "test-key"})
 	tag := client.Tag()
 	n, err := s.TagVectors(tag)
 	if err != nil {
@@ -125,8 +123,8 @@ func TestEmbedIsOffWithoutEndpoint(t *testing.T) {
 	if err := runEmbed(nil, &out, &errOut); err == nil {
 		t.Fatal("want an error naming the missing settings")
 	}
-	if vp := vectorParams(); vp.Embedder != nil {
-		t.Fatal("without settings the meaning pass must have no embedder")
+	if e := embedder(); e != nil {
+		t.Fatal("without settings the vector source must have no embedder")
 	}
 }
 
@@ -151,26 +149,11 @@ func TestHookStaysLexicalWhenTheEndpointIsDown(t *testing.T) {
 	}
 }
 
-func TestVectorParamsReadTheMargin(t *testing.T) {
-	t.Setenv("MEMCUE_EMBED_MARGIN", "2.5")
-	t.Setenv("MEMCUE_EMBED_MAX_FACTS", "3")
-	vp := vectorParams()
-	if math.Abs(vp.Margin-2.5) > 1e-9 || vp.MaxFacts != 3 {
-		t.Fatalf("vectorParams = %+v", vp)
-	}
-	t.Setenv("MEMCUE_EMBED_MARGIN", "not a number")
-	if vp := vectorParams(); math.Abs(vp.Margin-recall.DefaultVectorMargin) > 1e-9 {
-		t.Fatalf("a malformed margin must keep the default, got %v", vp.Margin)
-	}
-}
-
-func TestOnlyModeIsReadFromTheEnvironment(t *testing.T) {
-	t.Setenv("MEMCUE_EMBED_MODE", "only")
-	if vp := vectorParams(); !vp.Only {
-		t.Fatal("MEMCUE_EMBED_MODE=only did not reach the params")
-	}
-	t.Setenv("MEMCUE_EMBED_MODE", "fallback")
-	if vp := vectorParams(); vp.Only {
-		t.Fatal("any other value must keep the words first")
+func TestEmbedderReadsTheEndpointAndModel(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_EMBED_URL", "http://127.0.0.1:11434/v1")
+	t.Setenv("MEMCUE_EMBED_MODEL", "bge-m3")
+	if e := embedder(); e == nil {
+		t.Fatal("an endpoint and model must create an embedder")
 	}
 }

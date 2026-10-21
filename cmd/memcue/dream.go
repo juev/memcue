@@ -48,23 +48,6 @@ const (
 	triageParallel = 8
 )
 
-// configureTriage reads the triage endpoint from the environment. Triage stays off unless URL, model and key are all
-// set, and when MEMCUE_TRIAGE_MIN is not a probability, so a half-done setup changes nothing.
-func configureTriage() {
-	extract.Triage.URL = os.Getenv("MEMCUE_TRIAGE_URL")
-	extract.Triage.Model = os.Getenv("MEMCUE_TRIAGE_MODEL")
-	extract.Triage.Key = os.Getenv("MEMCUE_TRIAGE_KEY")
-	extract.Triage.Min = triageMin
-	if v := os.Getenv("MEMCUE_TRIAGE_MIN"); v != "" {
-		m, err := strconv.ParseFloat(v, 64)
-		if err != nil || m < 0 || m > 1 {
-			extract.Triage.URL = ""
-			return
-		}
-		extract.Triage.Min = m
-	}
-}
-
 // triageFn is the triage step, replaced in tests.
 var triageFn = func(facts []string) (extract.TriageResult, error) {
 	ctx, cancel := contextTimeout()

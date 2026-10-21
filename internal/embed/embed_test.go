@@ -16,7 +16,7 @@ import (
 
 func settings(t *testing.T, srv *httptest.Server) *Settings {
 	t.Helper()
-	return &Settings{URL: srv.URL, Model: "test-model", KeyEnv: "MEMCUE_TEST_KEY", Timeout: time.Second}
+	return &Settings{URL: srv.URL, Model: "test-model", Key: "test-key", Timeout: time.Second}
 }
 
 func TestEmbedReturnsNormalizedVectorsInInputOrder(t *testing.T) {
@@ -139,8 +139,9 @@ func TestFromEnvIsOffWithoutEndpointOrModel(t *testing.T) {
 	}
 	t.Setenv("MEMCUE_EMBED_URL", "https://routerai.ru/api/v1")
 	t.Setenv("MEMCUE_EMBED_MODEL", "bge-m3")
+	t.Setenv("MEMCUE_EMBED_KEY", "k")
 	s := FromEnv()
-	if s == nil || s.URL != "https://routerai.ru/api/v1" || s.Timeout != DefaultTimeout || s.KeyEnv != "OPENAI_API_KEY" {
+	if s == nil || s.URL != "https://routerai.ru/api/v1" || s.Timeout != DefaultTimeout || s.Key != "k" {
 		t.Fatalf("FromEnv = %+v", s)
 	}
 }

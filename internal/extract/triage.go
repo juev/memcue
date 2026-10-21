@@ -8,18 +8,15 @@ import (
 	"github.com/juev/memcue/internal/decisions"
 )
 
-// Triage is a decision endpoint that tells a dream which groups are worth the main model: most groups need no action,
-// and a cheap classifier can say so. It speaks the typed decisions API of RouterAI (POST with a "choice" question,
-// probabilities back), not chat completions. It is off unless URL, Model and Key are all set.
+// Triage is the threshold for the judge's triage role: most dream groups need no action, and the same Jev model can
+// say so. The endpoint, model and key come from JevJudge; only the probability stays role-specific.
 var Triage struct {
-	URL   string  // the full endpoint, e.g. https://routerai.ru/api/v1/decisions
-	Model string  // e.g. typesafe/jev-1.13
-	Key   string  // bearer token
-	Min   float64 // a group goes on to the main model when P(duplicate) + P(outdated) reaches it
+	Min     float64 // a group goes on to the main model when P(duplicate) + P(outdated) reaches it
+	Enabled bool    // false when the judge is off or the threshold is malformed
 }
 
-// TriageOn says whether triage is configured.
-func TriageOn() bool { return Triage.URL != "" && Triage.Model != "" && Triage.Key != "" }
+// TriageOn says whether the dream can ask the judge about a group.
+func TriageOn() bool { return JevJudgeOn() && Triage.Enabled }
 
 // triagePolicy is the wording the threshold was measured with (2026-10-20, 395 groups against an Opus dry run).
 const triagePolicy = "A knowledge base stores atomic facts for a coding agent. A group holds facts close in words. " +
@@ -39,7 +36,7 @@ func TriageGroup(ctx context.Context, facts []string) (TriageResult, error) {
 	for i, f := range facts {
 		_, _ = fmt.Fprintf(&list, "%d) %s\n", i+1, strings.Join(strings.Fields(f), " "))
 	}
-	c := decisions.Client{URL: Triage.URL, Model: Triage.Model, Key: Triage.Key}
+	c := decisions.Client{URL: JevJudge.URL, Model: JevJudge.Model, Key: JevJudge.Key}
 	res, err := c.Ask(ctx, map[string]string{"policy": triagePolicy, "facts": strings.TrimSpace(list.String())},
 		map[string]decisions.Question{"q": {
 			Type:         "choice",

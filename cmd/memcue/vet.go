@@ -46,30 +46,35 @@ const (
 	judgeMaxFacts = 400
 )
 
-// configureJudge reads the duplicate judge from the environment. It stays off unless URL, model and key are all set,
-// and when MEMCUE_JUDGE_MIN is not a probability or MEMCUE_JUDGE_MAX_FACTS is not a positive number.
+// configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage, rerank and the
+// duplicate check; only the thresholds and request limits stay role-specific.
 func configureJudge() {
 	extract.JevJudge.URL = os.Getenv("MEMCUE_JUDGE_URL")
 	extract.JevJudge.Model = os.Getenv("MEMCUE_JUDGE_MODEL")
 	extract.JevJudge.Key = os.Getenv("MEMCUE_JUDGE_KEY")
 	extract.JevJudge.Min = judgeMin
 	extract.JevJudge.MaxFacts = judgeMaxFacts
-	extract.JevJudge.LongContext = os.Getenv("MEMCUE_JUDGE_LONG_CONTEXT") == "1"
-	if v := os.Getenv("MEMCUE_JUDGE_MIN"); v != "" {
+	extract.JevJudge.LongContext = os.Getenv("MEMCUE_JUDGE_DUP_LONG_CONTEXT") == "1"
+
+	extract.Triage.Min = triageMin
+	extract.Triage.Enabled = extract.JevJudgeOn()
+	if v := os.Getenv("MEMCUE_JUDGE_TRIAGE_MIN"); v != "" {
 		m, err := strconv.ParseFloat(v, 64)
 		if err != nil || m < 0 || m > 1 {
-			extract.JevJudge.URL = ""
-			return
+			extract.Triage.Enabled = false
+		} else {
+			extract.Triage.Min = m
 		}
-		extract.JevJudge.Min = m
 	}
-	if v := os.Getenv("MEMCUE_JUDGE_MAX_FACTS"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			extract.JevJudge.URL = ""
-			return
+	if v := os.Getenv("MEMCUE_JUDGE_DUP_MIN"); v != "" {
+		if m, err := strconv.ParseFloat(v, 64); err == nil && m >= 0 && m <= 1 {
+			extract.JevJudge.Min = m
 		}
-		extract.JevJudge.MaxFacts = n
+	}
+	if v := os.Getenv("MEMCUE_JUDGE_DUP_MAX_FACTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			extract.JevJudge.MaxFacts = n
+		}
 	}
 }
 

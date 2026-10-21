@@ -67,32 +67,27 @@ environment:
   MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
   MEMCUE_MODEL    model of the extraction (default claude-opus-5-5)
   MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
+  MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got ($XDG_STATE_HOME/memcue/recall.log; holds prompt text)
   MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
-  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL  OpenAI-compatible embeddings endpoint and model for the meaning pass; both
-                  unset keeps recall lexical only. The key comes from MEMCUE_EMBED_KEY_ENV (default OPENAI_API_KEY)
-  MEMCUE_EMBED_MARGIN  standard deviations above the chance maximum a fact must stand to be recalled by meaning
-                  alone (default 1.0); MEMCUE_EMBED_MIN_SCORE adds an absolute floor, MEMCUE_EMBED_MAX_FACTS a cap
-  MEMCUE_EMBED_MODE  only makes the meaning pass the only reader: the words are read only when the endpoint fails
-  MEMCUE_RERANK_URL  typed decisions endpoint (Jev) that orders the facts the words found; unset keeps it off
-  MEMCUE_RERANK_MODEL, MEMCUE_RERANK_KEY  its model (default typesafe/jev-1.14) and key (or MEMCUE_RERANK_KEY_ENV,
-                  default OPENROUTER_API_KEY); MEMCUE_RERANK_MIN 0.5, _CANDIDATES 10, _TIMEOUT 2s
-  MEMCUE_EMBED_TIMEOUT  one request, default 2s; MEMCUE_EMBED_SPACE labels the vector space of the model
+  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage, recall rerank and the
+                  duplicate check; off unless all three are set
+  MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
+  MEMCUE_JUDGE_RERANK_CANDIDATES  candidates taken from each source (default 10)
+  MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
+  MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
+  MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
+  MEMCUE_JUDGE_DUP_MAX_FACTS  approved facts that fit one duplicate request (default 400)
+  MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
+  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY  OpenAI-compatible embeddings endpoint, model and key;
+                  the vector candidates are added to the judge when both the judge and the embedder are set
+  MEMCUE_EMBED_TIMEOUT  one embedding request (default 2s)
+  MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
-  MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs an
-                  endpoint (MEMCUE_VET_URL or MEMCUE_API_URL); undecided ones stay candidates
-  MEMCUE_VET_URL, MEMCUE_VET_MODEL, MEMCUE_VET_KEY  endpoint, model and key of that review (default: the extraction's)
+  MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs
+                  MEMCUE_API_URL; undecided ones stay candidates
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes the mirrors are checked against; empty skips that rule
-  MEMCUE_TRIAGE_URL, MEMCUE_TRIAGE_MODEL, MEMCUE_TRIAGE_KEY  decision endpoint that drops groups a dream need not
-                  send to the model; off unless all three are set
-  MEMCUE_TRIAGE_MIN probability of an action a group needs to go on (default 0.2)
-  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  decision endpoint that retires a candidate repeating an
-                  approved fact, vet only; off unless all three are set
-  MEMCUE_JUDGE_MIN  probability of "same claim" that retires a candidate (default 0.5)
-  MEMCUE_JUDGE_MAX_FACTS  approved facts the base may hold and still be judged in one request (default 400);
-                  a bigger base falls back to the review model and its neighbours
-  MEMCUE_JUDGE_LONG_CONTEXT  1 sends the danger-zone header, which lifts the request to 262k tokens
 `
 
 func main() {
@@ -104,9 +99,6 @@ func main() {
 		extract.Model = m
 	}
 	extract.API.URL, extract.API.Key = os.Getenv("MEMCUE_API_URL"), os.Getenv("MEMCUE_API_KEY")
-	extract.Judge.URL, extract.Judge.Model, extract.Judge.Key =
-		os.Getenv("MEMCUE_VET_URL"), os.Getenv("MEMCUE_VET_MODEL"), os.Getenv("MEMCUE_VET_KEY")
-	configureTriage()
 	configureJudge()
 	var err error
 	switch os.Args[1] {
@@ -315,7 +307,8 @@ type recallRecord struct {
 type recallFact struct {
 	ID        string  `json:"id"`
 	Coverage  float64 `json:"coverage"`
-	Meaning   float64 `json:"meaning,omitempty"` // similarity, when the fact came from the meaning pass
+	Source    string  `json:"source,omitempty"`
+	Meaning   float64 `json:"meaning,omitempty"` // vector similarity or judge score
 	Scope     string  `json:"scope,omitempty"`
 	Displaced bool    `json:"displaced,omitempty"`
 }
@@ -340,7 +333,7 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,
-			Meaning: math.Round(h.Meaning*1000) / 1000, Scope: h.Scope, Displaced: h.Displaced})
+			Source: h.Source, Meaning: math.Round(h.Meaning*1000) / 1000, Scope: h.Scope, Displaced: h.Displaced})
 		if h.Displaced {
 			rec.Displaced = true
 		}

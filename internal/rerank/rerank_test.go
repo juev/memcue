@@ -119,24 +119,25 @@ func TestPauseSurvivesTheProcess(t *testing.T) {
 }
 
 func TestFromEnvIsOffWithoutEndpointOrKey(t *testing.T) {
-	t.Setenv("MEMCUE_RERANK_URL", "")
-	t.Setenv("MEMCUE_RERANK_KEY", "")
-	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("MEMCUE_JUDGE_URL", "")
+	t.Setenv("MEMCUE_JUDGE_MODEL", "")
+	t.Setenv("MEMCUE_JUDGE_KEY", "")
 	if s := FromEnv(); s != nil {
 		t.Fatalf("FromEnv = %+v, want nil", s)
 	}
-	t.Setenv("MEMCUE_RERANK_URL", "https://openrouter.ai/api/alpha/decisions")
+	t.Setenv("MEMCUE_JUDGE_URL", "https://openrouter.ai/api/alpha/decisions")
 	if s := FromEnv(); s != nil {
-		t.Fatal("an endpoint without a key must stay off")
+		t.Fatal("an endpoint without a model and key must stay off")
 	}
-	t.Setenv("MEMCUE_RERANK_KEY", "k")
+	t.Setenv("MEMCUE_JUDGE_MODEL", "typesafe/jev-1.14")
+	t.Setenv("MEMCUE_JUDGE_KEY", "k")
 	s := FromEnv()
 	if s == nil || s.Model != DefaultModel || s.Min != DefaultMin || s.Candidates != DefaultCandidates ||
 		s.Timeout != DefaultTimeout {
 		t.Fatalf("FromEnv = %+v", s)
 	}
-	t.Setenv("MEMCUE_RERANK_MIN", "0.7")
-	t.Setenv("MEMCUE_RERANK_CANDIDATES", "4")
+	t.Setenv("MEMCUE_JUDGE_RERANK_MIN", "0.7")
+	t.Setenv("MEMCUE_JUDGE_RERANK_CANDIDATES", "4")
 	if s := FromEnv(); s.Min != 0.7 || s.Candidates != 4 {
 		t.Fatalf("FromEnv = %+v", s)
 	}

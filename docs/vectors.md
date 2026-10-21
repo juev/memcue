@@ -1,133 +1,70 @@
-# Search by meaning
+# Vector candidates for the judge
 
-Recall reads facts by words: the FTS5 index over the stems of every active fact, then a gate on how much of the
-prompt a fact holds. It is fast (3-8 ms), local, and exact on the things an agent usually asks about — a ticket key, a
-path, a port, a hash. What it cannot do is find a fact the prompt describes in other words. Measured on 120 real
-prompts from the Hermes gateway with blind-judge labels, 35 prompts that needed memory got nothing at all.
+Recall reads facts by words: the FTS5 index over the stems of every active fact. Words are exact on a ticket key, a
+path, a port or a version, but they cannot find a fact described in other words. The optional vector model proposes
+such facts as **candidates**; the Jev judge decides whether they reach the prompt.
 
-This is the optional second reader. It never replaces the words: a fact it offers is added next to what the words
-found, and nothing it does can make recall worse. With no endpoint configured — the default, and the only sane setup
-for a laptop — none of this code runs and no request leaves the machine.
+The vector model is not a standalone reader. It never adds a fact by itself: without `MEMCUE_JUDGE_*`, configuring an
+embeddings endpoint changes nothing in recall.
 
 ## Turning it on
 
-An OpenAI-compatible `/embeddings` endpoint is all it takes; a local server, a hosted router and a vendor API are the
-same three settings.
+An OpenAI-compatible `/embeddings` endpoint is enough:
 
 ```sh
-# a local server: Ollama serves the OpenAI shape under /v1 (its /api/embeddings is a different format)
 export MEMCUE_EMBED_URL=http://127.0.0.1:11434/v1
 export MEMCUE_EMBED_MODEL=bge-m3
-
-# or a hosted OpenAI-compatible router
-export MEMCUE_EMBED_URL=https://routerai.ru/api/v1
-export MEMCUE_EMBED_MODEL=bge-m3
-export MEMCUE_EMBED_KEY_ENV=ROUTERAI_API_KEY   # name of the variable holding the key, not the key itself
+# for a hosted endpoint:
+# export MEMCUE_EMBED_KEY=...
 ```
 
-Then fill the vectors once, and again after adding facts or changing the model:
+Fill the vectors once, and again after adding facts or changing the model:
 
 ```sh
 memcue embed -dry-run   # how many active facts have no vector for this model
 memcue embed            # 32 facts per request; -batch N, -limit N and -timeout 2m change that
 ```
 
-233 facts against a local `bge-m3` took 54 seconds on one host (8 requests of 32, model warm-up included).
-
-`add` and `correct` never call the endpoint: a fact without a vector simply does not take part in the meaning pass
+`add` and `correct` never call the endpoint: a fact without a vector simply does not take part in the candidate pass
 until the next `memcue embed`.
 
 | Variable | Meaning |
 |---|---|
 | `MEMCUE_EMBED_URL` | base address; `/embeddings` is appended |
 | `MEMCUE_EMBED_MODEL` | model name |
-| `MEMCUE_EMBED_KEY_ENV` | variable holding the key (default `OPENAI_API_KEY`) |
-| `MEMCUE_EMBED_TIMEOUT` | one request (default 2 s, clamped to 0.2-10 s) |
-| `MEMCUE_EMBED_MARGIN` | how far above chance a fact must stand (default 1.0; see below) |
-| `MEMCUE_EMBED_MIN_SCORE` | optional absolute similarity floor, off by default |
-| `MEMCUE_EMBED_MAX_FACTS` | cap on facts per prompt, lexical and vector together (default: recall's own limit) |
-| `MEMCUE_EMBED_SPACE` | label of the vector space, for a server that changes model under one name |
+| `MEMCUE_EMBED_KEY` | key for a hosted endpoint; empty for a local server |
+| `MEMCUE_EMBED_TIMEOUT` | one request (default 2 s) |
+| `MEMCUE_EMBED_SPACE` | label of the vector space, when a server changes model under one name |
 
-## What decides a fact is offered
+## What it contributes
 
-Not an absolute similarity. On the measured set a raw threshold does not separate a prompt that needs memory from one
-that does not: at 0.55 it kept 20 of the 35 misses but also 33 of 37 prompts that needed nothing, because any
-technical text scores 0.5-0.6 against any technical fact, and the model's own baseline differs from model to model
-(a paraphrase of a stored fact scores 0.38-0.66 on one and 0.68-0.84 on another).
+For a prompt, the vector model returns its top-N active facts by cosine similarity. The lexical candidates and the
+vector candidates are deduplicated and passed together to Jev; the judge orders them and keeps what clears
+`MEMCUE_JUDGE_RERANK_MIN`. The total is capped by recall's `MaxFacts`.
 
-The spread inside one query does separate them. A fact is offered when its similarity stands `Margin` standard
-deviations above the closest of `n` unrelated facts would reach by chance, `sqrt(2 ln n)`:
+There is no absolute similarity threshold, no margin and no `only` mode. A similarity gate could not separate "needs
+memory" from "does not" on the measured set, and the judge is better at that decision. The vector model only has to
+propose; Jev decides.
 
-```
-threshold = mean + Margin * std * sqrt(2 ln n)
-```
+Vectors from another model, another address or another space under the same model name are never compared: each
+vector carries its tag and the hash of the text it was made from. A corrected fact therefore has no comparable vector
+until `memcue embed` runs again, which is deliberate.
 
-The bar therefore rises as the base grows, while a paraphrase of a stored fact keeps standing out. Vectors from
-another model, or made from another version of the text, are never compared: each vector carries its model tag and
-the hash of the text it was made from.
+## Failure behaviour
 
-## Two modes
+A missing endpoint, a timeout or a wrong answer only removes the vector candidates; the lexical candidates and the
+judge still run. After a failure the endpoint is left alone for 60 s, doubling to 15 minutes, and the pause is kept in
+`$XDG_STATE_HOME/memcue/embed.pause` because the hook is a fresh process on every prompt.
 
-`MEMCUE_EMBED_MODE` decides who reads the base.
+## What the pilot measured
 
-- unset or `fallback` (default): the words first; the pass adds facts only when they found fewer than the limit.
-- `only`: the pass is the only reader, and what it finds is the answer — even when that is nothing. The words are
-  read only when the endpoint fails or the base has no vectors yet, so a dead model costs precision, never memory.
-
-Measured on the 120-prompt labelled set (233 facts of `bge-m3`), counting what `memcue eval` reports:
-
-| mode | prompts with a fact | labelled useful | all facts | into prompts needing no memory |
-|---|---|---|---|---|
-| words only | 73 | 13 | 127 | 45 |
-| fallback, margin 1.0 (default) | 87 | 13 | 159 | 52 |
-| only, margin 1.0 | 46 | 3 | 64 | 14 |
-| only, floor 0.62 | 49 | 8 | 84 | 25 |
-
-Vector-only is the weaker reader on this base: it keeps 3-8 of the 13 prompts the words serve, because bge-m3's
-similarities are flat enough that a gate strict enough to keep noise out also throws out paraphrases. Its one
-advantage is noise — it never served a fact the judges called NOISE. `only` is there for an experiment or for a base
-where the words have proven uselessly imprecise, not as an improvement over the default.
-
-## When the endpoint is down, slow or wrong
-
-Recall falls back to the words, silently and with the same answer it would have given before the feature existed.
-After a failure the endpoint is left alone for 60 s, doubling to 15 minutes on repeated failures. The pause is kept
-in `$XDG_STATE_HOME/memcue/embed.pause`, because the hook is a fresh process on every prompt and would otherwise pay
-the timeout again on each of the next turns.
-
-The pass only runs when the words found fewer facts than the limit, so a normal prompt costs nothing.
-
-## Baseline to beat
-
-Measured on 322 facts and 120 prompts with blind-judge labels (`memcue eval`):
-
-- vector top-2 overlaps the lexical top-2 by 0.20 — the two readers look at different facts;
-- vector top-2 alone keeps only 10 of the 21 facts judged USEFUL that FTS5 finds, so a replacement is not an option;
-- on the 35 prompts that got nothing, a bge-m3 top-1 offers a useful fact for about 11 of them.
-
-What the pass actually does on that set (233 vectors of `bge-m3`, Ollama on the same host, 120 prompts), counting the
-facts `memcue eval` reports after the lexical pass:
-
-| setting | prompts with a fact | labelled useful | all facts | into prompts needing no memory |
-|---|---|---|---|---|
-| words only | 73 | 13 | 127 | 45 |
-| margin 0.75 | 115 | 15 | 214 | 64 |
-| margin 1.0 (default) | 87 | 13 | 159 | 52 |
-| margin 1.5 | 73 | 13 | 127 | 45 |
-| floor 0.62, margin 0.1 | 82 | 13 | 147 | 51 |
-
-Read this honestly: at 1.0 the pass adds 32 facts and changes no labelled verdict, at 0.75 it adds 87 facts for two
-more useful prompts and 19 more facts into prompts that need nothing, and at 1.5 nothing clears the bar at all. The
-labelled set cannot show the gain, because it labels only the pairs the lexical pass produced — the facts the pass
-adds on the 35 misses are exactly the unlabelled ones. Judging those pairs is the next step before the default is
-tuned; the mechanism, not the number, is what this change ships.
-
-A margin above 1.5 making the pass silent is not a bug: `sqrt(2 ln n)` treats the base as isotropic, while real
-embeddings are clustered, so the chance maximum on a small homogeneous base is higher than the formula assumes. The
-floor (`MEMCUE_EMBED_MIN_SCORE`) is the per-model answer, at the price of being model-specific.
+On a copy of the 2,571-fact Claude Code base and 180 real prompts, Jev over lexical candidates found a useful top-1
+fact for 112 prompts; adding the vector candidates raised that to **129**, with 18 rescues and 2 losses against
+Jev-over-lexical. Vector candidates alone were much weaker (35 useful top-1), which is why they go to the judge rather
+than into the prompt. The details are in [models.md](models.md) and the research under `docs/research/`.
 
 ## Schema
 
-Schema 4 adds `fact_vectors`, keyed by `(id, tag)`. A base opened by this version cannot be read by an older memcue
-(`fact base has schema 3, this memcue knows 4` is the error in reverse), so upgrade the binary before pointing it at a
-shared base.
+Schema 4 adds `fact_vectors`, keyed by `(id, tag)`; the table is derived data and can be rebuilt with `memcue embed`.
+A base opened by this version cannot be read by an older memcue. The vector model is optional and can be left
+unconfigured.

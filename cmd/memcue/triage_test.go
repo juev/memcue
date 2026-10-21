@@ -27,13 +27,13 @@ func fakeTriage(t *testing.T, answer func(facts []string) (extract.TriageResult,
 // triageEnv sets the triage variables and reads them as main does; empty values stay unset.
 func triageEnv(t *testing.T, url, model, key, minP string) {
 	t.Helper()
-	old := extract.Triage
-	t.Cleanup(func() { extract.Triage = old })
-	for k, v := range map[string]string{"MEMCUE_TRIAGE_URL": url, "MEMCUE_TRIAGE_MODEL": model,
-		"MEMCUE_TRIAGE_KEY": key, "MEMCUE_TRIAGE_MIN": minP} {
+	oldTriage, oldJudge := extract.Triage, extract.JevJudge
+	t.Cleanup(func() { extract.Triage, extract.JevJudge = oldTriage, oldJudge })
+	for k, v := range map[string]string{"MEMCUE_JUDGE_URL": url, "MEMCUE_JUDGE_MODEL": model,
+		"MEMCUE_JUDGE_KEY": key, "MEMCUE_JUDGE_TRIAGE_MIN": minP} {
 		t.Setenv(k, v)
 	}
-	configureTriage()
+	configureJudge()
 }
 
 // Without the triage variables, or with only some of them, or with a bad threshold, a dream is what it was before

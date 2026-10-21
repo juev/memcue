@@ -17,7 +17,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,13 +37,13 @@ var ErrPaused = errors.New("embeddings endpoint is paused after a failure")
 type Settings struct {
 	URL       string        // base address, e.g. https://openrouter.ai/api/v1
 	Model     string        // embedding model name
-	KeyEnv    string        // name of the environment variable holding the API key
+	Key       string        // bearer token; empty for a local server
 	Space     string        // optional label of the vector space, for a server that changes model under one name
 	Timeout   time.Duration // one request
 	StateFile string        // where the pause is remembered between processes; empty keeps it in memory
 }
 
-// FromEnv reads MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY_ENV, MEMCUE_EMBED_SPACE and
+// FromEnv reads MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY, MEMCUE_EMBED_SPACE and
 // MEMCUE_EMBED_TIMEOUT. It returns nil when no endpoint or no model is named, which is the default.
 func FromEnv() *Settings {
 	raw, model := strings.TrimSpace(os.Getenv("MEMCUE_EMBED_URL")), strings.TrimSpace(os.Getenv("MEMCUE_EMBED_MODEL"))
@@ -54,7 +53,7 @@ func FromEnv() *Settings {
 	s := &Settings{
 		URL:     strings.TrimRight(raw, "/"),
 		Model:   model,
-		KeyEnv:  envOr("MEMCUE_EMBED_KEY_ENV", "OPENAI_API_KEY"),
+		Key:     strings.TrimSpace(os.Getenv("MEMCUE_EMBED_KEY")),
 		Space:   strings.TrimSpace(os.Getenv("MEMCUE_EMBED_SPACE")),
 		Timeout: DefaultTimeout,
 	}
@@ -99,7 +98,7 @@ func New(s *Settings) *Client {
 	return &Client{
 		set:  s,
 		http: &http.Client{Timeout: s.Timeout},
-		key:  strings.TrimSpace(os.Getenv(s.KeyEnv)),
+		key:  strings.TrimSpace(s.Key),
 	}
 }
 
@@ -267,13 +266,6 @@ type response struct {
 	} `json:"error"`
 }
 
-func envOr(name, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
-		return v
-	}
-	return fallback
-}
-
 // hashLabel keeps a query string (which may hold a deployment or a key) out of the tag as written.
 func hashLabel(s string) string {
 	const hex = "0123456789abcdef"
@@ -287,31 +279,4 @@ func hashLabel(s string) string {
 		b[i] = hex[(sum>>(uint(i)*8))&0xf]
 	}
 	return string(b)
-}
-
-// ParseMargin reads a positive float from the environment, keeping the fallback when it is missing or malformed.
-func ParseMargin(name string, fallback float64) float64 {
-	v, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv(name)), 64)
-	if err != nil || v <= 0 || math.IsNaN(v) || math.IsInf(v, 0) {
-		return fallback
-	}
-	return v
-}
-
-// ParseScore reads an optional absolute similarity floor: 0, the default, leaves the decision to the margin alone.
-func ParseScore(name string) float64 {
-	v, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv(name)), 64)
-	if err != nil || v <= 0 || v > 1 || math.IsNaN(v) {
-		return 0
-	}
-	return v
-}
-
-// ParseCount reads a positive integer from the environment; 0, the default, means the caller's own limit.
-func ParseCount(name string) int {
-	v, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
-	if err != nil || v <= 0 {
-		return 0
-	}
-	return v
 }
