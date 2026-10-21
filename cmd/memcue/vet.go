@@ -710,7 +710,9 @@ func maybeVet(ids []string) {
 }
 
 // memoryNotes reads the built-in memory notes of dir — every markdown file, folded into one text. An unset or
-// unreadable directory is reported as not found: the mirror rule is skipped rather than retiring every mirror.
+// unreadable directory is reported as not found: the mirror rule is skipped rather than retiring every mirror. A file
+// that cannot be read reports the same, because the notes we could read are not the whole note and a mirror they do
+// not hold is not a deleted one.
 func memoryNotes(dir string) (string, bool) {
 	if strings.TrimSpace(dir) == "" {
 		return "", false
@@ -726,7 +728,7 @@ func memoryNotes(dir string) (string, bool) {
 		}
 		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
-			continue
+			return "", false
 		}
 		b.Write(data)
 		b.WriteString("\n")

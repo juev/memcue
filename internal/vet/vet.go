@@ -44,7 +44,8 @@ type Decision struct {
 // are given as the whole text of their directory; haveMemory says whether that directory was found at all, because
 // an unreadable directory must not turn every mirror into "stale".
 //
-// An origin that starts with "test" is a test run that wrote to a live base: it never belongs there.
+// An origin whose tier is exactly "test" is a test run that wrote to a live base: it never belongs there. Origins are
+// "<tier> <date>", so a repository called test-utils or testing must not be mistaken for one.
 //
 // A candidate whose words are all in an approved fact says nothing new and would only take room in a prompt.
 func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decided []Decision, rest []store.Fact) {
@@ -59,7 +60,7 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 				decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
 					Reason: "stale mirror: the built-in memory no longer holds it"})
 			}
-		case strings.HasPrefix(strings.ToLower(strings.TrimSpace(c.Origin)), "test"):
+		case isTestOrigin(c.Origin):
 			decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
 				Reason: "origin=test: a test run wrote it"})
 		default:
@@ -72,6 +73,14 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 		}
 	}
 	return decided, rest
+}
+
+// isTestOrigin reports whether origin is a test run's: its tier, the first word of "<tier> <date>", has to be exactly
+// "test". A prefix test would also catch real tiers such as test-utils, testing or test-infra and retire every fact
+// extracted there.
+func isTestOrigin(origin string) bool {
+	fields := strings.Fields(strings.ToLower(origin))
+	return len(fields) > 0 && fields[0] == "test"
 }
 
 // covers names an approved fact that already holds every word of the candidate. Equal text is a duplicate outright;
