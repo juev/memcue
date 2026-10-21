@@ -6,6 +6,7 @@ Inside Hermes the real agent modules are used; elsewhere they are stubbed.
 
 import http.server
 import importlib.util
+import inspect
 import json
 import threading
 import time
@@ -92,6 +93,9 @@ class ProviderTest(unittest.TestCase):
                 os.environ[key] = value
 
     def tearDown(self):
+        self.p._stop.set()
+        if self.p._watcher is not None:
+            self.p._watcher.join(timeout=2)
         shutil.rmtree(self.home, ignore_errors=True)
 
     def facts(self):
@@ -108,6 +112,20 @@ class ProviderTest(unittest.TestCase):
 
     def test_base_lives_in_hermes_home(self):
         self.assertEqual(self.p._facts, str(Path(self.home) / "memcue" / "facts.db"))
+
+    def test_provider_matches_real_hermes_api(self):
+        from agent.memory_provider import MemoryProvider
+        if not hasattr(MemoryProvider, "on_session_switch"):
+            self.skipTest("the Hermes MemoryProvider stub is in use")
+        self.assertIsInstance(self.p, MemoryProvider)
+        for name in ("initialize", "prefetch", "sync_turn", "on_memory_write", "on_session_end",
+                     "on_session_switch", "on_pre_compress", "get_tool_schemas", "handle_tool_call",
+                     "system_prompt_block", "shutdown", "backup_paths", "is_available",
+                     "unavailable_reason"):
+            self.assertTrue(callable(getattr(self.p, name, None)), name)
+        params = inspect.signature(self.p.on_session_switch).parameters
+        for name in ("new_session_id", "reset", "rewound"):
+            self.assertIn(name, params)
 
     def test_no_base_recalls_nothing_and_creates_nothing(self):
         self.assertEqual(self.p.prefetch("какой порт у базы demo postgres"), "")

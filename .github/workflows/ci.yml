@@ -29,3 +29,46 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13
+
+  plugins:
+    name: dsh / claude-code plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      # The plugin imports the harness packages as peers. Pin the tested runtime so a new API cannot slip in
+      # unnoticed; the repository root is a dsh bundle, so the packages resolve from the checkout.
+      - name: install harness packages
+        run: npm install --no-save --no-package-lock @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/dsh-tools@0.2.0-rc.2
+
+      - name: test plugins
+        run: node --test plugins/deepseek-harness/test/*.test.mjs plugins/claude-code/test/*.test.mjs
+
+  hermes-contract:
+    name: hermes contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: build memcue
+        run: go build -o bin/memcue ./cmd/memcue
+
+      # The in-tree tests stub MemoryProvider when Hermes is missing. This job installs the pinned real package
+      # so the contract test checks the actual abstract API and on_session_switch signature.
+      - name: install Hermes
+        run: |
+          python3 -m venv /tmp/hermes-venv
+          /tmp/hermes-venv/bin/python -m pip install --disable-pip-version-check 'hermes-agent==0.15.2'
+
+      - name: test against real Hermes
+        run: MEMCUE_BIN="$PWD/bin/memcue" /tmp/hermes-venv/bin/python plugins/hermes/memcue/tests/test_provider.py
