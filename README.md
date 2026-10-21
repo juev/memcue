@@ -36,6 +36,19 @@ not yet run for long in daily work.
   endpoint is configured instead (see [Configuration](#configuration)).
 - Go 1.27 or later, to build from source.
 
+## Compatibility
+
+This release is `0.3.0`; the fact-base schema is 4. The three plugin manifests carry the same version, and a release
+bumps all of them together.
+
+| memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
+|---|---|---|---|---|
+| 0.3.0 | 4 | 0.3.0 | 0.3.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.3.0 (`hermes-agent` 0.15.2) |
+
+The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
+tests ran against. The Claude Code plugin has no separate version negotiation: install the plugin and the binary from
+the same release.
+
 ## Install
 
 1. Install the binary and make sure `memcue` is on `PATH`: download it for your system from
@@ -83,9 +96,9 @@ The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin f
 
 ## Upgrade
 
-The fact base schema is 4. memcue 0.2.1 and older refuse a newer base with `update memcue`: upgrade every machine that
-shares the base before the first new memcue writes to it. A mixed-version sync is not safe: an older binary refuses
-the version-4 base instead of reading it, and 0.2.1 does not know `fact_vectors`. Opening a version-3 base creates
+The fact base schema is 4. memcue 0.3.0 reads it; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
+every machine that shares the base before the first new memcue writes to it. A mixed-version sync is not safe: an
+older binary refuses the version-4 base instead of reading it, and 0.2.1 does not know `fact_vectors`. Opening a version-3 base creates
 `fact_vectors` and rebuilds the derived index once; version 4 adds the optional vectors on top of the version-3
 stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 
