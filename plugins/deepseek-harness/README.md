@@ -15,9 +15,10 @@ fact base:
   does not send the same text twice. Extraction reads only direct human messages: compaction summaries, cron and
   goal notices, hook contexts and subagent sessions are left out, and a forked session starts at its inherited
   prefix instead of re-extracting the parent's history.
-- **A system-prompt section** says the memory is memcue and names the two tools; the built-in memory files are not
+- **A system-prompt section** says the memory is memcue and names the fact tools; the built-in memory files are not
   written.
-- **Two tools**: `memcue_search` (facts by words, `search -json`) and `memcue_add` (one fact, `add`).
+- **Four tools**: `memcue_search` (facts by words, with their ids), `memcue_add` (one new fact), `memcue_correct`
+  (a new version of a stored fact) and `memcue_retire` (stop recalling a fact; the history keeps it).
 
 The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
 the harness, so everything that works for Claude Code and Hermes works here on the same file.
@@ -135,8 +136,8 @@ granular token without the 2FA bypass cannot run `npm publish`: use `npm stage p
 
 ## What differs from the Hermes plugin
 
-- Hermes' `MEMORY.md` mirror and its four memory tools have no counterpart here: dsh has no built-in memory files, so
-  there is nothing to mirror, and `memcue_add` covers the write path.
+- Hermes' `MEMORY.md` mirror has no counterpart here: dsh has no built-in memory files, so there is nothing to
+  mirror. The write path is `memcue_add`, `memcue_correct` and `memcue_retire`.
 - Recall arrives as a durable message in the session log rather than a `<memory-context>` block, so it replays with
   the session and survives a harness restart.
 - The Claude Code hooks bridge in dsh cannot do this: it runs `SessionStart` and `UserPromptSubmit`, but it ignores
