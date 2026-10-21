@@ -209,8 +209,11 @@ func runVet(args []string, out io.Writer) error {
 	return vetFailure(rec)
 }
 
-// vetFailure is the command's exit status: a run that could not write a decision is not a success.
+// vetFailure is the command's exit status: a run that could not read the base or write a decision is not a success.
 func vetFailure(rec vetRecord) error {
+	if rec.Error != "" {
+		return errors.New(rec.Error)
+	}
 	if rec.Failed > 0 {
 		return fmt.Errorf("%d vet decision(s) failed to apply", rec.Failed)
 	}
