@@ -3,17 +3,22 @@ package extract
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/juev/memcue/internal/judge"
 )
 
 // jevEndpoint serves one decisions answer and records what was asked. answers maps a question key to the noul it
 // should return.
 func jevEndpoint(t *testing.T, status int, answers map[string]float64, asked *[]map[string]any) {
 	t.Helper()
+	judge.Shared.Reset()
+	t.Cleanup(judge.Shared.Reset)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
 		var req map[string]any
@@ -103,6 +108,18 @@ func TestJudgeDuplicateErrors(t *testing.T) {
 		[]JudgeFact{{ID: "f1", Text: "y"}})
 	if err == nil || !strings.Contains(err.Error(), "500") {
 		t.Errorf("err %v", err)
+	}
+}
+
+// One dead endpoint means no role pays another timeout: a failed duplicate call pauses triage too.
+func TestSharedPauseStopsTriageAfterDuplicateFailure(t *testing.T) {
+	jevEndpoint(t, 500, nil, nil)
+	if _, err := JudgeDuplicate(context.Background(), JudgeFact{ID: "c", Text: "x"},
+		[]JudgeFact{{ID: "f1", Text: "y"}}); err == nil {
+		t.Fatal("duplicate call should fail")
+	}
+	if _, err := TriageGroup(context.Background(), []string{"факт"}); !errors.Is(err, judge.ErrPaused) {
+		t.Fatalf("triage after a failed duplicate = %v, want ErrPaused", err)
 	}
 }
 

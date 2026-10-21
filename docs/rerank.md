@@ -38,9 +38,9 @@ lexical candidates (FTS5, gates)
   -> keep >= MEMCUE_JUDGE_RERANK_MIN, sort, cap MaxFacts
 ```
 
-Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. A failure pauses the
-endpoint for 60 s, doubling to 15 minutes, with the pause in `$XDG_STATE_HOME/memcue/judge.pause` because the hook is
-a fresh process on every prompt.
+Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
+the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `$XDG_STATE_HOME/memcue/judge.pause`
+and is shared by rerank, triage and duplicate, because the hook is a fresh process on every prompt.
 
 ## What it measured
 

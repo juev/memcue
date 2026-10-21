@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	judgepkg "github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/vet"
@@ -49,6 +50,9 @@ const (
 // configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage, rerank and the
 // duplicate check; only the thresholds and request limits stay role-specific.
 func configureJudge() {
+	if dir, err := stateDir(); err == nil {
+		judgepkg.Configure(filepath.Join(dir, "judge.pause"))
+	}
 	extract.JevJudge.URL = os.Getenv("MEMCUE_JUDGE_URL")
 	extract.JevJudge.Model = os.Getenv("MEMCUE_JUDGE_MODEL")
 	extract.JevJudge.Key = os.Getenv("MEMCUE_JUDGE_KEY")

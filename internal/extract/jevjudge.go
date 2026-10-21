@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/juev/memcue/internal/decisions"
+	"github.com/juev/memcue/internal/judge"
 )
 
 // JevJudge is a decisions endpoint that answers one question about a candidate: does it repeat something the base
@@ -92,6 +93,9 @@ func JudgeDuplicate(ctx context.Context, cand JudgeFact, approved []JudgeFact) (
 	if len(approved) == 0 {
 		return DuplicateVerdict{}, nil
 	}
+	if err := judge.Shared.Check(); err != nil {
+		return DuplicateVerdict{}, err
+	}
 	var list strings.Builder
 	for k, f := range approved {
 		_, _ = fmt.Fprintf(&list, "[%d] %s\n", k+1, strings.Join(strings.Fields(f.Text), " "))
@@ -111,8 +115,9 @@ func JudgeDuplicate(ctx context.Context, cand JudgeFact, approved []JudgeFact) (
 		"approved":  strings.TrimSpace(list.String()),
 	}, questions)
 	if err != nil {
-		return DuplicateVerdict{}, err
+		return DuplicateVerdict{}, judge.Shared.Fail(err)
 	}
+	judge.Shared.OK()
 	out := DuplicateVerdict{Tokens: Tokens{Input: res.Input}, Cost: res.Cost}
 	for k, f := range approved {
 		a, ok := res.Answers[fmt.Sprintf("a%d", k+1)]

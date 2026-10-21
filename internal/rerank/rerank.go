@@ -8,17 +8,15 @@ package rerank
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/juev/memcue/internal/decisions"
+	"github.com/juev/memcue/internal/judge"
 )
 
 // Defaults measured on 120 real prompts: ten candidates, a 0.5 threshold, and a call that took 0.7 s at the median.
@@ -27,12 +25,12 @@ const (
 	DefaultTimeout    = 2 * time.Second
 	DefaultMin        = 0.5
 	DefaultCandidates = 10
-	PauseFirst        = 60 * time.Second
-	PauseMax          = 15 * time.Minute
+	PauseFirst        = judge.PauseFirst
+	PauseMax          = judge.PauseMax
 )
 
 // ErrPaused is returned, without a call, while a failed endpoint is left alone.
-var ErrPaused = errors.New("rerank endpoint is paused after a failure")
+var ErrPaused = judge.ErrPaused
 
 // Settings describe the endpoint. A nil *Settings means the rerank pass is off.
 type Settings struct {
@@ -42,7 +40,8 @@ type Settings struct {
 	Timeout    time.Duration
 	Min        float64
 	Candidates int
-	StateFile  string // where the pause is remembered between processes
+	StateFile  string         // where the pause is remembered between processes
+	Breaker    *judge.Breaker // shared with triage and duplicate; nil keeps a private one
 }
 
 // FromEnv reads the one judge endpoint and the rerank knobs: MEMCUE_JUDGE_URL, _MODEL and _KEY, then
@@ -82,18 +81,20 @@ func FromEnv() *Settings {
 
 // Ranker is one endpoint plus the pause that keeps a dead one from costing a timeout on every turn.
 type Ranker struct {
-	set    *Settings
-	client decisions.Client
-
-	mu       sync.Mutex
-	pausedTo time.Time
-	pause    time.Duration
+	set     *Settings
+	client  decisions.Client
+	breaker *judge.Breaker
 }
 
 // New builds a ranker for the settings.
 func New(s *Settings) *Ranker {
+	breaker := s.Breaker
+	if breaker == nil {
+		breaker = judge.New(s.StateFile)
+	}
 	return &Ranker{
-		set: s,
+		set:     s,
+		breaker: breaker,
 		client: decisions.Client{
 			URL:   s.URL,
 			Model: s.Model,
@@ -110,28 +111,16 @@ func (r *Ranker) Min() float64 { return r.set.Min }
 func (r *Ranker) Candidates() int { return r.set.Candidates }
 
 // Paused reports whether the endpoint is being left alone, and for how much longer.
-func (r *Ranker) Paused() (bool, time.Duration) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	left := r.left()
-	if left <= 0 {
-		r.pausedTo = time.Time{}
-		return false, 0
-	}
-	return true, left
-}
+func (r *Ranker) Paused() (bool, time.Duration) { return r.breaker.Paused() }
 
 // Scores asks one yes/no question per fact: would it help answer the prompt. The answer is aligned with facts.
 func (r *Ranker) Scores(ctx context.Context, prompt string, facts []string) ([]float64, error) {
 	if len(facts) == 0 {
 		return nil, nil
 	}
-	r.mu.Lock()
-	if paused, left := r.pausedLocked(); paused {
-		r.mu.Unlock()
-		return nil, fmt.Errorf("%w: %s left", ErrPaused, left.Round(time.Second))
+	if err := r.breaker.Check(); err != nil {
+		return nil, err
 	}
-	r.mu.Unlock()
 
 	state := append([]string{"Prompt: " + prompt, "Candidate facts:"},
 		numbered(facts)...)
@@ -146,17 +135,17 @@ func (r *Ranker) Scores(ctx context.Context, prompt string, facts []string) ([]f
 	defer cancel()
 	result, err := r.client.Ask(ctx, state, questions)
 	if err != nil {
-		return nil, r.fail(err)
+		return nil, r.breaker.Fail(err)
 	}
 	out := make([]float64, len(facts))
 	for i := range facts {
 		answer, ok := result.Answers[fmt.Sprintf("f%d", i+1)]
 		if !ok {
-			return nil, r.fail(fmt.Errorf("no answer for fact %d", i+1))
+			return nil, r.breaker.Fail(fmt.Errorf("no answer for fact %d", i+1))
 		}
 		out[i] = answer.Noul
 	}
-	r.ok()
+	r.breaker.OK()
 	return out, nil
 }
 
@@ -171,55 +160,6 @@ func numbered(facts []string) []string {
 // oneLine keeps a fact on one line: the numbered state is read as a list of entries.
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
-}
-
-func (r *Ranker) fail(err error) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.pause < PauseFirst {
-		r.pause = PauseFirst
-	} else if r.pause *= 2; r.pause > PauseMax {
-		r.pause = PauseMax
-	}
-	r.pausedTo = time.Now().Add(r.pause)
-	if r.set.StateFile != "" {
-		if mkErr := os.MkdirAll(filepath.Dir(r.set.StateFile), 0o700); mkErr == nil {
-			_ = os.WriteFile(r.set.StateFile, []byte(r.pausedTo.UTC().Format(time.RFC3339)), 0o600)
-		}
-	}
-	return err
-}
-
-func (r *Ranker) ok() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.pause, r.pausedTo = 0, time.Time{}
-	if r.set.StateFile != "" {
-		_ = os.Remove(r.set.StateFile)
-	}
-}
-
-// pausedLocked must be called with the lock held.
-func (r *Ranker) pausedLocked() (bool, time.Duration) {
-	left := r.left()
-	if left <= 0 {
-		r.pausedTo = time.Time{}
-		return false, 0
-	}
-	return true, left
-}
-
-// left is the remaining pause, from memory and from the file a previous process may have written.
-func (r *Ranker) left() time.Duration {
-	until := r.pausedTo
-	if r.set.StateFile != "" {
-		if b, err := os.ReadFile(r.set.StateFile); err == nil {
-			if t, err := time.Parse(time.RFC3339, strings.TrimSpace(string(b))); err == nil && t.After(until) {
-				until = t
-			}
-		}
-	}
-	return time.Until(until)
 }
 
 func parseFloat(s string) (float64, error) { return strconv.ParseFloat(s, 64) }

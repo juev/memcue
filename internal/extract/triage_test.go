@@ -8,10 +8,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/juev/memcue/internal/judge"
 )
 
 func triageEndpoint(t *testing.T, status int, answer string) {
 	t.Helper()
+	judge.Shared.Reset()
+	t.Cleanup(judge.Shared.Reset)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/decisions" || r.Header.Get("Authorization") != "Bearer k" {
 			t.Errorf("path %q auth %q", r.URL.Path, r.Header.Get("Authorization"))
