@@ -6,8 +6,10 @@ fact base:
 - **Before each step** the prompt goes to `memcue hook`; at most two matching facts come back and are appended as a
   user-role message with source `memcue` and form `recall`. memcue itself keeps a fact to one delivery per session.
 - **When a turn ends** the messages it added go to `memcue extract-messages` in the background, once
-  `minNewChars` of new text has gathered. The read offset per session lives in `<stateDir>/<session>.json`, so a
-  message is sent once even though a turn boundary repeats.
+  `minNewChars` of new text has gathered. The checkpoint per session lives in `<stateDir>/<session>.json`: it holds
+  the last acknowledged event and a pending batch, written atomically before the model call. A failed extraction
+  keeps the batch and retries it on the next turn; a successful one advances the checkpoint, so a turn boundary
+  does not send the same text twice.
 - **A system-prompt section** says the memory is memcue and names the two tools; the built-in memory files are not
   written.
 - **Two tools**: `memcue_search` (facts by words, `search -json`) and `memcue_add` (one fact, `add`).

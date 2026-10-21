@@ -6,7 +6,7 @@
  *   node --test plugins/deepseek-harness/test/*.test.mjs
  */
 import assert from 'node:assert/strict'
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
@@ -120,6 +120,33 @@ async function waitForLog(needle, timeoutMs = 5000) {
 	throw new Error(`stub log never saw ${needle}`)
 }
 
+/** Wait until a file contains a needle. */
+async function waitForText(path, needle, timeoutMs = 5000) {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline) {
+		try {
+			const text = await readFile(path, 'utf8')
+			if (text.includes(needle)) return text
+		} catch {}
+		await new Promise((resolve) => setTimeout(resolve, 50))
+	}
+	throw new Error(`${path} never held ${needle}`)
+}
+
+/** Wait until a state file parses and satisfies a predicate. */
+async function waitForState(path, predicate, timeoutMs = 5000) {
+	const deadline = Date.now() + timeoutMs
+	let last
+	while (Date.now() < deadline) {
+		try {
+			last = JSON.parse(await readFile(path, 'utf8'))
+			if (predicate(last)) return last
+		} catch {}
+		await new Promise((resolve) => setTimeout(resolve, 50))
+	}
+	throw new Error(`${path} never matched; last=${JSON.stringify(last)}`)
+}
+
 /** Drop what earlier tests recorded, so a wait cannot match their lines. */
 async function resetLog() {
 	await writeFile(log, '')
@@ -185,6 +212,66 @@ test('a turn end sends the new messages to extract-messages', async () => {
 		{ role: 'assistant', content: 'noted' },
 		{ role: 'tool', content: 'PORT=55432\nsecond line' },
 	])
+})
+
+test('a failed extraction keeps the batch and retries it', async () => {
+	const stateDir = join(dir, 'state-81-fail')
+	const failLog = join(dir, 'fail-81.log')
+	const count = join(dir, 'fail-81.count')
+	const failBinary = join(dir, 'memcue-fail-81.sh')
+	await writeFile(failBinary, `#!/bin/sh
+case "$1" in
+  extract-messages)
+    n=$(cat "${count}" 2>/dev/null || echo 0)
+    n=$((n+1)); printf '%s' "$n" > "${count}"
+    cat >> "${failLog}"; printf '\\n' >> "${failLog}"
+    if [ "$n" -eq 1 ]; then exit 7; fi
+    ;;
+esac
+exit 0
+`)
+	await chmod(failBinary, 0o755)
+
+	const { listeners } = mount({ binary: failBinary, stateDir, minNewChars: 1 })
+	const events = [
+		{ type: 'user/message', data: userMessage('remember the durable fact') },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's81', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+
+	listener(session, events.at(-1))
+	await waitForText(failLog, 'remember the durable fact')
+	const pending = JSON.parse(await readFile(join(stateDir, 's81.json'), 'utf8'))
+	assert.equal(pending.seq, 0)
+	assert.equal(pending.pending.seq, events.length)
+	assert.equal(pending.pending.messages[0].content, 'remember the durable fact')
+
+	listener(session, events.at(-1))
+	await waitForState(join(stateDir, 's81.json'), (state) => state.seq === events.length && state.pending === null)
+	const calls = (await readFile(failLog, 'utf8')).trim().split('\n')
+	assert.equal(calls.length, 2)
+	assert.deepEqual(JSON.parse(calls[0]), JSON.parse(calls[1]))
+})
+
+test('a state file with only seq is still accepted', async () => {
+	await resetLog()
+	const stateDir = join(dir, 'state-81-old')
+	await mkdir(stateDir, { recursive: true })
+	await writeFile(join(stateDir, 's81old.json'), JSON.stringify({ seq: 1 }))
+
+	const { listeners } = mount({ stateDir, minNewChars: 1 })
+	const events = [
+		{ type: 'user/message', data: userMessage('old message') },
+		{ type: 'user/message', data: userMessage('new message') },
+		{ type: 'turn/end', data: { turn: 1, reason: 'stop' } },
+	]
+	const session = { id: 's81old', seq: events.length, eventAt: (seq) => events[seq] }
+	const [listener] = listeners.get('session/event')
+	listener(session, events.at(-1))
+
+	const text = await waitForLog('extract-input')
+	assert.deepEqual(JSON.parse(lastPayload(text, 'extract-input: ')), [{ role: 'user', content: 'new message' }])
 })
 
 test('tool output sent to extraction is capped', async () => {
