@@ -87,6 +87,7 @@ environment:
                   the vector candidates are added to the judge when both the judge and the embedder are set
   MEMCUE_EMBED_TIMEOUT  one embedding request (default 2s)
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
+  MEMCUE_VECTOR_POOL  vectors of the most recent facts scored per prompt; 0 or less scores every vector (default 2000)
   MEMCUE_DREAM    1 runs a dream after an extraction once a day ($XDG_STATE_HOME/memcue/dream.log)
   MEMCUE_VET      1 decides the facts a session extracted, after storing them and before the dream; needs
                   MEMCUE_API_URL; undecided ones become provisional for MEMCUE_VET_TTL_DAYS
@@ -203,6 +204,11 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]reca
 	if v := os.Getenv("MEMCUE_MIN_COVERAGE"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 && f <= 1 {
 			p.MinCoverage = f
+		}
+	}
+	if v := os.Getenv("MEMCUE_VECTOR_POOL"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			p.VectorPool = n
 		}
 	}
 	return recallFacts(s, prompt, tier.Of(cwd, claudeDir()), p)

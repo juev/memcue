@@ -258,6 +258,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EMBED_KEY` | key for a hosted embeddings endpoint; empty for a local server | empty |
 | `MEMCUE_EMBED_TIMEOUT` | one embedding request | `2s` |
 | `MEMCUE_EMBED_SPACE` | label of the vector space when a server changes model under one name | empty |
+| `MEMCUE_VECTOR_POOL` | vectors of the most recent facts scored per prompt; `0` or less scores every vector | `2000` |
 | `MEMCUE_EXTRACT` | `0` turns the extraction hook off | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |

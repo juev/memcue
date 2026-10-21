@@ -3,6 +3,7 @@ package recall
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"path/filepath"
 	"testing"
@@ -135,6 +136,31 @@ func TestVectorCandidatesSkipSeenFacts(t *testing.T) {
 	}
 }
 
+// A pool reads only the vectors of the most recent facts: the old target is out at pool 3 and back when the cap is off.
+func TestVectorCandidatesRespectThePool(t *testing.T) {
+	s, target := meaningBase(t)
+	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
+	p := Default
+	p.VectorPool = 3
+	hits, err := vectorCandidates(s, "почему стало меньше ерунды в подсказках", p, e, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range hits {
+		if h.ID == target {
+			t.Fatalf("a fact outside the pool was scored: %v", ids(hits))
+		}
+	}
+	p.VectorPool = 0 // no cap
+	hits, err = vectorCandidates(s, "почему стало меньше ерунды в подсказках", p, e, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].ID != target {
+		t.Fatalf("hits = %v, want the old target when the pool is off", ids(hits))
+	}
+}
+
 func TestVectorCandidatesFailOpen(t *testing.T) {
 	s, _ := meaningBase(t)
 	e := fakeEmbedder{tag: modelTag, err: errors.New("endpoint is down")}
@@ -207,6 +233,55 @@ func TestRecallJudgeFallsBackWhenEmbeddingsFail(t *testing.T) {
 	}
 	if len(hits) != len(plain) || (len(hits) > 0 && hits[0].ID != plain[0].ID) {
 		t.Fatalf("hits = %v, lexical = %v", ids(hits), ids(plain))
+	}
+}
+
+// BenchmarkVectorCandidates10k measures the vector pass of a prompt hook on a 10k-fact, 128-dimension base: the pool
+// keeps the decode and the dot products bounded, while 0 scores every stored vector.
+func BenchmarkVectorCandidates10k(b *testing.B) {
+	const facts, dim, batch = 10000, 128, 500
+	s, err := store.Open(filepath.Join(b.TempDir(), "facts.db"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = s.Close() })
+	query := make([]float32, dim)
+	query[0] = 1
+
+	b.StopTimer()
+	for start := 0; start < facts; start += batch {
+		inputs := make([]store.FactInput, 0, batch)
+		for i := start; i < start+batch && i < facts; i++ {
+			inputs = append(inputs, store.FactInput{Content: fmt.Sprintf("Факт %d о порте %d демо-базы.", i, 5000+i),
+				Keywords: []string{"порт"}, Origin: "bench 2026-10-20"})
+		}
+		added, err := s.AddBatch(inputs)
+		if err != nil {
+			b.Fatal(err)
+		}
+		for j, f := range added {
+			vec := make([]float32, dim)
+			vec[j%dim] = 1
+			if err := s.SaveVector(f.ID, modelTag, store.TextHash(f.Content), vec); err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+	e := fakeEmbedder{tag: modelTag, vec: query}
+	prompt := "какой порт у демо-базы"
+
+	for _, pool := range []int{2000, 0} {
+		b.Run(fmt.Sprintf("pool=%d", pool), func(b *testing.B) {
+			p := Default
+			p.VectorPool = pool
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := vectorCandidates(s, prompt, p, e, 10); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
