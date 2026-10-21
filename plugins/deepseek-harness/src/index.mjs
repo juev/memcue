@@ -317,6 +317,7 @@ function messagesSince(session, from, settings) {
 export function apply(ctx, config) {
 	const settings = settingsOf(config)
 	const busy = new Set()
+	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
 
 	ctx.systemPrompt.section({
 		name,
@@ -330,23 +331,43 @@ export function apply(ctx, config) {
 		if (decision.kind === 'reject' || payload.signal.aborted) return decision
 		const prompt = promptOf(decision.messages)
 		if (!prompt) return decision
+		const sessionId = String(payload.agent.session.id)
+		const cwd = payload.agent.session.header?.cwd ?? process.cwd()
+
+		// The card is a view of the base, not a copy: deliver it on the first prompt of a session and
+		// again after a compaction. session-card resets the fact's seen state for source "compact".
+		let card = ''
+		const cardSource = cardSources.get(sessionId) ?? 'startup'
+		if (cardSource !== 'done') {
+			const { code, out, err } = await runMemcue(settings, ['session-card'], {
+				input: JSON.stringify({ session_id: sessionId, cwd, source: cardSource }),
+				timeoutMs: HOOK_TIMEOUT_MS,
+			})
+			if (code !== 0) console.warn(`memcue: session-card exited ${code}: ${err.trim().slice(0, 500)}`)
+			else card = contextOf(out)
+			cardSources.set(sessionId, 'done')
+		}
+
 		const { out } = await runMemcue(settings, ['hook'], {
-			input: JSON.stringify({
-				prompt,
-				cwd: payload.agent.session.header?.cwd ?? process.cwd(),
-				session_id: String(payload.agent.session.id),
-			}),
+			input: JSON.stringify({ prompt, cwd, session_id: sessionId }),
 			timeoutMs: HOOK_TIMEOUT_MS,
 		})
 		const text = contextOf(out)
-		if (!text) return decision
-		return {
-			...decision,
-			messages: [...decision.messages, createUserMessage({
+		if (!card && !text) return decision
+		const messages = [...decision.messages]
+		if (card) {
+			messages.push(createUserMessage({
+				content: [{ type: 'text', text: card }],
+				source: { kind: name, form: 'notice', summary: 'memcue session card' },
+			}))
+		}
+		if (text) {
+			messages.push(createUserMessage({
 				content: [{ type: 'text', text }],
 				source: { kind: name, form: 'recall' },
-			})],
+			}))
 		}
+		return { ...decision, messages }
 	})
 
 	if (settings.extract) {
@@ -393,6 +414,13 @@ export function apply(ctx, config) {
 			})()
 		})
 	}
+
+	// The context lost the facts it had before the compaction: deliver the card again and let
+	// session-card reset the seen file so those facts may be recalled once more.
+	ctx.on('session/event', (session, event) => {
+		if (event?.type !== 'compaction/end') return
+		cardSources.set(String(session.id), 'compact')
+	})
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',

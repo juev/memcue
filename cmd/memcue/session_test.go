@@ -55,6 +55,62 @@ func sessionStartContext(t *testing.T, dir, source, session string) string {
 	return resp.HookSpecificOutput.AdditionalContext
 }
 
+func TestSessionCardOnlyReturnsTheCard(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.AddWith("Правило: card only без note.", nil, "test 2026-10-20", "", store.Meta{Kind: "rule",
+		Scope: "global", Source: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	in, _ := json.Marshal(map[string]string{"session_id": "s-card", "source": "startup", "cwd": dir})
+	var out bytes.Buffer
+	if err := runSessionCard(bytes.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		HookSpecificOutput struct {
+			HookEventName     string `json:"hookEventName"`
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if resp.HookSpecificOutput.HookEventName != "SessionCard" || !strings.Contains(resp.HookSpecificOutput.AdditionalContext, f.Content) {
+		t.Errorf("got %+v", resp)
+	}
+	if strings.Contains(resp.HookSpecificOutput.AdditionalContext, "memcue add") {
+		t.Errorf("session-card leaked the session note: %q", resp.HookSpecificOutput.AdditionalContext)
+	}
+}
+
+func TestSessionCardResetsSeenOnCompact(t *testing.T) {
+	env(t)
+	path, err := seenPath("s-card-compact")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("01ARZ3NDEKTSV4RRFFQ69G5FAV\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	in, _ := json.Marshal(map[string]string{"session_id": "s-card-compact", "source": "compact"})
+	var out bytes.Buffer
+	if err := runSessionCard(bytes.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("seen file still exists: %v", err)
+	}
+}
+
 func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")

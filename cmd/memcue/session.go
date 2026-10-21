@@ -78,6 +78,37 @@ func runSessionStart(in io.Reader, out io.Writer) error {
 	return json.NewEncoder(out).Encode(resp)
 }
 
+// runSessionCard returns only the card, for a host whose own system prompt already carries the memory note. It
+// takes the same input as session-start and resets the session's delivered facts after a compaction or a clear.
+func runSessionCard(in io.Reader, out io.Writer) error {
+	var h sessionStartInput
+	if err := json.NewDecoder(in).Decode(&h); err != nil {
+		return fmt.Errorf("session-card input: %w", err)
+	}
+	if h.Source == "compact" || h.Source == "clear" {
+		if path, err := seenPath(h.SessionID); err == nil {
+			_ = os.Remove(path)
+		}
+	}
+	card, ids, err := sessionCard(h.CWD)
+	if err != nil {
+		return err
+	}
+	if card == "" {
+		return nil
+	}
+	logCard(h, ids, len([]rune(card)))
+	var resp struct {
+		HookSpecificOutput struct {
+			HookEventName     string `json:"hookEventName"`
+			AdditionalContext string `json:"additionalContext"`
+		} `json:"hookSpecificOutput"`
+	}
+	resp.HookSpecificOutput.HookEventName = "SessionCard"
+	resp.HookSpecificOutput.AdditionalContext = card
+	return json.NewEncoder(out).Encode(resp)
+}
+
 // cardBudget is the room for the session-start card in characters, about 1-1.5 thousand tokens. The card is a
 // reminder of rules and decisions, not a copy of the base.
 const cardBudget = 3500
