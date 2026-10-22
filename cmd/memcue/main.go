@@ -113,6 +113,7 @@ commands:
   review    approve or reject candidates on a local page: memcue review [-addr 127.0.0.1:0] [-no-open]
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
+  reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
   dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
   audit     propose retirements for the migrated base: memcue audit -dry-run -plan FILE | memcue audit -apply FILE
@@ -212,6 +213,8 @@ func main() {
 		err = runReview(os.Args[2:], os.Stdout)
 	case "retire":
 		err = runRetire(os.Args[2:], os.Stdout)
+	case "reopen":
+		err = runReopen(os.Args[2:], os.Stdout)
 	case "facts":
 		err = runFacts(os.Stdout)
 	case "dream":

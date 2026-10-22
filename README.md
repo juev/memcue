@@ -129,6 +129,7 @@ memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
+memcue reopen ID                     # undo a retire: back as it was before, approved or waiting for review
 memcue candidates                    # extracted facts waiting for approval, newest first (-json for a JSON array)
 memcue vet -dry-run                  # what the rules and the judge would decide about the queue
 memcue vet                           # decide it: approve what belongs in the base, retire what does not

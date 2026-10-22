@@ -34,6 +34,7 @@ Find the fact first; `search` prints IDs, best match first:
 memcue search "<words of the fact>"
 memcue correct ID "<corrected fact>"   # new version; keywords stay unless -keywords is given
 memcue retire ID                       # no longer recalled; the history keeps it
+memcue reopen ID                       # undo a retire made by mistake
 ```
 
 Correct when the fact changed; retire when it no longer holds and nothing replaces it. Tell the user which fact you
