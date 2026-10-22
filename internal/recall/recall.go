@@ -102,6 +102,22 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	return served, nil
 }
 
+// Nearest returns the first MaxFacts facts the words find for prompt in the search's BM25 order, whether the term and
+// coverage gate let them pass or not: the facts a judge reads in place of the whole base. Seen, expired and
+// other-ticket facts are still left out; a non-positive MaxFacts returns every candidate.
+func Nearest(s *store.Store, prompt string, p Params) ([]Hit, error) {
+	passed, gated, err := recallCandidates(s, prompt, p)
+	if err != nil {
+		return nil, err
+	}
+	hits := append(passed, gated...)
+	sort.SliceStable(hits, func(i, j int) bool { return hits[i].rank < hits[j].rank })
+	if n := capFacts(p.MaxFacts, len(hits)); len(hits) > n {
+		hits = hits[:n]
+	}
+	return hits, nil
+}
+
 // place ranks a fact for a tie of equal coverage: this host first, then the session's repository, then a global
 // origin, then everything else. The host only orders facts; it never excludes another host's fact.
 func place(h Hit, sessionTier, host string) int {

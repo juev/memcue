@@ -252,3 +252,41 @@ func TestRecallJudgeReadsTheFirstFactsInSearchOrder(t *testing.T) {
 		}
 	}
 }
+
+// Nearest returns the facts the words found in BM25 order, the ones the gate turned away included, up to MaxFacts,
+// and leaves out a fact the caller has seen.
+func TestNearestReadsTheSearchOrderPastTheGate(t *testing.T) {
+	s := gateBase(t, 12)
+	if _, err := s.Add("Логи не ротируются, пока logrotate выключен.", nil, "test 2026-10-22"); err != nil {
+		t.Fatal(err)
+	}
+	trace := &Trace{}
+	p := Default
+	p.Trace = trace
+	p.MaxFacts = 0
+	all, err := Nearest(s, gatePrompt, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != len(trace.Lexical) {
+		t.Fatalf("nearest = %d facts, the search found %d", len(all), len(trace.Lexical))
+	}
+	for i, h := range all {
+		if h.Content != trace.Lexical[i].Content {
+			t.Fatalf("fact %d is %q, the search put %q there", i, h.Content, trace.Lexical[i].Content)
+		}
+	}
+	if !slices.ContainsFunc(all, func(h Hit) bool { return contains(h.Content, "journald") }) {
+		t.Errorf("a fact below the gate is missing: %v", ids(all))
+	}
+
+	p.Trace, p.MaxFacts = nil, 3
+	p.Seen = map[string]bool{all[0].ID: true}
+	top, err := Nearest(s, gatePrompt, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := ids(all[1:4]); !slices.Equal(ids(top), want) {
+		t.Errorf("nearest without the seen fact = %v, want %v", ids(top), want)
+	}
+}
