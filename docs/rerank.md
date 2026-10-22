@@ -14,13 +14,12 @@ This pass asks a typed decisions model (Jev) one yes/no question per candidate: 
 prompt*. It orders the lexical candidates and, when an embeddings endpoint is configured, the vector candidates too;
 the answer stays capped by `MaxFacts`.
 
-## One judge for three roles
+## One judge for two roles
 
 `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` configure one Jev endpoint. The same endpoint serves:
 
 - **recall rerank** — this document;
 - **dream triage** — `MEMCUE_JUDGE_TRIAGE_MIN`;
-- **duplicate check in vet** — `MEMCUE_JUDGE_DUP_MIN`, `_DUP_MAX_FACTS`, `_DUP_LONG_CONTEXT`.
 
 There is no `MEMCUE_RERANK_*` or `MEMCUE_TRIAGE_*` endpoint pair. The role-specific variables are only thresholds,
 request limits and timeouts under the judge namespace.
@@ -34,7 +33,6 @@ request limits and timeouts under the judge namespace.
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in BM25 order (default 20; 10 from each source before #232) |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request (default 2 s) |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request (default 2 s) |
-| `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request (default 10 s) |
 
 ## Flow
 
@@ -49,7 +47,7 @@ lexical candidates (FTS5, gates)
 Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
 the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `judge.pause` in the binary's state
 directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or `MEMCUE_STATE_DIR`)
-and is shared by rerank, triage and duplicate, because the hook is a fresh process on every prompt.
+and is shared by rerank and triage, because the hook is a fresh process on every prompt.
 
 ## What it measured
 
@@ -79,6 +77,4 @@ $0.0166 and 0.79 s median.
 
 - Cost and latency are paid per prompt while the judge is configured; on a laptop without a key it is off.
 - The labels are one model's opinion; the later 60-fact truth sample was 52 TRUE_NOW / 8 STALE, but it was not random.
-- A base larger than the duplicate cap (400 facts, 1,700 with the long-context header) is split into chunks; the
-  cost per candidate grows with the number of chunks, and a failed chunk leaves the candidate undecided.
 - Jev is a judge, not a retriever: do not ask it to search the whole base.

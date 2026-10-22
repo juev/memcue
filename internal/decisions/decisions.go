@@ -41,11 +41,10 @@ type Result struct {
 
 // Client is one decisions endpoint. It is on only when the URL, the model and the key are all set.
 type Client struct {
-	URL         string // the full endpoint, e.g. https://openrouter.ai/api/alpha/decisions
-	Model       string // e.g. typesafe/jev-1.14
-	Key         string // bearer token
-	LongContext bool   // TypeSafe-Danger-Zone-Long-Context: 262k in one request, slower and less accurate
-	HTTP        *http.Client
+	URL   string // the full endpoint, e.g. https://openrouter.ai/api/alpha/decisions
+	Model string // e.g. typesafe/jev-1.14
+	Key   string // bearer token
+	HTTP  *http.Client
 }
 
 // On says whether the client can send anything.
@@ -69,9 +68,6 @@ func (c Client) Ask(ctx context.Context, state any, questions map[string]Questio
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Key)
-	if c.LongContext {
-		req.Header.Set("TypeSafe-Danger-Zone-Long-Context", "true")
-	}
 	httpClient := c.HTTP
 	if httpClient == nil {
 		httpClient = http.DefaultClient

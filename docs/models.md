@@ -14,8 +14,8 @@ Keep exactly three model roles, each configured by environment variables:
 
 1. **Main chat model** — extraction and candidate review. `MEMCUE_API_*`; when `MEMCUE_API_URL`
    is empty, extraction falls back to `claude -p`.
-2. **Judge** — Jev, one model for all three typed decisions: dream triage, recall rerank and
-   duplicate check. `MEMCUE_JUDGE_*`.
+2. **Judge** — Jev, one model for the typed decisions: dream triage and recall rerank (the
+   duplicate check of vet was removed in #266). `MEMCUE_JUDGE_*`.
 3. **Embeddings** — a local or hosted OpenAI-compatible embedder (bge-m3 in the pilot),
    used only to propose candidates for the judge. `MEMCUE_EMBED_*`.
 
@@ -56,7 +56,7 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | Variable | Meaning |
 |---|---|
 | `MEMCUE_API_URL`, `MEMCUE_API_KEY`, `MEMCUE_MODEL` | main chat endpoint, key and model; URL empty means `claude -p` |
-| `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_KEY`, `MEMCUE_JUDGE_MODEL` | one Jev endpoint for triage, rerank and duplicate check |
+| `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_KEY`, `MEMCUE_JUDGE_MODEL` | one Jev endpoint for triage and rerank |
 
 ### Optional tuning
 
@@ -67,10 +67,6 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | 2 s | one rerank request |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | 2 s | one triage request |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | 0.2 | probability of an action that sends a dream group to the main model |
-| `MEMCUE_JUDGE_DUP_TIMEOUT` | 10 s | one duplicate request |
-| `MEMCUE_JUDGE_DUP_MIN` | 0.5 | probability of "same claim" that retires a candidate |
-| `MEMCUE_JUDGE_DUP_MAX_FACTS` | 50 | nearest approved facts asked about in one duplicate request |
-| `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | off | send the 262k danger-zone header for the duplicate check |
 
 ### Removed
 
@@ -114,8 +110,8 @@ the rerank-gate issue.
 
 ## Operational details
 
-- One judge endpoint owns one key and one pause/health state. Triage, rerank and
-  duplicate share `internal/judge` and the `judge.pause` file in the binary's state directory
+- One judge endpoint owns one key and one pause/health state. Triage and
+  rerank share `internal/judge` and the `judge.pause` file in the binary's state directory
   (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or
   `MEMCUE_STATE_DIR`); embeddings keep their own pause because they are a different endpoint.
 - `recall.log` records the candidate source (lexical/vector) and the judge score separately;
@@ -133,11 +129,9 @@ the rerank-gate issue.
   an approved fact is `unsure` (not `drop`); by default it becomes provisional for
   `MEMCUE_VET_TTL_DAYS`, recalled after approved facts. `MEMCUE_VET_POLICY=quarantine` keeps the
   human queue.
-- **Duplicate check is one Jev role.** Each candidate is compared with its nearest approved facts,
-  the first `MEMCUE_JUDGE_DUP_MAX_FACTS` in BM25 order, in one request: about 12k input tokens a
-  candidate on the 2.6k base instead of 580k for the whole base. On the 41-candidate sample it
-  retires as many duplicates and keeps as the whole base —
-  [research/vet-neighbours-2026-10.md](research/vet-neighbours-2026-10.md).
+- **No duplicate check in vet** (#266). The review sees each candidate's nearest approved facts and
+  retired as many duplicates without the Jev pass, for about 420k fewer input tokens on the
+  41-candidate sample — [research/vet-neighbours-2026-10.md](research/vet-neighbours-2026-10.md).
 - **Triage is the same Jev role**; it is a cost filter for dream groups, not a fourth model.
 - **No Jev-as-retriever.** Whole-base Jev retrieval measured 12/120 useful top-1, worse than
   bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.
@@ -162,7 +156,6 @@ the rerank-gate issue.
 
 ## Open work
 
-- Measure the chunked duplicate precision and cost on the full 2.6k base.
 - Random truth audit of the base; the 60-fact sample was not random.
 - Decide whether provisional facts should auto-promote after use or stay TTL-only.
 - ~~A/B the main model as the reranker.~~ Measured 2026-10-21: the main model is 4 useful top-1
@@ -170,5 +163,4 @@ the rerank-gate issue.
   sample; keep the judge. See [main-reranker-2026-10.md](research/main-reranker-2026-10.md).
 - Decide whether vector candidates are added on every prompt or only on lexical misses; the
   pilot used every prompt, which is the measured 129/180 mode.
-- Measure the chunked duplicate precision and cost on the full 2.6k base, not only the 41-candidate sample.
 - Complete the random 160-fact truth audit if a base false-rate estimate is needed.

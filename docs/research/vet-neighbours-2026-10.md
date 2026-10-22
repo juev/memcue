@@ -1,7 +1,10 @@
 # The duplicate judge over the neighbours, October 2026
 
 Measurements of 2026-10-22 for #240. The document gives aggregate numbers only: the bases hold host names, paths and
-private repositories. The script is [scripts/vet_neighbours](scripts/vet_neighbours/main.go).
+private repositories. The script, `docs/research/scripts/vet_neighbours`, was removed with the code it measured in
+#266; it is in the history at commit fbf846f.
+
+**Status 2026-10-22 (#266):** vet no longer asks Jev about duplicates at all; see "Without the Jev pass" below.
 
 ## Question
 
@@ -66,3 +69,16 @@ MEMCUE_JUDGE_URL=… MEMCUE_JUDGE_MODEL=… MEMCUE_JUDGE_KEY=… \
     go run -tags research ./docs/research/scripts/vet_neighbours -facts FACTS.db -n 20,30,50 -runs 2 > out.jsonl
 env -u MEMCUE_JUDGE_URL -u MEMCUE_API_URL -u MEMCUE_MODEL MEMCUE_FACTS=COPY.db memcue vet -dry-run -json > labels.json
 ```
+
+## Without the Jev pass (#266)
+
+Stage 3 of #232 asked whether vet needs the Jev pass at all: the review already gets each candidate's nearest approved
+facts and is told to drop a duplicate. Same 41 candidates and `claude -p` labels, the review without reasoning (#259),
+two runs each:
+
+| vet | Agree / 41 | Drops retired / 11 | Keeps retired / 29 | Input tokens |
+|---|---|---|---|---|
+| review only | 37, 37 | 10, 10 | 2, 1 | 13,762 |
+| Jev over 50 neighbours, then the review | 35, 36 | 10, 8 | 4, 1 | 432,902 |
+
+The Jev pass retires no more duplicates and costs about 420k judge input tokens on this sample, so it was removed.

@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -534,25 +535,6 @@ func TestMaybeVetAutoPolicy(t *testing.T) {
 	}
 }
 
-// fakeDupJudge stands in for the duplicate judge: it answers by candidate text and counts the calls.
-func fakeDupJudge(t *testing.T, answer func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error)) *[]extract.JudgeFact {
-	t.Helper()
-	var calls []extract.JudgeFact
-	var mu sync.Mutex
-	oldFn := judgeDupFn
-	judgeDupFn = func(_ context.Context, cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
-		mu.Lock()
-		calls = append(calls, cand)
-		mu.Unlock()
-		return answer(cand, approved)
-	}
-	oldJev := extract.JevJudge
-	extract.JevJudge.URL, extract.JevJudge.Model, extract.JevJudge.Key = "http://127.0.0.1:1", "typesafe/jev-1.14", "k"
-	extract.JevJudge.Min, extract.JevJudge.MaxFacts = 0.9, 400
-	t.Cleanup(func() { judgeDupFn, extract.JevJudge = oldFn, oldJev })
-	return &calls
-}
-
 // approvedFact stores a fact the base already holds: what the duplicate judge compares a candidate with.
 func approvedFact(t *testing.T, content string) string {
 	t.Helper()
@@ -568,78 +550,23 @@ func approvedFact(t *testing.T, content string) string {
 	return f.ID
 }
 
-// A candidate the judge calls a duplicate is retired with its probability in the log; everything it does not call a
-// duplicate still goes to the chat judge, because Jev answers "is this known", not "is this worth keeping".
-func TestVetJudgeRetiresDuplicateAndLeavesTheRestToTheModel(t *testing.T) {
-	dir := env(t)
-	existing := approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
-	dup := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
-	other := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.", "hermes 2026-10-21", "tool")
-	calls := fakeDupJudge(t, func(cand extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
-		if cand.ID == dup {
-			return extract.DuplicateVerdict{P: 0.95, HitID: existing, Tokens: extract.Tokens{Input: 40000}, Cost: 0.0017}, nil
-		}
-		return extract.DuplicateVerdict{P: 0.11, Tokens: extract.Tokens{Input: 40000}, Cost: 0.0017}, nil
-	})
-	reviewCalls := fakeJudge(t, judgeByID(other))
-
-	var out bytes.Buffer
-	if err := runVet(nil, &out); err != nil {
-		t.Fatal(err)
-	}
-	// The other candidate shares no words with the base: it has no neighbour to repeat and needs no call.
-	if len(*calls) != 1 || (*calls)[0].ID != dup {
-		t.Fatalf("judge calls %v, want one for the candidate with a neighbour", *calls)
-	}
-	if f := vetStatus(t, dup); f.Status != store.Retired {
-		t.Errorf("duplicate %+v", f)
-	}
-	if f := vetStatus(t, other); f.Review != "" {
-		t.Errorf("the model did not decide the rest: %+v", f)
-	}
-	if len(*reviewCalls) != 1 || strings.Contains((*reviewCalls)[0], dup) {
-		t.Errorf("the chat judge saw the duplicate: %s", (*reviewCalls)[0])
-	}
-
-	logb, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "vet.log"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var seen vetLine
-	for _, line := range strings.Split(strings.TrimSpace(string(logb)), "\n") {
-		var l vetLine
-		if err := json.Unmarshal([]byte(line), &l); err != nil {
-			t.Fatalf("log line %q: %v", line, err)
-		}
-		if l.ID == dup {
-			seen = l
-		}
-	}
-	if seen.By != "judge" || seen.Decision != "retire" || seen.P == nil || *seen.P != 0.95 ||
-		!strings.Contains(seen.Reason, existing) {
-		t.Errorf("log line %+v", seen)
-	}
-	if !strings.Contains(out.String(), "отклонено 1") || !strings.Contains(out.String(), "$0.0037") {
-		t.Errorf("report:\n%s", out.String())
-	}
-}
-
-// A stale Drop must not undo an approval made while the judge was thinking.
+// A stale Drop must not undo an approval made while the model was thinking.
 func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
 	env(t)
 	_ = approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
 	cand := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
-	fakeDupJudge(t, func(c extract.JudgeFact, _ []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+	drop := judgeByID()
+	fakeJudge(t, func(input string) (extract.ReviewResult, error) {
 		s, err := store.Open(factsPath())
 		if err != nil {
-			return extract.DuplicateVerdict{}, err
+			return extract.ReviewResult{}, err
 		}
-		_, err = s.Approve(c.ID)
+		_, err = s.Approve(cand)
 		_ = s.Close()
 		if err != nil {
-			return extract.DuplicateVerdict{}, err
+			return extract.ReviewResult{}, err
 		}
-		return extract.DuplicateVerdict{P: 0.99}, nil
+		return drop(input)
 	})
 	var out bytes.Buffer
 	if err := runVet(nil, &out); err == nil || !strings.Contains(err.Error(), "failed to apply") {
@@ -653,78 +580,35 @@ func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
 	}
 }
 
-// A judge call that fails decides nothing: the candidate waits for the next run instead of being approved blind, and
-// the chat judge is not asked to answer the question the duplicate judge could not.
-func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
+// vet asks no judge about duplicates (#266): the review sees each candidate's nearest approved facts and drops a
+// duplicate itself, so a configured judge endpoint gets no call.
+func TestVetAsksTheJudgeNothing(t *testing.T) {
 	env(t)
-	quarantine(t)
-	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
-	cand := vetFact(t, "В контейнере hermes facts.db открывают через python3.", "hermes 2026-10-21", "tool")
-	fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
-		return extract.DuplicateVerdict{}, errors.New("decisions 500: boom")
-	})
-	reviewCalls := fakeJudge(t, judgeByID(cand))
+	called := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called++
+		http.Error(w, "no", http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	old := extract.JevJudge
+	t.Cleanup(func() { extract.JevJudge = old })
+	extract.JevJudge.URL, extract.JevJudge.Model, extract.JevJudge.Key = srv.URL, "typesafe/jev-1.14", "k"
+	existing := approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
+	dup := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
+	reviewCalls := fakeJudge(t, judgeByID())
 
 	var out bytes.Buffer
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, cand); f.Review != store.Candidate || f.Status != store.Active {
-		t.Errorf("a failed judge changed the base: %+v", f)
+	if called != 0 {
+		t.Errorf("the judge endpoint got %d calls", called)
 	}
-	if len(*reviewCalls) != 0 {
-		t.Errorf("the chat judge was asked after the duplicate judge failed")
+	if len(*reviewCalls) != 1 || !strings.Contains((*reviewCalls)[0], existing) {
+		t.Errorf("the review did not see the approved neighbour: %v", *reviewCalls)
 	}
-	if !strings.Contains(out.String(), "duplicate judge failed") || !strings.Contains(out.String(), "осталось решать 1") {
-		t.Errorf("report:\n%s", out.String())
-	}
-}
-
-// The judge is asked once per candidate about its nearest approved facts: the facts that share its words, at most
-// the request size of them, and never another candidate. A duplicate among them retires the candidate; the review
-// model is not asked afterwards.
-func TestVetJudgeAsksAboutTheNeighbours(t *testing.T) {
-	env(t)
-	near := approvedFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts, иначе крон его не видит.")
-	nearer := approvedFact(t, "Скрипт крона hermes лежит в HERMES_HOME/scripts.")
-	third := approvedFact(t, "Скрипт крона hermes запускают из HERMES_HOME/scripts раз в час.")
-	far := approvedFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.")
-	cand := vetFact(t, "Скрипт крона hermes лежит в HERMES_HOME/scripts, а не в cron.d.", "hermes 2026-10-21", "tool")
-	other := vetFact(t, "Скрипт крона hermes пишет лог в HERMES_HOME/logs.", "hermes 2026-10-21", "tool")
-	var mu sync.Mutex
-	asked := map[string][]string{}
-	fakeDupJudge(t, func(c extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		for _, f := range approved {
-			asked[c.ID] = append(asked[c.ID], f.ID)
-		}
-		if c.ID == cand {
-			return extract.DuplicateVerdict{P: 0.99, HitID: nearer}, nil
-		}
-		return extract.DuplicateVerdict{P: 0.1}, nil
-	})
-	extract.JevJudge.MaxFacts = 2
-	reviewCalls := fakeJudge(t, judgeByID(other))
-
-	var out bytes.Buffer
-	if err := runVet(nil, &out); err != nil {
-		t.Fatal(err)
-	}
-	got := asked[cand]
-	if len(got) != 2 || slices.ContainsFunc(got, func(id string) bool { return id != near && id != nearer && id != third }) {
-		t.Errorf("the candidate was compared with %v, want two of its neighbours %s, %s, %s", got, near, nearer, third)
-	}
-	for id, facts := range asked {
-		if slices.Contains(facts, far) || slices.Contains(facts, cand) || slices.Contains(facts, other) {
-			t.Errorf("%s was compared with %v: an unrelated fact or a candidate", id, facts)
-		}
-	}
-	if len(*reviewCalls) != 1 || strings.Contains((*reviewCalls)[0], cand) {
-		t.Errorf("the review model saw the duplicate or missed the rest: %v", *reviewCalls)
-	}
-	if f := vetStatus(t, cand); f.Status != store.Retired {
-		t.Errorf("the duplicate was not retired: %+v", f)
+	if f := vetStatus(t, dup); f.Status != store.Retired {
+		t.Errorf("the duplicate the review dropped is %+v", f)
 	}
 }
 
@@ -749,7 +633,7 @@ func TestVetBaseReadFailureIsAnError(t *testing.T) {
 	}
 }
 
-// The role timeouts come from their own variables; an unset, malformed or out-of-range value keeps the default.
+// The triage timeout comes from its own variable; an unset, malformed or out-of-range value keeps the default.
 func TestConfigureJudgeTimeouts(t *testing.T) {
 	env(t)
 	old := extract.JevJudge
@@ -758,29 +642,23 @@ func TestConfigureJudgeTimeouts(t *testing.T) {
 	t.Setenv("MEMCUE_JUDGE_MODEL", "m")
 	t.Setenv("MEMCUE_JUDGE_KEY", "k")
 	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "")
-	t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", "")
 	configureJudge()
-	if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout ||
-		extract.JevJudge.DupTimeout != extract.DefaultDupTimeout {
-		t.Fatalf("defaults = %v %v", extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+	if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout {
+		t.Fatalf("default = %v", extract.JevJudge.TriageTimeout)
 	}
 
 	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "750ms")
-	t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", "25s")
 	configureJudge()
-	if extract.JevJudge.TriageTimeout != 750*time.Millisecond ||
-		extract.JevJudge.DupTimeout != 25*time.Second {
-		t.Fatalf("configured = %v %v", extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+	if extract.JevJudge.TriageTimeout != 750*time.Millisecond {
+		t.Fatalf("configured = %v", extract.JevJudge.TriageTimeout)
 	}
 
 	for name, value := range map[string]string{"malformed": "much", "too short": "1ms", "too long": "1m"} {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", value)
-			t.Setenv("MEMCUE_JUDGE_DUP_TIMEOUT", value)
 			configureJudge()
-			if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout ||
-				extract.JevJudge.DupTimeout != extract.DefaultDupTimeout {
-				t.Errorf("bad value %q = %v %v", value, extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
+			if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout {
+				t.Errorf("bad value %q = %v", value, extract.JevJudge.TriageTimeout)
 			}
 		})
 	}

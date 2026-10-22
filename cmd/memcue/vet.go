@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -29,26 +28,11 @@ const vetBatch = 12
 // errVetBusy means another vet run holds stateDir/vet.lock.
 var errVetBusy = errors.New("another vet run is in progress")
 
-// vetJudgeParallel is how many candidates the duplicate judge asks about at once: the limit is the endpoint's queue,
-// not the network.
-const vetJudgeParallel = 4
-
 // reviewFn is the model step, replaced in tests.
 var reviewFn = extract.Review
 
-// judgeDupFn is the duplicate step, replaced in tests.
-var judgeDupFn = extract.JudgeDuplicate
-
-// judgeDefaults are the measured values of the duplicate judge: a score of "same claim" at 0.5 retires 8–11 of the
-// 15 duplicates of a 41-candidate sample and 0–1 of the 26 facts worth keeping, and the candidate's 50 nearest
-// approved facts retire as many of them as the whole base did (#240), at about 10k input tokens a candidate.
-const (
-	judgeMin      = 0.5
-	judgeMaxFacts = 50
-)
-
-// configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage, rerank and the
-// duplicate check; only the thresholds, request limits and timeouts stay role-specific.
+// configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage and rerank; only the
+// thresholds and timeouts stay role-specific.
 func configureJudge() {
 	if dir, err := stateDir(); err == nil {
 		judgepkg.Configure(filepath.Join(dir, "judge.pause"))
@@ -56,19 +40,10 @@ func configureJudge() {
 	extract.JevJudge.URL = os.Getenv("MEMCUE_JUDGE_URL")
 	extract.JevJudge.Model = os.Getenv("MEMCUE_JUDGE_MODEL")
 	extract.JevJudge.Key = os.Getenv("MEMCUE_JUDGE_KEY")
-	extract.JevJudge.Min = judgeMin
-	extract.JevJudge.MaxFacts = judgeMaxFacts
-	extract.JevJudge.LongContext = os.Getenv("MEMCUE_JUDGE_DUP_LONG_CONTEXT") == "1"
 	extract.JevJudge.TriageTimeout = extract.DefaultTriageTimeout
 	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT")); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 10*time.Second {
 			extract.JevJudge.TriageTimeout = d
-		}
-	}
-	extract.JevJudge.DupTimeout = extract.DefaultDupTimeout
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_DUP_TIMEOUT")); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 30*time.Second {
-			extract.JevJudge.DupTimeout = d
 		}
 	}
 
@@ -82,16 +57,6 @@ func configureJudge() {
 			extract.Triage.Min = m
 		}
 	}
-	if v := os.Getenv("MEMCUE_JUDGE_DUP_MIN"); v != "" {
-		if m, err := strconv.ParseFloat(v, 64); err == nil && m >= 0 && m <= 1 {
-			extract.JevJudge.Min = m
-		}
-	}
-	if v := os.Getenv("MEMCUE_JUDGE_DUP_MAX_FACTS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			extract.JevJudge.MaxFacts = n
-		}
-	}
 }
 
 // vetLine is one decision as vet.log records it. The review page logs its own shape (time, fact, decision), so an
@@ -103,7 +68,6 @@ type vetLine struct {
 	Applied     bool     `json:"applied"`
 	Provisional bool     `json:"provisional,omitempty"`
 	Verdict     string   `json:"verdict"`
-	P           *float64 `json:"p"`  // probability of the duplicate judge's "same claim"; null when another step decided
 	By          string   `json:"by"` // rule, judge or model
 	Reason      string   `json:"reason"`
 	Expires     string   `json:"expires,omitempty"`
@@ -123,8 +87,6 @@ type vetRecord struct {
 	Provisional int            `json:"provisional,omitempty"`
 	Split       int            `json:"split,omitempty"`
 	Failed      int            `json:"failed,omitempty"`
-	JudgeErrs   int            `json:"judge_errors,omitempty"`
-	JudgeCalls  int            `json:"judge_calls,omitempty"`
 	DryRun      bool           `json:"dry_run,omitempty"`
 	CostUSD     float64        `json:"cost_usd,omitempty"`
 	Tokens      extract.Tokens `json:"tokens,omitempty"`
@@ -256,24 +218,6 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 	memory, haveMemory := memoryNotes(o.memory)
 	decided, rest := vet.Rules(cands, approved, memory, haveMemory)
 
-	// The duplicate judge runs before the chat one and over the candidate's nearest approved facts: a duplicate is the
-	// one verdict that needs no reading of a candidate, only a comparison. The judge never decides that a candidate is
-	// worth keeping, so everything it does not call a duplicate still goes to the model.
-	probs := map[string]float64{}
-	if !o.noModel && extract.JevJudgeOn() {
-		stage := jevDuplicates(s, rest, approved)
-		decided = append(decided, stage.Retired...)
-		decided = append(decided, stage.Failed...)
-		rest = stage.Left
-		rec.Tokens.Add(stage.Tokens)
-		rec.CostUSD += stage.CostUSD
-		rec.JudgeErrs += stage.Errors
-		rec.JudgeCalls += stage.Calls
-		for id, p := range stage.P {
-			probs[id] = p
-		}
-	}
-
 	if o.noModel {
 		for _, f := range rest {
 			decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "rule",
@@ -348,9 +292,6 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		line := vetLine{Time: rec.Time, ID: d.Fact.ID, Verdict: string(d.Verdict), By: d.By,
 			Reason: d.Reason, Expires: d.Expires, Provisional: d.Provisional, Source: d.Fact.Source,
 			Content: clip(d.Fact.Content, 200)}
-		if p, ok := probs[d.Fact.ID]; ok {
-			line.P = &p
-		}
 		switch {
 		case d.Verdict == vet.Split:
 			line.Decision, line.Parts = "split", d.Parts
@@ -435,8 +376,6 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Provisional += o.Provisional
 	r.Split += o.Split
 	r.Failed += o.Failed
-	r.JudgeErrs += o.JudgeErrs
-	r.JudgeCalls += o.JudgeCalls
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -463,105 +402,6 @@ func modelDecision(f store.Fact, d extract.ReviewDecision, isPart bool) vet.Deci
 		dec.Parts, dec.Expires = d.Parts, ""
 	}
 	return dec
-}
-
-// duplicateStage is what the duplicate judge did with a batch: the candidates it retired, those it could not decide,
-// the rest for the chat judge, and the probability of every retired one.
-type duplicateStage struct {
-	Retired []vet.Decision
-	Failed  []vet.Decision
-	Left    []store.Fact
-	P       map[string]float64
-	Tokens  extract.Tokens
-	CostUSD float64
-	Errors  int
-	Calls   int
-}
-
-// dupNeighbours finds the approved facts a candidate is compared with: the first ones in BM25 order, gate or not, up
-// to the judge's request size (MaxFacts stays zero: the cap is taken over approved facts only). A copy shares the
-// candidate's words, so the whole base adds tokens, not duplicates: on the 41-candidate sample every fact the whole
-// base named at 0.5 was among the first 20 (#240). A copy in another language shares none and is not found here.
-var dupNeighbours = recall.Params{
-	Candidates:     80,
-	MinTerms:       2,
-	MaxPromptTerms: 24,
-}
-
-// jevDuplicates asks the judge whether each candidate already exists in the base, in one request over its nearest
-// approved facts. A candidate without neighbours needs no call. A call that fails decides nothing for that candidate,
-// so it waits for the next run rather than being approved blind.
-func jevDuplicates(s *store.Store, cands, approved []store.Fact) duplicateStage {
-	isApproved := make(map[string]bool, len(approved))
-	for _, f := range approved {
-		isApproved[f.ID] = true
-	}
-	type answer struct {
-		v      extract.DuplicateVerdict
-		err    error
-		tokens extract.Tokens
-		cost   float64
-		calls  int
-	}
-	got := make([]answer, len(cands))
-	n := extract.JevJudgeMaxFacts()
-	p := dupNeighbours
-	p.Candidates = max(p.Candidates, 2*n)
-	sem := make(chan struct{}, vetJudgeParallel)
-	var wg sync.WaitGroup
-	for i, f := range cands {
-		q := p
-		q.Seen = map[string]bool{f.ID: true}
-		hits, err := recall.Nearest(s, f.Content+" "+strings.Join(f.Keywords, " "), q)
-		if err != nil {
-			got[i].err = err
-			continue
-		}
-		var near []extract.JudgeFact
-		for _, h := range hits {
-			// The index holds candidates and provisional facts too; a candidate repeats only what the base approved,
-			// so the cap applies after them.
-			if isApproved[h.ID] && len(near) < n {
-				near = append(near, extract.JudgeFact{ID: h.ID, Text: h.Content})
-			}
-		}
-		if len(near) == 0 {
-			continue
-		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int, f store.Fact) {
-			defer func() { <-sem; wg.Done() }()
-			ctx, cancel := contextTimeout()
-			defer cancel()
-			v, err := judgeDupFn(ctx, extract.JudgeFact{ID: f.ID, Text: f.Content}, near)
-			got[i] = answer{v: v, err: err, tokens: v.Tokens, cost: v.Cost, calls: 1}
-		}(i, f)
-	}
-	wg.Wait()
-
-	out := duplicateStage{P: map[string]float64{}}
-	min := extract.JevJudgeMin()
-	for i, f := range cands {
-		a := got[i]
-		out.Calls += a.calls
-		out.Tokens.Add(a.tokens)
-		out.CostUSD += a.cost
-		switch {
-		case a.err != nil:
-			out.Errors++
-			out.Failed = append(out.Failed, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "judge", Failed: true,
-				Reason: "the duplicate judge failed: " + a.err.Error()})
-		case a.v.P >= min:
-			out.Retired = append(out.Retired, vet.Decision{Fact: f, Verdict: vet.Drop, By: "judge",
-				Reason: fmt.Sprintf("duplicate of %s, p=%.2f", a.v.HitID, a.v.P)})
-			out.P[f.ID] = a.v.P
-		default:
-			out.Left = append(out.Left, f)
-			out.P[f.ID] = a.v.P // below the threshold, but a reader of vet.log should still see how close it was
-		}
-	}
-	return out
 }
 
 // applyVet writes the verdict into the base and names what it did, or why it could not.
