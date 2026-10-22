@@ -51,3 +51,18 @@ func TestSessionFactCarriesKindSourceEvidenceScope(t *testing.T) {
 		t.Error("the session schema does not require the fields the policy reads")
 	}
 }
+
+// The search queries of a session fact are kept, trimmed, without empty ones, repeats or commas inside one.
+func TestSessionFactCarriesQueries(t *testing.T) {
+	r, err := decode(reply{payload: []byte(`{"facts":[{"content":"Порт db1 5432.","keywords":["порт"],` +
+		`"queries":[" обратный, прокси ","","обратный прокси","какой порт"]}],"dropped":""}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Facts[0].Queries; len(got) != 2 || got[0] != "обратный прокси" || got[1] != "какой порт" {
+		t.Errorf("queries %q", got)
+	}
+	if !strings.Contains(sessionSchema, `"queries":{"type":"array"`) || !strings.Contains(sessionAnswer, `"queries"`) {
+		t.Error("the session schema and answer shape must name queries")
+	}
+}
