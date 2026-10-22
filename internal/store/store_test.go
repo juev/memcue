@@ -988,7 +988,7 @@ func TestOpenReadOnlyRefusesANewerSchema(t *testing.T) {
 	}
 }
 
-// A version-3 base has no fact_vectors; opening it must create the table and leave it usable.
+// A version-3 base has no fact_vectors; opening it must create the table, which an older binary may still write.
 func TestOpeningAVersion3BaseCreatesFactVectors(t *testing.T) {
 	s, path := open(t)
 	f, err := s.Add("PostgreSQL-16 runs in a container on port 55432.", nil, "x 2026-10-20")
@@ -1009,11 +1009,65 @@ func TestOpeningAVersion3BaseCreatesFactVectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if err := s.SaveVector(f.ID, "test-model", TextHash(f.Content), []float32{1, 0}); err != nil {
-		t.Fatalf("saving a vector on a migrated base: %v", err)
+	saveVector(t, s, f.ID)
+	if n := countVectors(t, s); n != 1 {
+		t.Errorf("vectors after migration = %d, want 1", n)
 	}
-	if n, err := s.TagVectors("test-model"); err != nil || n != 1 {
-		t.Errorf("vectors after migration = %d, %v; want 1", n, err)
+}
+
+// saveVector stores a vector the way an older memcue did, straight into the table.
+func saveVector(t *testing.T, s *Store, id string) {
+	t.Helper()
+	if _, err := s.db.Exec(`INSERT INTO fact_vectors (id, tag, dim, text_hash, vec) VALUES (?, 'bge', 1024, 'h', ?)`,
+		id, make([]byte, 4096)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func countVectors(t *testing.T, s *Store) int {
+	t.Helper()
+	var n int
+	if err := s.db.QueryRow(`SELECT count(*) FROM fact_vectors`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// Opening a base that holds the vectors of an older memcue deletes them and gives the space back (#260); the table
+// stays for the binaries that still know it.
+func TestOpenDeletesStoredVectors(t *testing.T) {
+	s, path := open(t)
+	for i := range 300 {
+		f, err := s.Add(fmt.Sprintf("Факт %d про порт %d.", i, 3000+i), nil, "x 2026-10-22")
+		if err != nil {
+			t.Fatal(err)
+		}
+		saveVector(t, s, f.ID)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countVectors(t, s); n != 0 {
+		t.Errorf("vectors after open = %d, want none", n)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 300 vectors of 4 KiB are about 1.2 MB; the facts themselves are far smaller.
+	if after.Size() >= before.Size()/2 {
+		t.Errorf("base is %d bytes after open, %d before: the space was not given back", after.Size(), before.Size())
 	}
 }
 

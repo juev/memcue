@@ -1,7 +1,6 @@
 package store
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"sort"
@@ -22,9 +21,7 @@ type MergeStats struct {
 // order) and numbered anew; the latest of them is current. Nothing is lost: a correction made on one machine and a
 // retirement made on another both stay in the history.
 //
-// Vectors are derived, and only an older memcue writes them; the ones whose text hash still matches the merged content
-// are copied, so such a binary on another machine keeps them after a sync. A vector made from another version is not
-// copied: the reader would skip it anyway.
+// Vectors are not merged: nothing reads them, and Open deletes the ones an older binary stored (#260).
 func (s *Store) Merge(otherPath string) (MergeStats, error) {
 	var st MergeStats
 	other, err := Open(otherPath)
@@ -36,11 +33,7 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		_ = other.Close()
 		return st, err
 	}
-	vectors, err := other.vectorRows()
 	_ = other.Close()
-	if err != nil {
-		return st, err
-	}
 	ours, err := s.Rows()
 	if err != nil {
 		return st, err
@@ -87,74 +80,10 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 			}
 		}
 	}
-	if err := copyMatchingVectors(tx, vectors); err != nil {
-		return st, err
-	}
 	if err := tx.Commit(); err != nil {
 		return st, err
 	}
 	return st, s.Rebuild()
-}
-
-// vectorRow is one stored vector as Merge reads it from the other copy.
-type vectorRow struct {
-	id, tag, hash string
-	dim           int
-	vec           []byte
-}
-
-// vectorRows reads every vector of the base, without the fact join: Merge decides which of them still match.
-func (s *Store) vectorRows() ([]vectorRow, error) {
-	rows, err := s.db.Query(`SELECT id, tag, dim, text_hash, vec FROM fact_vectors`)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var out []vectorRow
-	for rows.Next() {
-		var v vectorRow
-		if err := rows.Scan(&v.id, &v.tag, &v.dim, &v.hash, &v.vec); err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	return out, rows.Err()
-}
-
-// copyMatchingVectors copies the vectors whose text hash matches the merged current content, replacing a stale vector
-// of the same id and tag. A vector of another version is left behind; the reader skips it by hash anyway.
-func copyMatchingVectors(tx *sql.Tx, vectors []vectorRow) error {
-	if len(vectors) == 0 {
-		return nil
-	}
-	rows, err := tx.Query(`SELECT f.id, f.content FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id)`)
-	if err != nil {
-		return err
-	}
-	current := make(map[string]string, len(vectors))
-	for rows.Next() {
-		var id, content string
-		if err := rows.Scan(&id, &content); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		current[id] = TextHash(content)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-	for _, v := range vectors {
-		if current[v.id] != v.hash {
-			continue
-		}
-		if _, err := tx.Exec(`INSERT INTO fact_vectors (id, tag, dim, text_hash, vec) VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(id, tag) DO UPDATE SET dim = excluded.dim, text_hash = excluded.text_hash, vec = excluded.vec
-			WHERE fact_vectors.text_hash != excluded.text_hash`, v.id, v.tag, v.dim, v.hash, v.vec); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func byID(rows []Fact) map[string][]Fact {
