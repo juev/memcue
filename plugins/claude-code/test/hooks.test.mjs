@@ -29,30 +29,31 @@ test('the hooks cover the four lifecycle events', async () => {
 		['PreCompact', 'SessionEnd', 'SessionStart', 'UserPromptSubmit'])
 })
 
-test('the SessionStart hook warns about a binary older than the plugin', async () => {
+test('the SessionStart hook can install the binary and warns about an older one', async () => {
 	const config = await json('hooks/hooks.json')
 	const [hook] = config.hooks.SessionStart[0].hooks
-	assert.match(hook.command, /memcue version -minimum 0\.4\.0/, 'the hook must check the binary version')
-	assert.match(hook.command, /older than 0\.4\.0/, 'the warning must name the required version')
+	assert.ok(hook.timeout >= 60, 'the first session downloads the release inside SessionStart')
+	const script = await readFile(new URL('scripts/memcue.sh', pluginRoot), 'utf8')
+	assert.match(script, /version -minimum "\$version"/, 'the script must check the binary version')
+	assert.match(script, /older than \$version/, 'the warning must name the required version')
 })
 
-test('every hook is a guarded command with a timeout', async () => {
+test('every hook runs the binary through the plugin script, with a timeout', async () => {
 	const config = await json('hooks/hooks.json')
 	const expected = {
-		SessionStart: /memcue session-start/,
-		UserPromptSubmit: /memcue hook/,
-		PreCompact: /memcue hook-extract/,
-		SessionEnd: /memcue hook-extract/,
+		SessionStart: 'session-start',
+		UserPromptSubmit: 'hook',
+		PreCompact: 'hook-extract',
+		SessionEnd: 'hook-extract',
 	}
-	for (const [event, pattern] of Object.entries(expected)) {
+	for (const [event, command] of Object.entries(expected)) {
 		const groups = config.hooks[event]
 		assert.equal(groups.length, 1, `${event} needs one matcher group`)
 		const [hook] = groups[0].hooks
 		assert.equal(hook.type, 'command', `${event} must run a command`)
 		assert.equal(typeof hook.timeout, 'number')
 		assert.ok(hook.timeout > 0, `${event} needs a positive timeout`)
-		assert.match(hook.command, pattern, `${event} names the wrong command`)
-		assert.match(hook.command, /command -v memcue/, `${event} must tolerate a missing binary`)
-		assert.match(hook.command, /\|\| true/, `${event} must not block the session`)
+		assert.equal(hook.command, `sh "\${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh" ${command} || true`,
+			`${event} must run the plugin script and never block the session`)
 	}
 })

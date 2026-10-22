@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v memcue >/dev/null 2>&1 && { if memcue version -minimum 0.4.0 >/dev/null 2>&1; then memcue session-start; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"memcue: the binary is older than 0.4.0; update memcue to get the session card and the facts again after a compaction.\"}}'; fi; } || true",
-            "timeout": 10
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start || true",
+            "timeout": 90
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v memcue >/dev/null 2>&1 && memcue hook || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook || true",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v memcue >/dev/null 2>&1 && memcue hook-extract || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook-extract || true",
             "timeout": 10
           }
         ]
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v memcue >/dev/null 2>&1 && memcue hook-extract || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook-extract || true",
             "timeout": 10
           }
         ]
