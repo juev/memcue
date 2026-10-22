@@ -4,6 +4,9 @@ Status: **measured 2026-10-21; keep Jev.** Issue #66 asked whether the main chat
 Jev as the second model. It cannot on this sample: the same-family main model scored 108 useful
 top-1 prompts against Jev's 112, and lost 10 prompts for every 6 it rescued.
 
+**2026-10-22:** measured again with reasoning off, the current candidates and Opus labels; the decision holds.
+See [main-judge-2026-10.md](main-judge-2026-10.md) (#274).
+
 ## Method
 
 - Pilot pool on a copy of the 2,571-fact Claude Code base: 180 real prompts, 3,223 fact labels
