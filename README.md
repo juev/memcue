@@ -373,7 +373,10 @@ about $5 per million characters of transcript; tool output is the bulk of it. So
 A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
 `claude -p` reports one; a rules-only run (`-no-model`) costs nothing. The review uses `MEMCUE_MODEL` and
-`MEMCUE_API_URL`, or `claude -p` without it; there is no separate review model.
+`MEMCUE_API_URL`, or `claude -p` without it; there is no separate review model. On `api.deepseek.com` the review
+turns reasoning off: it agreed with a `claude -p` reference as often and used a quarter of the output, while split,
+dream and extraction lost quality without it and keep it
+([docs/research/reasoning-off-2026-10.md](docs/research/reasoning-off-2026-10.md)).
 
 ## Results
 
