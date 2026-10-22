@@ -54,12 +54,14 @@ plugin and the binary from the same release.
 
 ## Install
 
-1. Install the binary and make sure `memcue` is on `PATH`: download it for your system from
+1. Optional: install the binary yourself and put `memcue` on `PATH`. Download it for your system from
    [Releases](https://github.com/juev/memcue/releases), or build it:
 
    ```bash
    go install github.com/juev/memcue/cmd/memcue@latest
    ```
+
+   Without this step the plugin installs the binary of its own release (see [Binary from the plugin](#binary-from-the-plugin)).
 
 2. Install the Claude Code plugin (hooks and skill) from this repository:
 
@@ -98,7 +100,26 @@ plugin and the binary from the same release.
    Without a repository memcue works the same; the base is just not synced. A merge carries the vectors whose text
    hash still matches the merged fact; the next write, or `memcue embed`, fills any missing or stale ones.
 
-The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin first is harmless.
+### Binary from the plugin
+
+All three plugins (Claude Code, DSH, Hermes) find the binary in this order: the one configured explicitly
+(`MEMCUE_BIN`, or `binary` in the DSH and Hermes config); `memcue` on `PATH` when it is the plugin's release or newer;
+the copy the plugin installed; an older `memcue` on `PATH`, so recall keeps working. When none of them is the plugin's
+release, the plugin downloads that release from GitHub, checks the archive against the release's `checksums.txt`,
+and installs it:
+
+| Host | Where | When |
+|---|---|---|
+| Claude Code | `${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/memcue` | in `SessionStart`, before the first answer of the session; the directory goes on the session's `PATH`, so the skill finds `memcue` too |
+| DSH | the same directory, shared with Claude Code | in the background at plugin start |
+| Hermes | `$HERMES_HOME/memcue/bin/<version>/memcue`, which outlives the container | in the background at the first `initialize` |
+
+A configured binary is never replaced. Set `MEMCUE_AUTO_INSTALL=0` to install nothing; the plugin then says that the
+binary is missing, as before. The checksum guards against a broken download, not against a replaced release:
+`checksums.txt` comes from the same release. Claude Code logs failed installs to
+`${XDG_STATE_HOME:-~/.local/state}/memcue/install.log`; DSH and Hermes log them as warnings. The Claude Code script
+needs `curl`, `tar` and `sha256sum` or `shasum`. A binary installed this way is not on your shell's `PATH`: to run
+`memcue install` or other commands by hand, call it by its path or add the directory to `PATH`.
 
 ## Upgrade
 
@@ -308,6 +329,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EMBED_TIMEOUT` | one embedding request | `2s` |
 | `MEMCUE_EMBED_SPACE` | label of the vector space when a server changes model under one name | empty |
 | `MEMCUE_VECTOR_POOL` | vectors of the most recent facts scored per prompt; `0` or less scores every vector | `2000` |
+| `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
