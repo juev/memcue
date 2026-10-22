@@ -133,6 +133,9 @@ var ErrRetired = errors.New("fact is retired")
 // ErrAlreadyCandidate: undo would put a fact back into review when it is already there.
 var ErrAlreadyCandidate = errors.New("fact is already a candidate")
 
+// ErrChanged is returned when a fact got a new version after the caller read it.
+var ErrChanged = errors.New("fact changed since it was read")
+
 // Store is an open fact base.
 type Store struct {
 	db     *sql.DB
@@ -574,9 +577,9 @@ func (s *Store) Candidates() ([]Fact, error) {
 		ORDER BY f.created DESC, f.id DESC`, Active, Candidate)
 }
 
-// CardFacts returns the facts a session-start card carries: global rules and the decisions of the given repository,
-// newest first, skipping facts whose expiry has passed. It is a view of the active facts, not a second store: a fact
-// appears only while it is active and unexpired. today is a local "YYYY-MM-DD" date; empty means today.
+// CardFacts returns the facts a session-start card carries: global rules and the rules and decisions of the given
+// repository, newest first, skipping facts whose expiry has passed. It is a view of the active facts, not a second
+// store: a fact appears only while it is active and unexpired. today is a local "YYYY-MM-DD" date; empty means today.
 func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 	if today == "" {
 		today = Today()
@@ -592,7 +595,7 @@ func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 		}
 		switch {
 		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
-		case f.Kind == "decision" && tier != "" && strings.EqualFold(f.Scope, "repo:"+tier):
+		case (f.Kind == "decision" || f.Kind == "rule") && tier != "" && strings.EqualFold(f.Scope, "repo:"+tier):
 		default:
 			continue
 		}
@@ -619,6 +622,29 @@ func (s *Store) Reopen(id string) (Fact, error) {
 	}
 	f := cur
 	f.Version, f.Created, f.Author, f.Status, f.Review = cur.Version+1, s.now().UTC(), s.author, Active, Candidate
+	return f, s.write(f)
+}
+
+// Relabel adds a version of an active fact with the given kind, scope and expiry; the content and everything else
+// stay, the creation time too: a label does not make an old fact new, which would move it ahead of recent facts in the
+// card and in the vector pool. version is the version the caller decided on: a fact edited since is refused with
+// ErrChanged, so a labelling run or its revert never overwrites a later edit.
+func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Version != version {
+		return Fact{}, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
+	}
+	if cur.Status == Retired {
+		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
+	}
+	if err := ValidExpiry(expires); err != nil {
+		return Fact{}, err
+	}
+	f := cur
+	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
 	return f, s.write(f)
 }
 
