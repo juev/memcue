@@ -71,7 +71,7 @@ func (s *Store) VectorsLimit(tag string, limit int) ([]VectorRow, error) {
 }
 
 func (s *Store) vectors(tag string, limit int) ([]VectorRow, error) {
-	q := `SELECT v.dim, v.text_hash, v.vec, ` + qualified("f") + `
+	q := `SELECT v.dim, v.text_hash, v.vec, ` + s.cols("f") + `
 		FROM fact_vectors v JOIN facts f ON f.id = v.id
 		WHERE v.tag = ?
 			AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)

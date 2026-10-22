@@ -28,6 +28,8 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
+// Version 5 adds the search queries of a fact (queries) to what the index holds. An older memcue must refuse such a
+// base: its merge and its writes would drop the queries, and its rebuild would leave them out of the index.
 // Version 4 adds fact_vectors: the optional vectors of the active facts, one per model tag, kept next to the facts
 // because a laptop without an embeddings endpoint simply has none of them (internal/embed).
 // Version 3 changes the stems again: a versioned name such as PostgreSQL-16 keeps its word and only the number is
@@ -35,7 +37,7 @@ import (
 // derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,
 // scope, source, evidence, review, prompt_version); an older memcue refuses a newer base instead of reading
 // candidates as active facts.
-const schemaVersion = 4
+const schemaVersion = 5
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
@@ -146,6 +148,9 @@ type Store struct {
 	db     *sql.DB
 	author string
 	now    func() time.Time
+	// absent are the columns an older base read without migration lacks, with the value they read as; Open adds
+	// them, so it is empty for a writable store.
+	absent map[string]string
 }
 
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
@@ -191,8 +196,8 @@ func Open(path string) (*Store, error) {
 
 // OpenReadOnly opens an existing base for reading without creating it, tightening its mode, migrating it or
 // rebuilding its index. It is for the git textconv: a historical file must not be changed by a diff. A missing file,
-// a file that is not a memcue base, and a base from a newer memcue are errors. An older base is read as it is, so a
-// command that needs columns added later may still fail on it.
+// a file that is not a memcue base, and a base from a newer memcue are errors. An older base is read as it is, the
+// columns added since it was written reading as their defaults.
 func OpenReadOnly(path string) (*Store, error) {
 	dsn, _, err := readOnlyDataSource(path)
 	if err != nil {
@@ -216,8 +221,19 @@ func OpenReadOnly(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("fact base has schema %d, this memcue knows %d: update memcue", version, schemaVersion)
 	}
+	have, err := factColumns(db)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("open %s read-only: %w", path, err)
+	}
+	absent := map[string]string{}
+	for _, c := range added {
+		if !have[c.name] {
+			absent[c.name] = c.def
+		}
+	}
 	host, _ := os.Hostname()
-	return &Store{db: db, author: host, now: time.Now}, nil
+	return &Store{db: db, author: host, now: time.Now, absent: absent}, nil
 }
 
 // dataSource returns the SQLite data source for path and the file it names, or "" for an in-memory base. A file path
@@ -289,11 +305,11 @@ var added = []addedColumn{
 	{"queries", "TEXT", "''"},
 }
 
-// ensureColumns adds to a base the columns written after it was created.
-func (s *Store) ensureColumns() error {
-	rows, err := s.db.Query(`PRAGMA table_info(facts)`)
+// factColumns names the columns the facts table of db has.
+func factColumns(db *sql.DB) (map[string]bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(facts)`)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	have := map[string]bool{}
@@ -304,14 +320,19 @@ func (s *Store) ensureColumns() error {
 			dflt             any
 		)
 		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
-			return err
+			return nil, err
 		}
 		have[name] = true
 	}
-	if err := rows.Err(); err != nil {
+	return have, rows.Err()
+}
+
+// ensureColumns adds to a base the columns written after it was created.
+func (s *Store) ensureColumns() error {
+	have, err := factColumns(s.db)
+	if err != nil {
 		return err
 	}
-	_ = rows.Close()
 	for _, c := range added {
 		if !have[c.name] {
 			if _, err := s.db.Exec(`ALTER TABLE facts ADD COLUMN ` + c.name + ` ` + c.typ + ` NOT NULL DEFAULT ` + c.def); err != nil {
@@ -581,7 +602,7 @@ func state(f Fact) string {
 // Candidates returns the latest version of every fact that waits for approval, newest first. Created comes first
 // because a base written before the monotonic ids can hold same-millisecond facts in random id order.
 func (s *Store) Candidates() ([]Fact, error) {
-	return s.query(`SELECT `+qualified("f")+` FROM facts f
+	return s.query(`SELECT `+s.cols("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
 		ORDER BY f.created DESC, f.id DESC`, Active, Candidate)
 }
@@ -906,7 +927,7 @@ func scan(row interface{ Scan(...any) error }) (Fact, error) {
 
 // Get returns the latest version of a fact, active or retired.
 func (s *Store) Get(id string) (Fact, error) {
-	f, err := scan(s.db.QueryRow(`SELECT `+columns+` FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`, id))
+	f, err := scan(s.db.QueryRow(`SELECT `+s.cols("")+` FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Fact{}, fmt.Errorf("%w: %s", ErrNotFound, id)
 	}
@@ -915,29 +936,36 @@ func (s *Store) Get(id string) (Fact, error) {
 
 // History returns every version of a fact, oldest first.
 func (s *Store) History(id string) ([]Fact, error) {
-	return s.query(`SELECT `+columns+` FROM facts WHERE id = ? ORDER BY version`, id)
+	return s.query(`SELECT `+s.cols("")+` FROM facts WHERE id = ? ORDER BY version`, id)
 }
 
 // Rows returns every version of every fact, ordered by id and version.
 func (s *Store) Rows() ([]Fact, error) {
-	return s.query(`SELECT ` + columns + ` FROM facts ORDER BY id, version`)
+	return s.query(`SELECT ` + s.cols("") + ` FROM facts ORDER BY id, version`)
 }
 
 // Active returns the latest version of every approved fact: not retired, not a candidate and not provisional. It
 // reads the facts, not the index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs
 // the index.
 func (s *Store) Active() ([]Fact, error) {
-	return s.query(`SELECT `+qualified("f")+` FROM facts f
+	return s.query(`SELECT `+s.cols("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ''
 		ORDER BY f.id`, Active)
 }
 
-func qualified(alias string) string {
-	cols := strings.Split(columns, ", ")
-	for i, c := range cols {
-		cols[i] = alias + "." + c
+// cols is the column list of a SELECT from facts, under alias when it is not empty; a column the base lacks reads as
+// its default.
+func (s *Store) cols(alias string) string {
+	out := strings.Split(columns, ", ")
+	for i, c := range out {
+		switch def, missing := s.absent[c]; {
+		case missing:
+			out[i] = def + " AS " + c
+		case alias != "":
+			out[i] = alias + "." + c
+		}
 	}
-	return strings.Join(cols, ", ")
+	return strings.Join(out, ", ")
 }
 
 func (s *Store) query(q string, args ...any) ([]Fact, error) {
@@ -972,7 +1000,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	for i, t := range terms {
 		q[i] = text.Query(t)
 	}
-	rows, err := s.db.Query(`SELECT i.stems, `+qualified("f")+`
+	rows, err := s.db.Query(`SELECT i.stems, `+s.cols("f")+`
 		FROM fact_fts JOIN fact_index i ON i.rid = fact_fts.rowid
 		JOIN facts f ON f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = i.id)
 		WHERE fact_fts MATCH ? ORDER BY bm25(fact_fts) LIMIT ?`, strings.Join(q, " OR "), limit)

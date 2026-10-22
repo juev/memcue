@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1313,5 +1314,68 @@ func TestCorrectDropsQueriesOfAnOldText(t *testing.T) {
 	moved, err := s.Correct(f.ID, "Порт gitea 3001.", nil)
 	if err != nil || len(moved.Queries) != 0 {
 		t.Errorf("new text: %+v %v", moved, err)
+	}
+}
+
+// A textconv of a base written before the queries column existed reads it with no queries instead of failing.
+func TestOpenReadOnlyReadsABaseWithoutQueries(t *testing.T) {
+	s, path := open(t)
+	f, err := s.Add("Gitea слушает порт 3000.", []string{"gitea"}, "demo 2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{`ALTER TABLE facts DROP COLUMN queries`, `PRAGMA user_version = 4`} {
+		if _, err := s.db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ro, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ro.Close() }()
+	var b bytes.Buffer
+	if err := ro.Dump(&b); err != nil || !strings.Contains(b.String(), f.ID) {
+		t.Fatalf("dump of a version-4 base: %q %v", b.String(), err)
+	}
+	if got, err := ro.Get(f.ID); err != nil || got.Content != f.Content || len(got.Queries) != 0 {
+		t.Errorf("get %+v %v", got, err)
+	}
+}
+
+// A version-4 base whose index lost the stems of the queries, as the rebuild of an older memcue leaves it, is
+// reindexed once when a current memcue opens it.
+func TestOpeningAVersion4BaseIndexesTheQueries(t *testing.T) {
+	s, path := open(t)
+	facts, err := s.AddBatch([]FactInput{{Content: "Caddy-private монтирует файл конфига.", Queries: []string{"обратный прокси"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`UPDATE fact_index SET stems = 'caddy-privat монтир файл конфиг'`,
+		`INSERT INTO fact_fts(fact_fts) VALUES('rebuild')`,
+		`PRAGMA user_version = 4`,
+	} {
+		if _, err := s.db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hits, _ := s.Search([]string{"прокс"}, 10); len(hits) != 0 {
+		t.Fatalf("setup: the index still holds the queries: %+v", hits)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s2.Close() }()
+	hits, err := s2.Search([]string{"прокс"}, 10)
+	if err != nil || len(hits) != 1 || hits[0].ID != facts[0].ID {
+		t.Errorf("search by a query word after the migration: %+v %v", hits, err)
 	}
 }
