@@ -97,8 +97,7 @@ plugin and the binary from the same release.
    It registers the driver in the repository's git config and adds `memory/facts.db merge=memcue diff=memcue` to
    `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
-   Without a repository memcue works the same; the base is just not synced. A merge carries the vectors an older
-   memcue wrote, while their text hash still matches the merged fact.
+   Without a repository memcue works the same; the base is just not synced. A merge carries no vectors.
 
 ### Binary from the plugin
 
@@ -348,7 +347,8 @@ whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms)
 tuned for words alone. Recall does not read vectors: on a gold set of 180 prompts, twenty facts in BM25 order gave a
 useful fact to 119–124 prompts, as many as the vector candidates and the judge together (121–124), with noise of 17–23
 facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed` and
-`MEMCUE_EMBED_*` are removed (#250); the vectors an older memcue stored stay in the base, unread.
+`MEMCUE_EMBED_*` are removed (#250). Opening a base deletes the vectors an older memcue stored and compacts the
+file once (#260); the empty `fact_vectors` table stays, so the schema and older binaries are unaffected.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host

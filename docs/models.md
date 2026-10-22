@@ -143,7 +143,8 @@ the rerank-gate issue.
   bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.
 - **No `only` mode, no `MEMCUE_EMBED_MARGIN`, no absolute vector floor.** The vector model
   proposes top-N; the judge decides.
-- **Schema is unchanged.** `fact_vectors` stays. No migration. (`memcue embed` was removed later, in #250.)
+- **Schema is unchanged.** `fact_vectors` stays. No migration. (`memcue embed` was removed later, in #250, and the
+  stored vectors in #260; the table stays, empty.)
 - **0.4.0 is a breaking configuration release.** Old variable names are removed, not aliased;
   the README and release notes carry the migration table. If one release of warnings is wanted,
   it is a separate decision.
