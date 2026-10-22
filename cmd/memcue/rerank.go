@@ -24,6 +24,9 @@ func ranker() recall.Ranker {
 func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall.Hit, error) {
 	r := ranker()
 	if r == nil {
+		if p.Trace != nil {
+			p.Trace.Fallback = "no judge configured"
+		}
 		return recall.Recall(s, prompt, tier, p)
 	}
 	return recall.RecallJudge(s, prompt, tier, p, r, embedder())

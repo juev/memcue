@@ -104,7 +104,7 @@ commands:
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-cwd DIR] [-session ID] [-event E] [-min-chars N]
   search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
-  recall    print what a prompt would recall: memcue recall [-cwd DIR] TEXT
+  recall    print what a prompt would recall: memcue recall [-cwd DIR] [-explain] [-fact ID] TEXT
   eval      measure recall and noise against labelled sets
   add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] -- TEXT
   candidates list the facts that wait for approval: memcue candidates [-json]
@@ -256,12 +256,14 @@ func claudeDir() string {
 const maxPrompt = 4000
 
 // recallFor recalls the facts of prompt; seen holds the facts the session already got (nil outside a session).
-func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool) ([]recall.Hit, error) {
+// trace, when set, records how the facts were chosen.
+func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *recall.Trace) ([]recall.Hit, error) {
 	if r := []rune(prompt); len(r) > maxPrompt {
 		prompt = string(r[:maxPrompt])
 	}
 	p := recall.Default
 	p.Seen = seen
+	p.Trace = trace
 	p.Host = currentHost()
 	if v := os.Getenv("MEMCUE_MIN_COVERAGE"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 && f <= 1 {
@@ -347,7 +349,7 @@ func runHook(in io.Reader, out io.Writer) error {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	hits, err := recallFor(s, req.Prompt, req.CWD, readSeen(req.SessionID))
+	hits, err := recallFor(s, req.Prompt, req.CWD, readSeen(req.SessionID), nil)
 	if err != nil {
 		return err
 	}
@@ -450,13 +452,25 @@ func render(hits []recall.Hit) string {
 func runRecall(args []string, out io.Writer) error {
 	fl := flag.NewFlagSet("recall", flag.ContinueOnError)
 	cwd := fl.String("cwd", ".", "session working directory (its repository wins ties)")
+	explain := fl.Bool("explain", false, "print every step of the decision instead of the facts")
+	fact := fl.String("fact", "", "with -explain: follow this fact id through the steps (implies -explain)")
 	if err := fl.Parse(args); err != nil {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
-		hits, err := recallFor(s, strings.Join(fl.Args(), " "), *cwd, nil)
+		var trace *recall.Trace
+		if *explain || *fact != "" {
+			trace = &recall.Trace{}
+		}
+		hits, err := recallFor(s, strings.Join(fl.Args(), " "), *cwd, nil, trace)
 		if err != nil {
 			return err
+		}
+		if *fact != "" {
+			return explainFact(s, trace, *fact, out)
+		}
+		if trace != nil {
+			return explainRecall(trace, out)
 		}
 		for _, h := range hits {
 			scope := ""
