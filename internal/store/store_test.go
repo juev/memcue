@@ -1053,3 +1053,58 @@ func TestAddBatchConcurrentIDsAreUnique(t *testing.T) {
 		t.Fatalf("ids = %d, want %d", len(seen), writers)
 	}
 }
+
+// A card carries the rules of the session's repository next to its decisions, and no rule or decision of another
+// repository.
+func TestCardFactsCarryRepositoryRules(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, kind, scope string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: kind, Scope: scope})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	own := add("Shop rule.", "rule", "repo:shop")
+	other := add("Lists rule.", "rule", "repo:lists")
+	pitfall := add("Shop pitfall.", "pitfall", "repo:shop")
+	got, err := s.CardFacts("shop", "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != own.ID {
+		t.Errorf("card facts %+v, want only %s (not %s or %s)", got, own.ID, other.ID, pitfall.ID)
+	}
+}
+
+// Relabel writes the labels as a new version that keeps the content and the creation time, and refuses a fact that
+// changed since the caller read it.
+func TestRelabelKeepsContentAndDate(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.Add("Gradle needs JAVA_HOME.", []string{"gradle"}, "lists 2026-10-09 (lists/feedback_gradle.md)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Relabel(f.ID, f.Version, "rule", "repo:lists", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != f.Version+1 || got.Kind != "rule" || got.Scope != "repo:lists" || got.Content != f.Content ||
+		!got.Created.Equal(f.Created) || got.Origin != f.Origin {
+		t.Errorf("relabelled %+v from %+v", got, f)
+	}
+	if _, err := s.Relabel(f.ID, f.Version, "pitfall", "global", ""); !errors.Is(err, ErrChanged) {
+		t.Errorf("a stale version: %v, want ErrChanged", err)
+	}
+	if _, err := s.Relabel(f.ID, got.Version, "rule", "global", "tomorrow"); err == nil {
+		t.Error("a bad expiry was accepted")
+	}
+	r, err := s.Retire(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Relabel(f.ID, r.Version, "rule", "global", ""); !errors.Is(err, ErrRetired) {
+		t.Errorf("a retired fact: %v, want ErrRetired", err)
+	}
+}
