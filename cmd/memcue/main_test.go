@@ -27,6 +27,9 @@ func env(t *testing.T) string {
 	oldSplit := splitFn
 	splitFn = func(string) (extract.SplitResult, error) { return extract.SplitResult{}, nil }
 	t.Cleanup(func() { splitFn = oldSplit })
+	oldExpand := expandFn
+	expandFn = func(string) (extract.ExpandResult, error) { return extract.ExpandResult{}, nil }
+	t.Cleanup(func() { expandFn = oldExpand })
 	return dir
 }
 
