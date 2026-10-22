@@ -172,7 +172,8 @@ What stands:
 1. **Recall without vectors** (#232, step 1): the judge reads the first 20 facts the words found, in BM25 order.
 2. **Expansion at write time** (step 2): extraction writes search phrases for its facts in the same call, and every
    dream fills them for facts that have none (written by `add`, `correct` or `import`); `dream -all` does the base
-   once.
+   once. The phrases live in their own column (`queries`), so a fact without them is known, and a
+   correction of the text drops them.
 3. **Vet duplicates without the Jev stage** (#240, step 3).
 4. **Remove the embedder** (step 4): `memcue embed`, `MEMCUE_EMBED_*` and the stored vectors.
 5. **Reasoning off** per call where a labelled sample shows no loss.
