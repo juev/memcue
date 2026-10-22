@@ -54,7 +54,8 @@ func TestReviewReadsDecisions(t *testing.T) {
 	answer, _ := json.Marshal("```json\n{\"decisions\":[" +
 		"{\"id\":\"01a\",\"verdict\":\" KEEP \",\"reason\":\"rule with a cause\"}," +
 		"{\"id\":\"01b\",\"verdict\":\"MAYBE\",\"reason\":\"?\"}," +
-		"{\"id\":\"01c\",\"verdict\":\"drop\",\"reason\":\"journal\",\"expires\":\"2026-11-01\"}]}\n```")
+		"{\"id\":\"01c\",\"verdict\":\"drop\",\"reason\":\"journal\",\"expires\":\"2026-11-01\"}," +
+		"{\"id\":\"01d\",\"verdict\":\"split\",\"reason\":\"two claims\",\"parts\":[\" Port 3000. \",\" \",\"Path /srv.\"]}]}\n```")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		var req struct {
@@ -75,7 +76,7 @@ func TestReviewReadsDecisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Decisions) != 3 {
+	if len(r.Decisions) != 4 {
 		t.Fatalf("decisions %+v", r.Decisions)
 	}
 	if d := r.Decisions[0]; d.Verdict != KeepVerdict || d.Reason != "rule with a cause" {
@@ -86,6 +87,10 @@ func TestReviewReadsDecisions(t *testing.T) {
 	}
 	if d := r.Decisions[2]; d.Verdict != DropVerdict || d.Expires != "2026-11-01" {
 		t.Errorf("drop %+v", d)
+	}
+	if d := r.Decisions[3]; d.Verdict != SplitVerdict || len(d.Parts) != 2 || d.Parts[0] != "Port 3000." ||
+		d.Parts[1] != "Path /srv." {
+		t.Errorf("split must keep the non-empty parts, trimmed: %+v", d)
 	}
 	if r.Tokens != (Tokens{Input: 700, Output: 40}) {
 		t.Errorf("tokens %+v", r.Tokens)
