@@ -38,11 +38,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.4.0`; the fact-base schema is 4 (5 on `main`, see [Upgrade](#upgrade)). The three plugin manifests carry the same version, and a release
-bumps all of them together.
+This release is `0.5.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.5.0 | 5 | 0.5.0 | 0.5.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.0 (`hermes-agent` 0.15.2) |
 | 0.4.0 | 4 | 0.4.0 | 0.4.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.4.0 (`hermes-agent` 0.15.2) |
 
 The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
@@ -123,13 +124,13 @@ needs `curl`, `tar` and `sha256sum` or `shasum`. A binary installed this way is 
 
 ## Upgrade
 
-On `main` the fact base schema is 5: it adds the search queries of a fact, which the index holds next to its words.
-memcue 0.4.0 refuses a version-5 base with `update memcue`, because its merge, its writes and its index rebuild would
-drop the queries: upgrade every machine that shares the base, the Hermes container included, before the first memcue
-from `main` opens it. Opening a version-4 base adds the column and rebuilds the index once; `memcue dump` (the git
+The fact base schema is 5: it adds the search queries of a fact, which the index holds next to its words. memcue
+0.4.0 refuses a version-5 base with `update memcue`, because its merge, its writes and its index rebuild would drop the
+queries: upgrade every machine that shares the base, the Hermes container included, before the first memcue 0.5.0
+opens it. Opening a version-4 base adds the column and rebuilds the index once; `memcue dump` (the git
 textconv) still reads older revisions of the file, with no queries.
 
-The release schema is 4. memcue 0.4.0 reads it; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
+Schema 4 was the schema of 0.3.0 and 0.4.0; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
 every machine that shares the base before the first new memcue writes to it. If you ran `memcue install` before
 0.4.0, run it once more after the upgrade: the merge driver is now a script in `.git` that survives a binary upgrade,
 while an older install pinned the absolute path of the binary it ran from. A mixed-version sync is not safe: an
