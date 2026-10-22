@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -780,5 +781,155 @@ func TestConfigureJudgeTimeouts(t *testing.T) {
 				t.Errorf("bad value %q = %v %v", value, extract.JevJudge.TriageTimeout, extract.JevJudge.DupTimeout)
 			}
 		})
+	}
+}
+
+// judgeSplit answers split with parts for every candidate whose text is a key of split, keep for the texts in keep and
+// drop for the rest.
+func judgeSplit(split map[string][]string, keep ...string) func(string) (extract.ReviewResult, error) {
+	return func(input string) (extract.ReviewResult, error) {
+		var req struct {
+			Candidates []judgedCandidate `json:"candidates"`
+		}
+		if err := json.Unmarshal([]byte(input), &req); err != nil {
+			return extract.ReviewResult{}, err
+		}
+		var r extract.ReviewResult
+		for _, c := range req.Candidates {
+			d := extract.ReviewDecision{ID: c.ID, Verdict: extract.DropVerdict, Reason: "judged"}
+			if parts, ok := split[c.Text]; ok {
+				d.Verdict, d.Parts = extract.SplitVerdict, parts
+			} else if slices.Contains(keep, c.Text) {
+				d.Verdict = extract.KeepVerdict
+			}
+			r.Decisions = append(r.Decisions, d)
+		}
+		return r, nil
+	}
+}
+
+// A compound candidate is retired and its parts are stored as candidates with its origin and meta; the same run reviews
+// the parts, so a session's vet does not leave them waiting for a manual run.
+func TestVetSplitsACompoundCandidateAndReviewsItsParts(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_VET", "1")
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
+	extract.API.URL = "http://127.0.0.1:1"
+	compound := "На loffe стоит memcue 0.4.0; бинарь лежит в /opt/data/bin."
+	version, path := "На loffe стоит memcue 0.4.0.", "Бинарь memcue на loffe лежит в /opt/data/bin."
+	id := vetFact(t, compound, "hermes 2026-10-22", "tool")
+	calls := fakeJudge(t, judgeSplit(map[string][]string{compound: {version, path}}, path))
+
+	maybeVet([]string{id})
+	if len(*calls) != 2 {
+		t.Fatalf("review calls %d, want the candidate and then its parts", len(*calls))
+	}
+	if f := vetStatus(t, id); f.Status != store.Retired {
+		t.Errorf("the compound candidate %+v", f)
+	}
+	logb, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "vet.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(logb)), "\n")
+	if len(lines) != 4 { // the split, its two parts, then the summary
+		t.Fatalf("log lines %d: %s", len(lines), logb)
+	}
+	var split vetLine
+	if err := json.Unmarshal([]byte(lines[0]), &split); err != nil {
+		t.Fatal(err)
+	}
+	if split.Decision != "split" || !split.Applied || len(split.Into) != 2 || len(split.Parts) != 2 {
+		t.Fatalf("split line %+v", split)
+	}
+	byText := map[string]store.Fact{}
+	for _, pid := range split.Into {
+		f := vetStatus(t, pid)
+		if f.Origin != "hermes 2026-10-22" || f.Scope != "host:test" || f.Kind != "pitfall" || f.Source != "tool" {
+			t.Errorf("a part lost the original's origin or meta: %+v", f)
+		}
+		byText[f.Content] = f
+	}
+	if f := byText[path]; f.Status != store.Active || f.Review != "" {
+		t.Errorf("the part judged keep %+v", f)
+	}
+	if f := byText[version]; f.Status != store.Retired {
+		t.Errorf("the part judged drop %+v", f)
+	}
+	var rec vetRecord
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Candidates != 3 || rec.Split != 1 || rec.Approved != 1 || rec.Retired != 1 {
+		t.Errorf("summary %+v", rec)
+	}
+}
+
+// A split the base cannot use leaves the candidate in the queue, even under the provisional policy: one part, or a
+// part that the model wants to split again in the same run.
+func TestVetBadSplitKeepsCandidate(t *testing.T) {
+	env(t)
+	one := vetFact(t, "Порт gitea 3000 на хосте loffe.", "hermes 2026-10-22", "tool")
+	twice := vetFact(t, "Порт gitea 3000; данные в /srv/gitea; бэкап по cron.", "hermes 2026-10-22", "tool")
+	fakeJudge(t, judgeSplit(map[string][]string{
+		"Порт gitea 3000 на хосте loffe.":                      {"Порт gitea 3000 на хосте loffe."},
+		"Порт gitea 3000; данные в /srv/gitea; бэкап по cron.": {"Порт gitea 3000.", "Данные gitea в /srv/gitea; бэкап по cron."},
+		"Данные gitea в /srv/gitea; бэкап по cron.":            {"Данные gitea в /srv/gitea.", "Бэкап gitea по cron."},
+	}, "Порт gitea 3000."))
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, one); f.Status != store.Active || f.Review != store.Candidate {
+		t.Errorf("a split into one part changed the candidate: %+v", f)
+	}
+	if f := vetStatus(t, twice); f.Status != store.Retired {
+		t.Errorf("the compound candidate %+v", f)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	cands, err := s.Candidates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for _, c := range cands {
+		texts = append(texts, c.Content)
+	}
+	slices.Sort(texts)
+	want := []string{"Данные gitea в /srv/gitea; бэкап по cron.", "Порт gitea 3000 на хосте loffe."}
+	if !slices.Equal(texts, want) {
+		t.Errorf("queue %q, want %q", texts, want)
+	}
+	for _, w := range []string{"split into 1 part(s)", "a part of a split was split again", "разделено на части 1",
+		"+ Порт gitea 3000."} {
+		if !strings.Contains(out.String(), w) {
+			t.Errorf("report lacks %q:\n%s", w, out.String())
+		}
+	}
+}
+
+// A dry run reports the split and its parts and writes nothing.
+func TestVetDryRunReportsASplit(t *testing.T) {
+	env(t)
+	compound := "Порт gitea 3000; данные в /srv/gitea."
+	id := vetFact(t, compound, "hermes 2026-10-22", "tool")
+	calls := fakeJudge(t, judgeSplit(map[string][]string{compound: {"Порт gitea 3000.", "Данные gitea в /srv/gitea."}}))
+	var out bytes.Buffer
+	if err := runVet([]string{"-dry-run"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 {
+		t.Errorf("review calls %d: a dry run has no parts to review", len(*calls))
+	}
+	if f := vetStatus(t, id); f.Status != store.Active || f.Review != store.Candidate || f.Version != 1 {
+		t.Errorf("a dry run changed the candidate: %+v", f)
+	}
+	if !strings.Contains(out.String(), "+ Данные gitea в /srv/gitea.") || !strings.Contains(out.String(), "разделено на части 1") {
+		t.Errorf("report:\n%s", out.String())
 	}
 }

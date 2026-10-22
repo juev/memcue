@@ -25,6 +25,7 @@ const (
 	Keep   Verdict = "KEEP"   // take it into recall
 	Drop   Verdict = "DROP"   // retire it: it is not worth a place in the base
 	Unsure Verdict = "UNSURE" // leave it in the queue: a human or a later run decides
+	Split  Verdict = "SPLIT"  // replace it with its parts, each a candidate of its own
 )
 
 // Decision is one verdict, with why and who made it.
@@ -32,9 +33,10 @@ type Decision struct {
 	Fact        store.Fact
 	Verdict     Verdict
 	Reason      string
-	Expires     string // last day the fact is worth recalling, when the decision came with one
-	By          string // rule, model or policy
-	Provisional bool   // keep it for a TTL instead of approving it
+	Expires     string   // last day the fact is worth recalling, when the decision came with one
+	Parts       []string // with Split: the simple facts the candidate holds
+	By          string   // rule, model or policy
+	Provisional bool     // keep it for a TTL instead of approving it
 	// Failed says the step could not decide: a failed or empty model answer, a duplicate judge error, or a
 	// malformed expiry. Such a candidate stays for the next run and never becomes provisional.
 	Failed bool

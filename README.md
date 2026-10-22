@@ -166,8 +166,12 @@ decide first, without a model: a mirror of the built-in memory stays only while 
 (`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
 mirror), an origin whose tier is exactly `test` (as in `test 2026-10-19`; a repository such as `test-utils` is not a
 test run) is retired as a test trace, and a candidate whose words are all in an
-approved fact is retired as covered. The rest goes to the `keep / drop / unsure` judge, twelve candidates a call, each
-with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the answer.
+approved fact is retired as covered. The rest goes to the `keep / drop / unsure / split` judge, twelve candidates a
+call, each with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the
+answer. `split` is for a candidate that still holds several claims, one of which can go stale while another stays
+true: the candidate is retired, each part is stored as a candidate with its origin, scope, kind and source (not its
+keywords, which were chosen for the whole text), and the same run reviews the parts. A part is not split again in that
+run, and a split into fewer than two parts leaves the candidate in the queue. `vet.log` records the parts and their ids.
 Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
 answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
 an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
