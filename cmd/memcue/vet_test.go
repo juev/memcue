@@ -282,6 +282,7 @@ func TestVetUnreadableNoteSkipsMirrors(t *testing.T) {
 func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	env(t)
 	t.Setenv("MEMCUE_VET", "")
+	t.Setenv("PATH", t.TempDir()) // no claude: the review needs the endpoint
 	oldURL := extract.API.URL
 	t.Cleanup(func() { extract.API.URL = oldURL })
 	newer := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
@@ -308,6 +309,29 @@ func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	}
 	if f := vetStatus(t, older); f.Review != store.Candidate {
 		t.Errorf("a candidate the session did not store was decided: %+v", f)
+	}
+}
+
+// Without an endpoint the review takes the `claude -p` path the extraction takes, when claude is on PATH.
+func TestMaybeVetUsesClaudeWithoutAnEndpoint(t *testing.T) {
+	env(t)
+	t.Setenv("MEMCUE_VET", "")
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
+	extract.API.URL = ""
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	id := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
+	calls := fakeJudge(t, judgeByID(id))
+	maybeVet([]string{id})
+	if len(*calls) != 1 {
+		t.Fatalf("review calls %d, want 1", len(*calls))
+	}
+	if f := vetStatus(t, id); f.Review != "" {
+		t.Errorf("the stored id %+v", f)
 	}
 }
 

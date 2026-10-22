@@ -151,8 +151,9 @@ environment:
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_VECTOR_POOL  vectors of the most recent facts scored per prompt; 0 or less scores every vector (default 2000)
   MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
-  MEMCUE_VET      0 stops deciding the facts a session extracted; on by default when MEMCUE_API_URL is set, after
-                  storing them and before the dream; undecided ones become provisional for MEMCUE_VET_TTL_DAYS
+  MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
+                  claude is on PATH), after storing them and before the dream; undecided ones become provisional for
+                  MEMCUE_VET_TTL_DAYS
   MEMCUE_VET_POLICY  provisional (default) turns an unsure candidate into a provisional fact; quarantine
                   (or "memcue vet -quarantine") keeps the human queue
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes the mirrors are checked against; empty skips that rule
