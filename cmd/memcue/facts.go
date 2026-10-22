@@ -134,9 +134,10 @@ func runAdd(args []string, out io.Writer) error {
 	})
 }
 
-// addExpandTimeout bounds the expansion call of add: the fact is stored already, and a slow endpoint must not hold the
-// command that stored it.
-const addExpandTimeout = 30 * time.Second
+// addExpandTimeout bounds the expansion call of add. The fact is stored before the call, so add has to finish inside the
+// plugins' own timeouts for it (DSH 10 s, Hermes 15 s): a plugin that kills a slow add reports the fact as not stored,
+// and the model writes it again. One fact without reasoning takes 1-2 s.
+const addExpandTimeout = 5 * time.Second
 
 // addExpandFn is the expansion call of add, replaced in tests.
 var addExpandFn = func(input string) (extract.ExpandResult, error) {
