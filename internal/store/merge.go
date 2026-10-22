@@ -168,7 +168,7 @@ func byID(rows []Fact) map[string][]Fact {
 func same(a, b Fact) bool {
 	return a.Content == b.Content && strings.Join(a.Keywords, ", ") == strings.Join(b.Keywords, ", ") &&
 		a.Origin == b.Origin && a.Created.Equal(b.Created) && a.Status == b.Status && a.Author == b.Author &&
-		a.Expires == b.Expires && a.Meta == b.Meta
+		a.Expires == b.Expires && a.Meta == b.Meta && strings.Join(a.Queries, ", ") == strings.Join(b.Queries, ", ")
 }
 
 // Dump writes every version of every fact, one per line, for git diff.
@@ -189,6 +189,9 @@ func (s *Store) Dump(w io.Writer) error {
 		}
 		if f.PromptVersion != 0 {
 			created += " prompt=" + strconv.Itoa(f.PromptVersion)
+		}
+		if len(f.Queries) > 0 {
+			created += " queries=[" + strings.Join(f.Queries, ", ") + "]"
 		}
 		if _, err := fmt.Fprintf(w, "%s v%d %s %s %s [%s] %s\n", f.ID, f.Version, f.Status,
 			created, f.Origin, strings.Join(f.Keywords, ", "),

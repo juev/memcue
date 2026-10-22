@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS facts (
 	evidence TEXT NOT NULL DEFAULT '',
 	review   TEXT NOT NULL DEFAULT '',
 	prompt_version INTEGER NOT NULL DEFAULT 0,
+	queries  TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
@@ -99,6 +100,9 @@ type Fact struct {
 	Status   string
 	Author   string // machine that wrote the version
 	Expires  string // last day the fact is worth recalling, "YYYY-MM-DD"; empty never expires
+	// Queries are the words and short phrases a user would ask about the fact with, written by the main model; the
+	// index holds them next to the content and the keywords. Empty means the fact has not been expanded yet.
+	Queries []string
 	Meta
 }
 
@@ -118,6 +122,7 @@ type FactInput struct {
 	Keywords []string
 	Origin   string
 	Expires  string
+	Queries  []string
 	Meta
 }
 
@@ -281,6 +286,7 @@ var added = []addedColumn{
 	{"evidence", "TEXT", "''"},
 	{"review", "TEXT", "''"},
 	{"prompt_version", "INTEGER", "0"},
+	{"queries", "TEXT", "''"},
 }
 
 // ensureColumns adds to a base the columns written after it was created.
@@ -431,7 +437,7 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 		}
 		facts = append(facts, Fact{ID: id.String(), Version: 1, Content: content, Keywords: in.Keywords,
 			Origin: in.Origin, Created: s.now().UTC(), Status: Active, Author: s.author, Expires: in.Expires,
-			Meta: in.Meta})
+			Queries: in.Queries, Meta: in.Meta})
 	}
 	if len(facts) == 0 {
 		return facts, nil
@@ -478,6 +484,9 @@ func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *
 	f := cur
 	f.Version, f.Content, f.Keywords, f.Created, f.Status, f.Author = cur.Version+1, content, keywords,
 		s.now().UTC(), Active, s.author
+	if content != cur.Content {
+		f.Queries = nil // they were written for the old text; the next dream writes them again
+	}
 	if expires != nil {
 		if err := ValidExpiry(*expires); err != nil {
 			return Fact{}, err
@@ -648,6 +657,24 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	return f, s.write(f)
 }
 
+// SetQueries adds a version of a fact with the search queries the main model wrote for it; the content and everything
+// else stay. Like Relabel, it refuses a fact edited since version (ErrChanged) and a retired fact.
+func (s *Store) SetQueries(id string, version int, queries []string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Version != version {
+		return Fact{}, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
+	}
+	if cur.Status == Retired {
+		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
+	}
+	f := cur
+	f.Version, f.Author, f.Queries = cur.Version+1, s.author, queries
+	return f, s.write(f)
+}
+
 // ErrNotRetired is returned when a fact to restore is not retired.
 var ErrNotRetired = errors.New("fact is not retired")
 
@@ -783,9 +810,9 @@ func (s *Store) write(f Fact) error {
 
 // insert writes one version as it is.
 func insert(tx *sql.Tx, f Fact) error {
-	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
+	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
 		f.Content, strings.Join(f.Keywords, ", "), f.Origin, f.Created.Format(time.RFC3339Nano), f.Status, f.Author,
-		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion)
+		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion, strings.Join(f.Queries, ", "))
 	return err
 }
 
@@ -799,16 +826,16 @@ func reindex(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec(`DELETE FROM fact_index WHERE id = ?`, id); err != nil {
 		return err
 	}
-	var content, keywords, status, review string
-	err := tx.QueryRow(`SELECT content, keywords, status, review FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`,
-		id).Scan(&content, &keywords, &status, &review)
+	var content, keywords, queries, status, review string
+	err := tx.QueryRow(`SELECT content, keywords, queries, status, review FROM facts WHERE id = ? ORDER BY version DESC
+		LIMIT 1`, id).Scan(&content, &keywords, &queries, &status, &review)
 	if errors.Is(err, sql.ErrNoRows) || status == Retired || review == Candidate {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	stems := strings.Join(text.Stems(content+"\n"+keywords), " ")
+	stems := strings.Join(text.Stems(content+"\n"+keywords+"\n"+queries), " ")
 	res, err := tx.Exec(`INSERT INTO fact_index(id, stems) VALUES (?, ?)`, id, stems)
 	if err != nil {
 		return err
@@ -858,17 +885,20 @@ func (s *Store) Rebuild() error {
 	return tx.Commit()
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version`
+const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version, queries`
 
 func scan(row interface{ Scan(...any) error }) (Fact, error) {
 	var f Fact
-	var keywords, created string
+	var keywords, created, queries string
 	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author,
-		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion); err != nil {
+		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion, &queries); err != nil {
 		return Fact{}, err
 	}
 	if keywords != "" {
 		f.Keywords = strings.Split(keywords, ", ")
+	}
+	if queries != "" {
+		f.Queries = strings.Split(queries, ", ")
 	}
 	f.Created, _ = time.Parse(time.RFC3339Nano, created)
 	return f, nil
@@ -953,13 +983,16 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	var out []Hit
 	for rows.Next() {
 		var h Hit
-		var stems, keywords, created string
+		var stems, keywords, created, queries string
 		if err := rows.Scan(&stems, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
-			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion); err != nil {
+			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion, &queries); err != nil {
 			return nil, err
 		}
 		if keywords != "" {
 			h.Keywords = strings.Split(keywords, ", ")
+		}
+		if queries != "" {
+			h.Queries = strings.Split(queries, ", ")
 		}
 		h.Created, _ = time.Parse(time.RFC3339Nano, created)
 		h.Stems = strings.Fields(stems)
