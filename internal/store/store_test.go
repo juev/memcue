@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1377,5 +1378,32 @@ func TestOpeningAVersion4BaseIndexesTheQueries(t *testing.T) {
 	hits, err := s2.Search([]string{"прокс"}, 10)
 	if err != nil || len(hits) != 1 || hits[0].ID != facts[0].ID {
 		t.Errorf("search by a query word after the migration: %+v %v", hits, err)
+	}
+}
+
+// A rule the user stated comes before newer ones the model wrote: on a migrated base most rules share one date.
+func TestCardFactsPutStatedRulesFirst(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, source string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "rule", Scope: "global", Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	stated := add("Stated rule.", "user")
+	confirmed := add("Confirmed rule.", "user_confirmed")
+	written := add("Written rule.", "tool")
+	got, err := s.CardFacts("", "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, f := range got {
+		order = append(order, f.ID)
+	}
+	if want := []string{confirmed.ID, stated.ID, written.ID}; !slices.Equal(order, want) {
+		t.Errorf("card order %v, want the stated rules newest first, then %s", order, written.ID)
 	}
 }
