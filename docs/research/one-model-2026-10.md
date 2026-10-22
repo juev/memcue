@@ -1,0 +1,133 @@
+# One model or three: what recall and the background jobs need, October 2026
+
+Issue #232 asked whether memcue can run on the main model alone, without the Jev judge and without the bge-m3
+embedder, to cut cost and the time a user waits. This note keeps the measurements of 2026-10-22, what other
+projects do, and what was decided, so the next step rests on numbers.
+
+## What each model does
+
+| Model | Where | When |
+|---|---|---|
+| main (`deepseek-flash` through `MEMCUE_API_*`, or `claude -p`) | extraction, vet review (keep/drop/unsure/split), dream (retire/correct, split), label, migrate | in the background, after a session |
+| Jev (`typesafe/jev-1.14` on RouterAI) | recall rerank on every prompt; vet duplicates over the whole base; dream triage | rerank: the user waits |
+| bge-m3 (RouterAI) | recall candidates, only in front of Jev | the user waits |
+
+Vectors were tried as dream neighbours on 2026-10-20 (base of 2,501 facts) and did not help: pairs at cosine ≥ 0.80
+were almost all found by words already, and the pairs only vectors saw (cosine 0.70–0.76) were neighbours by topic,
+not duplicates.
+
+## Where the time and the money go
+
+**Time** (#213, `docs/evaluation.md`, section Latency): the recall hook costs about 45 ms of its own; the embedder
+request takes 0.8–1.5 s (TLS 0.05–0.86 s of it) and the Jev request 0.37–0.53 s.
+
+**Tokens, 2026-10-22, from the memcue logs on the author's Mac:**
+
+| Command | Runs | Input | Cached | Output |
+|---|---|---|---|---|
+| vet | 42 | 11.6 M | 3 k | 3 k |
+| vet `-dry-run` | 3 | 10.5 M | 0.4 k | 4 k |
+| dream `-dry-run` (`-since` and `-all`) | 2 | 0.57 M | 66 k | 1.89 M |
+| extract | 5 | 0.19 M | 16 k | 40 k |
+
+- The vet input is the duplicate check (#240): every candidate goes to Jev with the whole approved base, 7 requests
+  of 400 facts, about 580k input tokens per candidate.
+- The dream output is the main model. The DeepSeek console showed 58.5 M tokens that day: 50.5 M cache hits (mostly
+  other work, code review), 3.8 M cache misses and 4.2 M output, so the two dream dry runs gave about half of the
+  output.
+
+**Reasoning.** One split call (the split prompt, 20 facts), [`reasoning_probe.py`](scripts/reasoning_probe.py):
+
+| Call | Output tokens | Reasoning | Time | Compound facts found |
+|---|---|---|---|---|
+| thinking on (the default), run 1 | 10,188 | 9,936 (97.5 %) | 44 s | 2 |
+| thinking on, run 2 | 17,667 | 17,424 (98.6 %) | 78 s | 2 |
+| `"thinking": {"type": "disabled"}` | 1,226 | 0 | 5 s | 9 |
+
+The DeepSeek chat completions reference (api-docs.deepseek.com/api/create-chat-completion) lists `thinking` with
+default `enabled`, and `reasoning_effort` with `none` / `low` / `high` / `max`. memcue sends neither, so every main
+model call reasons. Turning it off cuts the output 8–14 times, but it changed the decisions here (9 compound facts
+instead of 2), so each call needs a labelled sample before it is switched. Context caching covers only the shared
+prefix, the system prompt, and does not make output cheaper.
+
+## Recall with fewer models
+
+Gold set of 180 prompts (`gold-set-2026-10.md`), the base copy it was built on, every served pair labelled: pairs
+the gold pool did not hold were labelled by the same judge with the same prompt
+([`recall_extra_pool.py`](scripts/recall_extra_pool.py), then `gold_set.py label`). "Useful" is the number of
+prompts served a USEFUL fact; the scripts are [`recall_explain.py`](scripts/recall_explain.py) and
+[`recall_misses.py`](scripts/recall_misses.py).
+
+**Expansion at write time** (document expansion by query prediction, Nogueira et al., 2019): `deepseek-flash`
+without reasoning wrote 6.5 search queries per fact into `keywords` — synonyms, Russian and English words, how the
+problem is asked — 25 facts a call ([`expand_queries.py`](scripts/expand_queries.py),
+[`expand_queries_prompt.md`](scripts/expand_queries_prompt.md), applied to a copy with
+[`expand_apply.py`](scripts/expand_apply.py)): 2,571 facts in 2.5 minutes, 352k input and 199k output tokens.
+
+| Recall | Useful (top-1 / any) | USEFUL | RELATED | NOISE |
+|---|---|---|---|---|
+| words only, current gate | 43 / 52 | 72 | 31 | 68 |
+| words only, current gate, expanded | 46 / 56 | 79 | 38 | 72 |
+| words only, no gate, BM25 order | 71 / 90 | 122 | 91 | 128 |
+| words only, no gate, BM25 order, expanded | 75 / 91 | 129 | 93 | 121 |
+| Jev, no vectors | 93 / 99 | 152 | 54 | 21 |
+| Jev, no vectors, expanded | 98 / 108 | 165 | 46 | 19 |
+| vectors (local Ollama bge-m3) + Jev, two runs | 114–116 / 121–124 | 189–194 | 66–67 | 17–18 |
+
+Other gate settings (one or two matched terms, coverage 0.15 or 0, coverage or BM25 order) fall between these rows.
+The gate experiments used a build with environment knobs that was not committed.
+
+- **Recall on the main model alone does not work.** Expansion adds 1–4 prompts to recall by words. Loosening the gate
+  and ordering by BM25 finds more, but the noise grows six to seven times: what Jev brings is mostly the refusal to
+  serve what does not fit, and the words have no such signal.
+- **The main model as the reranker** was measured earlier (`main-reranker-2026-10.md`): 108 useful top-1 prompts
+  against Jev's 112, and a chat call per prompt takes seconds.
+- **Without vectors, paraphrases are lost.** With Jev and expansion, the vectors still add about 14 prompts
+  (108 → 121–124). In the gold set, Jev over word and vector candidates rescued 18 top-1 prompts against Jev over
+  the words alone, and all 18 rescued facts were candidates only the vectors found.
+- **Expansion helps the judge**: without vectors, 99 → 108 prompts at the same noise.
+
+## What other projects do
+
+Checked in their docs and source on 2026-10-22:
+
+| Project | Dense | BM25 / full text | Fusion | Reranker | Local embeddings |
+|---|---|---|---|---|---|
+| mem0 v2 | yes | yes (BM25 sparse in Qdrant, full text in other stores) | normalised sum of semantic, BM25 and entity scores | optional: cross-encoder, LLM, hosted | yes, Ollama |
+| Graphiti / Zep | yes | yes, BM25 | RRF by default; MMR, node distance | cross-encoder (OpenAI logprobs, Gemini, BGE-v2-m3) | yes, Ollama |
+| Letta, archival memory (V1 server) | yes, pgvector | on the Turbopuffer backend only | RRF | not found | yes: Ollama, LM Studio, vLLM, Hugging Face |
+| LangMem / LangGraph store | yes | not found | — | not found | yes, any embed function |
+
+Sources: github.com/mem0ai/mem0 (release v2.0.0), docs.mem0.ai (reranker search, Ollama embedder);
+help.getzep.com/graphiti/working-with-data/searching, github.com/getzep/graphiti; github.com/letta-ai/letta, branch
+`archive` (`agent_manager.py`, `tpuf_client.py`, `embedding_config.py`); docs.langchain.com/oss/python/langgraph/stores,
+langchain-ai.github.io/langmem.
+
+None of them replaces embeddings with query or document expansion; LangMem can let a model rewrite the query, and
+the search is still by embeddings. The common shape is dense plus BM25, fused (often with RRF), with an optional
+reranker, and every one of them can embed locally.
+
+## The cost of vectors is the remote call
+
+Embedding one prompt with bge-m3:
+
+| Where | Time |
+|---|---|
+| RouterAI | 0.8–1.5 s |
+| local Ollama, model loaded | 23–35 ms |
+| local Ollama, cold start | 1.6 s (Ollama unloads an idle model; `keep_alive` keeps it) |
+
+The gold set rows above with vectors were measured with the local Ollama, so the local embedder's quality is the best
+row of the table.
+
+## Decision and next steps
+
+- **Keep the vectors; move the embedder to a local Ollama** where the host can run it: recall loses 0.8–1.5 s and a
+  paid call per prompt. Only configuration changes (`MEMCUE_EMBED_URL=http://127.0.0.1:11434/v1`,
+  `MEMCUE_EMBED_MODEL=bge-m3`, then `memcue embed`). Not known yet: whether the Hermes container on loffe can reach an
+  Ollama.
+- **Keep expansion** as a cheap addition for the judge (+9 prompts), written by extraction in the same call.
+- **Jev stays in recall for now.** A local cross-encoder (bge-reranker-v2-m3) in its place is a hypothesis, not
+  measured; if it matched Jev on the gold set, the only paid model would be the main one, in the background.
+- **Independent of the above:** vet duplicates without the Jev stage (#240), and reasoning off per call where a
+  labelled sample shows no loss.
