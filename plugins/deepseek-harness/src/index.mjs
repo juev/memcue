@@ -24,6 +24,7 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { install, pluginVersion } from './install.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'memcue'
@@ -135,6 +136,8 @@ function settingsOf(config) {
 	}
 	return {
 		binary: expandHome(textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || DEFAULTS.binary)) || DEFAULTS.binary,
+		// A configured binary is used as it is; the default one may be replaced by the release this plugin installs.
+		pinned: Boolean(textOf(raw.binary, 'binary', process.env.MEMCUE_BIN || '')),
 		facts,
 		factsKey: resolve(facts || defaultFacts()),
 		// The global off switch wins over the profile: it is the one setting a user adds to a container or a launcher
@@ -512,21 +515,35 @@ export function apply(ctx, config) {
 		interpolate: false,
 	})
 
-	// The binary is installed separately from this package: check once that it has the commands the plugin uses, and
-	// turn the card and extraction off with one clear line instead of failing them every turn.
-	const checkBinary = async () => {
+	// The version the binary reports, and whether there is a binary at all.
+	const versionOf = async () => {
 		// `-json` is 0.4.0 too: an older binary answers the flag with an error, so ask for the plain form as well.
 		let { code, out } = await runMemcue(settings, ['version', '-json'], { timeoutMs: 5_000 })
 		if (code !== 0) ({ code, out } = await runMemcue(settings, ['version'], { timeoutMs: 5_000 }))
-		let reported = ''
-		if (code === 0) {
+		if (code !== 0) return { found: false, reported: '' }
+		try {
+			return { found: true, reported: String(JSON.parse(out)?.version ?? '') }
+		} catch {
+			return { found: true, reported: out.trim().split(/\s+/)[0] ?? '' }
+		}
+	}
+
+	// Check once that the binary has the commands the plugin uses. Without a configured binary, a missing or older
+	// one is replaced by the release of this plugin, installed or downloaded; until that is done recall uses what
+	// PATH has. Anything else turns the card and extraction off with one clear line instead of failing every turn.
+	const checkBinary = async () => {
+		let { found, reported } = await versionOf()
+		if (!settings.pinned && !(found && versionAtLeast(reported, MIN_BINARY))) {
+			let version = ''
 			try {
-				reported = String(JSON.parse(out)?.version ?? '')
-			} catch {
-				reported = out.trim().split(/\s+/)[0] ?? ''
+				version = await pluginVersion()
+				settings.binary = await install(version)
+				;({ found, reported } = await versionOf())
+			} catch (error) {
+				if (!found) console.warn(`memcue: no memcue binary on PATH, and the plugin could not install ${version || 'its release'}: ${error.message}`)
 			}
 		}
-		if (versionAtLeast(reported, MIN_BINARY)) return
+		if (!found || versionAtLeast(reported, MIN_BINARY)) return
 		compatible = false
 		extraction = false
 		console.warn(`memcue: binary ${reported || 'unknown'} is older than ${MIN_BINARY}; the session card and extraction are off, recall still works. Update memcue.`)
