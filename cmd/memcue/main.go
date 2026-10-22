@@ -242,6 +242,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "memcue:", err)
 		os.Exit(1)
 	}
+	if embedWrites[os.Args[1]] {
+		embedAfterWrite()
+	}
 }
 
 func claudeDir() string {

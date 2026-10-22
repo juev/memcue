@@ -18,15 +18,20 @@ export MEMCUE_EMBED_MODEL=bge-m3
 # export MEMCUE_EMBED_KEY=...
 ```
 
-Fill the vectors once, and again after adding facts or changing the model:
+Fill the vectors once, and again after changing the model:
 
 ```sh
 memcue embed -dry-run   # how many active facts have no vector for this model
 memcue embed            # 32 facts per request; -batch N, -limit N and -timeout 2m change that
 ```
 
-`add` and `correct` never call the endpoint: a fact without a vector simply does not take part in the candidate pass
-until the next `memcue embed`.
+After a command that can leave an active fact without a vector — `add`, `correct`, `approve`, `vet`, `dream`,
+`extract-session`, `extract-messages`, and an approval on the `memcue review` page — memcue starts `memcue embed` in
+a process of its own, so neither the command nor the turn waits for the endpoint. Embeds run one at a time per base
+(`embed.lock` in the state directory); their output goes to `embed.log` there. If one fails, the next write or a manual
+`memcue embed` fills the rest. Until then a fact without a vector does not take part in the candidate pass: on
+2026-10-22 the 29 facts written during a cleanup of the Hermes base had none, and the current fact about the installed
+version lost to stale ones until they were filled ([#221](https://github.com/juev/memcue/issues/221)).
 
 | Variable | Meaning |
 |---|---|
@@ -48,7 +53,7 @@ propose; Jev decides.
 
 Vectors from another model, another address or another space under the same model name are never compared: each
 vector carries its tag and the hash of the text it was made from. A corrected fact therefore has no comparable vector
-until `memcue embed` runs again, which is deliberate.
+until the embed started after the correction saves a new one.
 
 ## Failure behaviour
 

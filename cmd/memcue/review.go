@@ -30,6 +30,8 @@ type reviewServer struct {
 	logPath string
 	token   string // CSRF token of the forms; a page on another origin cannot read it
 	now     func() time.Time
+	// afterApprove runs after facts were approved, to fill their vectors; nil does nothing.
+	afterApprove func()
 
 	mu   sync.Mutex
 	last *reviewAction
@@ -200,6 +202,9 @@ func (rs *reviewServer) decide(w http.ResponseWriter, r *http.Request, kind stri
 		rs.last = &action
 		rs.mu.Unlock()
 	}
+	if kind == "approve" && len(done) > 0 && rs.afterApprove != nil {
+		rs.afterApprove()
+	}
 	msg := fmt.Sprintf("%s: %d", kind, len(done))
 	if len(failures) > 0 {
 		msg += "; failed: " + strings.Join(failures, "; ")
@@ -322,6 +327,7 @@ func runReview(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	rs.afterApprove = embedAfterWrite
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
 		return err
