@@ -45,6 +45,7 @@ const (
 	VerdictFewTerms     = "too few terms"
 	VerdictLowCoverage  = "low coverage"
 	VerdictOverJudge    = "passed, over the judge's candidate limit"
+	VerdictGatedToJudge = "below the gate, sent to the judge"
 	VerdictCandidate    = "candidate"
 	VerdictBelowTop     = "below the top"
 	VerdictFoundByWords = "candidate, already found by the words"

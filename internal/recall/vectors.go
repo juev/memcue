@@ -23,13 +23,25 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 		p.Trace.fallback("no judge configured")
 		return Recall(s, prompt, sessionTier, p)
 	}
-	lexical, err := recallCandidates(s, prompt, p)
+	lexical, gated, err := recallCandidates(s, prompt, p)
 	if err != nil {
 		return nil, err
 	}
 	n := r.Candidates()
 	if n <= 0 {
 		n = len(lexical)
+	}
+	// The gates were tuned for words alone. With a judge, a fact the words found but the gates turned away may still
+	// answer the prompt (2026-10-22, gold set of 180 prompts: the largest share of misses), so the free candidate slots
+	// go to the turned-away facts with the highest coverage, and the judge decides.
+	if free := n - len(lexical); free > 0 && len(gated) > 0 {
+		sort.SliceStable(gated, func(i, j int) bool { return gated[i].Coverage > gated[j].Coverage })
+		for _, h := range gated[:min(free, len(gated))] {
+			lexical = append(lexical, h)
+			if p.Trace != nil {
+				relabel(p.Trace.Lexical, h.ID, VerdictGatedToJudge)
+			}
+		}
 	}
 	if len(lexical) > n {
 		if p.Trace != nil {

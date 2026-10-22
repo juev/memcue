@@ -58,7 +58,7 @@ type Hit struct {
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
 func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error) {
-	hits, err := recallCandidates(s, prompt, p)
+	hits, _, err := recallCandidates(s, prompt, p)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,8 @@ func capFacts(maxFacts, available int) int {
 
 // recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the
 // MaxFacts cap. Recall adds the tie order and the cap; the rerank pass uses the same gates but lets the judge order.
-func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
+// gated are the facts the term and coverage gates turned away, in Search order: a judge may still read them.
+func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hit, err error) {
 	terms := text.Terms(prompt)
 	var tickets []string
 	for _, t := range terms {
@@ -154,11 +155,11 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	}
 	if len(terms) < minTerms {
 		p.Trace.stop("the prompt has too few terms")
-		return nil, nil
+		return nil, nil, nil
 	}
 	df, total, err := s.DocFreq(terms)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	weight := map[string]float64{}
 	var known []string
@@ -170,7 +171,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	}
 	if len(known) < minTerms {
 		p.Trace.stop("too few prompt terms occur in any fact")
-		return nil, nil
+		return nil, nil, nil
 	}
 	if p.MaxPromptTerms > 0 && len(known) > p.MaxPromptTerms {
 		sort.SliceStable(known, func(i, j int) bool { return weight[known[i]] > weight[known[j]] })
@@ -188,7 +189,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 
 	found, err := s.Search(known, p.Candidates)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// A prompt cannot match more terms than its facts know: a short question ("dream memcue") often keeps two terms,
 	// and the dev-set minimum of three then silenced every fact about them.
@@ -206,7 +207,6 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	if today == "" {
 		today = store.Today()
 	}
-	var hits []Hit
 	for _, f := range found {
 		if p.Seen[f.ID] {
 			p.Trace.lexical(f.Fact, nil, 0, VerdictSeen)
@@ -235,18 +235,21 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 			}
 		}
 		cov := got / sum
+		h := Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
+			Provisional: f.Review == store.Provisional}
 		switch {
 		case matched < minMatched:
 			p.Trace.lexical(f.Fact, held, cov, VerdictFewTerms)
+			gated = append(gated, h)
 		case cov < p.MinCoverage:
 			p.Trace.lexical(f.Fact, held, cov, VerdictLowCoverage)
+			gated = append(gated, h)
 		default:
 			p.Trace.lexical(f.Fact, held, cov, VerdictPassed)
-			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
-				Provisional: f.Review == store.Provisional})
+			hits = append(hits, h)
 		}
 	}
-	return hits, nil
+	return hits, gated, nil
 }
 
 // hostScope reports whether scope names this host.
