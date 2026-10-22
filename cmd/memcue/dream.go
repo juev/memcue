@@ -447,6 +447,18 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 	// Splits go first, so a group the model saw with the compound fact in it is refused below as changed. The parts
 	// are not marked seen: the next dream groups them with their neighbours, which this plan never did.
 	for _, sp := range plan.Splits {
+		// The owner may have edited the parts: a split left with fewer than two is refused, not a reason to stop.
+		var kept []string
+		for _, p := range sp.Parts {
+			if p = strings.TrimSpace(p); p != "" {
+				kept = append(kept, p)
+			}
+		}
+		if len(kept) < 2 {
+			rec.Refused = append(rec.Refused, fmt.Sprintf("split %s: %d part(s) in the plan", sp.ID, len(kept)))
+			continue
+		}
+		sp.Parts = kept
 		parts, err := s.SplitFact(sp.ID, sp.Version, sp.Parts)
 		switch {
 		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound):
