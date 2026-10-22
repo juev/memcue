@@ -276,6 +276,15 @@ parts, or of a fact that changed while the model ran, is refused and logged. `ve
 this step mostly matters for the facts stored before it: `memcue dream -all -dry-run -plan FILE` proposes the splits of
 the whole base, and `-apply FILE` writes them.
 
+Then every fresh fact without **search queries** gets them: 6–10 short phrases a user would name the task with, the
+general name of what the fact is about and how the problem or question sounds, which the index searches next to the
+words and keywords of the fact. Extraction writes them with every fact it stores, so the dream fills only the facts
+written by `add`, `correct` (a new text drops the old queries) or `import`, and the parts of a split; `dream -all` does
+the whole base once. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
+since the queries were measured that way and reasoning took 97–99 % of the output of such calls. A failed call leaves its
+facts for the next dream (`expand_errors` in `dream.log`). On the gold set of 180 prompts the queries added 7–9 prompts
+that got a useful fact from the judge ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).
+
 A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`. A fact pulled from another machine
 after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
@@ -287,7 +296,8 @@ that was reviewed, and it is paid for once. A group with a fact changed since th
 refused whole and logged, since its actions were decided on the old text; the other groups apply, and the dream is
 marked as of the dry run. The plan lists the splits under `splits`, each with the version the model read; edit the
 parts or delete an entry before `-apply`. Splits apply first, so a group the dry run formed around a compound fact is
-refused as changed, and the parts are left for the next dream to group with their neighbours.
+refused as changed, and the parts are left for the next dream to group with their neighbours. The queries are under
+`expansions`; they apply after the splits, and the version they write does not count as a change of the groups.
 
 Most groups need no action, and the Jev judge can tell them apart. With `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_MODEL` and
 `MEMCUE_JUDGE_KEY` set, a dream first asks the judge about each group and sends on only the groups whose probability of
