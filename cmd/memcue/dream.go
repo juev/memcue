@@ -303,7 +303,18 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	}
 	var fresh []store.Fact
 	for _, f := range active {
-		if seen != nil && seen[f.ID] != f.Version || seen == nil && !f.Created.Before(from) {
+		if seen != nil && seen[f.ID] != f.Version {
+			// A version that only gave the fact search queries says nothing new: the dream saw this text already.
+			same, err := onlyQueriesSince(s, f.ID, seen[f.ID])
+			if err != nil {
+				return rec, err
+			}
+			if !same {
+				fresh = append(fresh, f)
+			}
+			continue
+		}
+		if seen == nil && !f.Created.Before(from) {
 			fresh = append(fresh, f)
 		}
 	}
@@ -687,6 +698,35 @@ func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writ
 		}
 	}
 	return found, nil
+}
+
+// onlyQueriesSince reports whether every version of the fact after seen changed nothing but its search queries. A
+// fact the last dream did not see at all (seen is 0) is new.
+func onlyQueriesSince(s *store.Store, id string, seen int) (bool, error) {
+	if seen <= 0 {
+		return false, nil
+	}
+	hist, err := s.History(id)
+	if err != nil {
+		return false, err
+	}
+	var prev *store.Fact
+	for i := range hist {
+		f := &hist[i]
+		if f.Version < seen {
+			continue
+		}
+		if f.Version == seen {
+			prev = f
+			continue
+		}
+		if prev == nil || f.Content != prev.Content || !slices.Equal(f.Keywords, prev.Keywords) ||
+			f.Origin != prev.Origin || f.Status != prev.Status || f.Expires != prev.Expires || f.Meta != prev.Meta {
+			return false, nil
+		}
+		prev = f
+	}
+	return prev != nil, nil
 }
 
 // dreamExpansion is one fact that got queries: what a plan keeps of it and, once written, the new version.
