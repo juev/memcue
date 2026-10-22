@@ -96,3 +96,27 @@ func TestReviewReadsDecisions(t *testing.T) {
 		t.Errorf("tokens %+v", r.Tokens)
 	}
 }
+
+// The review asks DeepSeek not to reason (#259); another endpoint gets the plain request.
+func TestReviewAsksWithoutReasoning(t *testing.T) {
+	oldAPI, oldModel := API, Model
+	t.Cleanup(func() { API, Model = oldAPI, oldModel })
+	rt := &roundTrip{content: `{"decisions":[]}`}
+	useTransport(t, rt)
+
+	API.URL, API.Key, Model = "https://api.deepseek.com", "k", "deepseek-flash"
+	if _, err := Review(context.Background(), `{"candidates":[]}`); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rt.body), `"thinking":{"type":"disabled"}`) {
+		t.Errorf("DeepSeek review without the thinking switch: %s", rt.body)
+	}
+
+	API.URL = "https://openrouter.ai/api/v1"
+	if _, err := Review(context.Background(), `{"candidates":[]}`); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(rt.body), `"thinking"`) {
+		t.Errorf("another endpoint got the DeepSeek switch: %s", rt.body)
+	}
+}
