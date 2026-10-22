@@ -277,7 +277,7 @@ general name of what the fact is about and how the problem or question sounds, w
 words and keywords of the fact. Extraction writes them with every fact it stores, so the dream fills only the facts
 written by `add`, `correct` (a new text drops the old queries) or `import`, and the parts of a split. Facts stored
 before extraction wrote queries are never fresh again, so each dream also expands up to 500 of them, the newest first,
-without reviewing their text: a base upgraded from 0.4 fills over a few daily dreams, and `dream -all` does it at once,
+without reviewing their text: a base upgraded from 0.4 fills over a few dreams, and `dream -all` does it at once,
 together with the review of the whole base. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
 since the queries were measured that way and reasoning took 97–99 % of the output of such calls. A failed call leaves its
 facts for the next dream (`expand_errors` in `dream.log`). On the gold set of 180 prompts the queries added 7–9 prompts
@@ -333,7 +333,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
-| `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
+| `MEMCUE_DREAM` | `1` runs a dream after an extraction once an hour | off |
 | `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
