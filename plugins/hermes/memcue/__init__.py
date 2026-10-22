@@ -46,9 +46,13 @@ import logging
 import os
 import re
 import shutil
+import platform
 import subprocess
+import tarfile
+import tempfile
 import threading
 import time
+import urllib.request
 from collections import Counter
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -92,6 +96,77 @@ def _version_at_least(current: str, minimum: str) -> bool:
     if not have or not want:
         return True
     return have >= want
+
+
+_RELEASES = "https://github.com/juev/memcue/releases/download"  # MEMCUE_RELEASE_URL replaces it
+_STALE_LOCK = 600  # seconds after which a lock left by a crashed install stops blocking
+
+
+def _plugin_version() -> str:
+    """The version of this plugin, which is the release of the binary it installs."""
+    text = (Path(__file__).resolve().parent / "plugin.yaml").read_text(encoding="utf-8")
+    match = re.search(r"^version:\s*(\S+)\s*$", text, re.M)
+    return match.group(1) if match else ""
+
+
+def _release_target() -> Optional[str]:
+    """The os_arch part of a release archive name for this machine, or None when there is no release for it."""
+    system = {"Darwin": "darwin", "Linux": "linux"}.get(platform.system())
+    machine = {"x86_64": "amd64", "amd64": "amd64", "arm64": "arm64", "aarch64": "arm64"}.get(platform.machine().lower())
+    return f"{system}_{machine}" if system and machine else None
+
+
+def _auto_install() -> bool:
+    return os.environ.get("MEMCUE_AUTO_INSTALL") != "0" and _release_target() is not None
+
+
+def _install_release(version: str, path: Path) -> None:
+    """Download the release of `version`, check it against the release's checksums.txt and move it to `path`. The
+    archive is unpacked next to the target and renamed into place, so nobody runs half a binary; a lock directory keeps
+    two providers from downloading at once, the way the Claude Code and DSH plugins do."""
+    target = _release_target()
+    if not target:
+        raise RuntimeError(f"no memcue release for {platform.system()}/{platform.machine()}")
+    archive = f"memcue_{version}_{target}.tar.gz"
+    base = f"{os.environ.get('MEMCUE_RELEASE_URL') or _RELEASES}/v{version}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock = path.parent / ".lock"
+    try:
+        if time.time() - lock.stat().st_mtime > _STALE_LOCK:
+            lock.rmdir()
+    except OSError:
+        pass
+    try:
+        lock.mkdir()
+    except OSError as e:
+        raise RuntimeError("another install of memcue is running") from e
+    try:
+        with tempfile.TemporaryDirectory(dir=path.parent, prefix=".tmp.") as tmp:
+            with urllib.request.urlopen(f"{base}/{archive}", timeout=45) as r:
+                data = r.read()
+            with urllib.request.urlopen(f"{base}/checksums.txt", timeout=15) as r:
+                sums = r.read().decode("utf-8", "replace")
+            want = next((line.split()[0] for line in sums.splitlines()
+                         if len(line.split()) == 2 and line.split()[1] == archive), "")
+            if not want or want != hashlib.sha256(data).hexdigest():
+                raise RuntimeError(f"checksum of {archive} does not match checksums.txt")
+            local = Path(tmp) / archive
+            local.write_bytes(data)
+            with tarfile.open(local) as tar:
+                member = tar.getmember("memcue")
+                if not member.isfile():
+                    raise RuntimeError(f"{archive} holds no memcue file")
+                source = tar.extractfile(member)
+                assert source is not None
+                unpacked = Path(tmp) / "memcue"
+                unpacked.write_bytes(source.read())
+            unpacked.chmod(0o755)
+            os.replace(unpacked, path)
+    finally:
+        try:
+            lock.rmdir()
+        except OSError:
+            pass
 
 
 def _fingerprint(m: dict[str, Any]) -> str:
@@ -196,6 +271,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts the last prefetch injected
         self._warned: dict[str, float] = {}  # session -> when its last recall failure was reported
         self._compat: Optional[bool] = None  # the binary has the commands this provider uses
+        self._bin: Optional[str] = None  # the binary chosen without a configured one
+        self._installing: Optional[threading.Thread] = None
         self._warned_compat = False
         self._warned_card: dict[str, float] = {}  # session -> when its last card failure was reported
         self._card_retry_at = 0.0  # monotonic time before which a failed card is not asked for again
@@ -212,7 +289,55 @@ class MemcueMemoryProvider(MemoryProvider):
         configured = _expand_path(str(self._config.get("binary") or ""))
         if configured:
             return configured if os.access(configured, os.X_OK) else None
-        return shutil.which("memcue")
+        if self._bin:
+            return self._bin
+        found = shutil.which("memcue")
+        installed = self._installed()
+        if installed and os.access(installed, os.X_OK):
+            # The installed release competes with PATH: a binary there wins only when it is that release or newer.
+            self._bin = found if found and found != str(installed) and self._current(found) else str(installed)
+            return self._bin
+        return found
+
+    def _installed(self) -> Optional[Path]:
+        """Where the release of this plugin is installed: $HERMES_HOME/memcue/bin/<version>/memcue, next to the
+        provider's own state, because the home of a container may not outlive it."""
+        version = _plugin_version()
+        if not version:
+            return None
+        home = Path(self._state).parent if self._state else Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+        return home / "memcue" / "bin" / version / "memcue"
+
+    def _current(self, binary: str) -> bool:
+        try:
+            return subprocess.run([binary, "version", "-minimum", _plugin_version()], capture_output=True,
+                                  timeout=_RECALL_TIMEOUT, check=False).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+
+    def _install_in_background(self) -> None:
+        """Without a configured binary, start installing the release of this plugin when PATH has none or an older one.
+        Until it is in place the provider runs what PATH has; afterwards it asks the new binary for its version again."""
+        if self._config.get("binary") or not _auto_install() or self._installing is not None:
+            return
+        installed = self._installed()
+        if installed is None or os.access(installed, os.X_OK):
+            return
+        found = shutil.which("memcue")
+        if found and self._current(found):
+            return
+
+        def run() -> None:
+            try:
+                _install_release(_plugin_version(), installed)
+            except Exception as e:  # any failure leaves the provider on what PATH has
+                logger.warning("memcue: could not install the memcue %s binary: %s", _plugin_version(), e)
+                return
+            logger.info("memcue: installed %s", installed)
+            self._bin, self._compat = str(installed), None
+
+        self._installing = threading.Thread(target=run, name="memcue-install", daemon=True)
+        self._installing.start()
 
     def _binary_ok(self) -> bool:
         """Whether the binary has session-card and extract-messages -min-chars. A plugin installed from this
@@ -240,7 +365,7 @@ class MemcueMemoryProvider(MemoryProvider):
         return self._compat
 
     def is_available(self) -> bool:
-        return self._binary() is not None and self._facts_ok()
+        return (self._binary() is not None or (not self._config.get("binary") and _auto_install())) and self._facts_ok()
 
     def unavailable_reason(self) -> str:
         if not self._facts_ok():
@@ -259,6 +384,7 @@ class MemcueMemoryProvider(MemoryProvider):
             self._facts = str(Path(self._state) / "facts.db")
         self._keep_state_for_base()
         Path(self._state).mkdir(parents=True, exist_ok=True)
+        self._install_in_background()
         self._workspace = str(kwargs.get("agent_workspace") or "")
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
