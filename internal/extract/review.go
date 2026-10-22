@@ -14,14 +14,16 @@ const (
 	KeepVerdict   = "keep"
 	DropVerdict   = "drop"
 	UnsureVerdict = "unsure"
+	SplitVerdict  = "split"
 )
 
 // ReviewDecision is the verdict for one candidate.
 type ReviewDecision struct {
-	ID      string `json:"id"`
-	Verdict string `json:"verdict"` // keep, drop, unsure; any other word is read as unsure
-	Reason  string `json:"reason"`
-	Expires string `json:"expires,omitempty"` // YYYY-MM-DD, only when the fact is worth keeping until then
+	ID      string   `json:"id"`
+	Verdict string   `json:"verdict"` // keep, drop, unsure, split; any other word is read as unsure
+	Reason  string   `json:"reason"`
+	Expires string   `json:"expires,omitempty"` // YYYY-MM-DD, only when the fact is worth keeping until then
+	Parts   []string `json:"parts,omitempty"`   // with split: the simple facts the candidate holds, each standing alone
 }
 
 // ReviewResult is the model's answer over a batch of candidates.
@@ -37,11 +39,11 @@ var reviewPrompt string
 const reviewSchema = `{"type":"object","additionalProperties":false,"required":["decisions"],"properties":{
 "decisions":{"type":"array","items":{"type":"object","additionalProperties":false,
 "required":["id","verdict","reason"],"properties":{"id":{"type":"string"},
-"verdict":{"type":"string","enum":["keep","drop","unsure"]},"reason":{"type":"string"},
-"expires":{"type":["string","null"]}}}}}}`
+"verdict":{"type":"string","enum":["keep","drop","unsure","split"]},"reason":{"type":"string"},
+"expires":{"type":["string","null"]},"parts":{"type":["array","null"],"items":{"type":"string"}}}}}}}`
 
 const reviewShape = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
-	`{"decisions": [{"id": "…", "verdict": "keep|drop|unsure", "reason": "…", "expires": null}]}` + "\n"
+	`{"decisions": [{"id": "…", "verdict": "keep|drop|unsure|split", "reason": "…", "expires": null, "parts": null}]}` + "\n"
 
 // ReviewOn says whether a review can run: the extraction endpoint is configured, or `claude` is on PATH for the
 // `claude -p` path the extraction itself takes without one. The review after an extraction is one more call of the same
@@ -71,6 +73,13 @@ func Review(ctx context.Context, input string) (ReviewResult, error) {
 		r.Decisions[i].ID = strings.TrimSpace(r.Decisions[i].ID)
 		r.Decisions[i].Verdict = strings.ToLower(strings.TrimSpace(r.Decisions[i].Verdict))
 		r.Decisions[i].Expires = strings.TrimSpace(r.Decisions[i].Expires)
+		var parts []string
+		for _, p := range r.Decisions[i].Parts {
+			if p = strings.TrimSpace(p); p != "" {
+				parts = append(parts, p)
+			}
+		}
+		r.Decisions[i].Parts = parts
 	}
 	return r, nil
 }
