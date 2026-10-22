@@ -304,8 +304,9 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	var fresh []store.Fact
 	for _, f := range active {
 		if seen != nil && seen[f.ID] != f.Version {
-			// A version that only gave the fact search queries says nothing new: the dream saw this text already.
-			same, err := onlyQueriesSince(s, f.ID, seen[f.ID])
+			// A version that only gave the fact search queries or new labels says nothing new: the dream judges the
+			// text, and saw this one already.
+			same, err := onlyLabelsSince(s, f.ID, seen[f.ID])
 			if err != nil {
 				return rec, err
 			}
@@ -700,9 +701,10 @@ func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writ
 	return found, nil
 }
 
-// onlyQueriesSince reports whether every version of the fact after seen changed nothing but its search queries. A
-// fact the last dream did not see at all (seen is 0) is new.
-func onlyQueriesSince(s *store.Store, id string, seen int) (bool, error) {
+// onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,
+// scope or expiry: what `memcue label` and the queries step write. A fact the last dream did not see at all (seen is
+// 0) is new.
+func onlyLabelsSince(s *store.Store, id string, seen int) (bool, error) {
 	if seen <= 0 {
 		return false, nil
 	}
@@ -721,7 +723,8 @@ func onlyQueriesSince(s *store.Store, id string, seen int) (bool, error) {
 			continue
 		}
 		if prev == nil || f.Content != prev.Content || !slices.Equal(f.Keywords, prev.Keywords) ||
-			f.Origin != prev.Origin || f.Status != prev.Status || f.Expires != prev.Expires || f.Meta != prev.Meta {
+			f.Origin != prev.Origin || f.Status != prev.Status || f.Source != prev.Source ||
+			f.Evidence != prev.Evidence || f.Review != prev.Review || f.PromptVersion != prev.PromptVersion {
 			return false, nil
 		}
 		prev = f
