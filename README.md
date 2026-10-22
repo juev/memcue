@@ -131,6 +131,18 @@ queries: upgrade every machine that shares the base, the Hermes container includ
 opens it. Opening a version-4 base adds the column and rebuilds the index once; `memcue dump` (the git
 textconv) still reads older revisions of the file, with no queries.
 
+Two things a base upgraded from 0.4 still needs. The facts stored before 0.5 have no queries; each dream now gives them
+queries, up to 500 a dream, and `memcue dream -all` does the whole base at once. And facts that describe memcue 0.4
+itself (its variables, verbs and versions) stay recallable and win lexically, because they are written in memcue's own
+words: no dream or vet compares a fact with the release it is about. Find them and decide each one:
+
+```sh
+memcue facts | grep -E 'MEMCUE_EMBED|MEMCUE_(VET|RERANK|TRIAGE)_(URL|MODEL|KEY)|EMBED_MODE|memcue (embed|label|audit)|0\.4\.0'
+```
+
+`memcue retire ID` a fact that describes the removed state as current, `memcue correct ID TEXT` one that is partly
+true, and keep one that records what was measured or decided then.
+
 Schema 4 was the schema of 0.3.0 and 0.4.0; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
 every machine that shares the base before the first new memcue writes to it. If you ran `memcue install` before
 0.4.0, run it once more after the upgrade: the merge driver is now a script in `.git` that survives a binary upgrade,
@@ -263,8 +275,10 @@ the whole base, and `-apply FILE` writes them.
 Then every fresh fact without **search queries** gets them: 6–10 short phrases a user would name the task with, the
 general name of what the fact is about and how the problem or question sounds, which the index searches next to the
 words and keywords of the fact. Extraction writes them with every fact it stores, so the dream fills only the facts
-written by `add`, `correct` (a new text drops the old queries) or `import`, and the parts of a split; `dream -all` does
-the whole base once. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
+written by `add`, `correct` (a new text drops the old queries) or `import`, and the parts of a split. Facts stored
+before extraction wrote queries are never fresh again, so each dream also expands up to 500 of them, the newest first,
+without reviewing their text: a base upgraded from 0.4 fills over a few daily dreams, and `dream -all` does it at once,
+together with the review of the whole base. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
 since the queries were measured that way and reasoning took 97–99 % of the output of such calls. A failed call leaves its
 facts for the next dream (`expand_errors` in `dream.log`). On the gold set of 180 prompts the queries added 7–9 prompts
 that got a useful fact from the judge ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).

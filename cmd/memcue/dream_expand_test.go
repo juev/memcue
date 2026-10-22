@@ -6,8 +6,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
@@ -188,5 +190,49 @@ func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 	}
 	if !strings.Contains(sent, b) {
 		t.Errorf("a corrected fact was not reviewed: %q", sent)
+	}
+}
+
+// Facts a dream does not see as fresh still get queries: up to expandBacklog a dream, the newest first, without a review
+// of their text. A base written before extraction wrote queries is expanded over a few dreams (#276).
+func TestDreamExpandsTheBacklog(t *testing.T) {
+	env(t)
+	old, a, b, other := dreamBase(t)
+	byAge := []string{old, a, b, other}
+	slices.Sort(byAge) // ids order by time
+	oldBacklog := expandBacklog
+	expandBacklog = 2
+	t.Cleanup(func() { expandBacklog = oldBacklog })
+	sent := fakeExpand(t, nil)
+	calls := fakeDream(t, func(string) []extract.Action { return nil })
+	nothingFresh := []string{"-since", time.Now().Add(time.Hour).Format(time.RFC3339)}
+
+	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{byAge[3], byAge[2]}; !slices.Equal(*sent, want) {
+		t.Fatalf("first dream sent %q, want the two newest %q", *sent, want)
+	}
+	*sent = nil
+	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{byAge[1], byAge[0]}; !slices.Equal(*sent, want) {
+		t.Fatalf("second dream sent %q, want the rest %q", *sent, want)
+	}
+	*sent = nil
+	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*sent) != 0 {
+		t.Errorf("third dream sent %q, want nothing", *sent)
+	}
+	for _, id := range byAge {
+		if f := vetStatus(t, id); len(f.Queries) != 1 || f.Version != 2 {
+			t.Errorf("fact %s: %+v", id, f)
+		}
+	}
+	if len(*calls) != 0 {
+		t.Errorf("the backlog was reviewed: %d dream calls", len(*calls))
 	}
 }
