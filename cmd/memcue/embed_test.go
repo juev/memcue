@@ -123,9 +123,6 @@ func TestEmbedIsOffWithoutEndpoint(t *testing.T) {
 	if err := runEmbed(nil, &out, &errOut); err == nil {
 		t.Fatal("want an error naming the missing settings")
 	}
-	if e := embedder(); e != nil {
-		t.Fatal("without settings the vector source must have no embedder")
-	}
 }
 
 func TestHookStaysLexicalWhenTheEndpointIsDown(t *testing.T) {
@@ -146,14 +143,5 @@ func TestHookStaysLexicalWhenTheEndpointIsDown(t *testing.T) {
 	// The fact comes from the words, exactly as it did before the feature existed.
 	if !strings.Contains(warm.String(), "JAVA_HOME") {
 		t.Fatalf("hook output = %q", warm.String())
-	}
-}
-
-func TestEmbedderReadsTheEndpointAndModel(t *testing.T) {
-	env(t)
-	t.Setenv("MEMCUE_EMBED_URL", "http://127.0.0.1:11434/v1")
-	t.Setenv("MEMCUE_EMBED_MODEL", "bge-m3")
-	if e := embedder(); e == nil {
-		t.Fatal("an endpoint and model must create an embedder")
 	}
 }

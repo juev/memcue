@@ -19,8 +19,8 @@ func ranker() recall.Ranker {
 	return rerank.New(set)
 }
 
-// recallFacts is the one way recall is decided: the words, plus vector candidates, plus the judge when it is
-// configured. A missing judge keeps the lexical answer; a missing embedder only removes the vector candidates.
+// recallFacts is the one way recall is decided: the words, plus the judge when it is configured. A missing judge keeps
+// the lexical answer.
 func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall.Hit, error) {
 	r := ranker()
 	if r == nil {
@@ -29,5 +29,5 @@ func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall
 		}
 		return recall.Recall(s, prompt, tier, p)
 	}
-	return recall.RecallJudge(s, prompt, tier, p, r, embedder())
+	return recall.RecallJudge(s, prompt, tier, p, r)
 }

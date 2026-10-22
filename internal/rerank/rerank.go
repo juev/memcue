@@ -19,12 +19,14 @@ import (
 	"github.com/juev/memcue/internal/judge"
 )
 
-// Defaults measured on 120 real prompts: ten candidates, a 0.5 threshold, and a call that took 0.7 s at the median.
+// Defaults measured on 120 real prompts: a 0.5 threshold and a call that took 0.7 s at the median. Twenty candidates
+// in BM25 order were measured on the gold set of 180 prompts (2026-10-22, #232): 122-124 prompts got a useful fact,
+// against 113 with ten.
 const (
 	DefaultModel      = "typesafe/jev-1.14"
 	DefaultTimeout    = 2 * time.Second
 	DefaultMin        = 0.5
-	DefaultCandidates = 10
+	DefaultCandidates = 20
 	PauseFirst        = judge.PauseFirst
 	PauseMax          = judge.PauseMax
 )

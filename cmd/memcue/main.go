@@ -139,7 +139,7 @@ environment:
   MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage, recall rerank and the
                   duplicate check; off unless all three are set
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
-  MEMCUE_JUDGE_RERANK_CANDIDATES  candidates taken from each source (default 10)
+  MEMCUE_JUDGE_RERANK_CANDIDATES  facts the judge reads, in the search's BM25 order (default 20)
   MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
   MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
   MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
@@ -147,11 +147,10 @@ environment:
   MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
   MEMCUE_JUDGE_DUP_MAX_FACTS  approved facts that fit one duplicate request (default 400)
   MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
-  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY  OpenAI-compatible embeddings endpoint, model and key;
-                  the vector candidates are added to the judge when both the judge and the embedder are set
+  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY  OpenAI-compatible embeddings endpoint, model and key for
+                  memcue embed; recall no longer reads vectors
   MEMCUE_EMBED_TIMEOUT  one embedding request (default 2s)
   MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
-  MEMCUE_VECTOR_POOL  vectors of the most recent facts scored per prompt; 0 or less scores every vector (default 2000)
   MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
                   claude is on PATH), after storing them and before the dream; undecided ones become provisional for
@@ -280,11 +279,6 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 			p.MinCoverage = f
 		}
 	}
-	if v := os.Getenv("MEMCUE_VECTOR_POOL"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			p.VectorPool = n
-		}
-	}
 	return recallFacts(s, prompt, tier.Of(cwd, claudeDir()), p)
 }
 
@@ -396,7 +390,7 @@ type recallFact struct {
 	Coverage    float64 `json:"coverage"`
 	Source      string  `json:"source,omitempty"`
 	Provisional bool    `json:"provisional,omitempty"`
-	Meaning     float64 `json:"meaning,omitempty"` // vector similarity or judge score
+	Meaning     float64 `json:"meaning,omitempty"` // judge score
 	Scope       string  `json:"scope,omitempty"`
 	Displaced   bool    `json:"displaced,omitempty"`
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 )
 
@@ -89,38 +88,5 @@ func TestRecallExplainFactRejectsAnUnknownID(t *testing.T) {
 	seed(t)
 	if err := runRecall([]string{"-fact", "nope", "gradle jdk"}, &bytes.Buffer{}); err == nil {
 		t.Error("an unknown id gave no error")
-	}
-}
-
-// A fact the vector reader never compared is told apart: outside the pool of recent vectors, or with no vector.
-func TestVectorPlaceTellsThePoolFromAMissingVector(t *testing.T) {
-	env(t)
-	seed(t)
-	t.Setenv("MEMCUE_EMBED_URL", "http://127.0.0.1:1/api")
-	t.Setenv("MEMCUE_EMBED_MODEL", "test-model")
-	id := gradleID(t)
-	s, err := store.Open(factsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-	// The judge was asked about something else, so the vector reader ran and did not read this fact.
-	tr := &recall.Trace{VectorPool: 0, Judge: []recall.Step{{ID: "other"}}}
-
-	got, err := vectorPlace(s, tr, id)
-	if err != nil || !strings.HasPrefix(got, "no vector for ") {
-		t.Errorf("without a vector: %q, %v", got, err)
-	}
-
-	f, err := s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.SaveVector(id, embedder().Tag(), store.TextHash(f.Content), []float32{1, 0}); err != nil {
-		t.Fatal(err)
-	}
-	got, err = vectorPlace(s, tr, id)
-	if err != nil || !strings.HasPrefix(got, "outside the pool") {
-		t.Errorf("with a vector: %q, %v", got, err)
 	}
 }

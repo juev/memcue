@@ -24,7 +24,6 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
-	VectorPool     int             // vectors of the most recent facts scored per prompt; <= 0 means every vector
 	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
 	Today          string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
@@ -41,7 +40,6 @@ var Default = Params{
 	MinCoverage:    0.15,
 	MaxPromptTerms: 24,
 	MaxFacts:       2,
-	VectorPool:     2000,
 }
 
 // Hit is a fact chosen for the prompt.
@@ -50,10 +48,12 @@ type Hit struct {
 	Coverage    float64
 	Matched     int
 	Displaced   bool   // a fact of another host took a slot while a fact of this host was left out
-	Source      string // lexical or vector: which reader proposed the fact
+	Source      string // which reader proposed the fact: lexical
 	Provisional bool   // auto-approved for a TTL, recalled after approved facts
-	// Meaning is the vector similarity of a vector candidate or the judge score after rerank; 0 for a lexical fact.
+	// Meaning is the judge score after rerank; 0 when the words alone decided.
 	Meaning float64
+	rank    int  // position in the search's BM25 order
+	gated   bool // the term or coverage gate turned the fact away
 }
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
@@ -207,7 +207,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hi
 	if today == "" {
 		today = store.Today()
 	}
-	for _, f := range found {
+	for rank, f := range found {
 		if p.Seen[f.ID] {
 			p.Trace.lexical(f.Fact, nil, 0, VerdictSeen)
 			continue
@@ -236,13 +236,15 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hi
 		}
 		cov := got / sum
 		h := Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
-			Provisional: f.Review == store.Provisional}
+			Provisional: f.Review == store.Provisional, rank: rank}
 		switch {
 		case matched < minMatched:
 			p.Trace.lexical(f.Fact, held, cov, VerdictFewTerms)
+			h.gated = true
 			gated = append(gated, h)
 		case cov < p.MinCoverage:
 			p.Trace.lexical(f.Fact, held, cov, VerdictLowCoverage)
+			h.gated = true
 			gated = append(gated, h)
 		default:
 			p.Trace.lexical(f.Fact, held, cov, VerdictPassed)

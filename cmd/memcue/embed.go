@@ -13,27 +13,10 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/embed"
-	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 )
 
-// embedder builds the optional vector candidate source from the environment. A nil Embedder, the default, means
-// recall is lexical (or lexical + judge) without vector candidates.
-func embedder() recall.Embedder {
-	set := embed.FromEnv()
-	if set == nil {
-		return nil
-	}
-	// The hook runs as a fresh process on every prompt, so the pause after a failure is remembered in a file rather
-	// than being paid again by each of the next turns.
-	if dir, err := stateDir(); err == nil {
-		set.StateFile = filepath.Join(dir, "embed.pause")
-	}
-	return embed.New(set)
-}
-
-// meaning marks a fact the vector pass added: the words never found it, so its coverage and matched count say
-// nothing about why it came.
+// meaning shows the judge's score of a fact, when the judge decided.
 func meaning(sim float64) string {
 	if sim <= 0 {
 		return ""
