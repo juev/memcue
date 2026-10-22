@@ -702,8 +702,8 @@ func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writ
 }
 
 // onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,
-// scope or expiry: what `memcue label` and the queries step write. A fact the last dream did not see at all (seen is
-// 0) is new.
+// scope or expiry: what the queries step writes and the removed `memcue label` (#251) wrote, also on other machines
+// that sync this base. A fact the last dream did not see at all (seen is 0) is new.
 func onlyLabelsSince(s *store.Store, id string, seen int) (bool, error) {
 	if seen <= 0 {
 		return false, nil
