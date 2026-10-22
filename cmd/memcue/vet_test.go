@@ -587,8 +587,9 @@ func TestVetJudgeRetiresDuplicateAndLeavesTheRestToTheModel(t *testing.T) {
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) != 2 {
-		t.Fatalf("judge calls %d, want one per candidate", len(*calls))
+	// The other candidate shares no words with the base: it has no neighbour to repeat and needs no call.
+	if len(*calls) != 1 || (*calls)[0].ID != dup {
+		t.Fatalf("judge calls %v, want one for the candidate with a neighbour", *calls)
 	}
 	if f := vetStatus(t, dup); f.Status != store.Retired {
 		t.Errorf("duplicate %+v", f)
@@ -618,7 +619,7 @@ func TestVetJudgeRetiresDuplicateAndLeavesTheRestToTheModel(t *testing.T) {
 		!strings.Contains(seen.Reason, existing) {
 		t.Errorf("log line %+v", seen)
 	}
-	if !strings.Contains(out.String(), "отклонено 1") || !strings.Contains(out.String(), "$0.005") {
+	if !strings.Contains(out.String(), "отклонено 1") || !strings.Contains(out.String(), "$0.0037") {
 		t.Errorf("report:\n%s", out.String())
 	}
 }
@@ -658,7 +659,7 @@ func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
 	env(t)
 	quarantine(t)
 	approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
-	cand := vetFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
+	cand := vetFact(t, "В контейнере hermes facts.db открывают через python3.", "hermes 2026-10-21", "tool")
 	fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
 		return extract.DuplicateVerdict{}, errors.New("decisions 500: boom")
 	})
@@ -679,33 +680,48 @@ func TestVetJudgeFailureLeavesCandidates(t *testing.T) {
 	}
 }
 
-// A base above one request is split into chunks: every chunk is asked, and a duplicate found in any of them retires
-// the candidate; the review model is not asked afterwards.
-func TestVetJudgeChunksABaseAboveTheCap(t *testing.T) {
+// The judge is asked once per candidate about its nearest approved facts: the facts that share its words, at most
+// the request size of them, and never another candidate. A duplicate among them retires the candidate; the review
+// model is not asked afterwards.
+func TestVetJudgeAsksAboutTheNeighbours(t *testing.T) {
 	env(t)
-	for _, text := range []string{
-		"В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.",
-		"Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.",
-		"Скрипт крона должен лежать в HERMES_HOME/scripts.",
-	} {
-		approvedFact(t, text)
-	}
-	cand := vetFact(t, "Скрипт крона лежит в HERMES_HOME/scripts.", "hermes 2026-10-21", "tool")
-	calls := fakeDupJudge(t, func(extract.JudgeFact, []extract.JudgeFact) (extract.DuplicateVerdict, error) {
-		return extract.DuplicateVerdict{P: 0.99}, nil
+	near := approvedFact(t, "Скрипт крона должен лежать в HERMES_HOME/scripts, иначе крон его не видит.")
+	nearer := approvedFact(t, "Скрипт крона hermes лежит в HERMES_HOME/scripts.")
+	third := approvedFact(t, "Скрипт крона hermes запускают из HERMES_HOME/scripts раз в час.")
+	far := approvedFact(t, "Ключ DeepSeek берут из окружения процесса шлюза, а не из .env.")
+	cand := vetFact(t, "Скрипт крона hermes лежит в HERMES_HOME/scripts, а не в cron.d.", "hermes 2026-10-21", "tool")
+	other := vetFact(t, "Скрипт крона hermes пишет лог в HERMES_HOME/logs.", "hermes 2026-10-21", "tool")
+	var mu sync.Mutex
+	asked := map[string][]string{}
+	fakeDupJudge(t, func(c extract.JudgeFact, approved []extract.JudgeFact) (extract.DuplicateVerdict, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, f := range approved {
+			asked[c.ID] = append(asked[c.ID], f.ID)
+		}
+		if c.ID == cand {
+			return extract.DuplicateVerdict{P: 0.99, HitID: nearer}, nil
+		}
+		return extract.DuplicateVerdict{P: 0.1}, nil
 	})
-	extract.JevJudge.MaxFacts = 1
-	reviewCalls := fakeJudge(t, judgeByID(cand))
+	extract.JevJudge.MaxFacts = 2
+	reviewCalls := fakeJudge(t, judgeByID(other))
 
 	var out bytes.Buffer
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) != 3 {
-		t.Errorf("duplicate judge calls = %d, want one per chunk", len(*calls))
+	got := asked[cand]
+	if len(got) != 2 || slices.ContainsFunc(got, func(id string) bool { return id != near && id != nearer && id != third }) {
+		t.Errorf("the candidate was compared with %v, want two of its neighbours %s, %s, %s", got, near, nearer, third)
 	}
-	if len(*reviewCalls) != 0 {
-		t.Errorf("the review model was asked after a duplicate: %d calls", len(*reviewCalls))
+	for id, facts := range asked {
+		if slices.Contains(facts, far) || slices.Contains(facts, cand) || slices.Contains(facts, other) {
+			t.Errorf("%s was compared with %v: an unrelated fact or a candidate", id, facts)
+		}
+	}
+	if len(*reviewCalls) != 1 || strings.Contains((*reviewCalls)[0], cand) {
+		t.Errorf("the review model saw the duplicate or missed the rest: %v", *reviewCalls)
 	}
 	if f := vetStatus(t, cand); f.Status != store.Retired {
 		t.Errorf("the duplicate was not retired: %+v", f)
@@ -730,20 +746,6 @@ func TestVetBaseReadFailureIsAnError(t *testing.T) {
 	}
 	if err := vetFailure(rec); err == nil || !strings.Contains(err.Error(), rec.Error) {
 		t.Errorf("exit error %v, want the base error %q", err, rec.Error)
-	}
-}
-
-func TestDuplicateChunks(t *testing.T) {
-	base := []extract.JudgeFact{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}, {ID: "5"}}
-	got := duplicateChunks(base, 2)
-	if len(got) != 3 || len(got[0]) != 2 || len(got[1]) != 2 || len(got[2]) != 1 {
-		t.Fatalf("chunks = %v", got)
-	}
-	if all := duplicateChunks(base, 10); len(all) != 1 || len(all[0]) != 5 {
-		t.Fatalf("one chunk = %v", all)
-	}
-	if none := duplicateChunks(nil, 2); none != nil {
-		t.Fatalf("empty base = %v", none)
 	}
 }
 

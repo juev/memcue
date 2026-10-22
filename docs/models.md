@@ -66,7 +66,7 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_JUDGE_TRIAGE_MIN` | 0.2 | probability of an action that sends a dream group to the main model |
 | `MEMCUE_JUDGE_DUP_TIMEOUT` | 10 s | one duplicate request |
 | `MEMCUE_JUDGE_DUP_MIN` | 0.5 | probability of "same claim" that retires a candidate |
-| `MEMCUE_JUDGE_DUP_MAX_FACTS` | 400 | approved facts that still fit one duplicate request |
+| `MEMCUE_JUDGE_DUP_MAX_FACTS` | 50 | nearest approved facts asked about in one duplicate request |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | off | send the 262k danger-zone header for the duplicate check |
 | `MEMCUE_EMBED_TIMEOUT` | 2 s | one embedding request |
 | `MEMCUE_EMBED_SPACE` | empty | label of the vector space when a server changes model under one name |
@@ -132,9 +132,11 @@ the rerank-gate issue.
   an approved fact is `unsure` (not `drop`); by default it becomes provisional for
   `MEMCUE_VET_TTL_DAYS`, recalled after approved facts. `MEMCUE_VET_POLICY=quarantine` keeps the
   human queue.
-- **Duplicate check is one Jev role.** A base above 400 approved facts (1,700 with long context)
-  is split into chunks of `MEMCUE_JUDGE_DUP_MAX_FACTS`; the strongest "same claim" wins. The
-  2.6k base therefore costs several requests per candidate; precision on it is not measured yet.
+- **Duplicate check is one Jev role.** Each candidate is compared with its nearest approved facts,
+  the first `MEMCUE_JUDGE_DUP_MAX_FACTS` in BM25 order, in one request: about 12k input tokens a
+  candidate on the 2.6k base instead of 580k for the whole base. On the 41-candidate sample it
+  retires as many duplicates and keeps as the whole base —
+  [research/vet-neighbours-2026-10.md](research/vet-neighbours-2026-10.md).
 - **Triage is the same Jev role**; it is a cost filter for dream groups, not a fourth model.
 - **No Jev-as-retriever.** Whole-base Jev retrieval measured 12/120 useful top-1, worse than
   bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.

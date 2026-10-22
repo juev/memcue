@@ -219,20 +219,22 @@ rather than queued, and its failures go to `vet.log`, not to the extraction.
 A duplicate can be answered without reading a candidate: only by comparing it with the base. With `MEMCUE_JUDGE_URL`,
 `MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` set to a typed decisions endpoint (OpenRouter
 `https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14`, TypeSafe `https://api.typesafe.ai/v1/systemone`
-with `jev-latest`), `vet` asks it first: the candidate and the whole approved base in one request, one `score` per
-approved fact over three levels — same claim, same subject with a different claim, unrelated — and a candidate whose
+with `jev-latest`), `vet` asks it first: the candidate and its nearest approved facts in one request, one `score` per
+fact over three levels — same claim, same subject with a different claim, unrelated — and a candidate whose
 best "same claim" reaches `MEMCUE_JUDGE_DUP_MIN` (default 0.5) is retired with the probability and the fact it repeats in
 `vet.log`. Every fact gets its own question, not one `choice`: a `choice` names the closest fact and drops the others,
 and a base that holds three copies of a fact needs all three. Everything the judge does not call a duplicate still goes
 to the review model, which decides whether the fact is worth keeping at all; a failed call decides nothing and leaves
-the candidate in the queue. A base larger than `MEMCUE_JUDGE_DUP_MAX_FACTS` is split into requests of that size
-(default 400: about 150 input tokens per fact fit a 64k request; `MEMCUE_JUDGE_DUP_LONG_CONTEXT=1` sends the
-danger-zone header for 262k). Every chunk is asked and the strongest "same claim" wins, so the cost per candidate
-grows with the number of chunks; a failed chunk leaves the candidate undecided. Measured on a base of 235 approved
-facts and 41 candidates the review model had labelled: at 0.5 the judge retires 8–11 of the 15 duplicates and 0–1 of
-the 26 facts worth keeping, AUC 0.835–0.877 across two runs; a plain yes/no question at the same threshold retires 8
-and 1, AUC 0.815–0.822, at 0.3 it still lets 2 facts through. Each candidate costs 1.3 s and $0.0017 —
-[docs/research/jev-judge-2026-10.md](docs/research/jev-judge-2026-10.md).
+the candidate in the queue. The nearest facts are the first `MEMCUE_JUDGE_DUP_MAX_FACTS` (default 50) approved facts
+the words find in BM25 order, the ones below the recall gate included; a candidate that shares no words with the base
+is not asked about. A copy shares the candidate's words, so the rest of the base adds tokens, not duplicates.
+Measured on a base of 235 approved facts and 41 candidates the review model had labelled: against the whole base, at
+0.5 the judge retires 8–11 of the 15 duplicates and 0–1 of the 26 facts worth keeping, AUC 0.835–0.877 across two
+runs; a plain yes/no question at the same threshold retires 8 and 1, AUC 0.815–0.822, at 0.3 it still lets 2 facts
+through — [docs/research/jev-judge-2026-10.md](docs/research/jev-judge-2026-10.md). On the same sample relabelled by
+`claude -p`, 50 neighbours retire as many duplicates and keeps as the whole base in both runs, and every fact the
+whole base named was among the first 20; a candidate costs about 10k input tokens instead of 46k there, 12k instead
+of 580k on a base of 2,670 facts — [docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md).
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
@@ -338,7 +340,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
 | `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request | `10s` |
 | `MEMCUE_JUDGE_DUP_MIN` | probability of "same claim" that retires a candidate | `0.5` |
-| `MEMCUE_JUDGE_DUP_MAX_FACTS` | approved facts that fit one duplicate request | `400` |
+| `MEMCUE_JUDGE_DUP_MAX_FACTS` | nearest approved facts asked about in one duplicate request | `50` |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | `1` sends the danger-zone header for the duplicate check | off |
 | `MEMCUE_EMBED_URL` | OpenAI-compatible embeddings endpoint for `memcue embed`, e.g. `http://127.0.0.1:11434/v1`; recall no longer reads vectors | unset |
 | `MEMCUE_EMBED_MODEL` | embeddings model, e.g. `bge-m3` | unset |
