@@ -1,18 +1,21 @@
 """Label the facts the judge_ab.py readers served with Opus, then count what each reader served.
 
-  python3 -I judge_ab_report.py label  candidates.jsonl labels.json RESULT.jsonl...
+  python3 -I judge_ab_report.py label  candidates.jsonl labels.json RESULT.jsonl...   [LABELLER=deepseek]
   python3 -I judge_ab_report.py report candidates.jsonl labels.json RESULT.jsonl...
 
 A reader serves what recall would: the facts at or above the threshold, approved before provisional, by score, at most
 two (recall.Default.MaxFacts). `label` asks Opus through `claude -p` about every pair any reader served at any
 threshold of THRESHOLDS that labels.json does not hold yet. Opus does not see which reader served a pair; pairs of one
-prompt come in a fixed shuffled order. The labels are those of gold_set.py.
+prompt come in a fixed shuffled order. The labels are those of gold_set.py. LABELLER=deepseek asks the main model
+(MEMCUE_API_URL, MEMCUE_MODEL, MEMCUE_API_KEY) with the same instructions instead, reasoning left at its default.
 """
 import json
+import os
 import random
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -59,16 +62,31 @@ def label_batch(batch):
             index[n] = f"{pid}|{f}"
             text.append(f"{n}. {' '.join(content[f].split())}")
         text.append("")
+    out, cost = ask_labeller(SYSTEM, SCHEMA, "\n".join(text))
+    return {index[x["n"]]: x["label"] for x in out["labels"] if x["n"] in index}, cost
+
+
+def ask_labeller(system, schema, text):
+    """Opus through claude -p, or the main model when LABELLER=deepseek; returns the parsed JSON and the cost."""
+    if os.environ.get("LABELLER") == "deepseek":
+        body = {"model": os.environ["MEMCUE_MODEL"], "response_format": {"type": "json_object"},
+                "messages": [{"role": "system", "content": system + "\nAnswer with JSON matching this schema: " + schema},
+                             {"role": "user", "content": text}]}
+        req = urllib.request.Request(os.environ["MEMCUE_API_URL"].rstrip("/") + "/chat/completions",
+                                     data=json.dumps(body).encode(),
+                                     headers={"Authorization": "Bearer " + os.environ["MEMCUE_API_KEY"],
+                                              "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=900) as r:
+            return json.loads(json.load(r)["choices"][0]["message"]["content"]), 0
     with tempfile.TemporaryDirectory() as d:
         r = subprocess.run(["claude", "-p", "--model", "claude-opus-5-5", "--tools", "", "--no-session-persistence",
-                            "--settings", '{"disableAllHooks": true}', "--system-prompt", SYSTEM,
-                            "--json-schema", SCHEMA, "--output-format", "json"],
-                           input="\n".join(text), capture_output=True, text=True, cwd=d, timeout=900)
+                            "--settings", '{"disableAllHooks": true}', "--system-prompt", system,
+                            "--json-schema", schema, "--output-format", "json"],
+                           input=text, capture_output=True, text=True, cwd=d, timeout=900)
     if r.returncode != 0:
         raise RuntimeError(r.stderr[-500:])
     env = json.loads(r.stdout)
-    got = {index[x["n"]]: x["label"] for x in env["structured_output"]["labels"] if x["n"] in index}
-    return got, env.get("total_cost_usd", 0)
+    return env["structured_output"], env.get("total_cost_usd", 0)
 
 
 if mode == "label":
