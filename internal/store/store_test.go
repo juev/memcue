@@ -1265,3 +1265,53 @@ func TestSplitFactRefuses(t *testing.T) {
 		t.Errorf("a refused split wrote to the base: %d rows %v", len(rows), err)
 	}
 }
+
+// The queries of a fact are searched like its words, and SetQueries writes them as a new version that keeps the rest.
+func TestQueriesAreSearchedAndSet(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.Add("Caddy-private монтирует файл конфига; после замены пересоздать контейнер.", []string{"caddy"}, "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hits, _ := s.Search([]string{"прокси"}, 10); len(hits) != 0 {
+		t.Fatalf("found before the queries: %+v", hits)
+	}
+	got, err := s.SetQueries(f.ID, f.Version, []string{"обратный прокси", "reverse proxy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 2 || got.Content != f.Content || len(got.Queries) != 2 || got.Keywords[0] != "caddy" {
+		t.Errorf("version %+v", got)
+	}
+	hits, err := s.Search([]string{"прокси"}, 10)
+	if err != nil || len(hits) != 1 || hits[0].ID != f.ID || len(hits[0].Queries) != 2 {
+		t.Errorf("search by a query word: %+v %v", hits, err)
+	}
+	if _, err := s.SetQueries(f.ID, 1, []string{"x"}); !errors.Is(err, ErrChanged) {
+		t.Errorf("a stale version: %v", err)
+	}
+	if _, err := s.Retire(f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetQueries(f.ID, 3, []string{"x"}); !errors.Is(err, ErrRetired) {
+		t.Errorf("a retired fact: %v", err)
+	}
+}
+
+// A correction of the text drops the queries written for the old text; a correction of the keywords alone keeps them.
+func TestCorrectDropsQueriesOfAnOldText(t *testing.T) {
+	s, _ := open(t)
+	facts, err := s.AddBatch([]FactInput{{Content: "Порт gitea 3000.", Queries: []string{"git сервер"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := facts[0]
+	same, err := s.Correct(f.ID, f.Content, []string{"gitea"})
+	if err != nil || len(same.Queries) != 1 {
+		t.Errorf("keywords only: %+v %v", same, err)
+	}
+	moved, err := s.Correct(f.ID, "Порт gitea 3001.", nil)
+	if err != nil || len(moved.Queries) != 0 {
+		t.Errorf("new text: %+v %v", moved, err)
+	}
+}

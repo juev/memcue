@@ -279,3 +279,29 @@ func TestMergeSkipsAStaleVector(t *testing.T) {
 		t.Fatalf("a stale vector was copied: %d", len(vs))
 	}
 }
+
+// The queries one machine wrote reach the other with the merge, and the merged fact is found by them.
+func TestMergeCarriesQueries(t *testing.T) {
+	b, f := base(t)
+	c := clone(t, b)
+	sc := openAt(t, c, "loffe", t0.Add(time.Minute))
+	if _, err := sc.SetQueries(f.ID, f.Version, []string{"языковая модель гермеса"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = sc.Close()
+	s := openAt(t, b, "mac", t0.Add(2*time.Minute))
+	if _, err := s.Merge(c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil || got.Version != 2 || len(got.Queries) != 1 {
+		t.Errorf("merged %+v %v", got, err)
+	}
+	if !strings.Contains(dump(t, s), "queries=[языковая модель гермеса]") {
+		t.Errorf("dump lacks the queries: %s", dump(t, s))
+	}
+	if len(ids(t, s, "языковая модель")) != 1 {
+		t.Error("the merged queries are not searched")
+	}
+	_ = s.Close()
+}

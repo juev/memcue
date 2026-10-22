@@ -90,18 +90,22 @@ func (s *Store) vectors(tag string, limit int) ([]VectorRow, error) {
 	var out []VectorRow
 	for rows.Next() {
 		var (
-			dim    int
-			hash   string
-			blob   []byte
-			f      Fact
-			kw, cr string
+			dim       int
+			hash      string
+			blob      []byte
+			f         Fact
+			kw, cr, q string
 		)
 		if err := rows.Scan(&dim, &hash, &blob, &f.ID, &f.Version, &f.Content, &kw, &f.Origin, &cr, &f.Status,
-			&f.Author, &f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion); err != nil {
+			&f.Author, &f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion,
+			&q); err != nil {
 			return nil, err
 		}
 		if kw != "" {
 			f.Keywords = strings.Split(kw, ", ")
+		}
+		if q != "" {
+			f.Queries = strings.Split(q, ", ")
 		}
 		f.Created, _ = time.Parse(time.RFC3339Nano, cr)
 		values, err := decodeVector(blob, dim)
