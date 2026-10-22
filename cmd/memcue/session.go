@@ -414,7 +414,7 @@ func storeExtracted(text string, rec *extractRecord, minChars int) error {
 	batch := make([]store.FactInput, 0, len(keep))
 	for _, fact := range keep {
 		batch = append(batch, store.FactInput{Content: fact.Content, Keywords: fact.Keywords, Origin: rec.Origin,
-			Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
+			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
 				Review: store.Candidate}})
 	}
 	stored, err := s.AddBatch(batch)

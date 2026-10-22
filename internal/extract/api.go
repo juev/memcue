@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 )
 
@@ -42,17 +43,25 @@ type Endpoint struct {
 	URL   string // base URL, e.g. https://api.deepseek.com; /chat/completions is appended
 	Model string
 	Key   string
+	// Quick asks for an answer without reasoning where the endpoint is known to take that request: DeepSeek reasons by
+	// default, and on a split call 97–99 % of the output tokens were reasoning (#232). Other endpoints get the plain
+	// request, since an unknown field may be refused.
+	Quick bool
 }
 
 func runAPI(ctx context.Context, ep Endpoint, system, input string) (reply, error) {
-	body, err := json.Marshal(map[string]any{
+	request := map[string]any{
 		"model": ep.Model,
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": input},
 		},
 		"response_format": map[string]string{"type": "json_object"},
-	})
+	}
+	if ep.Quick && deepSeek(ep.URL) {
+		request["thinking"] = map[string]string{"type": "disabled"}
+	}
+	body, err := json.Marshal(request)
 	if err != nil {
 		return reply{}, err
 	}
@@ -121,4 +130,10 @@ func stripFence(s string) string {
 	s = strings.TrimPrefix(s, "```")
 	s = strings.TrimPrefix(s, "json")
 	return strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(s), "```"))
+}
+
+// deepSeek reports whether url is the DeepSeek API, which takes the thinking switch.
+func deepSeek(url string) bool {
+	u, err := neturl.Parse(url)
+	return err == nil && strings.EqualFold(u.Hostname(), "api.deepseek.com")
 }

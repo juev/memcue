@@ -358,7 +358,8 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 	extractFn = func(origin, text string) (extracted, error) {
 		seen = append(seen, text)
 		return extracted{Facts: []extract.Fact{{Content: fmt.Sprintf("факт %d", len(seen)), Keywords: []string{"k"},
-			Kind: "pitfall", Source: "user", Scope: "host:db1", Evidence: "реплика 0"}}, CostUSD: 0.1}, nil
+			Kind: "pitfall", Source: "user", Scope: "host:db1", Evidence: "реплика 0",
+			Queries: []string{"какой порт"}}}, CostUSD: 0.1}, nil
 	}
 	t.Cleanup(func() { extractFn = extractText })
 	tr := filepath.Join(dir, "s.jsonl")
@@ -400,7 +401,7 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 		t.Errorf("extracted facts are active: %+v", act)
 	}
 	fs, err := s.Candidates()
-	if err != nil || len(fs) != 2 || fs[0].Origin != "app 2026-10-19" {
+	if err != nil || len(fs) != 2 || fs[0].Origin != "app 2026-10-19" || len(fs[0].Queries) != 1 {
 		t.Errorf("facts %+v %v", fs, err)
 	}
 }

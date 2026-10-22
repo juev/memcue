@@ -70,12 +70,13 @@ func runExtract(args []string, out io.Writer) error {
 		}
 		defer func() { _ = s.Close() }()
 		for _, fact := range facts {
-			sf, err := s.AddWith(fact.Content, fact.Keywords, origin, "", store.Meta{Kind: fact.Kind,
-				Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence, Review: store.Candidate})
+			sf, err := s.AddBatch([]store.FactInput{{Content: fact.Content, Keywords: fact.Keywords, Origin: origin,
+				Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source,
+					Evidence: fact.Evidence, Review: store.Candidate}}})
 			if err != nil {
 				return err
 			}
-			ids = append(ids, sf.ID)
+			ids = append(ids, sf[0].ID)
 		}
 	}
 	enc := json.NewEncoder(out)
