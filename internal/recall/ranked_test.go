@@ -16,12 +16,14 @@ type fakeRanker struct {
 	err    error
 	min    float64
 	asked  int
+	got    []string // the facts of the last call
 }
 
 func (f *fakeRanker) Min() float64    { return f.min }
 func (f *fakeRanker) Candidates() int { return 10 }
 func (f *fakeRanker) Scores(_ context.Context, _ string, facts []string) ([]float64, error) {
 	f.asked = len(facts)
+	f.got = append([]string(nil), facts...)
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -211,7 +213,7 @@ func TestRecallJudgeKeepsProvisionalAboveThreshold(t *testing.T) {
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Approved": 0.1, "Provisional": 0.9}}
 	p := rankedParams()
 	p.MaxFacts = 2
-	hits, err := RecallJudge(s, "postgres port", "x", p, r, nil)
+	hits, err := RecallJudge(s, "postgres port", "x", p, r)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -86,25 +86,21 @@ func TestTraceNamesAnEarlyStop(t *testing.T) {
 
 // With a judge, the trace shows the vector reader's similarities, the judge's scores against its threshold and what
 // was served.
-func TestTraceRecordsVectorsAndTheJudge(t *testing.T) {
+func TestTraceRecordsTheJudge(t *testing.T) {
 	s, target := meaningBase(t)
-	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Порог": 0.95, "Caddy": 0.2}}
 	tr := &Trace{}
 	p := rankedParams()
 	p.Trace = tr
-	hits, err := RecallJudge(s, "почему шумно в ответах caddy", "", p, r, e)
+	hits, err := RecallJudge(s, "порог coverage шумовых фактов, а caddy", "", p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hits) == 0 || hits[0].ID != target {
 		t.Fatalf("hits = %v, want the target first", ids(hits))
 	}
-	if tr.VectorPool != p.VectorPool || tr.VectorError != "" || tr.Fallback != "" {
-		t.Errorf("pool = %d, vector error = %q, fallback = %q", tr.VectorPool, tr.VectorError, tr.Fallback)
-	}
-	if v := step(t, tr.Vector, "Порог"); v.Verdict != VerdictCandidate || v.Similarity < 0.9 || v.ID != tr.Vector[0].ID {
-		t.Errorf("vector = %+v, want the target first as a candidate", v)
+	if tr.Fallback != "" {
+		t.Errorf("fallback = %q", tr.Fallback)
 	}
 	if tr.JudgeMin != 0.5 {
 		t.Errorf("judge min = %v", tr.JudgeMin)
@@ -123,12 +119,11 @@ func TestTraceRecordsVectorsAndTheJudge(t *testing.T) {
 // A judge that fails leaves the lexical answer, and the trace says why.
 func TestTraceNamesTheFallback(t *testing.T) {
 	s, _ := meaningBase(t)
-	e := fakeEmbedder{tag: modelTag, vec: []float32{1, 0}}
 	tr := &Trace{}
 	p := Default
 	p.Trace = tr
-	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME, иначе сборка не находит JDK", "", p,
-		&fakeRanker{min: 0.5, err: errors.New("down")}, e); err != nil {
+	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг", "", p,
+		&fakeRanker{min: 0.5, err: errors.New("down")}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(tr.Fallback, "down") {
@@ -136,21 +131,5 @@ func TestTraceNamesTheFallback(t *testing.T) {
 	}
 	if f := step(t, tr.Final, "Gradle"); f.Verdict != VerdictServed {
 		t.Errorf("final = %+v", f)
-	}
-}
-
-// A dead embedder is named; recall goes on without vectors.
-func TestTraceNamesAFailedEmbedder(t *testing.T) {
-	s, _ := meaningBase(t)
-	tr := &Trace{}
-	p := rankedParams()
-	p.Trace = tr
-	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Gradle": 0.9}}
-	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME сборка JDK", "", p, r,
-		fakeEmbedder{tag: modelTag, err: errors.New("refused")}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(tr.VectorError, "refused") || len(tr.Vector) != 0 {
-		t.Errorf("vector error = %q, vector = %+v", tr.VectorError, tr.Vector)
 	}
 }

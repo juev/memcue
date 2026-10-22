@@ -10,9 +10,6 @@ type Trace struct {
 	MinMatched  int     // the gate actually used: a short prompt or a ticket key lowers it
 	MinCoverage float64 // the gate actually used
 	Lexical     []Step  // every fact FTS5 returned, in its order, with the gate's verdict
-	VectorPool  int     // vectors read: those of the most recent facts; <= 0 means every vector
-	VectorError string  // why the vector reader gave nothing; empty when it ran
-	Vector      []Step  // every vector read, the comparable ones by similarity
 	JudgeMin    float64 // score below which the judge drops a fact
 	Judge       []Step  // what the judge was asked about, in the order asked, with its score
 	Fallback    string  // why the lexical answer was given instead of the judge's; empty when it was not
@@ -27,13 +24,12 @@ type Term struct {
 
 // Step is one fact at one step of the decision.
 type Step struct {
-	ID         string
-	Content    string
-	Matched    []string // prompt terms the fact holds (lexical)
-	Coverage   float64  // IDF-weighted share of the prompt's terms (lexical)
-	Similarity float64  // cosine to the prompt (vector)
-	Score      float64  // the judge's score (judge, and final when the judge decided)
-	Verdict    string
+	ID       string
+	Content  string
+	Matched  []string // prompt terms the fact holds (lexical)
+	Coverage float64  // IDF-weighted share of the prompt's terms (lexical)
+	Score    float64  // the judge's score (judge, and final when the judge decided)
+	Verdict  string
 }
 
 // Verdicts of the steps.
@@ -46,11 +42,6 @@ const (
 	VerdictLowCoverage  = "low coverage"
 	VerdictOverJudge    = "passed, over the judge's candidate limit"
 	VerdictGatedToJudge = "below the gate, sent to the judge"
-	VerdictCandidate    = "candidate"
-	VerdictBelowTop     = "below the top"
-	VerdictFoundByWords = "candidate, already found by the words"
-	VerdictOtherText    = "vector of an older text"
-	VerdictOtherDim     = "vector of another dimension"
 	VerdictAboveMin     = "above min"
 	VerdictBelowMin     = "below min"
 	VerdictServed       = "served"
@@ -113,30 +104,7 @@ func (t *Trace) judge(candidates []Hit, scores []float64, minScore float64) {
 		if scores[i] < minScore {
 			verdict = VerdictBelowMin
 		}
-		t.Judge = append(t.Judge, Step{ID: h.ID, Content: h.Content, Coverage: h.Coverage, Similarity: similarity(h),
-			Score: scores[i], Verdict: verdict})
+		t.Judge = append(t.Judge, Step{ID: h.ID, Content: h.Content, Coverage: h.Coverage, Score: scores[i],
+			Verdict: verdict})
 	}
-}
-
-// similarity is the cosine of a vector candidate; a lexical one has none.
-func similarity(h Hit) float64 {
-	if h.Source == "vector" {
-		return h.Meaning
-	}
-	return 0
-}
-
-// vectorSkip names why a vector was not compared with the prompt.
-func vectorSkip(row store.VectorRow, dim int, today string, seen map[string]bool) string {
-	switch {
-	case row.Dim != dim:
-		return VerdictOtherDim
-	case row.Hash != store.TextHash(row.Content):
-		return VerdictOtherText
-	case store.Expired(row.Expires, today):
-		return VerdictExpired
-	case seen[row.ID]:
-		return VerdictSeen
-	}
-	return ""
 }

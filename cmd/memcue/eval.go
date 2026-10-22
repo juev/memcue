@@ -66,14 +66,13 @@ func runEval(args []string, out io.Writer) error {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
-		e := embedder()
 		r := ranker()
 		run := func(text, tier string) ([]recall.Hit, error) {
 			if r := []rune(text); len(r) > maxPrompt {
 				text = string(r[:maxPrompt])
 			}
 			if r != nil {
-				return recall.RecallJudge(s, text, tier, p, r, e)
+				return recall.RecallJudge(s, text, tier, p, r)
 			}
 			return recall.Recall(s, text, tier, p)
 		}

@@ -33,23 +33,6 @@ func explainRecall(t *recall.Trace, out io.Writer) error {
 			fmt.Fprintf(&b, "  %-24s %.2f [%s] %s\n", s.Verdict, s.Coverage, strings.Join(s.Matched, " "), factLine(s))
 		}
 	}
-	switch {
-	case t.VectorError != "":
-		fmt.Fprintf(&b, "vector: %s\n", t.VectorError)
-	case len(t.Vector) > 0:
-		fmt.Fprintf(&b, "vector (pool %d):\n", t.VectorPool)
-		below := 0
-		for _, s := range t.Vector {
-			if s.Verdict == recall.VerdictBelowTop {
-				below++
-				continue
-			}
-			fmt.Fprintf(&b, "  %-24s %.2f %s\n", s.Verdict, s.Similarity, factLine(s))
-		}
-		if below > 0 {
-			fmt.Fprintf(&b, "  %d more below the top\n", below)
-		}
-	}
 	if len(t.Judge) > 0 {
 		fmt.Fprintf(&b, "judge (min %.2f):\n", t.JudgeMin)
 		for _, s := range t.Judge {
@@ -96,12 +79,6 @@ func explainFact(s *store.Store, t *recall.Trace, id string, out io.Writer) erro
 		b.WriteString("lexical: not among the FTS5 results (holds none of the prompt terms, or others ranked higher)\n")
 	}
 
-	vector, err := vectorPlace(s, t, id)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(&b, "vector: %s\n", vector)
-
 	if st, ok := findStep(t.Judge, id); ok {
 		fmt.Fprintf(&b, "judge: %s, score %.2f of %.2f\n", st.Verdict, st.Score, t.JudgeMin)
 	} else if len(t.Judge) > 0 {
@@ -118,43 +95,6 @@ func explainFact(s *store.Store, t *recall.Trace, id string, out io.Writer) erro
 	}
 	_, err = io.WriteString(out, b.String())
 	return err
-}
-
-// vectorPlace says where the fact stood with the vector reader: its rank, why its vector was skipped, or why it
-// was never read.
-func vectorPlace(s *store.Store, t *recall.Trace, id string) (string, error) {
-	if t.VectorError != "" {
-		return t.VectorError, nil
-	}
-	// The compared vectors come first, by similarity, so the position of one of them is its rank.
-	for i, st := range t.Vector {
-		if st.ID != id {
-			continue
-		}
-		switch st.Verdict {
-		case recall.VerdictCandidate, recall.VerdictBelowTop, recall.VerdictFoundByWords:
-			return fmt.Sprintf("%s, similarity %.2f, rank %d", st.Verdict, st.Similarity, i+1), nil
-		}
-		return st.Verdict, nil
-	}
-	if len(t.Vector) == 0 && len(t.Judge) == 0 {
-		return "not read: recall did not reach the vector reader", nil
-	}
-	e := embedder()
-	if e == nil {
-		return "no embedder configured", nil
-	}
-	rows, err := s.Vectors(e.Tag())
-	if err != nil {
-		return "", err
-	}
-	for i, row := range rows {
-		if row.ID == id {
-			return fmt.Sprintf("outside the pool: %d most recent vectors are read, this one is %d", t.VectorPool,
-				i+1), nil
-		}
-	}
-	return "no vector for " + e.Tag() + " (memcue embed fills the vectors of active facts)", nil
 }
 
 func findStep(steps []recall.Step, id string) (recall.Step, bool) {
