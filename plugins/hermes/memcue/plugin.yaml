@@ -3,5 +3,5 @@ version: 0.4.0
 description: "memcue — long-term memory as a base of atomic facts: recalled by words before each turn, built-in memory writes mirrored into it (and not repeated by recall), facts with an expiry. Runs the memcue binary."
 external_dependencies:
   - name: memcue
-    install: "go install github.com/juev/memcue/cmd/memcue@latest (or a release binary on PATH)"
+    install: "installed by the provider from the release unless MEMCUE_AUTO_INSTALL=0; or go install github.com/juev/memcue/cmd/memcue@latest, or a release binary on PATH"
     check: "memcue version"

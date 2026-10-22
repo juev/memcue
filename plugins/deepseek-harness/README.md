@@ -57,7 +57,10 @@ directory's `cordis.patch.yml`. The plugin directory is also its own package, fo
 development. The entry is plain ESM (`src/index.mjs`) on purpose: dsh installs a bundle under `node_modules`, where
 Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an installed package.
 
-1. Put the `memcue` binary where the dsh process can run it and note its absolute path.
+1. Optional: put the `memcue` binary where the dsh process can run it and note its absolute path. Without a
+   configured `binary` and without a current `memcue` on `PATH`, the plugin installs the binary of its own release
+   into `${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/`, the directory the Claude Code plugin uses
+   (`MEMCUE_AUTO_INSTALL=0` turns that off; see [Binary from the plugin](../../README.md#binary-from-the-plugin)).
 
 2. Install the bundle from the repository:
 

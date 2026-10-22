@@ -51,9 +51,12 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 ## Install
 
-1. Put the `memcue` binary where the Hermes process can run it. In the official Docker image that is a Linux binary
-   (`uname -m` in the container tells amd64 or arm64), for example in `$HERMES_HOME/bin/memcue`. It is a static
-   binary with no Python dependencies.
+1. Optional: put the `memcue` binary where the Hermes process can run it. In the official Docker image that is a Linux
+   binary (`uname -m` in the container tells amd64 or arm64), for example in `$HERMES_HOME/bin/memcue`. It is a static
+   binary with no Python dependencies. Without a configured `binary` and without a current `memcue` on `PATH`, the
+   provider installs the binary of its own release into `$HERMES_HOME/memcue/bin/<version>/` in the background
+   (`MEMCUE_AUTO_INSTALL=0` in the gateway's environment turns that off; see
+   [Binary from the plugin](../../README.md#binary-from-the-plugin)).
 
 2. Copy this plugin into Hermes' plugin directory:
 
