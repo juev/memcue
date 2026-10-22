@@ -112,6 +112,31 @@ test('the plugin installs its release when no binary is configured or on PATH', 
 	assert.ok(await waitFor(() => existsSync(installedPath(version))), 'the plugin did not install the binary')
 })
 
+// pathBinary puts on PATH a memcue that answers `version -json` with the given version.
+function pathBinary(reported) {
+	const bin = mkdtempSync(join(tmpdir(), 'memcue-dsh-path-'))
+	writeFileSync(join(bin, 'memcue'), `#!/bin/sh\nprintf '{"version":"${reported}"}\\n'\n`)
+	chmodSync(join(bin, 'memcue'), 0o755)
+	process.env.PATH = `${bin}:/usr/bin:/bin`
+}
+
+// A release older than the plugin's on PATH is replaced, even when it has every command the plugin uses: it may not
+// open the base the plugin's release writes (#272).
+test('an older release on PATH is replaced by the plugin release', { skip }, async () => {
+	pathBinary('0.4.0')
+	apply(context(), {})
+	assert.ok(await waitFor(() => existsSync(installedPath(version))), 'the plugin kept the older binary')
+	assert.ok(hits > 0)
+})
+
+test('a binary on PATH as new as the plugin is kept, and nothing is downloaded', { skip }, async () => {
+	pathBinary(version)
+	apply(context(), {})
+	await new Promise((resolve) => setTimeout(resolve, 300))
+	assert.equal(hits, 0)
+	assert.equal(existsSync(installedPath(version)), false)
+})
+
 test('a configured binary is used as it is, and nothing is downloaded', { skip }, async () => {
 	const warn = console.warn
 	console.warn = () => {}

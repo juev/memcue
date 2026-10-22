@@ -42,9 +42,12 @@ once; `memcue_correct` of an approved fact is a deliberate correction, not a can
 
 ## Supported dsh
 
-The memcue binary must be 0.4.0 or newer: the plugin asks `memcue version -json` when it loads and, on an older
-binary, turns the session card and extraction off with one warning (recall keeps working, because the 0.3 hook is
-compatible). A build from source reports a suffixed version and counts as the current tree.
+The plugin asks `memcue version -json` when it loads. Without a configured `binary` or `MEMCUE_BIN`, a missing binary
+or one older than the plugin's release is replaced by that release, installed into
+`$XDG_DATA_HOME/memcue/<version>/` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base
+the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the session card
+and extraction off with one warning (recall keeps working). A build from source reports a suffixed version and counts
+as the current tree.
 
 Tested with `dsh 0.2.0-rc.2`. Both the repository bundle and the standalone package declare
 `>=0.2.0-rc.2 <0.3.0` peer ranges for `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools`, so dsh's compatibility

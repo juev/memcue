@@ -529,15 +529,19 @@ export function apply(ctx, config) {
 		}
 	}
 
-	// Check once that the binary has the commands the plugin uses. Without a configured binary, a missing or older
-	// one is replaced by the release of this plugin, installed or downloaded; until that is done recall uses what
-	// PATH has. Anything else turns the card and extraction off with one clear line instead of failing every turn.
+	// Check once that the binary has the commands the plugin uses. Without a configured binary, a missing one, or one
+	// older than this plugin's release, is replaced by that release, installed or downloaded: an older release may not
+	// open the base the plugin's release writes (#272). Until that is done recall uses what PATH has. Anything else
+	// turns the card and extraction off with one clear line instead of failing every turn.
 	const checkBinary = async () => {
 		let { found, reported } = await versionOf()
-		if (!settings.pinned && !(found && versionAtLeast(reported, MIN_BINARY))) {
-			let version = ''
+		let version = ''
+		try {
+			version = await pluginVersion()
+		} catch {}
+		if (!settings.pinned && !(found && versionAtLeast(reported, version || MIN_BINARY))) {
 			try {
-				version = await pluginVersion()
+				version = version || (await pluginVersion())
 				settings.binary = await install(version)
 				;({ found, reported } = await versionOf())
 			} catch (error) {
