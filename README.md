@@ -344,13 +344,18 @@ contract this release uses; there is no separate review or triage endpoint.
 
 The vector reader is a candidate source for the judge, not a standalone reader: without
 `MEMCUE_JUDGE_*`, `MEMCUE_EMBED_*` changes nothing in recall. Without `MEMCUE_EMBED_*`, the judge
-orders the lexical candidates only.
+orders the lexical candidates only. The lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) was tuned
+for words alone; with a judge, the lexical candidates that passed it come first, and while there are fewer than
+`MEMCUE_JUDGE_RERANK_CANDIDATES` the free places go to the facts the words found but the gate turned away, highest
+coverage first. On a gold set of 180 prompts this gave a useful fact to 121–124 prompts instead of 110–111, with the
+same noise ([docs/research/recall-misses-2026-10.md](docs/research/recall-misses-2026-10.md)).
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
 displaced one of this host. It stays on your machine and is what you judge recall by; it is off by default because it
 keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
-that lost it: the lexical gate (too few terms or low coverage), the vector reader (below the top, outside the
+that lost it: the lexical gate (too few terms or low coverage; with a judge, "below the gate, sent to the judge"
+means it was read anyway), the vector reader (below the top, outside the
 `MEMCUE_VECTOR_POOL` most recent vectors, or no vector yet), the judge (score below the minimum) or the cut to the
 first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
