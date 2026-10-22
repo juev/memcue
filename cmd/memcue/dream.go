@@ -109,6 +109,10 @@ const (
 	expandParallel = 6
 )
 
+// expandBacklog is how many facts outside the dream's fresh set one dream gives queries to: the facts of a base written
+// before extraction wrote queries, which no later dream sees as fresh (#276). 500 facts are 20 calls without reasoning.
+var expandBacklog = 500
+
 // expandFn is the expansion step, replaced in tests.
 var expandFn = func(input string) (extract.ExpandResult, error) {
 	ctx, cancel := contextTimeout()
@@ -351,6 +355,15 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 		for _, f := range fresh {
 			if len(f.Queries) == 0 && !splitIDs[f.ID] {
 				bare = append(bare, f)
+			}
+		}
+		// Facts the dream has seen and will not see again get them too, up to expandBacklog a dream, the newest first:
+		// an old base is expanded over a few dreams. They are not reviewed, only expanded.
+		isFresh, backlog := freshSet(fresh), 0
+		for i := len(active) - 1; i >= 0 && backlog < expandBacklog; i-- {
+			if f := active[i]; !isFresh[f.ID] && len(f.Queries) == 0 && !splitIDs[f.ID] {
+				bare = append(bare, f)
+				backlog++
 			}
 		}
 		expanded, err := expandStep(s, bare, &rec)
