@@ -15,7 +15,7 @@ test('the three plugin manifests carry the release version', async () => {
 	const hermesYaml = await readFile(new URL('plugins/hermes/memcue/plugin.yaml', root), 'utf8')
 	const hermes = hermesYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
 
-	assert.equal(rootPackage.version, '0.5.2')
+	assert.equal(rootPackage.version, '0.5.3')
 	assert.equal(dsh.version, rootPackage.version)
 	assert.equal(claude.version, rootPackage.version)
 	assert.equal(hermes, rootPackage.version)
@@ -23,8 +23,8 @@ test('the three plugin manifests carry the release version', async () => {
 
 test('the README compatibility table names the same release', async () => {
 	const readme = await readFile(new URL('README.md', root), 'utf8')
-	assert.match(readme, /\| 0\.5\.2 \| 5 \| 0\.5\.2 \| 0\.5\.2 /)
-	assert.match(readme, /0\.5\.2 \(`hermes-agent` 0\.15\.2\)/)
+	assert.match(readme, /\| 0\.5\.3 \| 5 \| 0\.5\.3 \| 0\.5\.3 /)
+	assert.match(readme, /0\.5\.3 \(`hermes-agent` 0\.15\.2\)/)
 })
 
 test('the README describes the per-base state and the Hermes card', async () => {
