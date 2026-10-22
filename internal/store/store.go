@@ -697,9 +697,6 @@ func (s *Store) RetireCandidate(id string) (Fact, error) {
 // original is retired and every part keeps its origin, expiry and meta. The keywords stay with the original, since
 // they were chosen for the whole text. Like RetireCandidate, it refuses a fact that is no longer a candidate.
 func (s *Store) SplitCandidate(id string, parts []string) ([]Fact, error) {
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("split %s: %d part(s), want at least two", id, len(parts))
-	}
 	cur, err := s.Get(id)
 	if err != nil {
 		return nil, err
@@ -707,13 +704,41 @@ func (s *Store) SplitCandidate(id string, parts []string) ([]Fact, error) {
 	if cur.Status != Active || cur.Review != Candidate {
 		return nil, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
 	}
+	return s.split(cur, parts)
+}
+
+// SplitFact does for a fact in recall what SplitCandidate does for a candidate: the parts take its place with its
+// origin, expiry and meta, so an approved fact gives approved parts and a provisional one provisional parts. It refuses
+// a fact that got a new version since the caller read it (ErrChanged), a retired fact and a candidate, which vet
+// splits.
+func (s *Store) SplitFact(id string, version int, parts []string) ([]Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case cur.Version != version:
+		return nil, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
+	case cur.Status != Active:
+		return nil, fmt.Errorf("%w: %s", ErrRetired, id)
+	case cur.Review == Candidate:
+		return nil, fmt.Errorf("%w: %s", ErrAlreadyCandidate, id)
+	}
+	return s.split(cur, parts)
+}
+
+// split retires cur and writes its parts in one transaction.
+func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("split %s: %d part(s), want at least two", cur.ID, len(parts))
+	}
 	retired := cur
 	retired.Version, retired.Created, retired.Status, retired.Author = cur.Version+1, s.now().UTC(), Retired, s.author
 	out := make([]Fact, 0, len(parts))
 	for _, p := range parts {
 		content := strings.TrimSpace(p)
 		if content == "" {
-			return nil, fmt.Errorf("split %s: empty part", id)
+			return nil, fmt.Errorf("split %s: empty part", cur.ID)
 		}
 		pid, err := ulid.New(ulid.Timestamp(s.now()), entropy)
 		if err != nil {
