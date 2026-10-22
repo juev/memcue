@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
@@ -124,9 +126,44 @@ func runAdd(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if !*candidate && extract.API.URL != "" {
+			expandAdded(s, f)
+		}
 		_, err = fmt.Fprintln(out, f.ID)
 		return err
 	})
+}
+
+// addExpandTimeout bounds the expansion call of add: the fact is stored already, and a slow endpoint must not hold the
+// command that stored it.
+const addExpandTimeout = 30 * time.Second
+
+// addExpandFn is the expansion call of add, replaced in tests.
+var addExpandFn = func(input string) (extract.ExpandResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), addExpandTimeout)
+	defer cancel()
+	return extract.ExpandFacts(ctx, input)
+}
+
+// expandAdded gives a fact add just stored its search queries, so it is found by the words a user asks with from the
+// first prompt (#288). Only with an API endpoint: claude -p takes seconds to start. A candidate is left alone, since
+// the Hermes mirror adds them on the turn's path, and the dream expands it once approved. Any failure leaves the fact
+// without queries for the dream to expand; the fact is stored either way.
+func expandAdded(s *store.Store, f store.Fact) {
+	input, err := renderSplitInput([]store.Fact{f})
+	if err != nil {
+		return
+	}
+	r, err := addExpandFn(input)
+	if err != nil {
+		return
+	}
+	for _, e := range r.Facts {
+		if e.ID == f.ID && len(e.Queries) > 0 {
+			_, _ = s.SetQueries(f.ID, f.Version, e.Queries)
+			return
+		}
+	}
 }
 
 var sources = map[string]bool{"user": true, "user_confirmed": true, "tool": true, "agent": true, "note": true,
