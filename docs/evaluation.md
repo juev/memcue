@@ -202,6 +202,31 @@ Extraction is the only part that calls a model. On the author's volume (about 17
 comes to roughly $120 a week at list prices; on a subscription that is usage of the plan, not money. DeepSeek is about
 thirty times cheaper and keeps three quarters of what Opus keeps.
 
+## Latency (October 2026)
+
+The recall hook is the only path a user waits on. Measured on the author's Mac on 2026-10-22 with memcue
+0.4.0-main.233e7f1, 2620 active facts, one prompt, five runs each; the embedder (`baai/bge-m3`) and the judge
+(`typesafe/jev-1.14`) are both on RouterAI.
+
+| Path | Time per prompt |
+|---|---|
+| words only: process start, base open, FTS5 | 43–44 ms |
+| words + judge, no embedder | 45–46 ms (no lexical candidate passed the gate, so the judge was not asked) |
+| words + embedder, no judge | 45–46 ms (the vector reader runs only in front of a judge) |
+| words + embedder + judge | 1023, 1079, 1238, 1319, 1817 ms |
+| embedder request alone, one prompt | 0.81–1.53 s, of it TLS handshake 0.05–0.86 s |
+| judge request alone, 20 facts | 0.37–0.53 s |
+| `memcue session-start` (the card) | 54–56 ms |
+| `memcue version -minimum 0.4.0` (the plugin's check) | 21–49 ms |
+
+The two requests share one HTTP/2 connection, so there is no second handshake to save. Dream and vet already run
+their model calls in parallel; extraction runs in the background after the turn. On loffe, the Hermes host, the hook
+with both services took a median of 919 ms over four runs with 228 facts (#213).
+
+memcue itself costs about 45 ms; the rest is waiting on the two remote services. On the probe prompt every served fact
+came from the vector pass, so turning the services off would also lose those facts. #232 is about matching their
+quality with local signals only.
+
 ## Repeating the measurements
 
 `memcue eval -set FILE` runs a labelled set against the base and prints how many questions found their fact and,
