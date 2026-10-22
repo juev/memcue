@@ -703,7 +703,9 @@ test('a checkpoint is not reused for another fact base', async () => {
 	}
 	await resetLog()
 	await extract(first)
-	await waitForText(statePath, '"base"')
+	// The first write holds the pending batch; wait for the one after the extraction, or the second instance starts
+	// while the first still writes the checkpoint (#261).
+	await waitForText(statePath, '"pending":null')
 	const before = ((await readFile(log, 'utf8')).match(/extract-input:/g) ?? []).length
 	assert.equal(before, 1)
 	// The same session against another base must send its messages again: the fingerprints belonged to the first base.
