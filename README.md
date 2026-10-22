@@ -172,8 +172,6 @@ memcue dream -since 2026-10-19 -list # groups of similar facts a dream would rev
 memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
 memcue dream -apply plan.json              # carry it out later, without the model
-memcue audit -dry-run -plan audit.json     # propose old journal and CI facts to retire
-memcue audit -apply audit.json             # carry out the retire decisions after review
 memcue label -dry-run                      # how many old facts lack a kind or a scope
 memcue label                               # fill them from the migrated notes and the model
 memcue label -revert STATE/label-….jsonl   # undo a run
@@ -237,8 +235,8 @@ whole base named was among the first 20; a candidate costs about 10k input token
 of 580k on a base of 2,670 facts — [docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md).
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
-retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
-never served it.
+retired or expired. `card.log` records the ids it carried, so a rule shows as used even though recall never served
+it.
 
 The card holds about 3,500 characters, a dozen facts, and a labelled base has more rules than that. They are chosen
 in this order:
@@ -253,15 +251,6 @@ Measured on the author's base (65 global rules after `memcue label`, 129 facts f
 global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
 with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already serves
 are the ones the card is not needed for.
-
-`memcue audit` is the one-off clean-up of the migrated base. It proposes active facts that read as a journal entry
-(a date next to "обновили", "упал", …) or a retelling of CI or a Makefile, and writes them with a reason, their
-`last_recalled` and card delivery to a JSON plan. Mark each proposal `retire` or `keep`, then apply the plan: a
-heuristic is applied only when every one of its proposals is labelled, `-min-precision` (default 0.95) refuses a whole
-heuristic whose labelled precision is lower, and a fact changed since the plan is not retired on stale text. A partial
-review therefore retires nothing of that heuristic, even when its few labels agree. The plan, the measured precision
-and every applied or refused decision go to `audit.log`. Usage only orders the review; it never retires a fact by
-itself.
 
 `memcue label` fills the kind and scope of approved facts written before those fields existed; the card needs them to
 carry a rule or a decision. A fact migrated from a note gets its scope from the note's directory (`_global` →
@@ -366,7 +355,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With a judge configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
 whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
