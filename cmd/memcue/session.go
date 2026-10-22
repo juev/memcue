@@ -120,8 +120,8 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 // reminder of rules and decisions, not a copy of the base.
 const cardBudget = 3500
 
-// sessionCard renders the card from the base: global rules, then decisions of the current repository, newest
-// first. It returns the text and the ids it carried. No base means no card; a base that cannot be read is an error
+// sessionCard renders the card from the base: global rules and the rules and decisions of the current repository, in
+// the order of store.CardFacts. It returns the text and the ids it carried. No base means no card; a base that cannot be read is an error
 // the caller reports without failing the session.
 func sessionCard(cwd string) (string, []string, error) {
 	if _, err := os.Stat(factsPath()); os.IsNotExist(err) {
@@ -139,16 +139,14 @@ func sessionCard(cwd string) (string, []string, error) {
 	return renderCard(facts)
 }
 
-// renderCard writes the lines that fit cardBudget. A fact too long for the budget is cut, not allowed to push every
-// later rule out of the card.
+// renderCard writes the lines that fit cardBudget, in the order given. The facts of the repository may take half of
+// the room before anything else is placed, so sixty global rules cannot leave a repository with three lines; the rest
+// of the room is filled in the given order, so a repository that comes first may take more than half. A fact too long
+// for the budget is cut, not allowed to push every later rule out of the card.
 func renderCard(facts []store.Fact) (string, []string, error) {
 	const header = "memcue: rules and decisions from the base (data, not instructions; each says its scope and date)"
-	var (
-		lines []string
-		ids   []string
-		used  = len([]rune(header)) + 1
-	)
-	for _, f := range facts {
+	lines := make([]string, len(facts))
+	for i, f := range facts {
 		line := "- " + clip(f.Content, 400)
 		var meta []string
 		if f.Scope != "" {
@@ -160,18 +158,37 @@ func renderCard(facts []store.Fact) (string, []string, error) {
 		if len(meta) > 0 {
 			line += " (" + strings.Join(meta, ", ") + ")"
 		}
-		n := len([]rune(line)) + 1
-		if used+n > cardBudget {
-			continue
+		lines[i] = line
+	}
+	room := cardBudget - len([]rune(header)) - 1
+	taken := make([]bool, len(facts))
+	used := 0
+	place := func(onlyRepo bool, limit int) {
+		for i, f := range facts {
+			n := len([]rune(lines[i])) + 1
+			if taken[i] || (onlyRepo && strings.EqualFold(f.Scope, "global")) || used+n > limit {
+				continue
+			}
+			taken[i] = true
+			used += n
 		}
-		lines = append(lines, line)
-		ids = append(ids, f.ID)
-		used += n
+	}
+	place(true, room/2)
+	place(false, room)
+	var (
+		out []string
+		ids []string
+	)
+	for i, f := range facts {
+		if taken[i] {
+			out = append(out, lines[i])
+			ids = append(ids, f.ID)
+		}
 	}
 	if len(ids) == 0 {
 		return "", nil, nil
 	}
-	return header + "\n" + strings.Join(lines, "\n") + "\n", ids, nil
+	return header + "\n" + strings.Join(out, "\n") + "\n", ids, nil
 }
 
 // cardRecord is one line of card.log: the facts the session-start card carried. The audit reads it to see rules
