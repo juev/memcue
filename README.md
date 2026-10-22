@@ -245,6 +245,15 @@ Each retirement names the fact that covers it (`by`) and its kind: `duplicate` o
 one with the smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same
 copy and never retire both.
 
+Before grouping, a dream asks the main model which of those facts still hold several claims, twenty facts a call: a
+fact one part of which can go stale while another stays true. Such a fact is retired and its parts take its place,
+approved, with its origin, scope, kind, source and expiry (not its keywords, which were chosen for the whole text).
+The parts are grouped in the same dream, so a part that repeats an older fact is retired as its duplicate. A failed
+split call leaves its facts as they are and is counted in `dream.log` (`split_errors`); a split with fewer than two
+parts, or of a fact that changed while the model ran, is refused and logged. `vet` splits candidates the same way, so
+this step mostly matters for the facts stored before it: `memcue dream -all -dry-run -plan FILE` proposes the splits of
+the whole base, and `-apply FILE` writes them.
+
 A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`. A fact pulled from another machine
 after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
@@ -254,7 +263,9 @@ A dry run with `-plan FILE` writes the actions that passed the checks, with the 
 groups. `-apply FILE` carries them out without asking the model again, so the run that changes the base is the one
 that was reviewed, and it is paid for once. A group with a fact changed since the plan (a new version, or retired) is
 refused whole and logged, since its actions were decided on the old text; the other groups apply, and the dream is
-marked as of the dry run.
+marked as of the dry run. The plan lists the splits under `splits`, each with the version the model read; edit the
+parts or delete an entry before `-apply`. Splits apply first, so a group the dry run formed around a compound fact is
+refused as changed, and the parts are left for the next dream to group with their neighbours.
 
 Most groups need no action, and the Jev judge can tell them apart. With `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_MODEL` and
 `MEMCUE_JUDGE_KEY` set, a dream first asks the judge about each group and sends on only the groups whose probability of

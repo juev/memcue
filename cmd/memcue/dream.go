@@ -99,6 +99,18 @@ func triageGroups(groups [][]store.Fact) ([][]store.Fact, *triageRecord) {
 	return kept, rec
 }
 
+const (
+	splitBatch    = 20 // facts one split call reads
+	splitParallel = 8
+)
+
+// splitFn is the split step, replaced in tests.
+var splitFn = func(input string) (extract.SplitResult, error) {
+	ctx, cancel := contextTimeout()
+	defer cancel()
+	return extract.SplitFacts(ctx, input)
+}
+
 // dreamFn is the model step, replaced in tests.
 var dreamFn = func(groups string) (extract.DreamResult, error) {
 	ctx, cancel := contextTimeout()
@@ -113,13 +125,16 @@ type dreamRecord struct {
 	Fresh   int              `json:"fresh"`
 	Groups  int              `json:"groups"`
 	DryRun  bool             `json:"dry_run,omitempty"`
+	Splits  []extract.Split  `json:"splits,omitempty"` // compound facts replaced by their parts
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
-	CostUSD float64          `json:"cost_usd"`
-	Tokens  extract.Tokens   `json:"tokens"`
-	Plan    string           `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
-	Triage  *triageRecord    `json:"triage,omitempty"`
-	Error   string           `json:"error,omitempty"`
+	// SplitErrors counts split calls that failed; their facts stay as they are until the next dream reviews them.
+	SplitErrors int            `json:"split_errors,omitempty"`
+	CostUSD     float64        `json:"cost_usd"`
+	Tokens      extract.Tokens `json:"tokens"`
+	Plan        string         `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
+	Triage      *triageRecord  `json:"triage,omitempty"`
+	Error       string         `json:"error,omitempty"`
 }
 
 // dreamPlan is what a dry run decided, for -apply to carry out later without the model: the actions of each group
@@ -127,7 +142,17 @@ type dreamRecord struct {
 type dreamPlan struct {
 	Start  time.Time        `json:"start"`
 	Seen   map[string]int   `json:"seen"`
+	Splits []dreamPlanSplit `json:"splits,omitempty"`
 	Groups []dreamPlanGroup `json:"groups"`
+}
+
+// dreamPlanSplit is a compound fact the dry run would split, with the version the model read. The owner may edit the
+// parts or delete the entry before -apply.
+type dreamPlanSplit struct {
+	ID      string   `json:"id"`
+	Version int      `json:"version"`
+	Parts   []string `json:"parts"`
+	Reason  string   `json:"reason"`
 }
 
 type dreamPlanGroup struct {
@@ -260,6 +285,27 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	}
 	saw := versions(active) // what the next dream counts as seen: the base now, with this dream's own changes
 	rec.Fresh = len(fresh)
+	plan := dreamPlan{Start: start, Seen: versions(active)}
+	if !list {
+		// Splitting comes first: a part that repeats another fact is then grouped with it and retired as a duplicate.
+		// A dry run keeps the originals and puts the splits in the plan.
+		splits, err := splitStep(s, fresh, &rec, out)
+		if err != nil {
+			return rec, err
+		}
+		for _, sp := range splits {
+			if dryRun {
+				plan.Splits = append(plan.Splits, sp.plan)
+				continue
+			}
+			active = replaceFact(active, sp.plan.ID, sp.parts)
+			fresh = replaceFact(fresh, sp.plan.ID, sp.parts)
+			saw[sp.plan.ID] = sp.plan.Version + 1
+			for _, p := range sp.parts {
+				saw[p.ID] = p.Version
+			}
+		}
+	}
 	groups, err := groupFacts(s, active, fresh)
 	if err != nil {
 		return rec, err
@@ -272,7 +318,6 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	if extract.TriageOn() {
 		groups, rec.Triage = triageGroups(groups)
 	}
-	plan := dreamPlan{Start: start, Seen: versions(active)}
 	for batch := range slices.Chunk(groups, groupsPerCall) {
 		r, err := dreamFn(renderGroups(batch, freshSet(fresh)))
 		rec.CostUSD += r.CostUSD
@@ -398,6 +443,24 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 		return rec, err
 	}
 	defer func() { _ = s.Close() }()
+	saw := maps.Clone(plan.Seen)
+	// Splits go first, so a group the model saw with the compound fact in it is refused below as changed. The parts
+	// are not marked seen: the next dream groups them with their neighbours, which this plan never did.
+	for _, sp := range plan.Splits {
+		parts, err := s.SplitFact(sp.ID, sp.Version, sp.Parts)
+		switch {
+		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound):
+			rec.Refused = append(rec.Refused, "split "+sp.ID+": "+err.Error())
+			continue
+		case err != nil:
+			return rec, err
+		}
+		saw[sp.ID] = sp.Version + 1
+		rec.Splits = append(rec.Splits, extract.Split{ID: sp.ID, Parts: sp.Parts, Reason: sp.Reason})
+		if err := printSplit(out, sp.ID, sp.Reason, parts); err != nil {
+			return rec, err
+		}
+	}
 	// The snapshot must name every fact of the plan, including provisional and retired ones: store.Active leaves
 	// provisional facts out, and a group with a provisional neighbour would otherwise look changed and be refused
 	// although nothing happened since the dry run.
@@ -418,7 +481,6 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 			now[id] = f.Version
 		}
 	}
-	saw := maps.Clone(plan.Seen)
 	for _, g := range plan.Groups {
 		changed := ""
 		for id, v := range g.Facts {
@@ -449,6 +511,131 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 		}
 	}
 	return rec, errors.Join(writeDreamSeen(dir, saw), markDream(dir, plan.Start))
+}
+
+// dreamSplit is one checked split: what a plan keeps of it and, once written, the parts.
+type dreamSplit struct {
+	plan  dreamPlanSplit
+	parts []store.Fact
+}
+
+// splitStep asks the model which fresh facts hold several claims and, unless the record is a dry run, replaces them
+// with their parts. A failed call leaves its facts as they are and is counted, the way triage fails open; an answer
+// about a fact that was not sent, a second answer about one fact or fewer than two parts is refused. A fact that
+// changed while the model ran is refused too, since the parts were read off its old text.
+func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writer) ([]dreamSplit, error) {
+	batches := slices.Collect(slices.Chunk(fresh, splitBatch))
+	res := make([]extract.SplitResult, len(batches))
+	errs := make([]error, len(batches))
+	sem := make(chan struct{}, splitParallel)
+	var wg sync.WaitGroup
+	for i, batch := range batches {
+		input, err := renderSplitInput(batch)
+		if err != nil {
+			return nil, err
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			res[i], errs[i] = splitFn(input)
+		}()
+	}
+	wg.Wait()
+	byID := make(map[string]store.Fact, len(fresh))
+	for _, f := range fresh {
+		byID[f.ID] = f
+	}
+	var found []dreamSplit
+	done := map[string]bool{}
+	for i := range batches {
+		rec.CostUSD += res[i].CostUSD
+		rec.Tokens.Add(res[i].Tokens)
+		if errs[i] != nil {
+			rec.SplitErrors++
+			continue
+		}
+		sent := map[string]bool{}
+		for _, f := range batches[i] {
+			sent[f.ID] = true
+		}
+		for _, sp := range res[i].Splits {
+			switch {
+			case !sent[sp.ID]:
+				rec.Refused = append(rec.Refused, "split "+sp.ID+": not a fact of the batch")
+				continue
+			case done[sp.ID]:
+				rec.Refused = append(rec.Refused, "split "+sp.ID+": second split of the fact")
+				continue
+			case len(sp.Parts) < 2:
+				rec.Refused = append(rec.Refused, fmt.Sprintf("split %s: %d part(s)", sp.ID, len(sp.Parts)))
+				continue
+			}
+			done[sp.ID] = true
+			f := byID[sp.ID]
+			ds := dreamSplit{plan: dreamPlanSplit{ID: f.ID, Version: f.Version, Parts: sp.Parts, Reason: sp.Reason}}
+			if !rec.DryRun {
+				parts, err := s.SplitFact(f.ID, f.Version, sp.Parts)
+				if errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound) {
+					rec.Refused = append(rec.Refused, "split "+f.ID+": "+err.Error())
+					continue
+				}
+				if err != nil {
+					return found, err
+				}
+				ds.parts = parts
+			}
+			rec.Splits = append(rec.Splits, sp)
+			if err := printSplit(out, sp.ID, sp.Reason, ds.parts); err != nil {
+				return found, err
+			}
+			if rec.DryRun {
+				for _, p := range sp.Parts {
+					if _, err := fmt.Fprintf(out, "  + %s\n", p); err != nil {
+						return found, err
+					}
+				}
+			}
+			found = append(found, ds)
+		}
+	}
+	return found, nil
+}
+
+// renderSplitInput is the JSON the split prompt reads: the id and text of each fact.
+func renderSplitInput(facts []store.Fact) (string, error) {
+	type item struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	items := make([]item, len(facts))
+	for i, f := range facts {
+		items[i] = item{ID: f.ID, Text: f.Content}
+	}
+	b, err := json.Marshal(map[string]any{"facts": items})
+	return string(b), err
+}
+
+// printSplit reports a split and, once written, the parts with their new ids.
+func printSplit(out io.Writer, id, reason string, parts []store.Fact) error {
+	if _, err := fmt.Fprintf(out, "split %s: %s\n", id, reason); err != nil {
+		return err
+	}
+	for _, p := range parts {
+		if _, err := fmt.Fprintf(out, "  + %s %s\n", p.ID, p.Content); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// replaceFact puts parts in the place of the fact id.
+func replaceFact(facts []store.Fact, id string, parts []store.Fact) []store.Fact {
+	i := slices.IndexFunc(facts, func(f store.Fact) bool { return f.ID == id })
+	if i < 0 {
+		return facts
+	}
+	return slices.Concat(facts[:i:i], parts, facts[i+1:])
 }
 
 // writeJSONFile replaces path through a temporary file next to it.

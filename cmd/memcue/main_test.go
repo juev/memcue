@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 )
@@ -21,6 +22,11 @@ func env(t *testing.T) string {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	// The tests pin the historical layout; the per-base subdirectory has its own test.
 	t.Setenv("MEMCUE_STATE_DIR", filepath.Join(dir, "state", "memcue"))
+	// A dream asks the model to split facts before it groups them; a test that is not about splitting gets no split
+	// and no network call.
+	oldSplit := splitFn
+	splitFn = func(string) (extract.SplitResult, error) { return extract.SplitResult{}, nil }
+	t.Cleanup(func() { splitFn = oldSplit })
 	return dir
 }
 
