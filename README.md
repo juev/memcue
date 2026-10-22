@@ -275,8 +275,10 @@ the whole base, and `-apply FILE` writes them.
 
 Then every fresh fact without **search queries** gets them: 6–10 short phrases a user would name the task with, the
 general name of what the fact is about and how the problem or question sounds, which the index searches next to the
-words and keywords of the fact. Extraction writes them with every fact it stores, so the dream fills only the facts
-written by `add`, `correct` (a new text drops the old queries) or `import`, and the parts of a split. Facts stored
+words and keywords of the fact. Extraction writes them with every fact it stores, and `add` asks for them in one call
+when `MEMCUE_API_URL` is set (not for `-candidate`; a failed call leaves the fact to the dream). So the dream fills only
+the facts written by `add` without an endpoint, `correct` (a new text drops the old queries) or `import`, and the parts
+of a split. Facts stored
 before extraction wrote queries are never fresh again, so each dream also expands up to 500 of them, the newest first,
 without reviewing their text: a base upgraded from 0.4 fills over a few dreams, and `dream -all` does it at once,
 together with the review of the whole base. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
