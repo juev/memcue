@@ -251,3 +251,38 @@ func TestDreamRefusesBadSplits(t *testing.T) {
 		t.Errorf("record %+v, dream calls %d", r, len(*calls))
 	}
 }
+
+// A split the owner cut to one part in the plan is refused, and the rest of the plan still applies.
+func TestDreamApplyRefusesAnEditedSplitWithOnePart(t *testing.T) {
+	dir := env(t)
+	compound, _ := splitBase(t)
+	fakeSplit(t, splitByText)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	plan := filepath.Join(dir, "plan.json")
+	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	var p dreamPlan
+	b, _ := os.ReadFile(plan)
+	if err := json.Unmarshal(b, &p); err != nil || len(p.Splits) != 1 {
+		t.Fatalf("plan %s: %v", b, err)
+	}
+	p.Splits[0].Parts = []string{versionPart, "  "}
+	if err := writeJSONFile(plan, p); err != nil {
+		t.Fatal(err)
+	}
+	if err := runDream([]string{"-apply", plan}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, compound); f.Status != store.Active || f.Version != 1 {
+		t.Errorf("a split with one part was applied: %+v", f)
+	}
+	recs := readDreamLog(t, dir)
+	if last := recs[len(recs)-1]; last.Error != "" || len(last.Refused) != 1 ||
+		!strings.Contains(last.Refused[0], "1 part(s) in the plan") {
+		t.Errorf("apply record %+v", last)
+	}
+	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); !ok {
+		t.Error("-apply did not mark the dream")
+	}
+}
