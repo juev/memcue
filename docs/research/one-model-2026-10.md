@@ -120,6 +120,12 @@ Embedding one prompt with bge-m3:
 The gold set rows above with vectors were measured with the local Ollama, so the local embedder's quality is the best
 row of the table.
 
+The two serve the same vectors: for 5 random facts of the Mac base, the stored RouterAI `baai/bge-m3` vector and the
+local Ollama `bge-m3` vector of the same text had cosine 0.99997–0.99999, both 1024-dimensional. The tag a vector is
+stored under is built from the endpoint URL and the model name (`embed.Settings.Tag`), so switching a machine to the
+local Ollama would store a second set of the same vectors in the synced base (the RouterAI set is 10.8 MB of a
+19.7 MB base) unless the tag stops depending on the URL.
+
 ## Decision and next steps
 
 - **Keep the vectors; move the embedder to a local Ollama** where the host can run it: recall loses 0.8–1.5 s and a
