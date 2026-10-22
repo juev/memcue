@@ -22,9 +22,9 @@ type MergeStats struct {
 // order) and numbered anew; the latest of them is current. Nothing is lost: a correction made on one machine and a
 // retirement made on another both stay in the history.
 //
-// Vectors are derived, but copying the ones whose text hash still matches the merged content saves a full embed pass
-// after a sync. A vector made from another version is not copied: the reader would skip it anyway, and MissingVectors
-// keeps the fact in the next embed run.
+// Vectors are derived, and only an older memcue writes them; the ones whose text hash still matches the merged content
+// are copied, so such a binary on another machine keeps them after a sync. A vector made from another version is not
+// copied: the reader would skip it anyway.
 func (s *Store) Merge(otherPath string) (MergeStats, error) {
 	var st MergeStats
 	other, err := Open(otherPath)

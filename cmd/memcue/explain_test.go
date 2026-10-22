@@ -8,10 +8,10 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// lexicalOnly turns the judge and the embedder off, whatever the developer's environment holds.
+// lexicalOnly turns the judge off, whatever the developer's environment holds.
 func lexicalOnly(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_EMBED_URL", "MEMCUE_EMBED_MODEL"} {
+	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL"} {
 		t.Setenv(k, "")
 	}
 }

@@ -120,7 +120,6 @@ commands:
   label     fill the kind and scope of old facts from their notes and the model: memcue label [-dry-run] [-no-model] [-limit N] | memcue label -revert FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
-  embed     fill the vectors the meaning pass compares against: memcue embed [-dry-run] [-batch N] [-limit N]
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
@@ -147,10 +146,6 @@ environment:
   MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
   MEMCUE_JUDGE_DUP_MAX_FACTS  nearest approved facts in one duplicate request (default 50)
   MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
-  MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY  OpenAI-compatible embeddings endpoint, model and key for
-                  memcue embed; recall no longer reads vectors
-  MEMCUE_EMBED_TIMEOUT  one embedding request (default 2s)
-  MEMCUE_EMBED_SPACE  label of the vector space when a server changes model under one name
   MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
                   claude is on PATH), after storing them and before the dream; undecided ones become provisional for
@@ -226,8 +221,6 @@ func main() {
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":
 		err = runImport(os.Args[2:], os.Stdout)
-	case "embed":
-		err = runEmbed(os.Args[2:], os.Stdout, os.Stderr)
 	case "extract":
 		err = runExtract(os.Args[2:], os.Stdout)
 	case "merge":
@@ -247,9 +240,6 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "memcue:", err)
 		os.Exit(1)
-	}
-	if embedWrites[os.Args[1]] {
-		embedAfterWrite()
 	}
 }
 
@@ -451,6 +441,14 @@ func render(hits []recall.Hit) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// meaning shows the judge's score of a fact, when the judge decided.
+func meaning(sim float64) string {
+	if sim <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" meaning=%.2f", sim)
 }
 
 func runRecall(args []string, out io.Writer) error {
