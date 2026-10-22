@@ -1,8 +1,8 @@
 //go:build research
 
-// Command judgecand writes, for every prompt of a gold set, the candidates recall hands to the judge: the first facts
-// the words found, in BM25 order, as RecallJudge picks them. A judge is then asked about the same lists outside memcue
-// (judge_ab.py). Experiment only, not part of memcue.
+// Command judgecand writes, for every prompt of a gold set, the candidates recall hands to the judge (the first facts
+// the words found, in BM25 order, as RecallJudge picks them) and the facts the words alone serve. A judge is then asked
+// about the same lists outside memcue (judge_ab.py). Experiment only, not part of memcue.
 package main
 
 import (
@@ -28,6 +28,14 @@ type row struct {
 	ID         string      `json:"id"`
 	Text       string      `json:"text"`
 	Candidates []candidate `json:"candidates"`
+	Lexical    []lexical   `json:"lexical"` // what the words alone serve: the answer recall falls back to
+}
+
+type lexical struct {
+	ID       string  `json:"id"`
+	Content  string  `json:"content"`
+	Coverage float64 `json:"coverage"`
+	Matched  int     `json:"matched"`
 }
 
 // recorder takes the facts RecallJudge would send and refuses to answer, so recall falls back without a call.
@@ -77,10 +85,14 @@ func main() {
 			text = string(r[:4000])
 		}
 		rec := &recorder{}
-		if _, err := recall.RecallJudge(s, text, p.Tier, recall.Default, rec); err != nil {
+		words, err := recall.RecallJudge(s, text, p.Tier, recall.Default, rec)
+		if err != nil {
 			panic(err)
 		}
 		out := row{ID: p.ID, Text: text}
+		for _, h := range words {
+			out.Lexical = append(out.Lexical, lexical{h.ID, h.Content, h.Coverage, h.Matched})
+		}
 		for _, c := range rec.facts {
 			f, ok := byContent[c]
 			if !ok {
