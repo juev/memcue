@@ -153,3 +153,36 @@ func TestDreamExpansionFailureIsCounted(t *testing.T) {
 		t.Errorf("record %+v, dream calls %d", r, len(*calls))
 	}
 }
+
+// A version that only added search queries does not make a fact new to the next dream: a whole base expanded at once
+// must not send every fact to the split step and the groups again.
+func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
+	env(t)
+	_, a, b, _ := dreamBase(t)
+	calls := fakeDream(t, func(string) []extract.Action { return nil })
+	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := store.Open(factsPath())
+	fa := vetStatus(t, a)
+	if _, err := s.SetQueries(a, fa.Version, []string{"новые запросы"}); err != nil {
+		t.Fatal(err)
+	}
+	fb := vetStatus(t, b)
+	if _, err := s.Correct(b, fb.Content+" Проверено.", fb.Keywords); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	splits := fakeSplit(t, func(input string) ([]extract.Split, error) { return nil, nil })
+	*calls = nil
+	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	sent := strings.Join(*splits, " ")
+	if strings.Contains(sent, a) {
+		t.Errorf("a fact with new queries only was reviewed again: %q", sent)
+	}
+	if !strings.Contains(sent, b) {
+		t.Errorf("a corrected fact was not reviewed: %q", sent)
+	}
+}
