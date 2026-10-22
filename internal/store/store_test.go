@@ -560,6 +560,61 @@ func TestRetireCandidateRefusesAnApprovedFact(t *testing.T) {
 	}
 }
 
+// A split retires the compound candidate and stores each part as a candidate of its own, with the origin, expiry and
+// meta of the original.
+func TestSplitCandidate(t *testing.T) {
+	s, _ := open(t)
+	meta := Meta{Kind: "environment", Scope: "host:loffe", Source: "tool", Evidence: "memcue version", Review: Candidate}
+	f, err := s.AddWith("На loffe стоит memcue 0.4.0; бинарь лежит в /opt/data/bin.", []string{"memcue"},
+		"hermes 2026-10-22", "2027-01-01", meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts, err := s.SplitCandidate(f.ID, []string{" На loffe стоит memcue 0.4.0. ", "Бинарь memcue на loffe лежит в /opt/data/bin."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 2 || parts[0].Content != "На loffe стоит memcue 0.4.0." {
+		t.Fatalf("parts %+v", parts)
+	}
+	for _, p := range parts {
+		got, err := s.Get(p.ID)
+		if err != nil || got.Origin != f.Origin || got.Expires != f.Expires || got.Meta != meta ||
+			got.Status != Active || got.Version != 1 || len(got.Keywords) != 0 {
+			t.Errorf("part %+v %v", got, err)
+		}
+	}
+	if got, _ := s.Get(f.ID); got.Status != Retired || got.Version != 2 || got.Content != f.Content {
+		t.Errorf("original %+v", got)
+	}
+	cands, err := s.Candidates()
+	if err != nil || len(cands) != 2 {
+		t.Errorf("candidates %+v %v", cands, err)
+	}
+}
+
+// A split that cannot be applied whole changes nothing: an approved fact, one part, or an empty part.
+func TestSplitCandidateRefuses(t *testing.T) {
+	s, _ := open(t)
+	approved, _ := s.Add("Одобренный факт про порт 3000 и путь /srv.", nil, "")
+	if _, err := s.SplitCandidate(approved.ID, []string{"Порт 3000.", "Путь /srv."}); !errors.Is(err, ErrNotCandidate) {
+		t.Errorf("splitting an approved fact: %v", err)
+	}
+	cand, _ := s.AddWith("Кандидат про порт 3000 и путь /srv.", nil, "", "", Meta{Review: Candidate})
+	for _, parts := range [][]string{{"Порт 3000."}, {"Порт 3000.", "  "}} {
+		if _, err := s.SplitCandidate(cand.ID, parts); err == nil {
+			t.Errorf("split into %q was accepted", parts)
+		}
+	}
+	rows, err := s.Rows()
+	if err != nil || len(rows) != 2 {
+		t.Errorf("a refused split wrote to the base: %d rows %v", len(rows), err)
+	}
+	if got, _ := s.Get(cand.ID); got.Status != Active || got.Review != Candidate || got.Version != 1 {
+		t.Errorf("candidate after refused splits %+v", got)
+	}
+}
+
 func TestApproveRefusesWhatIsNotACandidate(t *testing.T) {
 	s, _ := open(t)
 	act, _ := s.Add("Активный факт.", nil, "")

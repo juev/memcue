@@ -693,6 +693,54 @@ func (s *Store) RetireCandidate(id string) (Fact, error) {
 	return f, s.write(f)
 }
 
+// SplitCandidate replaces a candidate that holds several claims with one candidate per part, in one transaction: the
+// original is retired and every part keeps its origin, expiry and meta. The keywords stay with the original, since
+// they were chosen for the whole text. Like RetireCandidate, it refuses a fact that is no longer a candidate.
+func (s *Store) SplitCandidate(id string, parts []string) ([]Fact, error) {
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("split %s: %d part(s), want at least two", id, len(parts))
+	}
+	cur, err := s.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	if cur.Status != Active || cur.Review != Candidate {
+		return nil, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
+	}
+	retired := cur
+	retired.Version, retired.Created, retired.Status, retired.Author = cur.Version+1, s.now().UTC(), Retired, s.author
+	out := make([]Fact, 0, len(parts))
+	for _, p := range parts {
+		content := strings.TrimSpace(p)
+		if content == "" {
+			return nil, fmt.Errorf("split %s: empty part", id)
+		}
+		pid, err := ulid.New(ulid.Timestamp(s.now()), entropy)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, Fact{ID: pid.String(), Version: 1, Content: content, Origin: cur.Origin,
+			Created: s.now().UTC(), Status: Active, Author: s.author, Expires: cur.Expires, Meta: cur.Meta})
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, f := range append([]Fact{retired}, out...) {
+		if err := insert(tx, f); err != nil {
+			return nil, err
+		}
+		if err := reindex(tx, f.ID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (s *Store) write(f Fact) error {
 	tx, err := s.db.Begin()
 	if err != nil {
