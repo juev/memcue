@@ -161,6 +161,10 @@ the rerank-gate issue.
 - ~~A/B the main model as the reranker.~~ Measured 2026-10-21: the main model is 4 useful top-1
   prompts behind Jev (108 vs 112 on 176 prompts) and about five times slower, despite labelling the
   sample; keep the judge. See [main-reranker-2026-10.md](research/main-reranker-2026-10.md).
+  Measured again 2026-10-22 with reasoning off, 20 candidates and Opus labels, for rerank and triage
+  (#274): the main model serves 81–88 useful top-1 prompts against Jev's 92, is three times slower, and
+  in triage loses a third to half of the groups that need an action; keep Jev in both roles. See
+  [main-judge-2026-10.md](research/main-judge-2026-10.md).
 - Decide whether vector candidates are added on every prompt or only on lexical misses; the
   pilot used every prompt, which is the measured 129/180 mode.
 - Complete the random 160-fact truth audit if a base false-rate estimate is needed.
