@@ -13,6 +13,7 @@ type Trace struct {
 	JudgeMin    float64 // score below which the judge drops a fact
 	Judge       []Step  // what the judge was asked about, in the order asked, with its score
 	Fallback    string  // why the lexical answer was given instead of the judge's; empty when it was not
+	Paused      bool    // the judge was skipped because the shared breaker is leaving the endpoint alone
 	Final       []Step  // the facts that reached the cut, in order: served or cut
 }
 

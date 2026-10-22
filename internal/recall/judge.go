@@ -2,8 +2,10 @@ package recall
 
 import (
 	"context"
+	"errors"
 	"sort"
 
+	"github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/store"
 )
 
@@ -51,9 +53,16 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 	}
 	scores, err := r.Scores(context.Background(), prompt, contents)
 	if err != nil || len(scores) != len(candidates) {
-		if err != nil {
+		switch {
+		case errors.Is(err, judge.ErrPaused):
+			// Not a failure of this prompt: an earlier one paused the endpoint, and this prompt never reached it.
+			p.Trace.fallback("judge skipped: " + err.Error())
+			if p.Trace != nil {
+				p.Trace.Paused = true
+			}
+		case err != nil:
 			p.Trace.fallback("judge failed: " + err.Error())
-		} else {
+		default:
 			p.Trace.fallback("judge returned a wrong number of scores")
 		}
 		return Recall(s, prompt, sessionTier, p)

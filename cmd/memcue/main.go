@@ -329,7 +329,7 @@ func runHook(in io.Reader, out io.Writer) error {
 	}
 	start := time.Now()
 	if reHarness.MatchString(req.Prompt) {
-		logRecall(req.SessionID, req.CWD, req.Prompt, nil, time.Since(start))
+		logRecall(req.SessionID, req.CWD, req.Prompt, nil, time.Since(start), nil)
 		return nil
 	}
 	s, err := store.Open(factsPath())
@@ -337,12 +337,17 @@ func runHook(in io.Reader, out io.Writer) error {
 		return err
 	}
 	defer func() { _ = s.Close() }()
-	hits, err := recallFor(s, req.Prompt, req.CWD, readSeen(req.SessionID), nil)
+	// The trace costs a little; it is kept only for the log, which says whether the judge was paused.
+	var trace *recall.Trace
+	if os.Getenv("MEMCUE_RECALL_LOG") == "1" {
+		trace = &recall.Trace{}
+	}
+	hits, err := recallFor(s, req.Prompt, req.CWD, readSeen(req.SessionID), trace)
 	if err != nil {
 		return err
 	}
 	markSeen(req.SessionID, hits)
-	logRecall(req.SessionID, req.CWD, req.Prompt, hits, time.Since(start))
+	logRecall(req.SessionID, req.CWD, req.Prompt, hits, time.Since(start), trace)
 	if len(hits) == 0 {
 		return nil
 	}
@@ -367,6 +372,7 @@ type recallRecord struct {
 	Facts     []recallFact `json:"facts,omitempty"`
 	Ms        float64      `json:"ms"`
 	Displaced bool         `json:"host_displaced,omitempty"`
+	Judge     string       `json:"judge,omitempty"` // "paused": the breaker kept the judge out, the words decided
 }
 
 type recallFact struct {
@@ -384,7 +390,7 @@ const logPrompt = 500
 
 // logRecall appends what the hook decided to recall.log in the state directory, prompts that got nothing included.
 // It keeps the text of prompts, so it is off unless MEMCUE_RECALL_LOG=1. A failure to log never fails the hook.
-func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duration) {
+func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duration, trace *recall.Trace) {
 	if os.Getenv("MEMCUE_RECALL_LOG") != "1" {
 		return
 	}
@@ -397,6 +403,9 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 	}
 	rec := recallRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: session, Tier: tier.Of(cwd, claudeDir()),
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
+	if trace != nil && trace.Paused {
+		rec.Judge = "paused"
+	}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,
 			Source: h.Source, Provisional: h.Provisional, Meaning: math.Round(h.Meaning*1000) / 1000,
