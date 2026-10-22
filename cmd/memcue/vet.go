@@ -29,8 +29,8 @@ const vetBatch = 12
 // errVetBusy means another vet run holds stateDir/vet.lock.
 var errVetBusy = errors.New("another vet run is in progress")
 
-// vetJudgeParallel is how many candidates the duplicate judge asks about at once. Each call carries the whole base, so
-// the limit is the endpoint's queue, not the network.
+// vetJudgeParallel is how many candidates the duplicate judge asks about at once: the limit is the endpoint's queue,
+// not the network.
 const vetJudgeParallel = 4
 
 // reviewFn is the model step, replaced in tests.
@@ -40,11 +40,11 @@ var reviewFn = extract.Review
 var judgeDupFn = extract.JudgeDuplicate
 
 // judgeDefaults are the measured values of the duplicate judge: a score of "same claim" at 0.5 retires 8–11 of the
-// 15 duplicates of a 41-candidate sample and 0–1 of the 26 facts worth keeping, and 400 facts fit a default request at
-// about 150 input tokens each.
+// 15 duplicates of a 41-candidate sample and 0–1 of the 26 facts worth keeping, and the candidate's 50 nearest
+// approved facts retire as many of them as the whole base did (#240), at about 10k input tokens a candidate.
 const (
 	judgeMin      = 0.5
-	judgeMaxFacts = 400
+	judgeMaxFacts = 50
 )
 
 // configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage, rerank and the
@@ -256,13 +256,12 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 	memory, haveMemory := memoryNotes(o.memory)
 	decided, rest := vet.Rules(cands, approved, memory, haveMemory)
 
-	// The duplicate judge runs before the chat one and over the approved base: a duplicate is the one verdict that
-	// needs no reading of a candidate, only a comparison. A base above one request is split into chunks; the judge
-	// never decides that a candidate is worth keeping, so everything it does not call a duplicate still goes to the
-	// model.
+	// The duplicate judge runs before the chat one and over the candidate's nearest approved facts: a duplicate is the
+	// one verdict that needs no reading of a candidate, only a comparison. The judge never decides that a candidate is
+	// worth keeping, so everything it does not call a duplicate still goes to the model.
 	probs := map[string]float64{}
 	if !o.noModel && extract.JevJudgeOn() {
-		stage := jevDuplicates(rest, approved)
+		stage := jevDuplicates(s, rest, approved)
 		decided = append(decided, stage.Retired...)
 		decided = append(decided, stage.Failed...)
 		rest = stage.Left
@@ -479,15 +478,23 @@ type duplicateStage struct {
 	Calls   int
 }
 
-// jevDuplicates asks the judge whether each candidate already exists in the base. The base is split into chunks
-// that fit one request; a candidate is compared with every chunk and keeps its strongest "same claim". One chunk
-// that fails decides nothing for that candidate, so it waits for the next run rather than being approved blind.
-func jevDuplicates(cands, approved []store.Fact) duplicateStage {
-	base := make([]extract.JudgeFact, 0, len(approved))
+// dupNeighbours finds the approved facts a candidate is compared with: the first ones in BM25 order, gate or not, up
+// to the judge's request size (MaxFacts stays zero: the cap is taken over approved facts only). A copy shares the candidate's words, so the whole base adds tokens, not duplicates: on
+// the 41-candidate sample every fact the whole base named at 0.5 was among the first 20 (#240).
+var dupNeighbours = recall.Params{
+	Candidates:     80,
+	MinTerms:       2,
+	MaxPromptTerms: 24,
+}
+
+// jevDuplicates asks the judge whether each candidate already exists in the base, in one request over its nearest
+// approved facts. A candidate without neighbours needs no call. A call that fails decides nothing for that candidate,
+// so it waits for the next run rather than being approved blind.
+func jevDuplicates(s *store.Store, cands, approved []store.Fact) duplicateStage {
+	isApproved := make(map[string]bool, len(approved))
 	for _, f := range approved {
-		base = append(base, extract.JudgeFact{ID: f.ID, Text: f.Content})
+		isApproved[f.ID] = true
 	}
-	chunks := duplicateChunks(base, extract.JevJudgeMaxFacts())
 	type answer struct {
 		v      extract.DuplicateVerdict
 		err    error
@@ -496,30 +503,38 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 		calls  int
 	}
 	got := make([]answer, len(cands))
+	n := extract.JevJudgeMaxFacts()
+	p := dupNeighbours
+	p.Candidates = max(p.Candidates, 2*n)
 	sem := make(chan struct{}, vetJudgeParallel)
 	var wg sync.WaitGroup
 	for i, f := range cands {
+		q := p
+		q.Seen = map[string]bool{f.ID: true}
+		hits, err := recall.Nearest(s, f.Content+" "+strings.Join(f.Keywords, " "), q)
+		if err != nil {
+			got[i].err = err
+			continue
+		}
+		var near []extract.JudgeFact
+		for _, h := range hits {
+			// The index holds candidates and provisional facts too; a candidate repeats only what the base approved,
+			// so the cap applies after them.
+			if isApproved[h.ID] && len(near) < n {
+				near = append(near, extract.JudgeFact{ID: h.ID, Text: h.Content})
+			}
+		}
+		if len(near) == 0 {
+			continue
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(i int, f store.Fact) {
 			defer func() { <-sem; wg.Done() }()
-			a := answer{}
-			for _, chunk := range chunks {
-				ctx, cancel := contextTimeout()
-				v, err := judgeDupFn(ctx, extract.JudgeFact{ID: f.ID, Text: f.Content}, chunk)
-				cancel()
-				a.calls++
-				a.tokens.Add(v.Tokens)
-				a.cost += v.Cost
-				if err != nil {
-					a.err = err
-					break
-				}
-				if v.P > a.v.P {
-					a.v = v
-				}
-			}
-			got[i] = a
+			ctx, cancel := contextTimeout()
+			defer cancel()
+			v, err := judgeDupFn(ctx, extract.JudgeFact{ID: f.ID, Text: f.Content}, near)
+			got[i] = answer{v: v, err: err, tokens: v.Tokens, cost: v.Cost, calls: 1}
 		}(i, f)
 	}
 	wg.Wait()
@@ -544,25 +559,6 @@ func jevDuplicates(cands, approved []store.Fact) duplicateStage {
 			out.Left = append(out.Left, f)
 			out.P[f.ID] = a.v.P // below the threshold, but a reader of vet.log should still see how close it was
 		}
-	}
-	return out
-}
-
-// duplicateChunks splits the approved base into requests of at most max facts. A nil or empty base needs no call;
-// a max below one uses the judge's own default.
-func duplicateChunks(base []extract.JudgeFact, max int) [][]extract.JudgeFact {
-	if len(base) == 0 {
-		return nil
-	}
-	if max <= 0 {
-		max = extract.JevJudgeMaxFacts()
-	}
-	if max <= 0 || max >= len(base) {
-		return [][]extract.JudgeFact{base}
-	}
-	out := make([][]extract.JudgeFact, 0, (len(base)+max-1)/max)
-	for start := 0; start < len(base); start += max {
-		out = append(out, base[start:min(start+max, len(base))])
 	}
 	return out
 }

@@ -145,7 +145,7 @@ environment:
   MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
   MEMCUE_JUDGE_DUP_TIMEOUT  one duplicate request (default 10s)
   MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
-  MEMCUE_JUDGE_DUP_MAX_FACTS  approved facts that fit one duplicate request (default 400)
+  MEMCUE_JUDGE_DUP_MAX_FACTS  nearest approved facts in one duplicate request (default 50)
   MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
   MEMCUE_EMBED_URL, MEMCUE_EMBED_MODEL, MEMCUE_EMBED_KEY  OpenAI-compatible embeddings endpoint, model and key for
                   memcue embed; recall no longer reads vectors

@@ -28,17 +28,17 @@ var JevJudge struct {
 
 // Defaults measured on one base of 235 approved facts and 41 candidates the review model had already labelled, in two
 // runs: a score of "same claim" at 0.5 retires 8–11 of the 15 duplicates and 0–1 of the 26 facts worth keeping (AUC
-// 0.835–0.877), where a noul at the same threshold retires 8 and 1 (AUC 0.815–0.822). 400 facts fit a default request
-// at about 150 input tokens per fact, 1 700 with the long-context header, so a bigger base falls back to the
-// neighbours the chat judge already gets.
+// 0.835–0.877), where a noul at the same threshold retires 8 and 1 (AUC 0.815–0.822). The candidate's 50 nearest
+// approved facts retire as many duplicates and keeps as the whole base on the same sample relabelled (#240), at about
+// a fifth of the input tokens.
 const (
 	jevMin      = 0.5
-	jevMaxFacts = 400
+	jevMaxFacts = 50
 )
 
 // Judge request timeouts. Rerank gives ten candidates 2 s; triage asks about a group of at most six facts, so it gets
-// the same bound. The duplicate check carries the whole base (up to 400 facts, 1 700 with the long-context header),
-// where the measured call is 1.2–1.3 s, so it gets 10 s. Both are far below the ten-minute context the callers pass:
+// the same bound. The duplicate check carries the candidate's neighbours (up to 400 facts were measured at 1.2–1.3 s
+// a call), so it gets 10 s. Both are far below the ten-minute context the callers pass:
 // a hung endpoint costs seconds and then the shared breaker pauses it, not a held vet lock and dream.
 const (
 	DefaultTriageTimeout = 2 * time.Second
