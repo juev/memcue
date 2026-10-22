@@ -57,9 +57,11 @@ func ReviewOn() bool {
 }
 
 // Review asks the model whether the candidates in the rendered input belong in the base. The answer is not checked
-// against anything here: a caller decides which ids it sent, and acts only on those it gets back.
+// against anything here: a caller decides which ids it sent, and acts only on those it gets back. It runs without
+// reasoning: on the 41-candidate sample DeepSeek agreed with the claude -p labels on 37 of 41 either way, retired 1–2
+// facts worth keeping instead of 4, with a quarter of the output tokens and in 12 s instead of 50 (#259).
 func Review(ctx context.Context, input string) (ReviewResult, error) {
-	rp, err := callModel(ctx, Endpoint{URL: API.URL, Model: Model, Key: API.Key}, reviewPrompt, reviewSchema,
+	rp, err := callModel(ctx, Endpoint{URL: API.URL, Model: Model, Key: API.Key, Quick: true}, reviewPrompt, reviewSchema,
 		reviewShape, input)
 	if err != nil {
 		return ReviewResult{}, err
