@@ -117,7 +117,8 @@ and installs it:
 A configured binary is never replaced. Set `MEMCUE_AUTO_INSTALL=0` to install nothing; the plugin then says that the
 binary is missing, as before. The checksum guards against a broken download, not against a replaced release:
 `checksums.txt` comes from the same release. Claude Code logs failed installs to
-`${XDG_STATE_HOME:-~/.local/state}/memcue/install.log`; DSH and Hermes log them as warnings. The Claude Code script
+`${XDG_STATE_HOME:-~/.local/state}/memcue/install.log` and tries again after an hour, since `SessionStart` waits for
+the download; DSH and Hermes download in the background and log failures as warnings. The Claude Code script
 needs `curl`, `tar` and `sha256sum` or `shasum`. A binary installed this way is not on your shell's `PATH`: to run
 `memcue install` or other commands by hand, call it by its path or add the directory to `PATH`.
 

@@ -51,6 +51,8 @@ sha256() {
 
 # install downloads the release of this plugin, checks it against the release's checksums.txt and moves it into
 # place. A lock directory keeps two sessions from downloading at once; one left by a crash expires after ten minutes.
+# A failed install is not retried for an hour: SessionStart waits for it, and an unreachable GitHub would otherwise
+# delay the first answer of every session.
 install() {
 	[ "${MEMCUE_AUTO_INSTALL:-}" = 0 ] && return 1
 	[ -x "$installed" ] && return 0
@@ -69,6 +71,9 @@ install() {
 		return 1
 	fi
 	mkdir -p "$dir" || return 1
+	if [ -n "$(find "$dir/.failed" -maxdepth 0 -mmin -60 2>/dev/null)" ]; then
+		return 1
+	fi
 	if [ -d "$dir/.lock" ] && [ -n "$(find "$dir/.lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
 		rmdir "$dir/.lock" 2>/dev/null
 	fi
@@ -98,8 +103,13 @@ install() {
 		ok=0
 	fi
 	rm -rf "$tmp"
+	if [ $ok = 1 ]; then
+		rm -f "$dir/.failed"
+		log "install $version: installed $installed"
+	else
+		touch "$dir/.failed"
+	fi
 	rmdir "$dir/.lock"
-	[ $ok = 1 ] && log "install $version: installed $installed"
 	[ $ok = 1 ]
 }
 

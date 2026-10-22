@@ -77,6 +77,18 @@ test('a checksum that does not match installs nothing and says so', { skip: !os 
 	assert.match(readFileSync(join(root, 'state', 'memcue', 'install.log'), 'utf8'), /checksum/)
 })
 
+test('a failed install is not retried for an hour', { skip: !os || !arch }, () => {
+	const { env, installed, root } = setup({ badChecksum: true })
+	run(env, ['session-start'])
+	release(root) // the release is fixed, but the next session must not try again yet
+	run(env, ['session-start'])
+	assert.equal(existsSync(installed), false, 'a second attempt ran within the hour')
+	const failed = join(root, 'data', 'memcue', version, '.failed')
+	spawnSync('touch', ['-t', '200001010000', failed])
+	assert.match(run(env, ['session-start']), /^installed session-start/, 'an old failure must not block the install')
+	assert.equal(existsSync(failed), false)
+})
+
 test('MEMCUE_AUTO_INSTALL=0 downloads nothing', { skip: !os || !arch }, () => {
 	const { env, installed } = setup()
 	const out = run({ ...env, MEMCUE_AUTO_INSTALL: '0' }, ['session-start'])
