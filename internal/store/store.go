@@ -608,7 +608,8 @@ func (s *Store) Candidates() ([]Fact, error) {
 }
 
 // CardFacts returns the facts a session-start card carries: global rules and the rules and decisions of the given
-// repository, newest first, skipping facts whose expiry has passed. It is a view of the active facts, not a second
+// repository, the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
+// goes first because the date says little on a migrated base, where most rules share the day of the migration (#229). It is a view of the active facts, not a second
 // store: a fact appears only while it is active and unexpired. today is a local "YYYY-MM-DD" date; empty means today.
 func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 	if today == "" {
@@ -631,7 +632,11 @@ func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 		}
 		out = append(out, f)
 	}
+	stated := func(f Fact) bool { return f.Source == "user" || f.Source == "user_confirmed" }
 	sort.SliceStable(out, func(i, j int) bool {
+		if si, sj := stated(out[i]), stated(out[j]); si != sj {
+			return si
+		}
 		if !out[i].Created.Equal(out[j].Created) {
 			return out[i].Created.After(out[j].Created)
 		}
