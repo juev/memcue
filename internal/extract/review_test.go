@@ -6,21 +6,33 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// Review uses the main model; there is no separate review endpoint.
+// Review uses the main model: the extraction endpoint, or `claude -p` without one; there is no separate review
+// endpoint.
 func TestReviewUsesTheExtractionEndpoint(t *testing.T) {
 	oldAPI, oldModel := API, Model
 	t.Cleanup(func() { API, Model = oldAPI, oldModel })
+	t.Setenv("PATH", t.TempDir())
 	API.URL, API.Key, Model = "https://api.example", "k1", "main-model"
 	if !ReviewOn() {
 		t.Error("an endpoint is configured but ReviewOn is false")
 	}
 	API.URL, API.Key = "", ""
 	if ReviewOn() {
-		t.Error("no endpoint, but ReviewOn is true")
+		t.Error("no endpoint and no claude, but ReviewOn is true")
+	}
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if !ReviewOn() {
+		t.Error("claude is on PATH, but ReviewOn is false")
 	}
 }
 

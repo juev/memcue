@@ -174,8 +174,9 @@ every candidate the rules cannot decide in that queue as well. Every verdict goe
 directory with the rule or model and its reason; the page, the `approve` command and the page's undo (`store.Reopen`)
 stay the manual way, unchanged.
 
-The review runs on the main model. Whenever `MEMCUE_API_URL` is set, the facts a session just stored are reviewed in
-the extraction process, after storing them and before the dream (`MEMCUE_VET=0` turns that off); that process is
+The review runs on the main model: `MEMCUE_API_URL` when it is set, otherwise `claude -p`, as the extraction does. The
+facts a session just stored are reviewed in the extraction process, after storing them and before the dream
+(`MEMCUE_VET=0` turns that off; without an endpoint and without `claude` on `PATH` nothing is reviewed); that process is
 already detached from the session, so a turn never waits for the verdict. A run that finds another one busy is skipped
 rather than queued, and its failures go to `vet.log`, not to the extraction.
 
@@ -282,7 +283,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
-| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, when `MEMCUE_API_URL` is set | on |
+| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
@@ -315,7 +316,7 @@ about $5 per million characters of transcript; tool output is the bulk of it. So
 A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
 `claude -p` reports one; a rules-only run (`-no-model`) costs nothing. The review uses `MEMCUE_MODEL` and
-`MEMCUE_API_URL`; there is no separate review model.
+`MEMCUE_API_URL`, or `claude -p` without it; there is no separate review model.
 
 ## Results
 

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 )
 
@@ -42,9 +43,16 @@ const reviewSchema = `{"type":"object","additionalProperties":false,"required":[
 const reviewShape = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
 	`{"decisions": [{"id": "…", "verdict": "keep|drop|unsure", "reason": "…", "expires": null}]}` + "\n"
 
-// ReviewOn says whether a review can run without `claude -p`: the extraction endpoint is configured. A hook leaves
-// the subscription alone; a by-hand `memcue vet` may still use `claude -p`.
-func ReviewOn() bool { return API.URL != "" }
+// ReviewOn says whether a review can run: the extraction endpoint is configured, or `claude` is on PATH for the
+// `claude -p` path the extraction itself takes without one. The review after an extraction is one more call of the same
+// model on the same plan, a call per twelve candidates.
+func ReviewOn() bool {
+	if API.URL != "" {
+		return true
+	}
+	_, err := exec.LookPath("claude")
+	return err == nil
+}
 
 // Review asks the model whether the candidates in the rendered input belong in the base. The answer is not checked
 // against anything here: a caller decides which ids it sent, and acts only on those it gets back.

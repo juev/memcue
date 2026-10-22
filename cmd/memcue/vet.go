@@ -697,10 +697,10 @@ func logVet(lines []vetLine, rec vetRecord) error {
 	return appendJSON(filepath.Join(dir, "vet.log"), rec)
 }
 
-// maybeVet reviews the candidates a session just stored, unless MEMCUE_VET=0 or no review model is set. It runs in the extraction process, which
-// the hook already detached, so it holds no turn, and before the dream, which only sees approved facts. A run that
-// finds the lock taken is skipped, not waited for: the next session reviews the same queue. Its failures go to
-// vet.log and never fail the extraction.
+// maybeVet reviews the candidates a session just stored, unless MEMCUE_VET=0 or no review model can run (no
+// endpoint and no `claude` on PATH). It runs in the extraction process, which the hook already detached, so it holds
+// no turn, and before the dream, which only sees approved facts. A run that finds the lock taken is skipped, not
+// waited for: the next session reviews the same queue. Its failures go to vet.log and never fail the extraction.
 func maybeVet(ids []string) {
 	if os.Getenv("MEMCUE_VET") == "0" || len(ids) == 0 || !extract.ReviewOn() {
 		return
