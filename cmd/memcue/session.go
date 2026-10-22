@@ -121,8 +121,8 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 const cardBudget = 3500
 
 // sessionCard renders the card from the base: global rules and the rules and decisions of the current repository, in
-// the order of store.CardFacts. It returns the text and the ids it carried. No base means no card; a base that cannot be read is an error
-// the caller reports without failing the session.
+// the order of store.CardFacts. It returns the text and the ids it carried. No base means no card; a base that cannot
+// be read is an error the caller reports without failing the session.
 func sessionCard(cwd string) (string, []string, error) {
 	if _, err := os.Stat(factsPath()); os.IsNotExist(err) {
 		return "", nil, nil
