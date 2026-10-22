@@ -38,11 +38,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.5.2`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.5.3`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.5.3 | 5 | 0.5.3 | 0.5.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.3 (`hermes-agent` 0.15.2) |
 | 0.5.2 | 5 | 0.5.2 | 0.5.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.2 (`hermes-agent` 0.15.2) |
 | 0.5.1 | 5 | 0.5.1 | 0.5.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.1 (`hermes-agent` 0.15.2) |
 | 0.5.0 | 5 | 0.5.0 | 0.5.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.0 (`hermes-agent` 0.15.2) |
