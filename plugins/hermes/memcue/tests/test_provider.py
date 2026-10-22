@@ -5,6 +5,7 @@ Inside Hermes the real agent modules are used; elsewhere they are stubbed.
 """
 
 import datetime
+import hashlib
 import http.server
 import importlib.util
 import inspect
@@ -819,6 +820,93 @@ class AccumulationTest(unittest.TestCase):
         p.initialize("s2", hermes_home=self.home, agent_context="subagent")
         p.sync_turn("x" * 5000, "ok", session_id="s2", messages=[{"role": "user", "content": "x" * 5000}])
         self.assertEqual(p._pending, {})
+
+
+@unittest.skipUnless(memcue_provider._release_target(), "no memcue release for this machine")
+class InstallTest(unittest.TestCase):
+    """The provider installs the binary of its release when none is configured; a local server stands in for GitHub."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.version = memcue_provider._plugin_version()
+        build = Path(self.root) / "build"
+        build.mkdir()
+        (build / "memcue").write_text("#!/bin/sh\nexit 0\n")
+        (build / "memcue").chmod(0o755)
+        archive = f"memcue_{self.version}_{memcue_provider._release_target()}.tar.gz"
+        subprocess.run(["tar", "-czf", str(Path(self.root) / archive), "-C", str(build), "memcue"], check=True)
+        data = (Path(self.root) / archive).read_bytes()
+        self.files = {f"/v{self.version}/{archive}": data,
+                      f"/v{self.version}/checksums.txt": f"{hashlib.sha256(data).hexdigest()}  {archive}\n".encode()}
+        self.hits = 0
+        test = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                test.hits += 1
+                body = test.files.get(self.path)
+                self.send_response(200 if body else 404)
+                self.end_headers()
+                if body:
+                    self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close)
+        self.addCleanup(srv.shutdown)
+        self.home = str(Path(self.root) / "home")
+        for key, value in {"MEMCUE_RELEASE_URL": f"http://127.0.0.1:{srv.server_address[1]}",
+                           "PATH": "/usr/bin:/bin", "HERMES_HOME": self.home, "MEMCUE_AUTO_INSTALL": None,
+                           "MEMCUE_FACTS": None}.items():
+            old = os.environ.get(key)
+            self.addCleanup(lambda k=key, v=old: os.environ.pop(k, None) if v is None else os.environ.update({k: v}))
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        self.installed = Path(self.home) / "memcue" / "bin" / self.version / "memcue"
+
+    def test_install_release_checks_the_checksum(self):
+        memcue_provider._install_release(self.version, self.installed)
+        self.assertTrue(os.access(self.installed, os.X_OK))
+        self.installed.unlink()
+        key = next(k for k in self.files if k.endswith("checksums.txt"))
+        self.files[key] = b"0" * 64 + self.files[key][64:]
+        with self.assertRaisesRegex(RuntimeError, "checksum"):
+            memcue_provider._install_release(self.version, self.installed)
+        self.assertFalse(self.installed.exists())
+        self.assertFalse((self.installed.parent / ".lock").exists(), "the lock must be released")
+
+    def test_the_provider_installs_its_release_without_a_binary(self):
+        p = memcue_provider.MemcueMemoryProvider({})
+        self.assertTrue(p.is_available(), "a provider that can install the binary is available")
+        p.initialize("s1", hermes_home=self.home)
+        p._installing.join(10)
+        self.assertTrue(os.access(self.installed, os.X_OK))
+        self.assertEqual(p._binary(), str(self.installed))
+        again = memcue_provider.MemcueMemoryProvider({})
+        again.initialize("s2", hermes_home=self.home)
+        self.assertIsNone(again._installing, "an installed release must not be downloaded again")
+        self.assertEqual(again._binary(), str(self.installed))
+
+    def test_a_configured_binary_is_used_as_it_is(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(Path(self.root) / "no-such-memcue")})
+        p.initialize("s1", hermes_home=self.home)
+        self.assertIsNone(p._installing)
+        self.assertFalse(p.is_available())
+        self.assertEqual(self.hits, 0)
+
+    def test_auto_install_can_be_turned_off(self):
+        os.environ["MEMCUE_AUTO_INSTALL"] = "0"
+        p = memcue_provider.MemcueMemoryProvider({})
+        self.assertFalse(p.is_available())
+        p.initialize("s1", hermes_home=self.home)
+        self.assertIsNone(p._installing)
+        self.assertEqual(self.hits, 0)
 
 
 if __name__ == "__main__":
