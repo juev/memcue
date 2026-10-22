@@ -37,8 +37,7 @@ type Decision struct {
 	Parts       []string // with Split: the simple facts the candidate holds
 	By          string   // rule, model or policy
 	Provisional bool     // keep it for a TTL instead of approving it
-	// Failed says the step could not decide: a failed or empty model answer, a duplicate judge error, or a
-	// malformed expiry. Such a candidate stays for the next run and never becomes provisional.
+	// Failed says the step could not decide: a failed or empty model answer, or a malformed expiry. Such a candidate stays for the next run and never becomes provisional.
 	Failed bool
 }
 

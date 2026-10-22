@@ -133,17 +133,13 @@ environment:
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got (recall.log in the state directory; holds prompt text)
   MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
-  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage, recall rerank and the
-                  duplicate check; off unless all three are set
+  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage and recall rerank; off
+                  unless all three are set
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
   MEMCUE_JUDGE_RERANK_CANDIDATES  facts the judge reads, in the search's BM25 order (default 20)
   MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
   MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
   MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
-  MEMCUE_JUDGE_DUP_TIMEOUT  one duplicate request (default 10s)
-  MEMCUE_JUDGE_DUP_MIN  probability of "same claim" that retires a candidate (default 0.5)
-  MEMCUE_JUDGE_DUP_MAX_FACTS  nearest approved facts in one duplicate request (default 50)
-  MEMCUE_JUDGE_DUP_LONG_CONTEXT  1 sends the danger-zone header for the duplicate check
   MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
                   claude is on PATH), after storing them and before the dream; undecided ones become provisional for

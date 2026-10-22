@@ -1,5 +1,5 @@
-// Package judge keeps the pause shared by the three roles of the one Jev endpoint: recall rerank, dream triage and
-// the duplicate check. A failed endpoint is left alone for a while instead of paying another timeout in every role.
+// Package judge keeps the pause shared by the roles of the one Jev endpoint: recall rerank and dream triage. A failed
+// endpoint is left alone for a while instead of paying another timeout in every role.
 package judge
 
 import (

@@ -210,25 +210,11 @@ facts a session just stored are reviewed in the extraction process, after storin
 already detached from the session, so a turn never waits for the verdict. A run that finds another one busy is skipped
 rather than queued, and its failures go to `vet.log`, not to the extraction.
 
-A duplicate can be answered without reading a candidate: only by comparing it with the base. With `MEMCUE_JUDGE_URL`,
-`MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` set to a typed decisions endpoint (OpenRouter
-`https://openrouter.ai/api/alpha/decisions` with `typesafe/jev-1.14`, TypeSafe `https://api.typesafe.ai/v1/systemone`
-with `jev-latest`), `vet` asks it first: the candidate and its nearest approved facts in one request, one `score` per
-fact over three levels — same claim, same subject with a different claim, unrelated — and a candidate whose
-best "same claim" reaches `MEMCUE_JUDGE_DUP_MIN` (default 0.5) is retired with the probability and the fact it repeats in
-`vet.log`. Every fact gets its own question, not one `choice`: a `choice` names the closest fact and drops the others,
-and a base that holds three copies of a fact needs all three. Everything the judge does not call a duplicate still goes
-to the review model, which decides whether the fact is worth keeping at all; a failed call decides nothing and leaves
-the candidate in the queue. The nearest facts are the first `MEMCUE_JUDGE_DUP_MAX_FACTS` (default 50) approved facts
-the words find in BM25 order, the ones below the recall gate included; a candidate that shares no words with the base
-is not asked about. A copy shares the candidate's words, so the rest of the base adds tokens, not duplicates.
-Measured on a base of 235 approved facts and 41 candidates the review model had labelled: against the whole base, at
-0.5 the judge retires 8–11 of the 15 duplicates and 0–1 of the 26 facts worth keeping, AUC 0.835–0.877 across two
-runs; a plain yes/no question at the same threshold retires 8 and 1, AUC 0.815–0.822, at 0.3 it still lets 2 facts
-through — [docs/research/jev-judge-2026-10.md](docs/research/jev-judge-2026-10.md). On the same sample relabelled by
-`claude -p`, 50 neighbours retire as many duplicates and keeps as the whole base in both runs, and every fact the
-whole base named was among the first 20; a candidate costs about 10k input tokens instead of 46k there, 12k instead
-of 580k on a base of 2,670 facts — [docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md).
+Duplicates are the review's job too: it sees each candidate's nearest approved facts and drops a candidate that
+repeats one. A separate Jev pass over those neighbours ran before the review until #266; on the 41-candidate sample of
+#240, labelled by `claude -p`, the review alone retired 10 of the 11 drops and 1–2 of 29 facts worth keeping, and with
+the Jev pass 8–10 and 1–4, for about 420k more input tokens
+([docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md)).
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so a rule shows as used even though recall never served
@@ -326,10 +312,6 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
-| `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request | `10s` |
-| `MEMCUE_JUDGE_DUP_MIN` | probability of "same claim" that retires a candidate | `0.5` |
-| `MEMCUE_JUDGE_DUP_MAX_FACTS` | nearest approved facts asked about in one duplicate request | `50` |
-| `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | `1` sends the danger-zone header for the duplicate check | off |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |

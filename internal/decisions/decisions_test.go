@@ -76,20 +76,6 @@ func TestAskChoicesAndConfidence(t *testing.T) {
 	}
 }
 
-func TestAskSendsLongContextHeader(t *testing.T) {
-	var seen http.Header
-	c := endpoint(t, 200, `{"answers":{"a1":{"type":"noul","noul":0.5}}}`, func(_ map[string]any, h http.Header) {
-		seen = h
-	})
-	c.LongContext = true
-	if _, err := c.Ask(context.Background(), "s", map[string]Question{"a1": {Type: "noul", Instructions: "?"}}); err != nil {
-		t.Fatal(err)
-	}
-	if seen.Get("TypeSafe-Danger-Zone-Long-Context") != "true" {
-		t.Errorf("headers %v", seen)
-	}
-}
-
 func TestAskErrors(t *testing.T) {
 	for name, tc := range map[string]struct {
 		status int
