@@ -28,6 +28,7 @@ type Params struct {
 	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
 	Seen           map[string]bool // facts the session already got: they give way to the next ones
 	Today          string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
+	Trace          *Trace          // records the decision when set; nil records nothing
 }
 
 // Default holds the values chosen on the dev set of facts (2026-10-19, 2335 facts migrated from the notes, 180 real
@@ -79,6 +80,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	if maxFacts := capFacts(p.MaxFacts, len(hits)); len(hits) > maxFacts {
 		served = hits[:maxFacts]
 	}
+	p.Trace.final(hits, len(served))
 	// Did another host take one of the slots while a fact of this host was left out? The log uses this to decide
 	// whether a hard filter is ever needed; it never changes the choice.
 	if p.Host != "" {
@@ -147,7 +149,11 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	if len(tickets) > 0 {
 		minTerms = 1
 	}
+	if p.Trace != nil {
+		p.Trace.Stopped, p.Trace.Terms, p.Trace.Lexical = "", nil, nil
+	}
 	if len(terms) < minTerms {
+		p.Trace.stop("the prompt has too few terms")
 		return nil, nil
 	}
 	df, total, err := s.DocFreq(terms)
@@ -163,6 +169,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 		}
 	}
 	if len(known) < minTerms {
+		p.Trace.stop("too few prompt terms occur in any fact")
 		return nil, nil
 	}
 	if p.MaxPromptTerms > 0 && len(known) > p.MaxPromptTerms {
@@ -172,6 +179,11 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	var sum float64
 	for _, t := range known {
 		sum += weight[t]
+	}
+	if p.Trace != nil {
+		for _, t := range known {
+			p.Trace.Terms = append(p.Trace.Terms, Term{Term: t, Weight: weight[t]})
+		}
 	}
 
 	found, err := s.Search(known, p.Candidates)
@@ -187,29 +199,49 @@ func recallCandidates(s *store.Store, prompt string, p Params) ([]Hit, error) {
 	if len(known) < minMatched {
 		minMatched = len(known)
 	}
+	if p.Trace != nil {
+		p.Trace.MinMatched, p.Trace.MinCoverage = minMatched, p.MinCoverage
+	}
 	today := p.Today
 	if today == "" {
 		today = store.Today()
 	}
 	var hits []Hit
 	for _, f := range found {
-		if p.Seen[f.ID] || store.Expired(f.Expires, today) {
+		if p.Seen[f.ID] {
+			p.Trace.lexical(f.Fact, nil, 0, VerdictSeen)
+			continue
+		}
+		if store.Expired(f.Expires, today) {
+			p.Trace.lexical(f.Fact, nil, 0, VerdictExpired)
 			continue
 		}
 		// A prompt that names a ticket must not recall another ticket through a shared project word: PROJ-1235
 		// and PROJ-1234 can share "proj" in a keyword, but only the exact key is the subject of the prompt.
 		if len(tickets) > 0 && !slices.ContainsFunc(f.Stems, func(st string) bool { return slices.Contains(tickets, st) }) {
+			p.Trace.lexical(f.Fact, nil, 0, VerdictOtherTicket)
 			continue
 		}
 		var got float64
 		matched := 0
+		var held []string
 		for _, t := range known {
 			if slices.ContainsFunc(f.Stems, func(st string) bool { return text.Covers(t, st) }) {
 				got += weight[t]
 				matched++
+				if p.Trace != nil {
+					held = append(held, t)
+				}
 			}
 		}
-		if cov := got / sum; matched >= minMatched && cov >= p.MinCoverage {
+		cov := got / sum
+		switch {
+		case matched < minMatched:
+			p.Trace.lexical(f.Fact, held, cov, VerdictFewTerms)
+		case cov < p.MinCoverage:
+			p.Trace.lexical(f.Fact, held, cov, VerdictLowCoverage)
+		default:
+			p.Trace.lexical(f.Fact, held, cov, VerdictPassed)
 			hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
 				Provisional: f.Review == store.Provisional})
 		}
