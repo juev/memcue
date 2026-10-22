@@ -1202,3 +1202,66 @@ func TestRestoreUndoesARetire(t *testing.T) {
 		t.Errorf("a rejected candidate came back as %+v, want a candidate", got)
 	}
 }
+
+// An approved fact splits into approved parts that recall finds; a provisional one into provisional parts.
+func TestSplitFact(t *testing.T) {
+	s, _ := open(t)
+	meta := Meta{Kind: "environment", Scope: "host:loffe", Source: "tool"}
+	f, err := s.AddWith("На loffe стоит memcue 0.4.0; бинарь лежит в /opt/data/bin.", []string{"memcue"},
+		"hermes 2026-10-22", "", meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts, err := s.SplitFact(f.ID, f.Version, []string{"На loffe стоит memcue 0.4.0.", "Бинарь memcue на loffe лежит в /opt/data/bin."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Get(f.ID); got.Status != Retired {
+		t.Errorf("original %+v", got)
+	}
+	for _, p := range parts {
+		if got, _ := s.Get(p.ID); got.Status != Active || got.Review != "" || got.Meta != meta || got.Origin != f.Origin {
+			t.Errorf("part %+v", got)
+		}
+	}
+	hits, err := s.Search([]string{"opt"}, 10)
+	if err != nil || len(hits) != 1 || hits[0].ID != parts[1].ID {
+		t.Errorf("search for a part %+v %v", hits, err)
+	}
+	prov, _ := s.AddWith("Временный факт про порт 3000 и путь /srv.", nil, "", "2026-11-01", Meta{Review: Provisional})
+	pparts, err := s.SplitFact(prov.ID, prov.Version, []string{"Порт 3000.", "Путь /srv."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Get(pparts[0].ID); got.Review != Provisional || got.Expires != "2026-11-01" {
+		t.Errorf("provisional part %+v", got)
+	}
+}
+
+// SplitFact refuses a fact that changed since it was read, a retired fact and a candidate, and writes nothing then.
+func TestSplitFactRefuses(t *testing.T) {
+	s, _ := open(t)
+	parts := []string{"Порт 3000.", "Путь /srv."}
+	f, _ := s.Add("Порт 3000 и путь /srv.", nil, "")
+	if _, err := s.Correct(f.ID, "Порт 3000 и путь /srv/app.", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SplitFact(f.ID, 1, parts); !errors.Is(err, ErrChanged) {
+		t.Errorf("a changed fact: %v", err)
+	}
+	gone, _ := s.Add("Снятый факт про порт 3000 и путь /srv.", nil, "")
+	if _, err := s.Retire(gone.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SplitFact(gone.ID, 2, parts); !errors.Is(err, ErrRetired) {
+		t.Errorf("a retired fact: %v", err)
+	}
+	cand, _ := s.AddWith("Кандидат про порт 3000 и путь /srv.", nil, "", "", Meta{Review: Candidate})
+	if _, err := s.SplitFact(cand.ID, 1, parts); !errors.Is(err, ErrAlreadyCandidate) {
+		t.Errorf("a candidate: %v", err)
+	}
+	rows, err := s.Rows()
+	if err != nil || len(rows) != 5 {
+		t.Errorf("a refused split wrote to the base: %d rows %v", len(rows), err)
+	}
+}
