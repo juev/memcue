@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	judgepkg "github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 )
@@ -139,7 +141,7 @@ func TestRecallLogRecordsScopeHostAndDisplacement(t *testing.T) {
 	t.Setenv("MEMCUE_HOST", "mac")
 	t.Setenv("MEMCUE_RECALL_LOG", "1")
 	hits := []recall.Hit{{Fact: store.Fact{ID: "01TEST", Scope: "host:loffe"}, Coverage: 0.5, Displaced: true}}
-	logRecall("s1", dir, "прокси", hits, time.Millisecond)
+	logRecall("s1", dir, "прокси", hits, time.Millisecond, nil)
 	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
 	if err != nil {
 		t.Fatal(err)
@@ -533,5 +535,51 @@ func TestVersionAtLeast(t *testing.T) {
 		if got := versionAtLeast(tc.current, tc.minimum); got != tc.want {
 			t.Errorf("versionAtLeast(%q, %q) = %v, want %v", tc.current, tc.minimum, got, tc.want)
 		}
+	}
+}
+
+// A prompt the judge never reached because the shared breaker paused it is logged as such (#257): without the mark it
+// looks like a prompt that did not need the judge.
+func TestHookLogsAPausedJudge(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add("Gradle wrapper берёт JDK из JAVA_HOME, а не из PATH.", []string{"gradle", "jdk"}, "lists 2026-10-09"); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
+	for k, v := range map[string]string{"MEMCUE_JUDGE_URL": "http://127.0.0.1:1/decisions",
+		"MEMCUE_JUDGE_MODEL": "typesafe/jev-1.14", "MEMCUE_JUDGE_KEY": "k"} {
+		t.Setenv(k, v)
+	}
+	judgepkg.Shared.Reset()
+	t.Cleanup(judgepkg.Shared.Reset)
+	_ = judgepkg.Shared.Fail(errors.New("decisions 500"))
+
+	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("a paused judge lost the lexical answer: %q", got)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec recallRecord
+	if err := json.Unmarshal(b, &rec); err != nil || rec.Judge != "paused" {
+		t.Errorf("log %s, want judge paused", b)
+	}
+
+	judgepkg.Shared.Reset()
+	if err := os.Remove(filepath.Join(dir, "state", "memcue", "recall.log")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_JUDGE_URL", "")
+	hookContext(t, dir, "s2", gradlePrompt)
+	if b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log")); err != nil ||
+		strings.Contains(string(b), `"judge"`) {
+		t.Errorf("a prompt without a judge is marked: %s %v", b, err)
 	}
 }

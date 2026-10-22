@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/store"
 )
 
@@ -288,5 +290,31 @@ func TestNearestReadsTheSearchOrderPastTheGate(t *testing.T) {
 	}
 	if want := ids(all[1:4]); !slices.Equal(ids(top), want) {
 		t.Errorf("nearest without the seen fact = %v, want %v", ids(top), want)
+	}
+}
+
+// A judge the shared breaker paused is skipped, not failed: the trace says so, and the words decide (#257).
+func TestRecallJudgeMarksAPausedJudge(t *testing.T) {
+	s, _ := meaningBase(t)
+	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг"
+	trace := &Trace{}
+	p := Default
+	p.Trace = trace
+	r := &fakeRanker{min: 0.5, err: fmt.Errorf("%w: 40s left", judge.ErrPaused)}
+	if _, err := RecallJudge(s, prompt, "", p, r); err != nil {
+		t.Fatal(err)
+	}
+	if !trace.Paused || !strings.HasPrefix(trace.Fallback, "judge skipped") {
+		t.Errorf("paused %v, fallback %q", trace.Paused, trace.Fallback)
+	}
+
+	trace = &Trace{}
+	p.Trace = trace
+	r.err = errors.New("decisions 500")
+	if _, err := RecallJudge(s, prompt, "", p, r); err != nil {
+		t.Fatal(err)
+	}
+	if trace.Paused || !strings.HasPrefix(trace.Fallback, "judge failed") {
+		t.Errorf("a failure marked as a pause: paused %v, fallback %q", trace.Paused, trace.Fallback)
 	}
 }
