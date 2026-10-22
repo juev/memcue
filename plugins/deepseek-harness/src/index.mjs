@@ -18,7 +18,7 @@
  * @module memcue-dsh
  */
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -409,10 +409,11 @@ async function readState(path) {
 }
 
 /** Write the checkpoint atomically: a crash leaves the old file or the new one, never a half-written one.
- * The batch holds raw messages, so the directory and file are private to the user. */
+ * The batch holds raw messages, so the directory and file are private to the user. Each write has its own temporary
+ * file: two plugin instances on one session would otherwise rename each other's file and fail with ENOENT (#261). */
 async function writeState(path, state) {
 	await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-	const tmp = `${path}.tmp`
+	const tmp = `${path}.${randomUUID()}.tmp`
 	await writeFile(tmp, JSON.stringify(state), { mode: 0o600 })
 	await rename(tmp, path)
 }
