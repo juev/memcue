@@ -99,7 +99,7 @@ func configureJudge() {
 type vetLine struct {
 	Time        string   `json:"time"`
 	ID          string   `json:"id"`
-	Decision    string   `json:"decision"` // approve, retire, provisional, left; failed: … when the base refused the write
+	Decision    string   `json:"decision"` // approve, retire, provisional, split, left; failed: … when the base refused the write
 	Applied     bool     `json:"applied"`
 	Provisional bool     `json:"provisional,omitempty"`
 	Verdict     string   `json:"verdict"`
@@ -109,6 +109,8 @@ type vetLine struct {
 	Expires     string   `json:"expires,omitempty"`
 	Source      string   `json:"source,omitempty"`
 	Content     string   `json:"content,omitempty"`
+	Parts       []string `json:"parts,omitempty"` // what a split candidate was split into
+	Into        []string `json:"into,omitempty"`  // ids of the parts, once they are written
 }
 
 // vetRecord is the summary line of a run.
@@ -119,6 +121,7 @@ type vetRecord struct {
 	Retired     int            `json:"retired"`
 	Unsure      int            `json:"unsure"`
 	Provisional int            `json:"provisional,omitempty"`
+	Split       int            `json:"split,omitempty"`
 	Failed      int            `json:"failed,omitempty"`
 	JudgeErrs   int            `json:"judge_errors,omitempty"`
 	JudgeCalls  int            `json:"judge_calls,omitempty"`
@@ -135,6 +138,7 @@ type vetOptions struct {
 	auto    bool
 	ttlDays int
 	memory  string // directory of the built-in memory notes; empty skips the mirror rule
+	parts   bool   // the candidates are the parts of a split in this run: they are not split again
 }
 
 // vetTTLDays is how long a provisional fact is recalled; the default is two weeks.
@@ -292,8 +296,7 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 					decided = append(decided, vet.Decision{Fact: f, Verdict: vet.Unsure, By: "model", Failed: true,
 						Reason: "the judge said nothing"})
 				default:
-					decided = append(decided, vet.Decision{Fact: f, Verdict: verdictOf(d.Verdict), By: "model",
-						Reason: strings.TrimSpace(d.Reason), Expires: d.Expires})
+					decided = append(decided, modelDecision(f, d, o.parts))
 				}
 			}
 		}
@@ -341,6 +344,7 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 	}
 
 	lines := make([]vetLine, 0, len(decided))
+	var parts []store.Fact
 	for _, d := range decided {
 		line := vetLine{Time: rec.Time, ID: d.Fact.ID, Verdict: string(d.Verdict), By: d.By,
 			Reason: d.Reason, Expires: d.Expires, Provisional: d.Provisional, Source: d.Fact.Source,
@@ -349,6 +353,8 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 			line.P = &p
 		}
 		switch {
+		case d.Verdict == vet.Split:
+			line.Decision, line.Parts = "split", d.Parts
 		case d.Provisional:
 			line.Decision = "provisional"
 		case d.Verdict == vet.Keep:
@@ -360,6 +366,8 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		}
 		if o.dry {
 			switch {
+			case d.Verdict == vet.Split:
+				rec.Split++
 			case d.Provisional:
 				rec.Provisional++
 			case d.Verdict == vet.Keep:
@@ -373,6 +381,19 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 			continue
 		}
 		switch d.Verdict {
+		case vet.Split:
+			written, err := s.SplitCandidate(d.Fact.ID, d.Parts)
+			if err != nil {
+				line.Decision = "failed: " + err.Error()
+				rec.Failed++
+				break
+			}
+			line.Applied = true
+			rec.Split++
+			for _, p := range written {
+				line.Into = append(line.Into, p.ID)
+			}
+			parts = append(parts, written...)
 		case vet.Keep, vet.Drop:
 			line.Decision = applyVet(s, d, line.Decision)
 			if strings.HasPrefix(line.Decision, "failed") {
@@ -394,7 +415,55 @@ func vetQueue(s *store.Store, cands []store.Fact, o vetOptions) ([]vetLine, vetR
 		}
 		lines = append(lines, line)
 	}
+	// The parts are reviewed in the same run: a session's vet sees only the ids the session stored, so parts left for
+	// later would wait for a manual run. A part that the model wants to split again stays a candidate instead.
+	if len(parts) > 0 {
+		sub := o
+		sub.parts = true
+		more, subRec := vetQueue(s, parts, sub)
+		lines = append(lines, more...)
+		rec.add(subRec)
+	}
 	return lines, rec
+}
+
+// add counts a run over the parts of a split into the run that split them.
+func (r *vetRecord) add(o vetRecord) {
+	r.Candidates += o.Candidates
+	r.Approved += o.Approved
+	r.Retired += o.Retired
+	r.Unsure += o.Unsure
+	r.Provisional += o.Provisional
+	r.Split += o.Split
+	r.Failed += o.Failed
+	r.JudgeErrs += o.JudgeErrs
+	r.JudgeCalls += o.JudgeCalls
+	r.CostUSD += o.CostUSD
+	r.Tokens.Add(o.Tokens)
+	if r.Error == "" {
+		r.Error = o.Error
+	}
+}
+
+// modelDecision turns the model's answer about one candidate into a decision. A split needs two parts at least, and a
+// part of a split is not split again in the same run; either case is a failed answer, so the candidate waits.
+func modelDecision(f store.Fact, d extract.ReviewDecision, isPart bool) vet.Decision {
+	dec := vet.Decision{Fact: f, Verdict: verdictOf(d.Verdict), By: "model", Reason: strings.TrimSpace(d.Reason),
+		Expires: d.Expires}
+	if dec.Verdict != vet.Split {
+		return dec
+	}
+	switch {
+	case isPart:
+		dec.Verdict, dec.Failed = vet.Unsure, true
+		dec.Reason = "a part of a split was split again; " + dec.Reason
+	case len(d.Parts) < 2:
+		dec.Verdict, dec.Failed = vet.Unsure, true
+		dec.Reason = fmt.Sprintf("split into %d part(s); %s", len(d.Parts), dec.Reason)
+	default:
+		dec.Parts, dec.Expires = d.Parts, ""
+	}
+	return dec
 }
 
 // duplicateStage is what the duplicate judge did with a batch: the candidates it retired, those it could not decide,
@@ -606,6 +675,8 @@ func verdictOf(word string) vet.Verdict {
 		return vet.Keep
 	case extract.DropVerdict:
 		return vet.Drop
+	case extract.SplitVerdict:
+		return vet.Split
 	default:
 		return vet.Unsure
 	}
@@ -628,6 +699,11 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 			clip(l.Content, 90), reason); err != nil {
 			return err
 		}
+		for _, p := range l.Parts {
+			if _, err := fmt.Fprintf(out, "       + %s\n", clip(p, 110)); err != nil {
+				return err
+			}
+		}
 	}
 	if rec.Candidates == 0 {
 		_, err := fmt.Fprintln(out, "Карантин memcue пуст.")
@@ -639,6 +715,9 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 		line = fmt.Sprintf("Пробный прогон, ничего не изменено. Кандидатов %d: к принятию %d, к отклонению %d, "+
 			"временно принять %d, осталось решать %d", rec.Candidates, rec.Approved, rec.Retired, rec.Provisional,
 			rec.Unsure)
+	}
+	if rec.Split > 0 {
+		line += fmt.Sprintf("; разделено на части %d", rec.Split)
 	}
 	if rec.Failed > 0 {
 		line += fmt.Sprintf("; ошибок записи %d", rec.Failed)
