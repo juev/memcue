@@ -79,18 +79,22 @@ type vetLine struct {
 
 // vetRecord is the summary line of a run.
 type vetRecord struct {
-	Time        string         `json:"time"`
-	Candidates  int            `json:"candidates"`
-	Approved    int            `json:"approved"`
-	Retired     int            `json:"retired"`
-	Unsure      int            `json:"unsure"`
-	Provisional int            `json:"provisional,omitempty"`
-	Split       int            `json:"split,omitempty"`
-	Failed      int            `json:"failed,omitempty"`
-	DryRun      bool           `json:"dry_run,omitempty"`
-	CostUSD     float64        `json:"cost_usd,omitempty"`
-	Tokens      extract.Tokens `json:"tokens,omitempty"`
-	Error       string         `json:"error,omitempty"`
+	Time        string `json:"time"`
+	Candidates  int    `json:"candidates"`
+	Approved    int    `json:"approved"`
+	Retired     int    `json:"retired"`
+	Unsure      int    `json:"unsure"`
+	Provisional int    `json:"provisional,omitempty"`
+	Split       int    `json:"split,omitempty"`
+	Failed      int    `json:"failed,omitempty"`
+	// Suspects counts the approved facts the binary found suspect and asked the model about (#289); SuspectsRetired
+	// those the model said describe a past state as current.
+	Suspects        int            `json:"suspects,omitempty"`
+	SuspectsRetired int            `json:"suspects_retired,omitempty"`
+	DryRun          bool           `json:"dry_run,omitempty"`
+	CostUSD         float64        `json:"cost_usd,omitempty"`
+	Tokens          extract.Tokens `json:"tokens,omitempty"`
+	Error           string         `json:"error,omitempty"`
 }
 
 // vetOptions is how a run was asked for.
@@ -168,8 +172,11 @@ func runVet(args []string, out io.Writer) error {
 		if ttl <= 0 {
 			ttl = vetTTLDays()
 		}
-		lines, rec = vetQueue(s, cands, vetOptions{dry: *dry, noModel: *noModel, auto: policyAuto, ttlDays: ttl,
-			memory: *memory})
+		o := vetOptions{dry: *dry, noModel: *noModel, auto: policyAuto, ttlDays: ttl, memory: *memory}
+		lines, rec = vetQueue(s, cands, o)
+		more, sus := vetSuspects(s, o, time.Now())
+		lines = append(lines, more...)
+		rec.add(sus)
 		return nil
 	})
 	if err != nil {
@@ -376,6 +383,8 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Provisional += o.Provisional
 	r.Split += o.Split
 	r.Failed += o.Failed
+	r.Suspects += o.Suspects
+	r.SuspectsRetired += o.SuspectsRetired
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -542,6 +551,12 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 			}
 		}
 	}
+	if rec.Suspects > 0 {
+		if _, err := fmt.Fprintf(out, "Подозрительных одобренных фактов %d: снято %d\n", rec.Suspects,
+			rec.SuspectsRetired); err != nil {
+			return err
+		}
+	}
 	if rec.Candidates == 0 {
 		_, err := fmt.Fprintln(out, "Карантин memcue пуст.")
 		return err
@@ -598,7 +613,7 @@ func releaseVetLock(lock *os.File) {
 // logVet appends the decisions and the summary to vet.log. The log is the record a human checks the automatic
 // decisions by, so a failure to write it is reported rather than swallowed.
 func logVet(lines []vetLine, rec vetRecord) error {
-	if len(lines) == 0 && rec.Candidates == 0 {
+	if len(lines) == 0 && rec.Candidates == 0 && rec.Error == "" {
 		return nil
 	}
 	dir, err := stateDir()
@@ -640,8 +655,11 @@ func maybeVet(ids []string) {
 		}
 		cands = append(cands, f)
 	}
-	lines, rec := vetQueue(s, cands, vetOptions{auto: vetAutoPolicy(), ttlDays: vetTTLDays(),
-		memory: os.Getenv("MEMCUE_MEMORY_DIR")})
+	o := vetOptions{auto: vetAutoPolicy(), ttlDays: vetTTLDays(), memory: os.Getenv("MEMCUE_MEMORY_DIR")}
+	lines, rec := vetQueue(s, cands, o)
+	more, sus := vetSuspects(s, o, time.Now())
+	lines = append(lines, more...)
+	rec.add(sus)
 	if err := logVet(lines, rec); err != nil {
 		fmt.Fprintln(os.Stderr, "memcue:", err)
 	}

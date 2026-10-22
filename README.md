@@ -142,7 +142,8 @@ memcue facts | grep -E 'MEMCUE_EMBED|MEMCUE_(VET|RERANK|TRIAGE)_(URL|MODEL|KEY)|
 ```
 
 `memcue retire ID` a fact that describes the removed state as current, `memcue correct ID TEXT` one that is partly
-true, and keep one that records what was measured or decided then.
+true, and keep one that records what was measured or decided then. Since 0.5.3 `vet` finds most of these itself (see
+[Review and vet](#review-and-vet)); facts about the host's own config files are still found only this way.
 
 Schema 4 was the schema of 0.3.0 and 0.4.0; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
 every machine that shares the base before the first new memcue writes to it. If you ran `memcue install` before
@@ -407,6 +408,14 @@ deterministic rules and the review model to the queue, `memcue approve ID...` ta
 once, and an explicit `correct` of an approved fact writes a new active version. A retired fact cannot be corrected:
 retirement is final, so a changed fact is added as a new fact, and the review page's undo remains the way back from a
 rejection. The full rules are in [Use](#use).
+
+`vet` also checks the approved facts that this binary finds suspect: a fact that names a `MEMCUE_*` variable or a
+`` `memcue X` `` verb it does not have, a memcue version older than its own (a release build only), or a reminder
+whose dates have all passed. Code can find such a fact but cannot tell a stale one from a record of history, so the main
+model reads each with what was found and retires those that describe a past state as current. Every fact asked about is
+remembered with its version and the binary's version in `vet.checked` in the state directory, so a kept fact is not
+asked about again until its text or the binary changes. `-no-model` only lists the suspects; `-dry-run` asks and
+changes nothing.
 
 ## Harness support
 
