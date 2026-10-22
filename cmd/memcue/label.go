@@ -29,23 +29,25 @@ const labelBatch = 40
 // (_global/feedback_dns_dual_stack.md)".
 var reNote = regexp.MustCompile(`\(([^/()\s]+)/([^/()\s]+\.md)\)\s*$`)
 
-// noteKinds maps the prefix of a note's file name to the kind of every fact taken from it. A project note mixes
-// state, decisions and events, so its facts go to the model.
-var noteKinds = map[string]string{"feedback": "rule", "user": "rule", "negative": "pitfall", "reference": "environment"}
+// noteKinds maps the prefix of a note's file name to the kind of every fact taken from it. Only the notes whose facts
+// stay out of the card are settled this way: a feedback or user note splits into rules and plain knowledge about a
+// tool, and a project note mixes state, decisions and events, so their facts go to the model.
+var noteKinds = map[string]string{"negative": "pitfall", "reference": "environment"}
 
-// noteLabel returns what the migrated note of a fact says about it: the scope from the note's directory, and the kind
-// from its name where the name settles it. A fact with no note in its origin gets nothing.
-func noteLabel(origin string) (kind, scope string) {
+// noteLabel returns what the migrated note of a fact says about it: the scope from the note's directory, the kind from
+// its name where the name settles it, and the note's type (the prefix of its name) as a hint for the model. A fact
+// with no note in its origin gets nothing.
+func noteLabel(origin string) (kind, scope, note string) {
 	m := reNote.FindStringSubmatch(origin)
 	if m == nil {
-		return "", ""
+		return "", "", ""
 	}
 	scope = "repo:" + m[1]
 	if m[1] == tier.Global {
 		scope = "global"
 	}
-	prefix, _, _ := strings.Cut(m[2], "_")
-	return noteKinds[prefix], scope
+	note, _, _ = strings.Cut(m[2], "_")
+	return noteKinds[note], scope, note
 }
 
 // labelValues are the fields a run fills.
@@ -74,6 +76,7 @@ type labelInput struct {
 	Origin string `json:"origin,omitempty"`
 	Kind   string `json:"kind,omitempty"`
 	Scope  string `json:"scope,omitempty"`
+	Note   string `json:"note,omitempty"` // the type of the migrated note: feedback, user, project, …
 }
 
 // pendingLabel is a fact of the run with the values it is going to get.
@@ -81,6 +84,7 @@ type pendingLabel struct {
 	fact store.Fact
 	to   labelValues
 	by   []string
+	note string
 }
 
 // runLabel fills the kind and scope of approved facts written before those fields existed: memcue label [-dry-run]
@@ -108,7 +112,8 @@ func runLabel(args []string, out io.Writer) error {
 				continue
 			}
 			p := &pendingLabel{fact: f, to: labelValues{Kind: f.Kind, Scope: f.Scope, Expires: f.Expires}}
-			kind, scope := noteLabel(f.Origin)
+			kind, scope, note := noteLabel(f.Origin)
+			p.note = note
 			if p.to.Kind == "" && kind != "" {
 				p.to.Kind = kind
 			}
@@ -211,7 +216,7 @@ func askLabels(batch []*pendingLabel, host string, st *labelStats) error {
 	byID := map[string]*pendingLabel{}
 	for _, p := range batch {
 		in.Facts = append(in.Facts, labelInput{ID: p.fact.ID, Text: p.fact.Content, Origin: p.fact.Origin,
-			Kind: p.to.Kind, Scope: p.to.Scope})
+			Kind: p.to.Kind, Scope: p.to.Scope, Note: p.note})
 		byID[p.fact.ID] = p
 	}
 	b, err := json.Marshal(in)

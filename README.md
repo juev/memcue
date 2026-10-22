@@ -216,9 +216,10 @@ itself.
 
 `memcue label` fills the kind and scope of approved facts written before those fields existed; the card needs them to
 carry a rule or a decision. A fact migrated from a note gets its scope from the note's directory (`_global` →
-`global`, any other → `repo:<name>`) and its kind from the note's name: `feedback_*` and `user_*` → `rule`,
-`negative_*` → `pitfall`, `reference_*` → `environment`. The model labels the rest, in batches of 40, on the review
-model (`MEMCUE_API_URL` or `claude -p`), and may give an expiry to a dated fact. Only empty fields are filled; each
+`global`, any other → `repo:<name>`), and from a `negative_*` note the kind `pitfall`, from a `reference_*` note
+`environment`. The model labels the rest, in batches of 40, on the review model (`MEMCUE_API_URL` or `claude -p`),
+told the type of the note a fact came from: a `feedback_*` note holds rules and plain knowledge about a tool alike, so
+its type is a hint, not the kind. The model may also give an expiry to a dated fact. Only empty fields are filled; each
 label is a new version that keeps the fact's text and date, so it syncs like any other write and does not move an old
 fact ahead of new ones. Every change goes to `label-<time>.jsonl` in the state directory, and `memcue label -revert`
 with that file restores the previous values of the facts nobody edited since. `-no-model` applies only what the notes
