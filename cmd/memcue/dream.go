@@ -104,6 +104,18 @@ const (
 	splitParallel = 8
 )
 
+const (
+	expandBatch    = 25 // facts one expansion call reads
+	expandParallel = 6
+)
+
+// expandFn is the expansion step, replaced in tests.
+var expandFn = func(input string) (extract.ExpandResult, error) {
+	ctx, cancel := contextTimeout()
+	defer cancel()
+	return extract.ExpandFacts(ctx, input)
+}
+
 // splitFn is the split step, replaced in tests.
 var splitFn = func(input string) (extract.SplitResult, error) {
 	ctx, cancel := contextTimeout()
@@ -129,12 +141,16 @@ type dreamRecord struct {
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
 	// SplitErrors counts split calls that failed; their facts stay as they are until the next dream reviews them.
-	SplitErrors int            `json:"split_errors,omitempty"`
-	CostUSD     float64        `json:"cost_usd"`
-	Tokens      extract.Tokens `json:"tokens"`
-	Plan        string         `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
-	Triage      *triageRecord  `json:"triage,omitempty"`
-	Error       string         `json:"error,omitempty"`
+	SplitErrors int `json:"split_errors,omitempty"`
+	// Expanded counts the facts that got search queries; ExpandErrors the expansion calls that failed, whose facts
+	// wait for the next dream.
+	Expanded     int            `json:"expanded,omitempty"`
+	ExpandErrors int            `json:"expand_errors,omitempty"`
+	CostUSD      float64        `json:"cost_usd"`
+	Tokens       extract.Tokens `json:"tokens"`
+	Plan         string         `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
+	Triage       *triageRecord  `json:"triage,omitempty"`
+	Error        string         `json:"error,omitempty"`
 }
 
 // dreamPlan is what a dry run decided, for -apply to carry out later without the model: the actions of each group
@@ -143,7 +159,15 @@ type dreamPlan struct {
 	Start  time.Time        `json:"start"`
 	Seen   map[string]int   `json:"seen"`
 	Splits []dreamPlanSplit `json:"splits,omitempty"`
-	Groups []dreamPlanGroup `json:"groups"`
+	// Expansions are the search queries for facts that had none, with the version the model read.
+	Expansions []dreamPlanExpansion `json:"expansions,omitempty"`
+	Groups     []dreamPlanGroup     `json:"groups"`
+}
+
+type dreamPlanExpansion struct {
+	ID      string   `json:"id"`
+	Version int      `json:"version"`
+	Queries []string `json:"queries"`
 }
 
 // dreamPlanSplit is a compound fact the dry run would split, with the version the model read. The owner may edit the
@@ -303,6 +327,36 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 			saw[sp.plan.ID] = sp.plan.Version + 1
 			for _, p := range sp.parts {
 				saw[p.ID] = p.Version
+			}
+		}
+		// Then every fresh fact without search queries gets them, the parts of a split included, so the groups and
+		// recall find it by the words a user asks with. A dry run leaves out the facts it would split.
+		splitIDs := map[string]bool{}
+		for _, sp := range plan.Splits {
+			splitIDs[sp.ID] = true
+		}
+		var bare []store.Fact
+		for _, f := range fresh {
+			if len(f.Queries) == 0 && !splitIDs[f.ID] {
+				bare = append(bare, f)
+			}
+		}
+		expanded, err := expandStep(s, bare, &rec)
+		if err != nil {
+			return rec, err
+		}
+		for _, e := range expanded {
+			if dryRun {
+				plan.Expansions = append(plan.Expansions, e.plan)
+				continue
+			}
+			active = replaceFact(active, e.fact.ID, []store.Fact{e.fact})
+			fresh = replaceFact(fresh, e.fact.ID, []store.Fact{e.fact})
+			saw[e.fact.ID] = e.fact.Version
+		}
+		if rec.Expanded > 0 {
+			if _, err := fmt.Fprintf(out, "expanded %d facts\n", rec.Expanded); err != nil {
+				return rec, err
 			}
 		}
 	}
@@ -473,6 +527,27 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 			return rec, err
 		}
 	}
+	// Expansions next. The version they write is the plan's own change, so the groups below still count the fact as
+	// unchanged at that version; any other change refuses its group.
+	expandedFrom := map[string]int{}
+	for _, e := range plan.Expansions {
+		f, err := s.SetQueries(e.ID, e.Version, extract.CleanQueries(e.Queries))
+		switch {
+		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound):
+			rec.Refused = append(rec.Refused, "expand "+e.ID+": "+err.Error())
+			continue
+		case err != nil:
+			return rec, err
+		}
+		expandedFrom[e.ID] = e.Version
+		saw[e.ID] = f.Version
+		rec.Expanded++
+	}
+	if rec.Expanded > 0 {
+		if _, err := fmt.Fprintf(out, "expanded %d facts\n", rec.Expanded); err != nil {
+			return rec, err
+		}
+	}
 	// The snapshot must name every fact of the plan, including provisional and retired ones: store.Active leaves
 	// provisional facts out, and a group with a provisional neighbour would otherwise look changed and be refused
 	// although nothing happened since the dry run.
@@ -496,7 +571,7 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 	for _, g := range plan.Groups {
 		changed := ""
 		for id, v := range g.Facts {
-			if now[id] != v {
+			if now[id] != v && (expandedFrom[id] != v || now[id] != v+1) {
 				changed = id
 				break
 			}
@@ -609,6 +684,71 @@ func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writ
 				}
 			}
 			found = append(found, ds)
+		}
+	}
+	return found, nil
+}
+
+// dreamExpansion is one fact that got queries: what a plan keeps of it and, once written, the new version.
+type dreamExpansion struct {
+	plan dreamPlanExpansion
+	fact store.Fact
+}
+
+// expandStep asks the main model for the search queries of facts that have none and, unless the record is a dry run,
+// writes them. A failed call leaves its facts for the next dream and is counted, as a failed split call is; an answer
+// about a fact that was not sent, or with no query, is ignored; a fact changed while the model ran is refused.
+func expandStep(s *store.Store, facts []store.Fact, rec *dreamRecord) ([]dreamExpansion, error) {
+	batches := slices.Collect(slices.Chunk(facts, expandBatch))
+	res := make([]extract.ExpandResult, len(batches))
+	errs := make([]error, len(batches))
+	sem := make(chan struct{}, expandParallel)
+	var wg sync.WaitGroup
+	for i, batch := range batches {
+		input, err := renderSplitInput(batch)
+		if err != nil {
+			return nil, err
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			res[i], errs[i] = expandFn(input)
+		}()
+	}
+	wg.Wait()
+	var found []dreamExpansion
+	for i, batch := range batches {
+		rec.CostUSD += res[i].CostUSD
+		rec.Tokens.Add(res[i].Tokens)
+		if errs[i] != nil {
+			rec.ExpandErrors++
+			continue
+		}
+		byID := make(map[string]store.Fact, len(batch))
+		for _, f := range batch {
+			byID[f.ID] = f
+		}
+		for _, e := range res[i].Facts {
+			f, ok := byID[e.ID]
+			if !ok || len(e.Queries) == 0 {
+				continue
+			}
+			delete(byID, e.ID) // a second answer about the same fact is ignored
+			x := dreamExpansion{plan: dreamPlanExpansion{ID: f.ID, Version: f.Version, Queries: e.Queries}, fact: f}
+			if !rec.DryRun {
+				nf, err := s.SetQueries(f.ID, f.Version, e.Queries)
+				if errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound) {
+					rec.Refused = append(rec.Refused, "expand "+f.ID+": "+err.Error())
+					continue
+				}
+				if err != nil {
+					return found, err
+				}
+				x.fact = nf
+			}
+			rec.Expanded++
+			found = append(found, x)
 		}
 	}
 	return found, nil
