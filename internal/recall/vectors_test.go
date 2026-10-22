@@ -371,3 +371,76 @@ func TestRecallJudgeMarksDisplacement(t *testing.T) {
 		t.Error("the omitted fact of this host did not mark the served foreign fact as displaced")
 	}
 }
+
+// gateBase holds facts that pass the default gates for gatePrompt and facts that hold one or two of its terms.
+func gateBase(t *testing.T, passing int) *store.Store {
+	t.Helper()
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	for i := range passing {
+		if _, err := s.Add(fmt.Sprintf("Ротация журналов nginx на хосте loffe, вариант %d.", i), nil, "test 2026-10-22"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, content := range []string{
+		"Журналы systemd держит journald, его лимит задан в journald.conf.",
+		"Конфиг nginx на loffe лежит в /etc/nginx/conf.d.",
+	} {
+		if _, err := s.Add(content, nil, "test 2026-10-22"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return s
+}
+
+const gatePrompt = "почему журналы nginx на loffe не ротируются"
+
+// With a judge, a fact the words found but the term gate turned away still reaches the judge while there is room
+// among its candidates, and is served when the judge scores it; recall without a judge keeps the gate.
+func TestRecallJudgeReadsAFactTheGateTurnedAway(t *testing.T) {
+	s := gateBase(t, 0)
+	if plain, err := Recall(s, gatePrompt, "", Default); err != nil || len(plain) != 0 {
+		t.Fatalf("the gate must turn both facts away without a judge: %v %v", ids(plain), err)
+	}
+	trace := &Trace{}
+	p := Default
+	p.Trace = trace
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"journald": 0.9}}
+	hits, err := RecallJudge(s, gatePrompt, "", p, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.asked != 2 || len(hits) != 1 || !contains(hits[0].Content, "journald") {
+		t.Fatalf("asked %d, hits %v", r.asked, ids(hits))
+	}
+	gated := 0
+	for _, st := range trace.Lexical {
+		if st.Verdict == VerdictGatedToJudge {
+			gated++
+		}
+	}
+	if gated != 2 {
+		t.Errorf("trace marks %d facts as sent to the judge below the gate: %+v", gated, trace.Lexical)
+	}
+}
+
+// Facts below the gate only take free candidate slots: when the facts that passed fill them, the judge reads those.
+func TestRecallJudgeKeepsTheSlotsOfPassedFacts(t *testing.T) {
+	s := gateBase(t, 10)
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"journald": 0.9, "вариант": 0.6}}
+	hits, err := RecallJudge(s, gatePrompt, "", Default, r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.asked != 10 {
+		t.Fatalf("asked %d, want the 10 facts that passed", r.asked)
+	}
+	for _, h := range hits {
+		if contains(h.Content, "journald") || contains(h.Content, "conf.d") {
+			t.Errorf("a fact below the gate took the slot of a passed one: %v", ids(hits))
+		}
+	}
+}

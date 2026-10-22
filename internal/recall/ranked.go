@@ -34,7 +34,7 @@ func ranked(s *store.Store, prompt string, p Params, r Ranker) ([]Hit, bool) {
 	if r == nil {
 		return nil, false
 	}
-	facts, err := recallCandidates(s, prompt, p)
+	facts, _, err := recallCandidates(s, prompt, p)
 	if err != nil || len(facts) < minRankCandidates {
 		return nil, false
 	}
