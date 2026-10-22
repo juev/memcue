@@ -324,11 +324,11 @@ func TestMaybeDreamOnlyWhenOnAndDue(t *testing.T) {
 	if _, ok := lastDream(state); !ok || len(*calls) != 0 {
 		t.Fatalf("first call: marked %v, calls %d", ok, len(*calls))
 	}
-	maybeDream() // not a day yet
+	maybeDream() // not an hour yet
 	if len(*calls) != 0 {
-		t.Errorf("dreamt before a day passed")
+		t.Errorf("dreamt before an hour passed")
 	}
-	if err := markDream(state, time.Now().Add(-25*time.Hour)); err != nil {
+	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	// the first call saw the whole base, so a due dream has nothing new to review
@@ -336,11 +336,18 @@ func TestMaybeDreamOnlyWhenOnAndDue(t *testing.T) {
 	if len(*calls) != 0 {
 		t.Errorf("facts the first call saw were sent: calls %d", len(*calls))
 	}
-	if err := markDream(state, time.Now().Add(-25*time.Hour)); err != nil {
-		t.Fatal(err)
-	}
 	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",
 		"nightly-sync", "workflow")
+	if err := markDream(state, time.Now().Add(-59*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	maybeDream() // a new fact, but the last dream was 59 minutes ago
+	if len(*calls) != 0 {
+		t.Errorf("dreamt within the hour: calls %d", len(*calls))
+	}
+	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
 	maybeDream()
 	if len(*calls) != 1 {
 		t.Errorf("due dream with a new fact: calls %d", len(*calls))

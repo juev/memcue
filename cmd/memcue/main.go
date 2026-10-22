@@ -140,7 +140,7 @@ environment:
   MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
   MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
   MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
-  MEMCUE_DREAM    1 runs a dream after an extraction once a day (dream.log in the state directory)
+  MEMCUE_DREAM    1 runs a dream after an extraction once an hour (dream.log in the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
                   claude is on PATH), after storing them and before the dream; undecided ones become provisional for
                   MEMCUE_VET_TTL_DAYS

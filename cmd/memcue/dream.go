@@ -38,9 +38,9 @@ var dreamNeighbours = recall.Params{
 }
 
 const (
-	maxGroup      = 6  // facts in one group: a chain of neighbours longer than that is cut
-	groupsPerCall = 10 // groups the model sees at once
-	dreamEvery    = 24 * time.Hour
+	maxGroup      = 6         // facts in one group: a chain of neighbours longer than that is cut
+	groupsPerCall = 10        // groups the model sees at once
+	dreamEvery    = time.Hour // with no new fact and none left without queries, a dream calls no model
 )
 
 const (
@@ -253,7 +253,7 @@ func runDream(args []string, out io.Writer) error {
 	return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 }
 
-// maybeDream runs a dream after an extraction when MEMCUE_DREAM=1 and a day has passed since the last one. The first
+// maybeDream runs a dream after an extraction when MEMCUE_DREAM=1 and an hour has passed since the last one. The first
 // call only marks the start and the facts the base holds, so the base a machine already had is not swept by surprise
 // (memcue dream -all does that).
 // Its failures go to dream.log and never fail the extraction.
