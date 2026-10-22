@@ -96,7 +96,7 @@ plugin and the binary from the same release.
    `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
    Without a repository memcue works the same; the base is just not synced. A merge carries the vectors whose text
-   hash still matches the merged fact; `memcue embed` fills any missing or stale ones.
+   hash still matches the merged fact; the next write, or `memcue embed`, fills any missing or stale ones.
 
 The hooks do nothing while `memcue` is not on `PATH`, so installing the plugin first is harmless.
 
@@ -286,7 +286,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/embed.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 The vector reader is a candidate source for the judge, not a standalone reader: without
 `MEMCUE_JUDGE_*`, `MEMCUE_EMBED_*` changes nothing in recall. Without `MEMCUE_EMBED_*`, the judge
