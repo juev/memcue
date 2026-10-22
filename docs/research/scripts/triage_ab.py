@@ -1,14 +1,17 @@
 """Dream triage by Jev and by the main model on a sample of `memcue dream -all -list` groups, labelled by Opus.
 
   python3 -I triage_ab.py sample groups.md N SEED sample.json
-  python3 -I triage_ab.py ask    sample.json READER OUT.jsonl      READER: jev | main-lp | main-json
-  python3 -I triage_ab.py label  sample.json labels.json
+  python3 -I triage_ab.py ask    sample.json READER OUT.jsonl
+                                 READER: jev | main-lp | main-json | main-pairs | main-pairs-low
+  python3 -I triage_ab.py label  sample.json labels.json                [LABELLER=deepseek]
   python3 -I triage_ab.py report sample.json labels.json OUT.jsonl...
 
 Jev gets the request of extract.TriageGroup: the policy and the numbered facts in state, one `choice` of duplicate,
 outdated and none; P(act) = P(duplicate) + P(outdated). The main model, reasoning off, gets the same policy and the
-same three options: main-lp answers with one letter and P(act) comes from the logprobs of that letter; main-json
-writes the three probabilities. Opus answers the same question for every group of the sample, blind to the readers.
+same three options (LABELLER=deepseek asks the main model the Opus question instead, reasoning at its default):
+main-lp answers with one letter and P(act) comes from the logprobs of that letter; main-json
+writes the three probabilities; main-pairs names the pairs of facts that are duplicates or outdated, and a group with
+at least one pair is sent (P(act) is 1 or 0); main-pairs-low is main-pairs with reasoning at effort "low". Opus answers the same question for every group of the sample, blind to the readers.
 """
 import json
 import math
@@ -58,7 +61,7 @@ def post(url, key, body):
     req = urllib.request.Request(url, data=json.dumps(body).encode(),
                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     t = time.monotonic()
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=900) as r:
         resp = json.load(r)
     return resp, time.monotonic() - t
 
@@ -74,30 +77,42 @@ def ask_jev(facts):
     return p.get("duplicate", 0) + p.get("outdated", 0), dt, u.get("input_tokens", 0), u.get("output_tokens", 0)
 
 
-def ask_main(facts, json_mode):
-    if json_mode:
+def ask_main(facts, reader):
+    if reader == "main-json":
         options = "\n".join(f"{k}: {v}" for k, v in CRITERIA.items())
         task = ("Does this group need a cleanup action? Options:\n" + options +
                 '\nAnswer with JSON: {"duplicate": p, "outdated": p, "none": p}, probabilities from 0 to 1 that sum '
                 "to 1.")
+    elif reader.startswith("main-pairs"):
+        task = ("List every pair of facts that needs a cleanup action:\n" +
+                "\n".join(f"{k}: {v}" for k, v in CRITERIA.items() if k != "none") +
+                '\nAnswer with JSON: {"pairs": [{"a": n, "b": n, "kind": "duplicate" or "outdated"}]}; an empty list '
+                "when the facts are distinct and consistent.")
     else:
         options = "\n".join(f"{k} - {v}: {CRITERIA[v]}" for k, v in LETTERS.items())
         task = "Does this group need a cleanup action? Options:\n" + options + "\nAnswer with one letter: A, B or C."
-    body = {"model": os.environ["MEMCUE_MODEL"], "thinking": {"type": "disabled"},
+    body = {"model": os.environ["MEMCUE_MODEL"],
             "messages": [{"role": "system", "content": POLICY},
                          {"role": "user", "content": f"Facts:\n{numbered(facts)}\n\n{task}"}]}
-    if json_mode:
+    if reader.endswith("-low"):
+        body["reasoning_effort"] = "low"
+    else:
+        body["thinking"] = {"type": "disabled"}
+    if reader == "main-lp":
+        body["logprobs"], body["top_logprobs"], body["max_tokens"] = True, 10, 1
+    else:
         body["response_format"] = {"type": "json_object"}
         body["temperature"] = 0
-    else:
-        body["logprobs"], body["top_logprobs"], body["max_tokens"] = True, 10, 1
     resp, dt = post(os.environ["MEMCUE_API_URL"].rstrip("/") + "/chat/completions", os.environ["MEMCUE_API_KEY"], body)
     c = resp["choices"][0]
     u = resp.get("usage", {})
-    if json_mode:
+    if reader == "main-json":
         p = json.loads(c["message"]["content"])
         total = sum(float(p.get(k, 0)) for k in CRITERIA) or 1
         p_act = (float(p.get("duplicate", 0)) + float(p.get("outdated", 0))) / total
+    elif reader.startswith("main-pairs"):
+        pairs = json.loads(c["message"]["content"])["pairs"]
+        p_act = 1.0 if any(x.get("kind") in ("duplicate", "outdated") for x in pairs) else 0.0
     else:
         mass = {k: 0.0 for k in LETTERS}
         for t in c["logprobs"]["content"][0]["top_logprobs"]:
@@ -120,6 +135,15 @@ OPUS_SCHEMA = json.dumps({"type": "object", "required": ["groups"], "properties"
 
 def opus(batch):
     text = "\n".join(f"## Group {n}\n{numbered(g)}\n" for n, g in batch)
+    if os.environ.get("LABELLER") == "deepseek":
+        body = {"model": os.environ["MEMCUE_MODEL"], "response_format": {"type": "json_object"},
+                "messages": [{"role": "system",
+                              "content": OPUS_SYSTEM + "\nAnswer with JSON matching this schema: " + OPUS_SCHEMA},
+                             {"role": "user", "content": text}]}
+        resp, _ = post(os.environ["MEMCUE_API_URL"].rstrip("/") + "/chat/completions", os.environ["MEMCUE_API_KEY"],
+                       body)
+        out = json.loads(resp["choices"][0]["message"]["content"])
+        return {str(x["n"]): x["answer"] for x in out["groups"]}, 0
     with tempfile.TemporaryDirectory() as d:
         r = subprocess.run(["claude", "-p", "--model", "claude-opus-5-5", "--tools", "", "--no-session-persistence",
                             "--settings", '{"disableAllHooks": true}', "--system-prompt", OPUS_SYSTEM,
@@ -152,7 +176,7 @@ if mode == "ask":
                 if reader == "jev":
                     p, dt, tin, tout = ask_jev(facts)
                 else:
-                    p, dt, tin, tout = ask_main(facts, reader == "main-json")
+                    p, dt, tin, tout = ask_main(facts, reader)
                 return {"n": n, "p_act": p, "seconds": dt, "input": tin, "output": tout}
             except Exception as e:  # keep the error; a failed group is part of the result
                 err = f"{type(e).__name__}: {e}"
@@ -180,7 +204,7 @@ elif mode == "label":
 elif mode == "report":
     labels = json.loads(Path(sys.argv[3]).read_text())
     pos = {n for n, a in labels.items() if a != "none"}
-    print(f"groups {len(labels)}, Opus says act: {len(pos)}")
+    print(f"groups {len(labels)}, the labeller says act: {len(pos)}")
     for path in sys.argv[4:]:
         rows = {r["n"]: r for r in map(json.loads, open(path)) if "error" not in r}
         line = []

@@ -1,9 +1,12 @@
 # The main model in the judge's roles, October 2026
 
-Status: **measured 2026-10-22; keep Jev in both roles.** Issue #274 asked whether the main model (`deepseek-flash`,
-reasoning off) can answer the judge's typed questions in the two roles Jev still has: recall rerank and dream triage.
-If it could, memcue would need one provider instead of two. Opus labelled both samples, so neither side is graded by
-its own family. Aggregate numbers only: the base holds host names, paths and private repositories.
+Status: **measured 2026-10-22 in two rounds.** Issue #274 asked whether the main model (`deepseek-flash`) can answer
+the judge's questions in the two roles Jev still has: recall rerank and dream triage. If it could, memcue would need
+one provider instead of two. The first round asked the main model Jev's own question, a probability per fact or
+group, and it lost in both roles. The second round (#279) changed the shape of the question: for rerank, the main
+model picks at most two facts from the list (**listwise**), and in this shape it matches Jev on useful prompts with
+less noise. For triage, it names the pairs that need an action. Both samples were labelled blind by Opus and again by
+DeepSeek. Aggregate numbers only: the base holds host names, paths and private repositories.
 
 ## Why measure again
 
@@ -96,21 +99,87 @@ The main model answers "none" too readily. Its probabilities are almost binary: 
 of the Opus groups as Jev does at 0.2, it sends almost every group (main-json at 0.1: 126–131 of 150). A triage that
 passes everything saves nothing; one that loses a third of the needed actions is wrong.
 
+## Second round: questions that suit a chat model
+
+The first round made the main model imitate Jev: a probability for every fact. A chat model is not trained to give
+calibrated probabilities; it is trained to compare and choose. The second round (#279) used the same candidates, groups
+and readers' scripts with three changes:
+
+- **listwise rerank** (`main-list`): the model gets the 20 candidates and answers `{"facts": [n, ...]}`, at most two
+  facts, the most helpful first, or none. No threshold: what it picks is served.
+- **triage by pairs** (`main-pairs`): the model names the pairs of the group that are duplicates or outdated; a group
+  with a pair goes on to the dream.
+- **short reasoning** (`-low`): the same two shapes with `reasoning_effort: "low"` instead of reasoning off.
+
+Both rounds were then labelled a second time by `deepseek-flash` with the Opus instructions, reasoning at its default:
+598 pairs in 22 calls and the 150 groups in 15 calls. Opus labelled the 87 new pairs ($1.11).
+
+### Rerank
+
+Jev at its default threshold of 0.5 against the new readers; two runs each:
+
+| Reader | Opus: top-1 / any | Opus: NOISE | DeepSeek: top-1 / any | DeepSeek: NOISE | Median | p95 | Over 2 s |
+|---|---|---:|---|---:|---:|---:|---:|
+| Jev 0.5 | 92 / 101 | 40–44 | 105–106 / 115–117 | 22–26 | 0.52 s | 0.93–1.08 s | 0–2 |
+| main-json 0.5 | 81–84 / 92–94 | 11–12 | 91–95 / 100–102 | 4–5 | 1.47–1.50 s | 1.75–1.80 s | 0–5 |
+| **main-list** | **94 / 104** | **25–27** | **103 / 111** | **7–9** | **1.22–1.27 s** | **1.50 s** | **0** |
+| main-list-low | 98–100 / 106–109 | 33 | 115–118 / 123–125 | 13–14 | 2.62–2.72 s | 4.55–5.84 s | 146–149 |
+
+Paired at top-1 against Jev 0.5, same run number:
+
+| Reader | Opus: rescues / losses | DeepSeek: rescues / losses |
+|---|---|---|
+| main-list, run 1 / run 2 | 9 / 7, 10 / 8 | 12 / 14, 10 / 13 |
+| main-list-low, run 1 | 12 / 6 | 20 / 7 |
+
+- **main-list matches Jev on useful prompts and serves a third less NOISE (Opus) to two thirds less (DeepSeek).** Opus
+  puts it 2 prompts ahead of Jev, DeepSeek 2–3 behind; the paired rescues and losses are close to even under both.
+- It is stable: the two runs served the same first fact for 167 of 171 prompts and the same list for 161, against 153
+  and 132 for Jev; the useful top-1 prompts did not change at all.
+- It reads 339k input tokens per run against Jev's 608k and writes 1.4k.
+- It is slower than Jev: 1.2–1.3 s median against 0.5 s, p95 1.5 s, with no request over the 2 s timeout.
+- main-list-low is the best reader under both labellers, but it takes 2.6–2.7 s at the median and almost every request
+  is over the 2 s timeout, so it does not fit recall.
+- main-list served two facts on 128–130 prompts and nothing on 36: it picks two whenever it picks.
+
+### Triage
+
+| Reader, two runs | Sent | Opus: kept of 29 | DeepSeek: kept of 25 | Median |
+|---|---:|---|---|---:|
+| Jev 0.2 (the default) | 76–77 | 26–27 | 22 | 0.50–0.53 s |
+| Jev 0.5 | 45–46 | 22–23 | 18–20 | |
+| main-json 0.2 | 38–44 | 19–20 | 16–18 | 1.15 s |
+| main-pairs | 41–44 | 18–20 | 18–19 | 1.09–1.15 s |
+| main-pairs-low | 31–32 | 21–22 | 19 | 4.16–4.22 s |
+
+Naming pairs helps reasoning more than it helps the plain model. main-pairs-low sends 31–32 groups and keeps as many
+needed groups as Jev does at 0.5 with 45–46; it still loses 7–8 of the 29 Opus groups (6 of the 25 DeepSeek ones)
+that Jev at 0.2 keeps all but 2–3 of. Its median of 4 s does not matter in the background, but one group took 22 s
+and 3.8k output tokens, and the two runs wrote 190–217k output tokens against Jev's 6k.
+
+### The two labellers
+
+On the 598 rerank pairs Opus and DeepSeek agree on 65% of the labels (kappa 0.43). DeepSeek is more generous: it calls
+328 pairs USEFUL against 258 for Opus, mostly pairs Opus calls RELATED (88). On the 150 groups they agree on 134 about
+whether an action is needed: 19 both, 10 Opus only, 6 DeepSeek only. The ranking of the readers is the same under both
+labellers; the absolute numbers are not comparable between them.
+
 ## Decision
 
-- **Rerank stays on Jev.** The main model gives no quality gain at any threshold, takes three times as long while the
-  user waits, and changes its answer more between runs.
-- **Triage stays on Jev.** At the send rates where it saves anything, the main model loses a third (main-json) to more
-  than half (main-lp) of the groups Opus would act on.
-- No adapter is added to memcue. The scripts stay in [scripts/](scripts/) for a rerun with another main model.
+- **Rerank: listwise main model can replace Jev.** It serves as many useful prompts, much less noise, the same answer
+  on every run, and fits the timeout. The cost is 0.7 s more per prompt while the user waits. Whether to switch is a
+  product decision; it is not made in this note.
+- **Triage stays on Jev.** No shape of the main model keeps the needed groups as well as Jev at 0.2 while sending
+  fewer of them, short of reasoning, which writes over 30 times Jev's output tokens and still loses 7–8 groups of 29.
+- The first-round shapes (one probability per fact or group) are not worth pursuing: they lose in both roles.
 
 ## Limits
 
 - One main model (`deepseek-flash`), one base and one prompt set; a larger model in the main role may behave
   differently, as the outside eval suggests.
-- Opus is one labeller; no agreement between labellers was measured on these samples.
+- Two labellers with moderate agreement (kappa 0.43); neither is ground truth.
 - Only the served pairs were labelled. "None" means the reader served nothing, not that the base had nothing.
-- 150 triage groups with 29 positives: a difference of two or three kept groups is within the spread.
+- 150 triage groups with 25–29 positives: a difference of two or three kept groups is within the spread.
 - Latency was measured with four requests in parallel from one Mac; the hook sends one.
 
 ## Found along the way
@@ -123,16 +192,17 @@ question (gold set labels of 2026-10-21 came from `deepseek-flash`, not Opus).
 
 ```bash
 go run -tags research ./docs/research/scripts/judgecand FACTS.db eval.json > cand.jsonl
-python3 -I docs/research/scripts/judge_ab.py cand.jsonl jev jev-1.jsonl          # also main-lp, main-json
+python3 -I docs/research/scripts/judge_ab.py cand.jsonl jev jev-1.jsonl  # also main-lp, main-json, main-list, main-list-low
 python3 -I docs/research/scripts/judge_ab_report.py label  cand.jsonl labels.json jev-1.jsonl main-json-1.jsonl ...
 python3 -I docs/research/scripts/judge_ab_report.py report cand.jsonl labels.json jev-1.jsonl main-json-1.jsonl ...
 
 MEMCUE_FACTS=COPY.db MEMCUE_STATE_DIR=STATE memcue dream -all -list > groups.md
 python3 -I docs/research/scripts/triage_ab.py sample groups.md 150 274 sample.json
-python3 -I docs/research/scripts/triage_ab.py ask    sample.json jev t-jev-1.jsonl   # also main-lp, main-json
+python3 -I docs/research/scripts/triage_ab.py ask    sample.json jev t-jev-1.jsonl  # also main-lp, main-json, main-pairs, main-pairs-low
 python3 -I docs/research/scripts/triage_ab.py label  sample.json tlabels.json
 python3 -I docs/research/scripts/triage_ab.py report sample.json tlabels.json t-jev-1.jsonl ...
 ```
 
 The readers take `MEMCUE_JUDGE_*` and `MEMCUE_API_URL`, `MEMCUE_MODEL`, `MEMCUE_API_KEY` from the environment; the
-labels need `claude` on the path.
+Opus labels need `claude` on the path, and `LABELLER=deepseek` in front of a `label` command asks the main model
+instead.
