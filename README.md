@@ -137,6 +137,8 @@ memcue approve ID [ID ...]           # take candidates into recall
 memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
+memcue recall -explain "text"        # every step: terms, lexical gate, vectors, judge scores, final cut
+memcue recall -fact ID "text"        # where this fact dropped out for this prompt
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
@@ -293,7 +295,10 @@ orders the lexical candidates only.
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
 displaced one of this host. It stays on your machine and is what you judge recall by; it is off by default because it
-keeps the text of your prompts. `extract.log` has one JSON line per extraction run: session, part of the transcript
+keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
+that lost it: the lexical gate (too few terms or low coverage), the vector reader (below the top, outside the
+`MEMCUE_VECTOR_POOL` most recent vectors, or no vector yet), the judge (score below the minimum) or the cut to the
+first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
 The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the
