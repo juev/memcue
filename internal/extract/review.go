@@ -19,11 +19,46 @@ const (
 
 // ReviewDecision is the verdict for one candidate.
 type ReviewDecision struct {
-	ID      string   `json:"id"`
-	Verdict string   `json:"verdict"` // keep, drop, unsure, split; any other word is read as unsure
-	Reason  string   `json:"reason"`
-	Expires string   `json:"expires,omitempty"` // YYYY-MM-DD, only when the fact is worth keeping until then
-	Parts   []string `json:"parts,omitempty"`   // with split: the simple facts the candidate holds, each standing alone
+	ID      string `json:"id"`
+	Verdict string `json:"verdict"` // keep, drop, unsure, split; any other word is read as unsure
+	Reason  string `json:"reason"`
+	Expires string `json:"expires,omitempty"` // YYYY-MM-DD, only when the fact is worth keeping until then
+	Parts   Parts  `json:"parts,omitempty"`   // with split: the simple facts the candidate holds, each standing alone
+}
+
+// Parts are the texts of a split. Without reasoning the model sometimes gives a part as an object, such as
+// {"text": "…", "system": "loffe"} (#270): its text is the part, and a part with no text is dropped, so one odd answer
+// does not fail the whole batch.
+type Parts []string
+
+// UnmarshalJSON reads the parts as strings or as objects that carry the text.
+func (p *Parts) UnmarshalJSON(b []byte) error {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if raw == nil {
+		*p = nil
+		return nil
+	}
+	out := make(Parts, 0, len(raw))
+	for _, r := range raw {
+		var text string
+		if err := json.Unmarshal(r, &text); err != nil {
+			var obj struct {
+				Text string `json:"text"`
+			}
+			if err := json.Unmarshal(r, &obj); err != nil {
+				return err
+			}
+			text = obj.Text
+		}
+		if strings.TrimSpace(text) != "" {
+			out = append(out, text)
+		}
+	}
+	*p = out
+	return nil
 }
 
 // ReviewResult is the model's answer over a batch of candidates.

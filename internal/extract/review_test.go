@@ -120,3 +120,28 @@ func TestReviewAsksWithoutReasoning(t *testing.T) {
 		t.Errorf("another endpoint got the DeepSeek switch: %s", rt.body)
 	}
 }
+
+// Parts given as objects with a text are read as that text, and an empty part is dropped: one odd answer must not fail
+// the whole batch (#270).
+func TestReviewReadsPartsGivenAsObjects(t *testing.T) {
+	oldAPI, oldModel := API, Model
+	t.Cleanup(func() { API, Model = oldAPI, oldModel })
+	rt := &roundTrip{content: `{"decisions":[` +
+		`{"id":"a","verdict":"split","reason":"r","expires":null,"parts":[{"text":"Первая часть.","system":"loffe"},{"text":""},"Вторая часть."]},` +
+		`{"id":"b","verdict":"keep","reason":"r","expires":null,"parts":null}]}`}
+	useTransport(t, rt)
+	API.URL, API.Key, Model = "https://api.deepseek.com", "k", "deepseek-flash"
+	r, err := Review(context.Background(), `{"candidates":[]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Decisions) != 2 {
+		t.Fatalf("decisions %+v", r.Decisions)
+	}
+	if got := r.Decisions[0].Parts; len(got) != 2 || got[0] != "Первая часть." || got[1] != "Вторая часть." {
+		t.Errorf("parts %q", got)
+	}
+	if r.Decisions[1].Parts != nil {
+		t.Errorf("null parts read as %q", r.Decisions[1].Parts)
+	}
+}
