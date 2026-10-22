@@ -191,8 +191,8 @@ func renderCard(facts []store.Fact) (string, []string, error) {
 	return header + "\n" + strings.Join(out, "\n") + "\n", ids, nil
 }
 
-// cardRecord is one line of card.log: the facts the session-start card carried. The audit reads it to see rules
-// and decisions that recall never serves, and so would look unused.
+// cardRecord is one line of card.log: the facts the session-start card carried. It shows the rules and decisions
+// that reach the agent although recall never serves them, and so would look unused.
 type cardRecord struct {
 	Time    string   `json:"time"`
 	Session string   `json:"session,omitempty"`
