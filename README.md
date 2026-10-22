@@ -5,8 +5,8 @@ through hooks:
 
 - **Before each prompt** it looks for facts that share enough rare words with the prompt and gives the agent at
   most two of them, or nothing. Most prompts get nothing; that is intended.
-- **At session start, and again after a compaction or `/clear`** it sends a card: global rules and the decisions
-  of the current repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never
+- **At session start, and again after a compaction or `/clear`** it sends a card: global rules and the rules and
+  decisions of the current repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never
   shares a word with a prompt still reaches the agent.
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
@@ -145,6 +145,9 @@ memcue dream -all -dry-run -plan plan.json # review the whole base, keep what th
 memcue dream -apply plan.json              # carry it out later, without the model
 memcue audit -dry-run -plan audit.json     # propose old journal and CI facts to retire
 memcue audit -apply audit.json             # carry out the retire decisions after review
+memcue label -dry-run                      # how many old facts lack a kind or a scope
+memcue label                               # fill them from the migrated notes and the model
+memcue label -revert STATE/label-….jsonl   # undo a run
 ```
 
 `memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
@@ -210,6 +213,16 @@ heuristic whose labelled precision is lower, and a fact changed since the plan i
 review therefore retires nothing of that heuristic, even when its few labels agree. The plan, the measured precision
 and every applied or refused decision go to `audit.log`. Usage only orders the review; it never retires a fact by
 itself.
+
+`memcue label` fills the kind and scope of approved facts written before those fields existed; the card needs them to
+carry a rule or a decision. A fact migrated from a note gets its scope from the note's directory (`_global` →
+`global`, any other → `repo:<name>`) and its kind from the note's name: `feedback_*` and `user_*` → `rule`,
+`negative_*` → `pitfall`, `reference_*` → `environment`. The model labels the rest, in batches of 40, on the review
+model (`MEMCUE_API_URL` or `claude -p`), and may give an expiry to a dated fact. Only empty fields are filled; each
+label is a new version that keeps the fact's text and date, so it syncs like any other write and does not move an old
+fact ahead of new ones. Every change goes to `label-<time>.jsonl` in the state directory, and `memcue label -revert`
+with that file restores the previous values of the facts nobody edited since. `-no-model` applies only what the notes
+settle.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. The date is the local calendar day of the
