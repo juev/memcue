@@ -87,6 +87,36 @@ The gate experiments used a build with environment knobs that was not committed.
   the words alone, and all 18 rescued facts were candidates only the vectors found.
 - **Expansion helps the judge**: without vectors, 99 → 108 prompts at the same noise.
 
+## Without vectors: more candidates in BM25 order
+
+The rows above gave the judge ten lexical candidates in the gate's order: those that passed first, then the turned-away
+ones by coverage. An experiment build (not committed) tried three ways to win back what the vectors found, on the
+expanded base, with Jev and no embedder:
+
+1. the judge reads the first facts of the search in BM25 order, passed and turned away together;
+2. pseudo-relevance feedback: the 5 rarest stems shared by the top 5 facts go into a second FTS search;
+3. a synonym dictionary applied to the query: the main model without reasoning gave replacements for the 4,923 words
+   that occur in at least three facts (47 s, 27k input and 70k output tokens; 5,689 stem replacements).
+
+| Recall (Jev, no vectors) | Useful (top-1 / any) | USEFUL | RELATED | NOISE |
+|---|---|---|---|---|
+| 10 candidates, gate order | 98 / 108 | 165 | 46 | 19 |
+| 10 candidates, BM25 order | 107 / 113 | 181 | 46 | 16 |
+| 20 candidates, gate order | 107 / 120 | 182 | 57 | 20 |
+| **20 candidates, BM25 order**, two runs | **113 / 122–124** | 197–201 | 47–48 | 19–21 |
+| 20 candidates, BM25 order, base not expanded | 105 / 115 | 186 | 49 | 22 |
+| 20 candidates, BM25 order + PRF | 111 / 122 | 197 | 50 | 17 |
+| 20 candidates, BM25 order + dictionary | 107 / 115 | 178 | 68 | 23 |
+| vectors + Jev, two runs | 114–116 / 121–124 | 189–194 | 66–67 | 17–18 |
+
+Twenty facts in BM25 order match the full path: the vector candidates mostly filled places the words would fill if
+the judge read more of them, in the search's own order. Expansion adds 7–9 prompts here. PRF changes nothing beyond the
+run-to-run spread, and the dictionary makes it worse, because synonyms pull other facts into the twenty places.
+
+The product change (#232, step 1) was measured the same way: 114 / 123 prompts, NOISE 23, in a clean run; in another
+run one judge request timed out at 2 s, the judge paused for 60 s as designed, and 10 prompts got the words' answer
+(108 / 119, NOISE 17). The judged lists matched the experiment for 169 of the 180 prompts.
+
 ## What other projects do
 
 Checked in their docs and source on 2026-10-22:
@@ -128,12 +158,24 @@ local Ollama would store a second set of the same vectors in the synced base (th
 
 ## Decision and next steps
 
-- **Keep the vectors; move the embedder to a local Ollama** where the host can run it: recall loses 0.8–1.5 s and a
-  paid call per prompt. Only configuration changes (`MEMCUE_EMBED_URL=http://127.0.0.1:11434/v1`,
-  `MEMCUE_EMBED_MODEL=bge-m3`, then `memcue embed`). Not known yet: whether the Hermes container on loffe can reach an
-  Ollama.
-- **Keep expansion** as a cheap addition for the judge (+9 prompts), written by extraction in the same call.
-- **Jev stays in recall for now.** A local cross-encoder (bge-reranker-v2-m3) in its place is a hypothesis, not
-  measured; if it matched Jev on the gold set, the only paid model would be the main one, in the background.
-- **Independent of the above:** vet duplicates without the Jev stage (#240), and reasoning off per call where a
-  labelled sample shows no loss.
+An earlier decision of the same day, to keep the vectors and move the embedder to a local Ollama, was dropped:
+
+- the vectors a machine stores depend on the model its configuration names, so machines with different embedders
+  cannot share them, and naming the tag explicitly does not change that;
+- a local Ollama with bge-m3 holds 1.3 GB of memory (the `llama-server` process; the model itself is 0.69 GB, F16,
+  567M parameters) and 1.2 GB on disk, for vectors alone;
+- a static model computed inside memcue (Model2Vec `potion-multilingual-128M`, distilled from bge-m3, 256 dimensions)
+  needs no server, but its matrix is 512 MB, and a pure-Go Unigram tokenizer would have to be written.
+
+What stands:
+
+1. **Recall without vectors** (#232, step 1): the judge reads the first 20 facts the words found, in BM25 order.
+2. **Expansion at write time** (step 2): extraction writes search phrases for its facts in the same call, and every
+   dream fills them for facts that have none (written by `add`, `correct` or `import`); `dream -all` does the base
+   once.
+3. **Vet duplicates without the Jev stage** (#240, step 3).
+4. **Remove the embedder** (step 4): `memcue embed`, `MEMCUE_EMBED_*` and the stored vectors.
+5. **Reasoning off** per call where a labelled sample shows no loss.
+
+Jev stays in recall: the main model as the reranker scored 108 against 112 and takes seconds per prompt
+(`main-reranker-2026-10.md`); a local cross-encoder in its place is not measured.

@@ -1,5 +1,10 @@
 # Vector candidates for the judge
 
+**Status 2026-10-22 (#232):** recall no longer reads vectors. Twenty facts the words found, in BM25 order, gave the
+judge as many useful facts on the gold set of 180 prompts as the vector candidates did
+([research/one-model-2026-10.md](research/one-model-2026-10.md)). `memcue embed` still fills vectors until they are
+removed; the rest of this note describes the reader as it was.
+
 Recall reads facts by words: the FTS5 index over the stems of every active fact. Words are exact on a ticket key, a
 path, a port or a version, but they cannot find a fact described in other words. The optional vector model proposes
 such facts as **candidates**; the Jev judge decides whether they reach the prompt.

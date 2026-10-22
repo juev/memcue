@@ -1,5 +1,11 @@
 # The judge: order the facts the words and the vectors found
 
+**Status 2026-10-22 (#232):** recall no longer reads vectors. The judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES`
+facts (default 20) the words found, in BM25 order, whether the lexical gate let them pass or not; on the gold set of
+180 prompts this matched the vector candidates plus the judge
+([research/one-model-2026-10.md](research/one-model-2026-10.md)). The rest of this note is the history of the
+measurements.
+
 The words find the facts; they do not order them well. On a gold set built for the purpose, FTS5 put a useful fact
 first for 44 of 120 prompts. A semantic retriever alone did worse (bge-m3 21, Jev over the whole base 12), but a useful
 fact was among the candidates for 95 prompts: the loss was in the ranking, not in candidate generation.
@@ -25,7 +31,7 @@ request limits and timeouts under the judge namespace.
 | `MEMCUE_JUDGE_MODEL` | e.g. `typesafe/jev-1.14` |
 | `MEMCUE_JUDGE_KEY` | bearer token |
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a fact is not given (default 0.5) |
-| `MEMCUE_JUDGE_RERANK_CANDIDATES` | candidates taken from each source (default 10) |
+| `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in BM25 order (default 20; 10 from each source before #232) |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request (default 2 s) |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request (default 2 s) |
 | `MEMCUE_JUDGE_DUP_TIMEOUT` | one duplicate request (default 10 s) |

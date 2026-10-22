@@ -160,7 +160,7 @@ memcue approve ID [ID ...]           # take candidates into recall
 memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
-memcue recall -explain "text"        # every step: terms, lexical gate, vectors, judge scores, final cut
+memcue recall -explain "text"        # every step: terms, lexical gate, judge scores, final cut
 memcue recall -fact ID "text"        # where this fact dropped out for this prompt
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -since 2026-10-19 -dry-run
@@ -316,7 +316,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.14` | unset: no judge |
 | `MEMCUE_JUDGE_KEY` | key for that endpoint | unset: no judge |
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
-| `MEMCUE_JUDGE_RERANK_CANDIDATES` | candidates taken from each source, lexical and vector | `10` |
+| `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in the search's BM25 order | `20` |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
@@ -324,12 +324,11 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_DUP_MIN` | probability of "same claim" that retires a candidate | `0.5` |
 | `MEMCUE_JUDGE_DUP_MAX_FACTS` | approved facts that fit one duplicate request | `400` |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | `1` sends the danger-zone header for the duplicate check | off |
-| `MEMCUE_EMBED_URL` | OpenAI-compatible embeddings endpoint, e.g. `http://127.0.0.1:11434/v1` | unset: no vector candidates |
+| `MEMCUE_EMBED_URL` | OpenAI-compatible embeddings endpoint for `memcue embed`, e.g. `http://127.0.0.1:11434/v1`; recall no longer reads vectors | unset |
 | `MEMCUE_EMBED_MODEL` | embeddings model, e.g. `bge-m3` | unset |
 | `MEMCUE_EMBED_KEY` | key for a hosted embeddings endpoint; empty for a local server | empty |
 | `MEMCUE_EMBED_TIMEOUT` | one embedding request | `2s` |
 | `MEMCUE_EMBED_SPACE` | label of the vector space when a server changes model under one name | empty |
-| `MEMCUE_VECTOR_POOL` | vectors of the most recent facts scored per prompt; `0` or less scores every vector | `2000` |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
@@ -342,22 +341,20 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/embed.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
-The vector reader is a candidate source for the judge, not a standalone reader: without
-`MEMCUE_JUDGE_*`, `MEMCUE_EMBED_*` changes nothing in recall. Without `MEMCUE_EMBED_*`, the judge
-orders the lexical candidates only. The lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) was tuned
-for words alone; with a judge, the lexical candidates that passed it come first, and while there are fewer than
-`MEMCUE_JUDGE_RERANK_CANDIDATES` the free places go to the facts the words found but the gate turned away, highest
-coverage first. On a gold set of 180 prompts this gave a useful fact to 121–124 prompts instead of 110–111, with the
-same noise ([docs/research/recall-misses-2026-10.md](docs/research/recall-misses-2026-10.md)).
+With a judge configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
+whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
+tuned for words alone. Recall does not read vectors: on a gold set of 180 prompts, twenty facts in BM25 order gave a
+useful fact to 119–124 prompts, as many as the vector candidates and the judge together (121–124), with noise of 17–23
+facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed`
+still fills vectors; nothing reads them now.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
 displaced one of this host. It stays on your machine and is what you judge recall by; it is off by default because it
 keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
-that lost it: the lexical gate (too few terms or low coverage; with a judge, "below the gate, sent to the judge"
-means it was read anyway), the vector reader (below the top, outside the
-`MEMCUE_VECTOR_POOL` most recent vectors, or no vector yet), the judge (score below the minimum) or the cut to the
-first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
+that lost it: the search (not among its results), the lexical gate (too few terms or low coverage; with a judge,
+"below the gate, sent to the judge" means it was read anyway, and "over the judge's candidate limit" that it came too
+late in the BM25 order), the judge (score below the minimum) or the cut to the first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
 The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the
