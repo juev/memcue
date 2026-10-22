@@ -116,7 +116,6 @@ commands:
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
   dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
-  label     fill the kind and scope of old facts from their notes and the model: memcue label [-dry-run] [-no-model] [-limit N] | memcue label -revert FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
@@ -212,8 +211,6 @@ func main() {
 		err = runFacts(os.Stdout)
 	case "dream":
 		err = runDream(os.Args[2:], os.Stdout)
-	case "label":
-		err = runLabel(os.Args[2:], os.Stdout)
 	case "migrate":
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":

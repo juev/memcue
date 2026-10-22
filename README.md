@@ -172,9 +172,6 @@ memcue dream -since 2026-10-19 -list # groups of similar facts a dream would rev
 memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
 memcue dream -apply plan.json              # carry it out later, without the model
-memcue label -dry-run                      # how many old facts lack a kind or a scope
-memcue label                               # fill them from the migrated notes and the model
-memcue label -revert STATE/label-….jsonl   # undo a run
 ```
 
 `memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
@@ -247,21 +244,10 @@ in this order:
 3. The rest of the card is filled in the order of step 1, global rules and the repository's facts together, so a
    repository whose stated decisions come first may take more than half.
 
-Measured on the author's base (65 global rules after `memcue label`, 129 facts for the largest repository): the
+Measured on the author's base (65 global rules after the labelling of #219, 129 facts for the largest repository): the
 global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
 with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already serves
 are the ones the card is not needed for.
-
-`memcue label` fills the kind and scope of approved facts written before those fields existed; the card needs them to
-carry a rule or a decision. A fact migrated from a note gets its scope from the note's directory (`_global` →
-`global`, any other → `repo:<name>`), and from a `negative_*` note the kind `pitfall`, from a `reference_*` note
-`environment`. The model labels the rest, in batches of 40, on the review model (`MEMCUE_API_URL` or `claude -p`),
-told the type of the note a fact came from: a `feedback_*` note holds rules and plain knowledge about a tool alike, so
-its type is a hint, not the kind. The model may also give an expiry to a dated fact. Only empty fields are filled; each
-label is a new version that keeps the fact's text and date, so it syncs like any other write and does not move an old
-fact ahead of new ones. Every change goes to `label-<time>.jsonl` in the state directory, and `memcue label -revert`
-with that file restores the previous values of the facts nobody edited since. `-no-model` applies only what the notes
-settle.
 
 An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
 skips it, so a one-off reminder does not keep coming back months later. The date is the local calendar day of the

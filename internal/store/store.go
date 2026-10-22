@@ -663,8 +663,8 @@ func (s *Store) Reopen(id string) (Fact, error) {
 
 // Relabel adds a version of an active fact with the given kind, scope and expiry; the content and everything else
 // stay, the creation time too: a label does not make an old fact new, which would move it ahead of recent facts in the
-// card and in the vector pool. version is the version the caller decided on: a fact edited since is refused with
-// ErrChanged, so a labelling run or its revert never overwrites a later edit.
+// card. version is the version the caller decided on: a fact edited since is refused with ErrChanged, so a label
+// never overwrites a later edit.
 func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
