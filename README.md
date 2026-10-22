@@ -174,10 +174,10 @@ every candidate the rules cannot decide in that queue as well. Every verdict goe
 directory with the rule or model and its reason; the page, the `approve` command and the page's undo (`store.Reopen`)
 stay the manual way, unchanged.
 
-The review runs on the main model. With `MEMCUE_VET=1` the facts a session just stored are reviewed in the
-extraction process, after storing them and before the dream; that process is already detached from the session, so a
-turn never waits for the verdict. A run that finds another one busy is skipped rather than queued, and its failures go
-to `vet.log`, not to the extraction.
+The review runs on the main model. Whenever `MEMCUE_API_URL` is set, the facts a session just stored are reviewed in
+the extraction process, after storing them and before the dream (`MEMCUE_VET=0` turns that off); that process is
+already detached from the session, so a turn never waits for the verdict. A run that finds another one busy is skipped
+rather than queued, and its failures go to `vet.log`, not to the extraction.
 
 A duplicate can be answered without reading a candidate: only by comparing it with the base. With `MEMCUE_JUDGE_URL`,
 `MEMCUE_JUDGE_MODEL` and `MEMCUE_JUDGE_KEY` set to a typed decisions endpoint (OpenRouter
@@ -282,7 +282,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once a day | off |
-| `MEMCUE_VET` | `1` decides the facts a session extracted, right after storing them and before the dream; needs `MEMCUE_API_URL` | off |
+| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, when `MEMCUE_API_URL` is set | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |

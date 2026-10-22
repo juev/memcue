@@ -126,7 +126,9 @@ the rerank-gate issue.
 
 ## Other decisions and non-goals
 
-- **Review runs on the main model.** `MEMCUE_VET=1` remains off by default. A contradiction with
+- **Review runs on the main model.** It is on by default whenever `MEMCUE_API_URL` is set
+  (`MEMCUE_VET=0` turns it off); a setup without that endpoint, such as Claude Code extracting
+  through `claude -p`, still leaves candidates to the review queue (#225). A contradiction with
   an approved fact is `unsure` (not `drop`); by default it becomes provisional for
   `MEMCUE_VET_TTL_DAYS`, recalled after approved facts. `MEMCUE_VET_POLICY=quarantine` keeps the
   human queue.
