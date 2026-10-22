@@ -39,7 +39,8 @@ func gitEnv(home string) []string {
 func twoClones(t *testing.T, bin string) (env []string, mac, server string) {
 	t.Helper()
 	dir := t.TempDir()
-	env = gitEnv(dir)
+	// The driver must merge with the binary under test, not with a memcue the machine has on PATH.
+	env = append(gitEnv(dir), "MEMCUE_BIN="+bin)
 	origin := filepath.Join(dir, "origin.git")
 	run(t, dir, env, "git", "init", "-q", "--bare", "-b", "main", origin)
 	seed := filepath.Join(dir, "seed")
