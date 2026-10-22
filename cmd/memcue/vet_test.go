@@ -277,10 +277,11 @@ func TestVetUnreadableNoteSkipsMirrors(t *testing.T) {
 	}
 }
 
-// A session reviews only the ids it stored, and only when MEMCUE_VET=1 and an endpoint is set: the extraction path
-// must not start a model call on its own.
+// A session reviews only the ids it stored, and only when an endpoint is set and MEMCUE_VET is not 0: without a review
+// model the extraction path must not start a call, and MEMCUE_VET=0 turns the review off.
 func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 	env(t)
+	t.Setenv("MEMCUE_VET", "")
 	oldURL := extract.API.URL
 	t.Cleanup(func() { extract.API.URL = oldURL })
 	newer := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-21", "tool")
@@ -289,14 +290,15 @@ func TestMaybeVetGatesAndReviewsStoredIDs(t *testing.T) {
 
 	maybeVet([]string{newer})
 	if len(*calls) != 0 {
-		t.Fatal("an unset MEMCUE_VET reviewed the queue")
-	}
-	t.Setenv("MEMCUE_VET", "1")
-	maybeVet([]string{newer})
-	if len(*calls) != 0 {
 		t.Fatal("a missing endpoint reviewed the queue")
 	}
 	extract.API.URL = "http://127.0.0.1:1"
+	t.Setenv("MEMCUE_VET", "0")
+	maybeVet([]string{newer})
+	if len(*calls) != 0 {
+		t.Fatal("MEMCUE_VET=0 reviewed the queue")
+	}
+	t.Setenv("MEMCUE_VET", "")
 	maybeVet([]string{newer})
 	if len(*calls) != 1 {
 		t.Fatalf("review calls %d", len(*calls))
