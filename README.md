@@ -342,6 +342,11 @@ that lost it: the search (not among its results), the lexical gate (too few term
 late in the BM25 order), the judge (score below the minimum) or the cut to the first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
+`cost_usd` in `extract.log`, `vet.log` and `dream.log` holds only what a caller reports in dollars: `claude -p` and
+the Jev endpoint. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
+`tokens` (`input`, of which `cached` came from the prompt cache, and `output`) times the provider's price; memcue
+keeps no price table, since prices change and differ by account (#258).
+
 The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the
 session or note either way.
 
