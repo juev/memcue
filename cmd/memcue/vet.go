@@ -479,8 +479,9 @@ type duplicateStage struct {
 }
 
 // dupNeighbours finds the approved facts a candidate is compared with: the first ones in BM25 order, gate or not, up
-// to the judge's request size (MaxFacts stays zero: the cap is taken over approved facts only). A copy shares the candidate's words, so the whole base adds tokens, not duplicates: on
-// the 41-candidate sample every fact the whole base named at 0.5 was among the first 20 (#240).
+// to the judge's request size (MaxFacts stays zero: the cap is taken over approved facts only). A copy shares the
+// candidate's words, so the whole base adds tokens, not duplicates: on the 41-candidate sample every fact the whole
+// base named at 0.5 was among the first 20 (#240). A copy in another language shares none and is not found here.
 var dupNeighbours = recall.Params{
 	Candidates:     80,
 	MinTerms:       2,
