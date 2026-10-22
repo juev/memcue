@@ -273,6 +273,28 @@ func runRetire(args []string, out io.Writer) error {
 	})
 }
 
+func runReopen(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("reopen", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return errors.New("usage: memcue reopen ID")
+	}
+	return withStore(func(s *store.Store) error {
+		f, err := s.Restore(fs.Arg(0))
+		if err != nil {
+			return err
+		}
+		state := "active"
+		if f.Review != "" {
+			state = f.Review
+		}
+		_, err = fmt.Fprintf(out, "%s v%d %s\n", f.ID, f.Version, state)
+		return err
+	})
+}
+
 func runFacts(out io.Writer) error {
 	return withStore(func(s *store.Store) error {
 		fs, err := s.Active()

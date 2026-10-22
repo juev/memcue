@@ -112,8 +112,8 @@ func runEmbed(args []string, out, errOut io.Writer) error {
 
 // embedWrites are the commands after which an active fact may have no vector: a fact added, corrected or approved.
 // A retire needs none, and merge runs inside git as the merge driver, where the base is not yet the one recall reads.
-var embedWrites = map[string]bool{"add": true, "correct": true, "approve": true, "vet": true, "dream": true,
-	"extract-session": true, "extract-messages": true}
+var embedWrites = map[string]bool{"add": true, "correct": true, "approve": true, "reopen": true, "vet": true,
+	"dream": true, "extract-session": true, "extract-messages": true}
 
 // startEmbed runs `exe embed` in its own process, so a fact a write left without a vector reaches the vector reader
 // without the write or the turn waiting for the endpoint. Without MEMCUE_EMBED_* it does nothing. It is best effort:

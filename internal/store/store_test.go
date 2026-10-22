@@ -1108,3 +1108,42 @@ func TestRelabelKeepsContentAndDate(t *testing.T) {
 		t.Errorf("a retired fact: %v, want ErrRetired", err)
 	}
 }
+
+// Restore undoes a retire: an approved fact is found again with its content and labels, a rejected candidate goes back
+// to review, and a fact that is not retired is refused.
+func TestRestoreUndoesARetire(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddWith("Порт gitea на loffe 3000.", []string{"gitea"}, "test 2026-10-22", "",
+		Meta{Kind: "environment", Scope: "host:loffe", Source: "tool"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Restore(f.ID); !errors.Is(err, ErrNotRetired) {
+		t.Errorf("restoring an active fact: %v", err)
+	}
+	if _, err := s.Retire(f.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Restore(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 3 || got.Status != Active || got.Review != "" || got.Content != f.Content || got.Meta != f.Meta {
+		t.Errorf("restored %+v from %+v", got, f)
+	}
+	if _, ok := ids(t, s, "порт gitea")[f.ID]; !ok {
+		t.Error("a restored fact is not found by search")
+	}
+
+	c, _ := s.AddWith("Кандидат про порт forgejo 3000.", []string{"forgejo"}, "", "", Meta{Review: Candidate})
+	if _, err := s.RetireCandidate(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.Restore(c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != Active || got.Review != Candidate {
+		t.Errorf("a rejected candidate came back as %+v, want a candidate", got)
+	}
+}

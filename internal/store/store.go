@@ -648,6 +648,25 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	return f, s.write(f)
 }
 
+// ErrNotRetired is returned when a fact to restore is not retired.
+var ErrNotRetired = errors.New("fact is not retired")
+
+// Restore adds a version that brings a retired fact back with the review state it had: an approved fact is recalled
+// again, a rejected candidate waits for review again. The content and labels stay; it is the undo of a retire made by
+// a person, a vet verdict or a dream.
+func (s *Store) Restore(id string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Status != Retired {
+		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotRetired, id, state(cur))
+	}
+	f := cur
+	f.Version, f.Created, f.Author, f.Status = cur.Version+1, s.now().UTC(), s.author, Active
+	return f, s.write(f)
+}
+
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.
 func (s *Store) Retire(id string) (Fact, error) {
 	cur, err := s.Get(id)
