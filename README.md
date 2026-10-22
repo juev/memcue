@@ -6,8 +6,8 @@ through hooks:
 - **Before each prompt** it looks for facts that share enough rare words with the prompt and gives the agent at
   most two of them, or nothing. Most prompts get nothing; that is intended.
 - **At session start, and again after a compaction or `/clear`** it sends a card: global rules and the rules and
-  decisions of the current repository, newest first, within about 1.2 thousand tokens. The card is how a rule that never
-  shares a word with a prompt still reaches the agent.
+  decisions of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is how a
+  rule that never shares a word with a prompt still reaches the agent.
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
   added; nothing is compared or overwritten.
@@ -239,6 +239,20 @@ of 580k on a base of 2,670 facts — [docs/research/vet-neighbours-2026-10.md](d
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so an audit can see a rule as used even though recall
 never served it.
+
+The card holds about 3,500 characters, a dozen facts, and a labelled base has more rules than that. They are chosen
+in this order:
+
+1. The facts the user stated (`source` `user` or `user_confirmed`) come first, then the rest; newest first within
+   each. The date alone says little on a migrated base, where most rules share the day of the migration.
+2. The rules and decisions of the current repository may take half of the card before anything else is placed.
+3. The rest of the card is filled in the order of step 1, global rules and the repository's facts together, so a
+   repository whose stated decisions come first may take more than half.
+
+Measured on the author's base (65 global rules after `memcue label`, 129 facts for the largest repository): the
+global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
+with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already serves
+are the ones the card is not needed for.
 
 `memcue audit` is the one-off clean-up of the migrated base. It proposes active facts that read as a journal entry
 (a date next to "обновили", "упал", …) or a retelling of CI or a Makefile, and writes them with a reason, their

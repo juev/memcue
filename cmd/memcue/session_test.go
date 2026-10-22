@@ -205,6 +205,71 @@ func TestSessionStartCardStaysWithinBudget(t *testing.T) {
 	}
 }
 
+// Sixty global rules do not leave a repository with three lines: its facts take up to half of the card first, and the
+// rest of the room is filled in the given order.
+func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
+	long := func(i int, what string) string {
+		return fmt.Sprintf("%s %d: %s", what, i, strings.Repeat("слово ", 50))
+	}
+	var facts []store.Fact
+	for i := range 20 {
+		facts = append(facts, store.Fact{ID: fmt.Sprintf("g%02d", i), Content: long(i, "Правило"),
+			Meta: store.Meta{Kind: "rule", Scope: "global"}})
+	}
+	for i := range 6 {
+		facts = append(facts, store.Fact{ID: fmt.Sprintf("r%02d", i), Content: long(i, "Решение"),
+			Meta: store.Meta{Kind: "decision", Scope: "repo:shop"}})
+	}
+	card, ids, err := renderCard(facts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len([]rune(card)); n > cardBudget {
+		t.Errorf("card is %d runes, budget %d", n, cardBudget)
+	}
+	repo, global := 0, 0
+	for _, id := range ids {
+		if strings.HasPrefix(id, "r") {
+			repo++
+		} else {
+			global++
+		}
+	}
+	// A line is about 335 runes: half the card holds five of them, and the global rules, first in the order, fill the
+	// other half instead of the whole card.
+	if repo != 5 || global != 5 {
+		t.Errorf("repository %d lines, global %d: %v", repo, global, ids)
+	}
+	if strings.Index(card, "Правило 0:") > strings.Index(card, "Решение 0:") {
+		t.Errorf("lines are not in the given order:\n%s", card)
+	}
+
+	// Half is a floor, not a cap: facts of the repository that come first in the order keep the room after it.
+	first := append(append([]store.Fact(nil), facts[20:]...), facts[:20]...)
+	_, firstIDs, err := renderCard(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := 0
+	for _, id := range firstIDs {
+		if strings.HasPrefix(id, "r") {
+			got++
+		}
+	}
+	if got <= repo {
+		t.Errorf("a repository first in the order got %d lines, no more than its half (%d): %v", got, repo, firstIDs)
+	}
+
+	// Without facts of a repository the global rules get the whole card.
+	only, _, err := renderCard(facts[:20])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(only, "\n- "); got <= global {
+		t.Errorf("global rules alone got %d lines, no more than %d next to the repository", got, global)
+	}
+}
+
 func TestSessionStartWithoutBaseHasNoCard(t *testing.T) {
 	dir := env(t)
 	ctx := sessionStartContext(t, dir, "startup", "s1")
