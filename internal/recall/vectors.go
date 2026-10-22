@@ -2,6 +2,7 @@ package recall
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/juev/memcue/internal/store"
@@ -19,6 +20,7 @@ type Embedder interface {
 // the vector reader is not a standalone reader.
 func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker, e Embedder) ([]Hit, error) {
 	if r == nil {
+		p.Trace.fallback("no judge configured")
 		return Recall(s, prompt, sessionTier, p)
 	}
 	lexical, err := recallCandidates(s, prompt, p)
@@ -30,15 +32,33 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 		n = len(lexical)
 	}
 	if len(lexical) > n {
+		if p.Trace != nil {
+			for _, h := range lexical[n:] {
+				relabel(p.Trace.Lexical, h.ID, VerdictOverJudge)
+			}
+		}
 		lexical = lexical[:n]
 	}
 	candidates := append([]Hit(nil), lexical...)
 	if e != nil {
-		if vector, err := vectorCandidates(s, prompt, p, e, n); err == nil {
+		vector, err := vectorCandidates(s, prompt, p, e, n)
+		if err == nil {
 			candidates = mergeCandidates(candidates, vector)
+			if p.Trace != nil {
+				for _, h := range lexical {
+					if slices.ContainsFunc(vector, func(v Hit) bool { return v.ID == h.ID }) {
+						relabel(p.Trace.Vector, h.ID, VerdictFoundByWords)
+					}
+				}
+			}
+		} else if p.Trace != nil {
+			p.Trace.VectorError = err.Error()
 		}
+	} else if p.Trace != nil {
+		p.Trace.VectorError = "no embedder configured"
 	}
 	if len(candidates) < minRankCandidates {
+		p.Trace.fallback("fewer than two candidates for the judge")
 		return Recall(s, prompt, sessionTier, p)
 	}
 	contents := make([]string, len(candidates))
@@ -47,8 +67,14 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 	}
 	scores, err := r.Scores(context.Background(), prompt, contents)
 	if err != nil || len(scores) != len(candidates) {
+		if err != nil {
+			p.Trace.fallback("judge failed: " + err.Error())
+		} else {
+			p.Trace.fallback("judge returned a wrong number of scores")
+		}
 		return Recall(s, prompt, sessionTier, p)
 	}
+	p.Trace.judge(candidates, scores, r.Min())
 	order := make([]int, len(candidates))
 	for i := range order {
 		order[i] = i
@@ -86,6 +112,7 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 	if len(eligible) > maxFacts {
 		served = eligible[:maxFacts]
 	}
+	p.Trace.final(eligible, len(served))
 	if p.Host != "" {
 		omitted := false
 		for _, h := range eligible[len(served):] {
@@ -111,6 +138,9 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker,
 // lexical ones.
 func vectorCandidates(s *store.Store, prompt string, p Params, e Embedder, n int) ([]Hit, error) {
 	rows, err := s.VectorsLimit(e.Tag(), p.VectorPool)
+	if p.Trace != nil {
+		p.Trace.VectorPool = p.VectorPool
+	}
 	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
@@ -127,14 +157,31 @@ func vectorCandidates(s *store.Store, prompt string, p Params, e Embedder, n int
 		sim float64
 	}
 	var found []candidate
+	var skipped []Step
 	for _, row := range rows {
 		if row.Dim != len(query) || row.Hash != store.TextHash(row.Content) || store.Expired(row.Expires, today) ||
 			p.Seen[row.ID] {
+			if p.Trace != nil {
+				skipped = append(skipped, Step{ID: row.ID, Content: row.Content,
+					Verdict: vectorSkip(row, len(query), today, p.Seen)})
+			}
 			continue
 		}
 		found = append(found, candidate{row: row, sim: store.Dot(query, store.Normalize(row.Values))})
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].sim > found[j].sim })
+	if p.Trace != nil {
+		p.Trace.Vector = nil
+		for i, c := range found {
+			verdict := VerdictCandidate
+			if n > 0 && i >= n {
+				verdict = VerdictBelowTop
+			}
+			p.Trace.Vector = append(p.Trace.Vector, Step{ID: c.row.ID, Content: c.row.Content, Similarity: c.sim,
+				Verdict: verdict})
+		}
+		p.Trace.Vector = append(p.Trace.Vector, skipped...)
+	}
 	if n > 0 && len(found) > n {
 		found = found[:n]
 	}
