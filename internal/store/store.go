@@ -31,7 +31,7 @@ import (
 // Version 5 adds the search queries of a fact (queries) to what the index holds. An older memcue must refuse such a
 // base: its merge and its writes would drop the queries, and its rebuild would leave them out of the index.
 // Version 4 adds fact_vectors: the optional vectors of the active facts, one per model tag, kept next to the facts
-// because a laptop without an embeddings endpoint simply has none of them (internal/embed).
+// because a laptop without an embeddings endpoint simply has none of them (memcue embed, removed in #250).
 // Version 3 changes the stems again: a versioned name such as PostgreSQL-16 keeps its word and only the number is
 // dropped, while an uppercase ticket key such as PROJ-1234 stays one exact term. Opening an older base rebuilds the
 // derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,

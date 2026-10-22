@@ -97,8 +97,8 @@ plugin and the binary from the same release.
    It registers the driver in the repository's git config and adds `memory/facts.db merge=memcue diff=memcue` to
    `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
-   Without a repository memcue works the same; the base is just not synced. A merge carries the vectors whose text
-   hash still matches the merged fact; the next write, or `memcue embed`, fills any missing or stale ones.
+   Without a repository memcue works the same; the base is just not synced. A merge carries the vectors an older
+   memcue wrote, while their text hash still matches the merged fact.
 
 ### Binary from the plugin
 
@@ -342,11 +342,6 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_DUP_MIN` | probability of "same claim" that retires a candidate | `0.5` |
 | `MEMCUE_JUDGE_DUP_MAX_FACTS` | nearest approved facts asked about in one duplicate request | `50` |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | `1` sends the danger-zone header for the duplicate check | off |
-| `MEMCUE_EMBED_URL` | OpenAI-compatible embeddings endpoint for `memcue embed`, e.g. `http://127.0.0.1:11434/v1`; recall no longer reads vectors | unset |
-| `MEMCUE_EMBED_MODEL` | embeddings model, e.g. `bge-m3` | unset |
-| `MEMCUE_EMBED_KEY` | key for a hosted embeddings endpoint; empty for a local server | empty |
-| `MEMCUE_EMBED_TIMEOUT` | one embedding request | `2s` |
-| `MEMCUE_EMBED_SPACE` | label of the vector space when a server changes model under one name | empty |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
@@ -357,14 +352,14 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/embed.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/audit.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With a judge configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
 whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
 tuned for words alone. Recall does not read vectors: on a gold set of 180 prompts, twenty facts in BM25 order gave a
 useful fact to 119–124 prompts, as many as the vector candidates and the judge together (121–124), with noise of 17–23
-facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed`
-still fills vectors; nothing reads them now.
+facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed` and
+`MEMCUE_EMBED_*` are removed (#250); the vectors an older memcue stored stay in the base, unread.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host

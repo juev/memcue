@@ -4,6 +4,10 @@ Status: **accepted 2026-10-21 and implemented in 0.4.0.** The old opt-in endpoin
 this document is the contract the code and the README follow.
 Implementation: [#62](https://github.com/juev/memcue/issues/62).
 
+**2026-10-22:** the embeddings role is removed ([#250](https://github.com/juev/memcue/issues/250)). Recall stopped
+reading vectors ([#232](https://github.com/juev/memcue/issues/232)), and `memcue embed` and `MEMCUE_EMBED_*` are gone;
+the sections below keep the decision as it was made.
+
 ## Decision
 
 Keep exactly three model roles, each configured by environment variables:
@@ -53,7 +57,6 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 |---|---|
 | `MEMCUE_API_URL`, `MEMCUE_API_KEY`, `MEMCUE_MODEL` | main chat endpoint, key and model; URL empty means `claude -p` |
 | `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_KEY`, `MEMCUE_JUDGE_MODEL` | one Jev endpoint for triage, rerank and duplicate check |
-| `MEMCUE_EMBED_URL`, `MEMCUE_EMBED_KEY`, `MEMCUE_EMBED_MODEL` | OpenAI-compatible embeddings endpoint; key may be empty for a local server |
 
 ### Optional tuning
 
@@ -68,8 +71,6 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_JUDGE_DUP_MIN` | 0.5 | probability of "same claim" that retires a candidate |
 | `MEMCUE_JUDGE_DUP_MAX_FACTS` | 50 | nearest approved facts asked about in one duplicate request |
 | `MEMCUE_JUDGE_DUP_LONG_CONTEXT` | off | send the 262k danger-zone header for the duplicate check |
-| `MEMCUE_EMBED_TIMEOUT` | 2 s | one embedding request |
-| `MEMCUE_EMBED_SPACE` | empty | label of the vector space when a server changes model under one name |
 
 ### Removed
 
@@ -142,7 +143,7 @@ the rerank-gate issue.
   bge-m3 (21) and lexical (44). Jev orders candidates; it does not generate them.
 - **No `only` mode, no `MEMCUE_EMBED_MARGIN`, no absolute vector floor.** The vector model
   proposes top-N; the judge decides.
-- **Schema is unchanged.** `fact_vectors` stays; `memcue embed` stays. No migration.
+- **Schema is unchanged.** `fact_vectors` stays. No migration. (`memcue embed` was removed later, in #250.)
 - **0.4.0 is a breaking configuration release.** Old variable names are removed, not aliased;
   the README and release notes carry the migration table. If one release of warnings is wanted,
   it is a separate decision.
