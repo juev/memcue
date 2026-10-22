@@ -55,14 +55,20 @@ _spec.loader.exec_module(memcue_provider)
 BIN = os.environ.get("MEMCUE_BIN") or shutil.which("memcue")
 
 
+def _shell_memcue_vars() -> list:
+    """The memcue settings of the developer's shell. A judge endpoint there turns recall into a network call and
+    changes what the hook serves, so the suite runs without any of them (MEMCUE_BIN only names the binary)."""
+    return [k for k in os.environ if k.startswith("MEMCUE_") and k != "MEMCUE_BIN"]
+
+
 def _gives_a_fact_once(binary: str) -> bool:
     """Whether the binary keeps a fact from coming twice in a session (memcue 0.1.5+). Answered by trying, so a
     build from source, whose version is 'v0.1.5-dirty' or a bare hash, is judged like a release."""
     tmp = tempfile.mkdtemp()
     fact = "Проверка: проект demo слушает порт 55432."
-    env = dict(os.environ, MEMCUE_FACTS=os.path.join(tmp, "facts.db"), MEMCUE_EXTRACT="0",
+    env = {k: v for k, v in os.environ.items() if k not in _shell_memcue_vars()}
+    env.update(MEMCUE_FACTS=os.path.join(tmp, "facts.db"), MEMCUE_EXTRACT="0",
                XDG_STATE_HOME=os.path.join(tmp, "state"))
-    env.pop("MEMCUE_RECALL_LOG", None)
     payload = json.dumps({"prompt": "на каком порту слушает проект demo?", "cwd": tmp, "session_id": "probe"})
     try:
         subprocess.run([binary, "add", "-origin", "test", "--", fact], env=env, check=True, capture_output=True)
@@ -85,8 +91,8 @@ class ProviderTest(unittest.TestCase):
         os.environ["XDG_STATE_HOME"] = str(Path(self.home) / "state")  # memcue's extract.log
         # The suite must never touch a live base: an inherited MEMCUE_FACTS wins over HERMES_HOME and let an earlier
         # run write test facts into a real base and migrate it to another schema. MEMCUE_USAGE_LOG from the container
-        # would turn the usage log on behind the tests that assert it is off.
-        self._kept_env = {k: os.environ.pop(k, None) for k in ("MEMCUE_FACTS", "MEMCUE_USAGE_LOG")}
+        # would turn the usage log on behind the tests that assert it is off, and a judge endpoint changes recall.
+        self._kept_env = {k: os.environ.pop(k, None) for k in _shell_memcue_vars()}
         self.addCleanup(self._restore_facts_env)
         self.p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
