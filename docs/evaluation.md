@@ -169,6 +169,27 @@ session's language: 53 of 55 were Russian.
 
 Each extraction of 10 sessions cost about $5 on Opus; each blind comparison about $1.3.
 
+### One claim per fact (October 2026)
+
+A fact that bundles claims goes stale as a whole when one of them changes: "memcue 0.3.0 is installed on loffe, the
+binary is in P, releases are named R" kept answering "which version" after the upgrade. In a sample of 40 facts
+extracted on 20–21 October, 11 held more than one claim.
+
+Rule 1 of `session_prompt.md` got a test ("can one part go stale while the other stays true? then it is two facts"),
+the two common bundles (a system's state as a list; a fix with an unrelated aside) and a guard that splitting is no
+reason to drop a part. Ten real sessions of 0.2–2.3 MB were extracted twice with each prompt on deepseek-flash, and a
+separate agent labelled every fact single or compound without knowing which prompt produced it:
+
+| Prompt | Facts (2 runs × 10 sessions) | Compound |
+|---|---|---|
+| before | 120 | 43 (36 %) |
+| after | 124 | 24 (19 %) |
+
+Run-to-run spread is large: the same session gave 1 and 3 facts with the old prompt. A first version of the new rule,
+without the guard, dropped pitfalls found while investigating (one session went from 7–8 facts to 3–5); with the guard
+the count stayed level. The labeller was strict (it counted a backup path or file mode appended to a claim as a second
+claim), so the absolute rates matter less than the drop.
+
 ### Extraction by patterns
 
 holographic can store user sentences that match patterns such as "I prefer …" or "we decided …". Its patterns found
