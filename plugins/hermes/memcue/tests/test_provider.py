@@ -485,6 +485,15 @@ class ProviderTest(unittest.TestCase):
         strict.initialize("s9", hermes_home=self.home, agent_context="primary")
         self.assertEqual(len(strict.prefetch(query, session_id="s9").splitlines()), 2)  # only the full match
 
+    def test_max_facts_caps_the_injected_facts(self):
+        self.add_fact("Проект demo: кеш Redis слушает порт 6379.")
+        self.add_fact("Проект demo: кеш Memcached слушает порт 11211.")
+        query = "demo redis порт кеш"
+        self.assertEqual(len(self.p.prefetch(query, session_id="s1").splitlines()), 3)  # header + two facts
+        capped = memcue_provider.MemcueMemoryProvider({"binary": BIN, "max_facts": 1})
+        capped.initialize("s10", hermes_home=self.home, agent_context="primary")
+        self.assertEqual(len(capped.prefetch(query, session_id="s10").splitlines()), 2)  # header + one fact
+
     def test_usage_log_tells_used_facts_from_ignored_ones(self):
         os.environ["MEMCUE_USAGE_LOG"] = "1"
         self.addCleanup(os.environ.pop, "MEMCUE_USAGE_LOG", None)
