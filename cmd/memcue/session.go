@@ -384,7 +384,7 @@ func extractSession(path string, rec *extractRecord, minChars int) error {
 		return err
 	}
 	rec.To, rec.Chars = sess.Lines, len(sess.Text)
-	rec.Origin = strings.TrimSpace(originName(sess.CWD) + " " + sess.Start)
+	rec.Origin = originAt(sess.CWD, sess.Start)
 	return storeExtracted(sess.Text, rec, minChars)
 }
 
@@ -431,6 +431,7 @@ func storeExtracted(text string, rec *extractRecord, minChars int) error {
 	batch := make([]store.FactInput, 0, len(keep))
 	for _, fact := range keep {
 		batch = append(batch, store.FactInput{Content: fact.Content, Keywords: fact.Keywords, Origin: rec.Origin,
+			Expires: eventExpires(fact.Kind, ""),
 			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
 				Review: store.Candidate}})
 	}

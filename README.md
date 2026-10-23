@@ -163,8 +163,10 @@ an approved fact also writes a new active version: it is a deliberate correction
 extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
-for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory
-and today, or the directory's own name outside a repository):
+for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory and
+today; outside a repository the origin stays empty, because a scratch directory's name says nothing about where the
+fact came from). A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
+says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash
 memcue search -json postgres port    # find facts and their IDs (a JSON array with -json)
@@ -340,6 +342,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with a judge configured it gates the words' own answer and the fallback only | 0.15 |
+| `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once an hour | off |
 | `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
