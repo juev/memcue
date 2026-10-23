@@ -1461,3 +1461,22 @@ func TestCardFactsPutStatedRulesFirst(t *testing.T) {
 		t.Errorf("card order %v, want the stated rules newest first, then %s", order, written.ID)
 	}
 }
+
+func TestNewestReadsTheLatestVersionOfAnyStatus(t *testing.T) {
+	s, _ := open(t)
+	if got, err := s.Newest(); err != nil || !got.IsZero() {
+		t.Fatalf("empty base: %v, %v", got, err)
+	}
+	base := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return base }
+	a, _ := s.Add("первый факт про что-то важное", nil, "")
+	// Half a second later: as text "12:00:00.5Z" sorts before "12:00:00Z", so the text order alone would miss it.
+	s.now = func() time.Time { return base.Add(500 * time.Millisecond) }
+	if _, err := s.Retire(a.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Newest()
+	if err != nil || !got.Equal(base.Add(500*time.Millisecond)) {
+		t.Errorf("newest %v, %v; want the retired version's time", got, err)
+	}
+}
