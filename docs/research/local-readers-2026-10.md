@@ -6,6 +6,7 @@ and steps 2–4 of section 5). Three local readers were scored on the gold set a
 the words' own signals, a published multilingual cross-encoder, and the same cross-encoder fine-tuned on Jev's answers
 for 1442 other prompts. The best of them serves 61 useful prompts top-1 where Jev serves 92–94. The trees match the
 words' useful prompts with half their noise, which makes them a candidate for the setups that run without a judge.
+They ship as the opt-in reader `MEMCUE_RERANK=local` ([#321](#shipped-as-local-321)).
 
 ## Setup
 
@@ -113,6 +114,33 @@ The trees cost nothing at read time: `leaves` predicts a row in microseconds in 
   reader and still 30 prompts behind Jev; and it needs cgo or a sidecar for half a second a prompt. Revisit when the
   prompt pool is several times larger.
 
+## Shipped as `local` (#321)
+
+The model memcue embeds is trained by [local_train.py](scripts/local_train.py) on the 1442 pool prompts alone, with
+one Jev run as the target and no Platt scaling, so the gold set is unseen by it and nothing below was fitted on it.
+recall hands the reader the features of [rankfeat](scripts/rankfeat/main.go) through `recall.FeatureRanker`;
+rankfeat now records them through the same path and reproduces the features of the runs above on all 171 prompts.
+`internal/localrank` builds the vector in Go and walks the trees with `leaves`; its test reproduces LightGBM's raw
+score on every gold pair within 1e-9, and `RecallJudge` with the reader gave the same scores on all 171 prompts.
+
+| `local` at | top-1 | any | USEFUL | RELATED | NOISE | nothing served |
+|---|---|---|---|---|---|---|
+| 0.34 | 56 | 71 | 99 | 110 | 96 | 9 |
+| 0.40 | 54 | 66 | 89 | 100 | 71 | 22 |
+| **0.50** | **47** | **55** | **69** | **58** | **30** | **64** |
+
+0.34 is the threshold whose decisions agreed best with Jev's at 0.5 on out-of-fold pool predictions (F1 0.50); it
+serves more useful prompts than the words with more noise (two of its pairs are unlabelled). memcue reads the model at
+Jev's own 0.5, which the model learnt to predict: as many useful prompts as the words, 30 noise facts against 66. The
+model is 240 KB of LightGBM text; with `leaves` it adds 332 KB to the stripped `CGO_ENABLED=0` binary (13.8 MB).
+
+It is not the default. On a fresh base of two facts written by `memcue add` alone (no keywords, queries, kind or
+source), the reader scored
+"Проект demo: кеш Redis слушает порт 6379." at 0.49 for "demo redis порт кеш", a prompt whose every term the fact
+holds, and served nothing; the words serve it. The trees learnt the gold base, whose facts are expanded and labelled,
+and a base unlike it falls outside what they saw. How large or how expanded a base must be for the reader to help was
+not measured.
+
 ## Limits
 
 - One base, one user's prompts; 171 test prompts. A difference of a few prompts is noise.
@@ -134,6 +162,8 @@ python3 -I docs/research/scripts/judge_ab.py pool-cand.jsonl jev pool-jev.jsonl
 POOL=pool-cand.jsonl:pool-feat.jsonl:pool-jev.jsonl POOL_N=1000 python3 -I docs/research/scripts/local_ranker.py ...
 EPOCHS=2 python3 -I docs/research/scripts/ce_finetune.py MODEL_DIR pool-cand.jsonl pool-jev.jsonl cand.jsonl ce-tuned.jsonl
 THRESHOLDS=... python3 -I docs/research/scripts/judge_ab_report.py label|report cand.jsonl labels.json READERS...
+# the shipped model: internal/localrank/model.txt and testdata/gold.jsonl.gz, plus local.jsonl for the report
+python3 -I docs/research/scripts/local_train.py pool-cand.jsonl pool-feat.jsonl pool-jev.jsonl feat.jsonl OUT
 ```
 
 The trees and the cross-encoder need `lightgbm`, `scikit-learn`, `onnxruntime`, `tokenizers`, `torch` and

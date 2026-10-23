@@ -336,7 +336,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in the search's BM25 order | `20` |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
-| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` | `judge` when the Jev endpoint is set, `listwise` only when it is not and `MEMCUE_API_URL` is |
+| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `local` (trees built into memcue, no remote call), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` (the words and the coverage gate) | `judge` when the Jev endpoint is set, `off` otherwise |
 | `MEMCUE_MAIN_RERANK_CANDIDATES` | facts the listwise reader reads, in the search's BM25 order | `20` |
 | `MEMCUE_MAIN_RERANK_TIMEOUT` | one listwise request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
@@ -362,6 +362,14 @@ useful fact to 119–124 prompts, as many as the vector candidates and the judge
 facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed` and
 `MEMCUE_EMBED_*` are removed (#250). Opening a base deletes the vectors an older memcue stored and compacts the
 file once (#260); the empty `fact_vectors` table stays, so the schema and older binaries are unaffected.
+
+`MEMCUE_RERANK=local` turns on the local reader: gradient-boosted trees, built into the binary, over what the words
+know about each of the first 20 candidates (coverage, matched terms, kind, scope, source, age and so on). It makes no
+remote call and keeps a fact the trees score at 0.5 or above. On the gold set it served a useful fact first to 47 of
+171 prompts, as the words do (45), with 30 noise facts against their 66; Jev served 92 with 44
+([docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md)). It is not the default: the trees
+learnt one large base with expanded facts, and on a small fresh base they turned down a fact that held every term of
+the prompt. Without a Jev key and without `MEMCUE_RERANK` the words decide.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host

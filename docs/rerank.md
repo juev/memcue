@@ -61,6 +61,14 @@ lexical candidates (FTS5, gates)
   -> hits
 ```
 
+**Update 2026-10 (#321):** a third reader, `local`, is built in: LightGBM trees over the words' own signals about each
+candidate, trained to predict Jev's probability on 1442 prompts outside the gold set, and walked in pure Go. It reads
+the same first 20 facts in BM25 order and keeps those scored at 0.5 or above; on the gold set it served as many useful
+prompts as the words with half their noise ([research/local-readers-2026-10.md](research/local-readers-2026-10.md)).
+It is opt-in: on a small fresh base it scored a fact that held every prompt term below the threshold. Without a Jev key
+and without `MEMCUE_RERANK` the words decide; the listwise reader, the earlier fallback when the main model was
+configured, is opt-in only. A paused Jev still falls back to the words.
+
 Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
 the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `judge.pause` in the binary's state
 directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or `MEMCUE_STATE_DIR`)

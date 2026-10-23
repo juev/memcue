@@ -3,12 +3,12 @@ package main
 import (
 	"testing"
 
+	"github.com/juev/memcue/internal/localrank"
 	"github.com/juev/memcue/internal/rerank"
 )
 
-// MEMCUE_RERANK names the reader. Without it Jev runs when it is configured, and the main model reads the candidates
-// only where no Jev key exists: on the current base the listwise reader measured equal quality at three times the
-// latency (docs/research/listwise-2026-10.md); `off` keeps the words.
+// MEMCUE_RERANK names the reader. Without it Jev runs when it is configured and the words decide otherwise, whether
+// the main model is configured or not: the local and the listwise readers are opt-in (#321); `off` keeps the words.
 func TestRerankReaderPrecedence(t *testing.T) {
 	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY", "MEMCUE_API_URL",
 		"MEMCUE_MODEL", "MEMCUE_API_KEY", "MEMCUE_RERANK"} {
@@ -21,9 +21,14 @@ func TestRerankReaderPrecedence(t *testing.T) {
 	t.Setenv("MEMCUE_API_URL", "https://api.deepseek.com")
 	t.Setenv("MEMCUE_MODEL", "deepseek-flash")
 	t.Setenv("MEMCUE_API_KEY", "k")
-	if _, ok := ranker().(*rerank.Listwise); !ok {
-		t.Fatalf("main model only: ranker = %#v, want the listwise reader", ranker())
+	if r := ranker(); r != nil {
+		t.Fatalf("main model only: ranker = %#v, want nil", r)
 	}
+	t.Setenv("MEMCUE_RERANK", "local")
+	if _, ok := ranker().(localrank.Ranker); !ok {
+		t.Fatalf("local: ranker = %#v, want the local reader", ranker())
+	}
+	t.Setenv("MEMCUE_RERANK", "")
 
 	t.Setenv("MEMCUE_JUDGE_URL", "http://127.0.0.1:1/decisions")
 	t.Setenv("MEMCUE_JUDGE_MODEL", "typesafe/jev-1.14")
@@ -37,6 +42,11 @@ func TestRerankReaderPrecedence(t *testing.T) {
 		if _, ok := ranker().(*rerank.Listwise); !ok {
 			t.Fatalf("%s: ranker = %#v, want the listwise reader", name, ranker())
 		}
+	}
+
+	t.Setenv("MEMCUE_RERANK", "local")
+	if _, ok := ranker().(localrank.Ranker); !ok {
+		t.Fatalf("local with Jev configured: ranker = %#v, want the local reader", ranker())
 	}
 
 	t.Setenv("MEMCUE_RERANK", "off")

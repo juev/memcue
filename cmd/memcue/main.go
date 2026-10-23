@@ -140,8 +140,9 @@ environment:
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
   MEMCUE_JUDGE_RERANK_CANDIDATES  facts the judge reads, in the search's BM25 order (default 20)
   MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
-  MEMCUE_RERANK  which reader orders the recall candidates: listwise (the main model, MEMCUE_API_URL), judge (Jev),
-                  or off; default listwise when MEMCUE_API_URL is set, judge otherwise
+  MEMCUE_RERANK  which reader orders the recall candidates: judge (Jev), local (trees built into memcue, no remote
+                  call), listwise (the main model, MEMCUE_API_URL) or off (the words); default judge when the Jev
+                  endpoint is set, off otherwise
   MEMCUE_MAIN_RERANK_CANDIDATES  facts the listwise reader reads, in the search's BM25 order (default 20)
   MEMCUE_MAIN_RERANK_TIMEOUT  one listwise request (default 2s)
   MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
