@@ -58,8 +58,13 @@ func runAPI(ctx context.Context, ep Endpoint, system, input string) (reply, erro
 		},
 		"response_format": map[string]string{"type": "json_object"},
 	}
-	if ep.Quick && deepSeek(ep.URL) {
-		request["thinking"] = map[string]string{"type": "disabled"}
+	if ep.Quick {
+		// The review and the suspect calls judge an answer that is already written, so they must give the same verdict
+		// on the same input: without a temperature the endpoint samples, and a wrong retire sticks (#296).
+		request["temperature"] = 0
+		if deepSeek(ep.URL) {
+			request["thinking"] = map[string]string{"type": "disabled"}
+		}
 	}
 	body, err := json.Marshal(request)
 	if err != nil {

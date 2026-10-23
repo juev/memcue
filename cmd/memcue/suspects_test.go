@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,7 +113,7 @@ func TestVetAsksAboutSuspects(t *testing.T) {
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(*asked) != 2 || strings.Contains(strings.Join(*asked, " "), plain) {
+	if got := unique(*asked); len(got) != 2 || slices.Contains(got, plain) {
 		t.Fatalf("asked %q, want the two suspects", *asked)
 	}
 	if f := vetStatus(t, stale); f.Status != store.Retired {
@@ -148,7 +149,7 @@ func TestVetSuspectsFailureIsRetried(t *testing.T) {
 	if err := runVet(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(*asked) != 2 {
+	if got := unique(*asked); len(got) != 2 {
 		t.Errorf("next run asked %q", *asked)
 	}
 }
@@ -168,14 +169,64 @@ func TestVetSuspectsDryRunAndNoModel(t *testing.T) {
 	if err := runVet([]string{"-dry-run"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, stale); len(*asked) != 2 || f.Status != store.Active {
+	if f := vetStatus(t, stale); len(unique(*asked)) != 2 || f.Status != store.Active {
 		t.Fatalf("dry run: asked %q, fact %+v", *asked, f)
 	}
 	*asked = nil
 	if err := runVet(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(*asked) != 2 || vetStatus(t, stale).Status != store.Retired {
+	if len(unique(*asked)) != 2 || vetStatus(t, stale).Status != store.Retired {
 		t.Errorf("after the dry run: asked %q", *asked)
+	}
+}
+
+func unique(ids []string) []string {
+	var out []string
+	for _, id := range ids {
+		if !slices.Contains(out, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// A retire needs two agreeing answers: one call that says retire and a confirmation that says keep leaves the fact
+// alone, says so in the log, and remembers it so the next run does not roll the dice again (#296).
+func TestVetSuspectsRetireNeedsTwoAgreeingAnswers(t *testing.T) {
+	env(t)
+	stale, history, _ := suspectBase(t)
+	old := suspectFn
+	calls := 0
+	suspectFn = func(_ context.Context, input string) (extract.SuspectResult, error) {
+		calls++
+		var r extract.SuspectResult
+		for _, part := range strings.Split(input, `"id":"`)[1:] {
+			id := part[:strings.Index(part, `"`)]
+			verdict := extract.KeepSuspect
+			if calls == 1 && strings.Contains(part, "устар") {
+				verdict = extract.RetireSuspect
+			}
+			r.Decisions = append(r.Decisions, extract.SuspectDecision{ID: id, Verdict: verdict, Reason: "test"})
+		}
+		return r, nil
+	}
+	t.Cleanup(func() { suspectFn = old })
+
+	var out bytes.Buffer
+	if err := runVet(nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Errorf("the model was asked %d times, want the batch and the confirmation", calls)
+	}
+	if f := vetStatus(t, stale); f.Status != store.Active {
+		t.Errorf("retired on one answer: %+v", f)
+	}
+	if f := vetStatus(t, history); f.Status != store.Active {
+		t.Errorf("history fact %+v", f)
+	}
+	if !strings.Contains(out.String(), "the second answer did not agree") {
+		t.Errorf("out %q", out.String())
 	}
 }

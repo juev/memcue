@@ -141,3 +141,36 @@ func TestDreamAnswerBecomesActions(t *testing.T) {
 		t.Errorf("got %+v", r)
 	}
 }
+
+// The review and suspect calls judge text that is already written, so they ask the endpoint not to sample; the
+// extraction call writes new text and keeps the endpoint default (#296).
+func TestQuickCallAsksForNoSampling(t *testing.T) {
+	for _, tc := range []struct {
+		quick bool
+		want  bool
+	}{{true, true}, {false, false}} {
+		var fields map[string]any
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			if err := json.Unmarshal(b, &fields); err != nil {
+				t.Errorf("body %s", b)
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"{\"decisions\":[]}"},"finish_reason":"stop"}],
+				"usage":{"prompt_tokens":1,"completion_tokens":1}}`)
+		}))
+		ep := Endpoint{URL: srv.URL, Model: "m", Key: "k", Quick: tc.quick}
+		if _, err := runAPI(context.Background(), ep, "system", "input"); err != nil {
+			srv.Close()
+			t.Fatalf("quick=%v: %v", tc.quick, err)
+		}
+		srv.Close()
+		temperature, ok := fields["temperature"]
+		if ok != tc.want {
+			t.Fatalf("quick=%v: temperature present %v, want %v (body %v)", tc.quick, ok, tc.want, fields)
+		}
+		if ok && temperature != float64(0) {
+			t.Errorf("quick=%v: temperature = %v, want 0", tc.quick, temperature)
+		}
+	}
+}
