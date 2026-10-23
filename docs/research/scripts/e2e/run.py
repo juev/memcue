@@ -8,6 +8,8 @@ Modes differ only in memory. none: memcue hook silenced (MEMCUE_BIN=true), built
 on, the project's memory dir a symlink into the snapshot laid out as notes, _global injected by the old memory-sync.sh.
 memcue: the plugin hook over a copy of the snapshot base, built-in memory off, extraction off, no reranker (the words
 alone). judge: memcue with the Jev reranker, its endpoint taken from MEMCUE_JUDGE_* of the calling environment.
+stubs: memcue whose prompt hook (stubs_hook.py) injects five one-line stubs of the words' candidates and a line telling
+the agent to read the ones that may bear on the task with `memcue-show ID` (shim-stubs); the session card as in memcue.
 """
 import argparse, json, os, random, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -24,7 +26,7 @@ DENY = ["Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(glab *)", "Bash(gh 
         "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)"]
 ARCHIVE = os.path.expanduser("~/.claude/archive/memory-2026-10-19")
 CLAUDE = os.path.expanduser("~/.claude")
-ARMS = ("none", "files", "memcue", "judge")
+ARMS = ("none", "files", "memcue", "judge", "stubs")
 JUDGE_ENV = ("MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY")
 
 
@@ -118,6 +120,9 @@ def run_one(pid, arm, rep):
     link = None
     senv["MEMCUE_BIN"] = MEMCUE if arm in ("memcue", "judge") else "/usr/bin/true"
     senv["MEMCUE_RERANK"] = "off"  # memcue: the words alone, as in the first three modes' run
+    if arm == "stubs":
+        senv.update(MEMCUE_BIN=os.path.join(E, "stubs_hook.py"), MEMCUE_REAL=MEMCUE,
+                    PATH=os.path.join(E, "shim-stubs") + ":" + senv["PATH"])
     if arm == "judge":  # the same hook with the Jev reranker of the live setup
         missing = [k for k in JUDGE_ENV if not os.environ.get(k)]
         if missing:
@@ -151,6 +156,10 @@ def run_one(pid, arm, rep):
             "commit": commit, "cwd": cwd, "seconds": round(time.time() - start, 1)}
     rl = os.path.join(state, "recall.log")
     meta["recall"] = [json.loads(l) for l in open(rl)] if os.path.exists(rl) else []
+    for name in ("stubs", "show"):  # the stubs mode: what was offered and what the agent read
+        lp = os.path.join(state, f"{name}.log")
+        if os.path.exists(lp):
+            meta[name] = [json.loads(l) for l in open(lp)]
     json.dump(meta, open(os.path.join(out_dir, f"{arm}-{rep}.meta.json"), "w"), ensure_ascii=False, indent=1)
     os.replace(out + ".tmp", out)
     if link:

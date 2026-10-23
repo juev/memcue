@@ -1,6 +1,6 @@
 # Recall without a remote judge: local options, October 2026
 
-Status: **literature and source review of 2026-10-23, no measurement.** The owner asked how memcue could stop calling a
+Status: **literature and source review of 2026-10-23; its measurements are done, see [Outcome](#outcome).** The owner asked how memcue could stop calling a
 remote model on the read path and decide locally, with the working model where that is possible, which facts a prompt
 gets: global rules and what the user asked to remember always, within a budget; the repository's facts when they are
 needed. This note collects what memcue's own measurements say the remote call buys, what other systems and the
@@ -332,6 +332,35 @@ and so does its determinism.
    harm metric of [other-memories](other-memories-2026-10.md), try 1, applied to C.
 6. **Stubs as an end-to-end arm**, only in Claude Code: five stubs and a forced-evaluation line, scored by the e2e
    harness against the words alone.
+
+## Outcome
+
+The six steps of section 5 were measured on 2026-10-23 (#316–#320). Total spend about $58: $7.18 of Opus labels for the
+local readers, $3.08 for the anchors, $31.82 of stubs runs and $15.91 of grading, about $0.2 of Jev, and 367k input
+and 135k output tokens of the main model for the anchors.
+
+| step | result | note |
+|---|---|---|
+| 1. judge end to end | judge 1.06–1.07, words 0.95–0.97; only judge against none outside the noise | [e2e-files](e2e-files-2026-10.md) |
+| 2. feature ranker | 49–59 useful prompts top-1 against Jev's 92–94; at the words' level of useful prompts, half their noise (32 against 66) | [local-readers](local-readers-2026-10.md) |
+| 3. more labels | 1442 more prompts change the trees by a few prompts: the features are the limit | [local-readers](local-readers-2026-10.md) |
+| 4. cross-encoder | published: 42 top-1, below the words; fine-tuned on Jev: 61; ONNX Runtime 155 ms + 324 ms cold, the cgo-free Go backend 3–9 s | [local-readers](local-readers-2026-10.md) |
+| 5. state channel | 63 % of facts get an anchor, a turn gets a median of 8–48 fires, 11 % of them useful | [anchors](anchors-2026-10.md) |
+| 6. stubs | 0.99, between the words and the judge, inside the noise; the agent reads 2.5 of 5 stubs | [e2e-files](e2e-files-2026-10.md) |
+
+**The direction chosen.** No local reader replaces Jev, and Jev stays the reader wherever its key is set: it is the
+only reader with a gain end to end, it costs under a cent a session, and a fresh local model would take as long. The
+dependency is reduced instead of removed:
+
+1. **The tree ranker becomes the local reader** (`MEMCUE_RERANK=local`, `leaves` in pure Go, the model shipped as
+   JSON) and replaces both the words' gate and the listwise fallback when the judge is off, unconfigured or paused.
+   Without a judge key memcue then makes no model call on the read path, and serves half the noise the words serve
+   today. This is the next implementation issue.
+2. **Prompts keep being collected** (`MEMCUE_RECALL_LOG=1`) and Jev keeps scoring them offline, so the fine-tuned
+   cross-encoder can be measured again once the pool is several times its 1442 prompts; it is the one local reader that
+   gains from more data.
+3. **Not pursued**: anchors written by the model, the published cross-encoder, the cgo-free cross-encoder runtime, and
+   stubs as a default.
 
 ## Contradictions and open questions
 

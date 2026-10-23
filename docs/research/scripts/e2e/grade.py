@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 E = os.path.dirname(os.path.abspath(__file__))
 PASS = int(sys.argv[2]) if len(sys.argv) > 2 else 1  # grading pass: two passes measure the grader's own noise
-ARMS = ("none", "files", "memcue", "judge")
+ARMS = ("none", "files", "memcue", "judge", "stubs")
 
 PROMPT = """Ты оцениваешь ответы агента на реплику пользователя. Агент работал в режиме планирования: только читал
 репозиторий, без сети и без записи. Дан эталон — начало реального ответа, который пользователь получил в настоящей
@@ -55,12 +55,18 @@ def grade_one(p):
             "answers": {l: ans[k]["text"] for l, k in letters.items()}}
     env = {k: v for k, v in os.environ.items() if not k.startswith("MEMCUE_")} | {"MEMCUE_EXTRACT": "0",
                                                                                    "MEMCUE_BIN": "/usr/bin/true"}
-    r = subprocess.run(["claude", "-p", "--model", "opus", "--tools", "", "--strict-mcp-config"],
+    r = subprocess.run(["claude", "-p", "--model", "opus", "--tools", "", "--strict-mcp-config",
+                        "--output-format", "json"],
                        input=PROMPT + json.dumps(body, ensure_ascii=False), capture_output=True, text=True,
                        env=env, timeout=900)
-    m = re.search(r"\{.*\}", r.stdout, re.S)
+    try:
+        envelope = json.loads(r.stdout)
+    except json.JSONDecodeError:
+        envelope = {}
+    m = re.search(r"\{.*\}", envelope.get("result") or "", re.S)
     got = json.loads(m.group(0)) if m else {}
-    return str(p["id"]), {f"{letters[l][0]}-{letters[l][1]}": v for l, v in got.items() if l in letters}
+    return (str(p["id"]), {f"{letters[l][0]}-{letters[l][1]}": v for l, v in got.items() if l in letters},
+            envelope.get("total_cost_usd") or 0)
 
 
 def cmd_run():
@@ -69,11 +75,14 @@ def cmd_run():
     path = os.path.join(E, f"grades-{PASS}.json")
     done = json.load(open(path)) if os.path.exists(path) else {}
     todo = [ps[i] for i in ids if len(done.get(str(i), {})) < 2 * len(ARMS)]
+    cost = 0
     with ThreadPoolExecutor(4) as ex:
-        for pid, g in ex.map(grade_one, todo):
+        for pid, g, c in ex.map(grade_one, todo):
             done[pid] = g
+            cost += c
             json.dump(done, open(path, "w"), ensure_ascii=False, indent=1)
-    print(f"graded {sum(1 for v in done.values() if len(v) == 2 * len(ARMS))} of {len(ids)} prompts")
+    print(f"graded {sum(1 for v in done.values() if len(v) == 2 * len(ARMS))} of {len(ids)} prompts, "
+          f"cost_usd {cost:.2f}")
 
 
 def cmd_report():
@@ -112,7 +121,7 @@ def cmd_report():
               f" {st.median(r['sec']):5.0f}  {r['errors']:4d}  {st.mean(r['served']):.1f}")
     print("\npairwise by prompt (mean of two reps): wins / ties / losses")
     for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none"), ("judge", "memcue"), ("judge", "files"),
-                 ("judge", "none")):
+                 ("judge", "none"), ("stubs", "memcue"), ("stubs", "judge"), ("stubs", "none")):
         w = t = l = 0
         for pid, d in per.items():
             if a in d and b in d:
@@ -127,6 +136,22 @@ def cmd_report():
     for arm in ARMS:
         diff = sum(1 for d in per.values() if len(d.get(arm, [])) == 2 and d[arm][0] != d[arm][1])
         print(f"  {arm}: {diff} of {sum(1 for d in per.values() if len(d.get(arm, [])) == 2)}")
+
+    # The stubs mode: how many stubs were offered and how many of them the agent read with memcue-show.
+    offered = read = runs = with_read = 0
+    for pid in ids:
+        for rep in (1, 2):
+            path = os.path.join(E, "runs", str(pid), f"stubs-{rep}.meta.json")
+            if not os.path.exists(path):
+                continue
+            meta = json.load(open(path))
+            runs += 1
+            stubs = {i for x in meta.get("stubs", []) for i in x["stubs"]}
+            got = {i for x in meta.get("show", []) for i in x} & stubs
+            offered += len(stubs); read += len(got); with_read += bool(got)
+    if runs:
+        print(f"\nstubs: {runs} runs, {offered / runs:.1f} stubs offered and {read / runs:.1f} read per run, "
+              f"runs that read any {with_read}")
 
 
 {"run": cmd_run, "report": cmd_report}[sys.argv[1]]()

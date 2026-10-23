@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+"""memcue-show ID...: print stored facts in full, for the stubs mode of the e2e run (#319). Reads MEMCUE_FACTS
+read-only and logs every call to MEMCUE_STATE_DIR/show.log, so the run can count fetches."""
+import json, os, sqlite3, sys
+db = sqlite3.connect(f"file:{os.environ['MEMCUE_FACTS']}?mode=ro", uri=True)
+with open(os.path.join(os.environ.get("MEMCUE_STATE_DIR", "."), "show.log"), "a") as f:
+    f.write(json.dumps(sys.argv[1:]) + "\n")
+for i in sys.argv[1:]:
+    row = db.execute("""select content, origin, scope from facts where id = ? order by version desc limit 1""",
+                     (i,)).fetchone()
+    print(f"{i}: " + (f"{row[0]} (learnt: {row[1]}; scope: {row[2]})" if row else "no such fact"))
