@@ -48,7 +48,9 @@ lexical candidates (FTS5, gates)
 rerank reader. Jev stays the default; `listwise` — the main chat model, one question per prompt — is an option, because on
 the current base it served as many useful prompts as Jev with two more noise facts and three times the latency
 ([research/main-judge-2026-10.md](research/main-judge-2026-10.md) for the older, noisier base where it won,
-[research/listwise-2026-10.md](research/listwise-2026-10.md) for the product-path check). The flow above then reads:
+[research/listwise-2026-10.md](research/listwise-2026-10.md) for the product-path check). `openai/gpt-6-luna-decisions`
+on the same endpoint was measured as a judge and lost to Jev on speed, price and useful prompts
+([research/luna-decisions-2026-10.md](research/luna-decisions-2026-10.md)). The flow above then reads:
 
 ```
 lexical candidates (FTS5, gates)
