@@ -1,15 +1,39 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	judgepkg "github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/rerank"
 	"github.com/juev/memcue/internal/store"
 )
 
-// ranker builds the rerank pass from the environment. A nil Ranker, the default, keeps recall lexical: the words
-// choose the facts and the coverage gate decides.
+// ranker builds the rerank pass from the environment. MEMCUE_RERANK names the reader: `listwise` is the main chat model
+// asking one listwise question (#281), `judge` is Jev scoring each candidate, `off` keeps the words. Without the variable
+// Jev runs when its endpoint is configured. The listwise reader is not the default: on the current base it served as
+// many useful prompts as Jev with two more noise facts and three times the latency
+// (docs/research/listwise-2026-10.md), so it is opt-in for a base where the words and Jev bring noise. A nil Ranker
+// keeps recall lexical, with the words choosing and the coverage gate deciding.
 func ranker() recall.Ranker {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MEMCUE_RERANK"))) {
+	case "off", "none", "words", "0":
+		return nil
+	case "listwise", "main":
+		return listwiseRanker()
+	}
+	if r := jevRanker(); r != nil {
+		return r
+	}
+	// No Jev key: the main model is better than the words alone.
+	return listwiseRanker()
+}
+
+// jevRanker is the pass that asks the decisions endpoint one yes/no question per candidate.
+func jevRanker() recall.Ranker {
 	set := rerank.FromEnv()
 	if set == nil {
 		return nil
@@ -19,13 +43,33 @@ func ranker() recall.Ranker {
 	return rerank.New(set)
 }
 
-// recallFacts is the one way recall is decided: the words, plus the judge when it is configured. A missing judge keeps
-// the lexical answer.
+// listwiseRanker is the pass that asks the main chat model which facts would help, best first.
+func listwiseRanker() recall.Ranker {
+	set := rerank.ListwiseFromEnv()
+	if set == nil {
+		return nil
+	}
+	set.Breaker = listwisePause()
+	return rerank.NewListwise(set)
+}
+
+// listwisePause is the pause file of the listwise reader. It is its own, not judge.pause: a dead main model must not
+// silence the Jev roles, and a dead Jev must not silence the reader (#281).
+var listwisePause = sync.OnceValue(func() *judgepkg.Breaker {
+	dir, err := stateDir()
+	if err != nil {
+		return judgepkg.New("")
+	}
+	return judgepkg.New(filepath.Join(dir, "listwise.pause"))
+})
+
+// recallFacts is the one way recall is decided: the words, plus the configured reader. A missing reader keeps the
+// lexical answer.
 func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall.Hit, error) {
 	r := ranker()
 	if r == nil {
 		if p.Trace != nil {
-			p.Trace.Fallback = "no judge configured"
+			p.Trace.Fallback = "no rerank reader configured"
 		}
 		return recall.Recall(s, prompt, tier, p)
 	}

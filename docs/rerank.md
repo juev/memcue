@@ -44,6 +44,21 @@ lexical candidates (FTS5, gates)
   -> keep >= MEMCUE_JUDGE_RERANK_MIN, sort, cap MaxFacts
 ```
 
+**Update 2026-10 (0.6.0):** the vectors and the embedding knobs are gone (#232, #250), and `MEMCUE_RERANK` chooses the
+rerank reader. Jev stays the default; `listwise` — the main chat model, one question per prompt — is an option, because on
+the current base it served as many useful prompts as Jev with two more noise facts and three times the latency
+([research/main-judge-2026-10.md](research/main-judge-2026-10.md) for the older, noisier base where it won,
+[research/listwise-2026-10.md](research/listwise-2026-10.md) for the product-path check). The flow above then reads:
+
+```
+lexical candidates (FTS5, gates)
+  -> the reader MEMCUE_RERANK names, over the first MEMCUE_*_CANDIDATES in BM25 order
+     listwise: "which of these would help, best first" -> the picks in the model's order
+     judge:    one noul per candidate -> keep >= MEMCUE_JUDGE_RERANK_MIN
+  -> approved before provisional, cap MaxFacts
+  -> hits
+```
+
 Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
 the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `judge.pause` in the binary's state
 directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or `MEMCUE_STATE_DIR`)

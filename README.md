@@ -335,6 +335,9 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in the search's BM25 order | `20` |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
+| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` | `judge` when the Jev endpoint is set, `listwise` only when it is not and `MEMCUE_API_URL` is |
+| `MEMCUE_MAIN_RERANK_CANDIDATES` | facts the listwise reader reads, in the search's BM25 order | `20` |
+| `MEMCUE_MAIN_RERANK_TIMEOUT` | one listwise request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
