@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 E = os.path.dirname(os.path.abspath(__file__))
 PASS = int(sys.argv[2]) if len(sys.argv) > 2 else 1  # grading pass: two passes measure the grader's own noise
-ARMS = ("none", "files", "memcue")
+ARMS = ("none", "files", "memcue", "judge")
 
 PROMPT = """Ты оцениваешь ответы агента на реплику пользователя. Агент работал в режиме планирования: только читал
 репозиторий, без сети и без записи. Дан эталон — начало реального ответа, который пользователь получил в настоящей
@@ -68,12 +68,12 @@ def cmd_run():
     ps = {p["id"]: p for p in json.load(open(os.path.join(E, "prompts-all.json")))}
     path = os.path.join(E, f"grades-{PASS}.json")
     done = json.load(open(path)) if os.path.exists(path) else {}
-    todo = [ps[i] for i in ids if len(done.get(str(i), {})) < 6]
+    todo = [ps[i] for i in ids if len(done.get(str(i), {})) < 2 * len(ARMS)]
     with ThreadPoolExecutor(4) as ex:
         for pid, g in ex.map(grade_one, todo):
             done[pid] = g
             json.dump(done, open(path, "w"), ensure_ascii=False, indent=1)
-    print(f"graded {sum(1 for v in done.values() if len(v) == 6)} of {len(ids)} prompts")
+    print(f"graded {sum(1 for v in done.values() if len(v) == 2 * len(ARMS))} of {len(ids)} prompts")
 
 
 def cmd_report():
@@ -111,7 +111,8 @@ def cmd_report():
               f" {r['past']:4d}  {st.mean(r['turns']):5.1f} {st.mean(r['tools']):5.1f} {sum(r['cost']):6.2f}"
               f" {st.median(r['sec']):5.0f}  {r['errors']:4d}  {st.mean(r['served']):.1f}")
     print("\npairwise by prompt (mean of two reps): wins / ties / losses")
-    for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none")):
+    for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none"), ("judge", "memcue"), ("judge", "files"),
+                 ("judge", "none")):
         w = t = l = 0
         for pid, d in per.items():
             if a in d and b in d:

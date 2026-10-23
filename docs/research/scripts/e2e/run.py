@@ -6,7 +6,8 @@
 
 Modes differ only in memory. none: memcue hook silenced (MEMCUE_BIN=true), built-in memory off. files: built-in memory
 on, the project's memory dir a symlink into the snapshot laid out as notes, _global injected by the old memory-sync.sh.
-memcue: the plugin hook over a copy of the snapshot base, built-in memory off, extraction off.
+memcue: the plugin hook over a copy of the snapshot base, built-in memory off, extraction off, no reranker (the words
+alone). judge: memcue with the Jev reranker, its endpoint taken from MEMCUE_JUDGE_* of the calling environment.
 """
 import argparse, json, os, random, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +24,8 @@ DENY = ["Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(glab *)", "Bash(gh 
         "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)"]
 ARCHIVE = os.path.expanduser("~/.claude/archive/memory-2026-10-19")
 CLAUDE = os.path.expanduser("~/.claude")
-ARMS = ("none", "files", "memcue")
+ARMS = ("none", "files", "memcue", "judge")
+JUDGE_ENV = ("MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY")
 
 
 def sh(*cmd, **kw):
@@ -111,9 +113,16 @@ def run_one(pid, arm, rep):
     shutil.copyfile(os.path.join(snap, "facts.db"), base)
     senv = {"MEMCUE_EXTRACT": "0", "MEMCUE_DREAM": "0", "MEMCUE_RECALL_LOG": "1", "MEMCUE_STATE_DIR": state,
             "MEMCUE_FACTS": base, "PATH": SHIM + ":" + os.environ["PATH"]}
-    settings = {"autoMemoryEnabled": False}
+    # The plugin is on in every mode (none and files silence it through MEMCUE_BIN), whatever the user settings say
+    settings = {"autoMemoryEnabled": False, "enabledPlugins": {"memcue@memcue": True}}
     link = None
-    senv["MEMCUE_BIN"] = MEMCUE if arm == "memcue" else "/usr/bin/true"
+    senv["MEMCUE_BIN"] = MEMCUE if arm in ("memcue", "judge") else "/usr/bin/true"
+    senv["MEMCUE_RERANK"] = "off"  # memcue: the words alone, as in the first three modes' run
+    if arm == "judge":  # the same hook with the Jev reranker of the live setup
+        missing = [k for k in JUDGE_ENV if not os.environ.get(k)]
+        if missing:
+            raise SystemExit(f"judge mode needs {', '.join(missing)}")
+        senv.update({k: os.environ[k] for k in JUDGE_ENV}, MEMCUE_RERANK="judge")
     if arm == "files":
         store = os.path.join(work, "store")
         shutil.copytree(os.path.join(snap, "store"), store)
