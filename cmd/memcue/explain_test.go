@@ -39,7 +39,7 @@ func TestRecallExplainPrintsEveryStep(t *testing.T) {
 	if err := runRecall([]string{"-explain", "gradle без make, какой JAVA_HOME для JDK"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"terms: ", "gate: ", "lexical:\n  passed", "fallback to the words: no judge configured",
+	for _, want := range []string{"terms: ", "gate: ", "lexical:\n  passed", "fallback to the words: no rerank reader configured",
 		"final:\n  served", gradleID(t)} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
