@@ -5,8 +5,17 @@ import (
 	"testing"
 )
 
-func TestParseStructuredOutput(t *testing.T) {
-	r, err := parse([]byte(`{"is_error":false,"result":"","total_cost_usd":0.14,
+// answer runs the two production steps the tests describe: the envelope of `claude -p` and the payload decode.
+func answer(b []byte) (Result, error) {
+	rp, err := envelope(b)
+	if err != nil {
+		return Result{}, err
+	}
+	return decode(rp)
+}
+
+func TestAnswerStructuredOutput(t *testing.T) {
+	r, err := answer([]byte(`{"is_error":false,"result":"","total_cost_usd":0.14,
 		"structured_output":{"facts":[{"content":"  wrapper ~/bin/glab ставит GODEBUG=tlsmlkem=0 ","keywords":["glab","EOF"]}],"dropped":""}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -16,21 +25,21 @@ func TestParseStructuredOutput(t *testing.T) {
 	}
 }
 
-func TestParseFallsBackToResultText(t *testing.T) {
-	r, err := parse([]byte(`{"is_error":false,"result":"{\"facts\":[],\"dropped\":\"только история\"}"}`))
+func TestAnswerFallsBackToResultText(t *testing.T) {
+	r, err := answer([]byte(`{"is_error":false,"result":"{\"facts\":[],\"dropped\":\"только история\"}"}`))
 	if err != nil || r.Dropped != "только история" {
 		t.Errorf("got %+v %v", r, err)
 	}
 }
 
-func TestParseReportsModelError(t *testing.T) {
-	if _, err := parse([]byte(`{"is_error":true,"result":"rate limited"}`)); err == nil {
+func TestAnswerReportsModelError(t *testing.T) {
+	if _, err := answer([]byte(`{"is_error":true,"result":"rate limited"}`)); err == nil {
 		t.Error("want error")
 	}
 }
 
-func TestParseRejectsEmptyAnswer(t *testing.T) {
-	if _, err := parse([]byte(`{"is_error":false,"structured_output":{"facts":[],"dropped":""}}`)); err == nil {
+func TestAnswerRejectsEmptyAnswer(t *testing.T) {
+	if _, err := answer([]byte(`{"is_error":false,"structured_output":{"facts":[],"dropped":""}}`)); err == nil {
 		t.Error("want error")
 	}
 }
