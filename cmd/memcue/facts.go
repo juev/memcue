@@ -127,44 +127,49 @@ func runAdd(args []string, out io.Writer) error {
 			return err
 		}
 		if !*candidate && extract.API.URL != "" {
-			expandAdded(s, f)
+			f = expandStored(s, f)
 		}
 		_, err = fmt.Fprintln(out, f.ID)
 		return err
 	})
 }
 
-// addExpandTimeout bounds the expansion call of add. The fact is stored before the call, so add has to finish inside the
-// plugins' own timeouts for it (DSH 10 s, Hermes 15 s): a plugin that kills a slow add reports the fact as not stored,
-// and the model writes it again. One fact without reasoning takes 1-2 s.
-const addExpandTimeout = 5 * time.Second
+// expandOneTimeout bounds one expansion call of add and correct. The fact is stored before the call, so the command has
+// to finish inside the plugins' own timeouts for it (DSH 10 s, Hermes 15 s): a plugin that kills a slow add reports the
+// fact as not stored, and the model writes it again. One fact without reasoning takes 1-2 s.
+const expandOneTimeout = 5 * time.Second
 
-// addExpandFn is the expansion call of add, replaced in tests.
-var addExpandFn = func(input string) (extract.ExpandResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), addExpandTimeout)
+// expandOneFn is the expansion call of add and correct, replaced in tests.
+var expandOneFn = func(input string) (extract.ExpandResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), expandOneTimeout)
 	defer cancel()
 	return extract.ExpandFacts(ctx, input)
 }
 
-// expandAdded gives a fact add just stored its search queries, so it is found by the words a user asks with from the
-// first prompt (#288). Only with an API endpoint: claude -p takes seconds to start. A candidate is left alone, since
-// the Hermes mirror adds them on the turn's path, and the dream expands it once approved. Any failure leaves the fact
-// without queries for the dream to expand; the fact is stored either way.
-func expandAdded(s *store.Store, f store.Fact) {
+// expandStored gives a fact add or correct just stored its search queries, so it is found by the words a user asks with
+// from the first prompt (#288, #297), and returns the fact as it stands afterwards. Only with an API endpoint:
+// claude -p takes seconds to start. A candidate is left alone, since the Hermes mirror adds them on the turn's path,
+// and the dream expands it once approved. Any failure leaves the fact without queries for the dream to expand; the fact
+// is stored either way.
+func expandStored(s *store.Store, f store.Fact) store.Fact {
 	input, err := renderSplitInput([]store.Fact{f})
 	if err != nil {
-		return
+		return f
 	}
-	r, err := addExpandFn(input)
+	r, err := expandOneFn(input)
 	if err != nil {
-		return
+		return f
 	}
 	for _, e := range r.Facts {
 		if e.ID == f.ID && len(e.Queries) > 0 {
-			_, _ = s.SetQueries(f.ID, f.Version, e.Queries)
-			return
+			nf, err := s.SetQueries(f.ID, f.Version, e.Queries)
+			if err != nil {
+				return f
+			}
+			return nf
 		}
 	}
+	return f
 }
 
 var sources = map[string]bool{"user": true, "user_confirmed": true, "tool": true, "agent": true, "note": true,
@@ -287,6 +292,11 @@ func runCorrect(args []string, out io.Writer) error {
 		f, err := s.CorrectExpiring(fs.Arg(0), content, kw, exp)
 		if err != nil {
 			return err
+		}
+		// The text changed, so the queries have to be asked for again: the words the fact was found by no longer
+		// describe it (#297). A candidate waits for the vet, whose approval expands it.
+		if f.Review == "" && extract.API.URL != "" {
+			f = expandStored(s, f)
 		}
 		_, err = fmt.Fprintf(out, "%s v%d\n", f.ID, f.Version)
 		return err

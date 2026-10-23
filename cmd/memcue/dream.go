@@ -397,6 +397,9 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	if extract.TriageOn() {
 		groups, rec.Triage = triageGroups(groups)
 	}
+	// The facts this dream corrects are expanded after the groups are judged: the expansion step above runs before
+	// them, and a corrected fact with the queries of its old text is what #297 filed.
+	var corrected []store.Fact
 	for batch := range slices.Chunk(groups, groupsPerCall) {
 		r, err := dreamFn(renderGroups(batch, freshSet(fresh)))
 		rec.CostUSD += r.CostUSD
@@ -430,6 +433,9 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 					return rec, err
 				}
 				saw[f.ID] = f.Version // a retired fact is not active, so its entry is never compared again
+				if a.Op != "retire" {
+					corrected = append(corrected, f)
+				}
 			}
 			rec.Actions = append(rec.Actions, a)
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
@@ -438,6 +444,18 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 		}
 	}
 	if !dryRun {
+		// A corrected fact has new text, and the queries of the old one no longer describe it: they are asked for in
+		// the same run, since the expansion step above goes before the groups are judged (#297). A failure leaves the
+		// fact to the next dream.
+		before := rec.Expanded
+		if err := expandCorrected(s, corrected, saw, &rec); err != nil {
+			return rec, err
+		}
+		if rec.Expanded > before {
+			if _, err := fmt.Fprintf(out, "expanded %d corrected facts\n", rec.Expanded-before); err != nil {
+				return rec, err
+			}
+		}
 		err = errors.Join(writeDreamSeen(dir, saw), markDream(dir, start))
 	}
 	if dryRun && planPath != "" {
@@ -808,6 +826,29 @@ func expandStep(s *store.Store, facts []store.Fact, rec *dreamRecord) ([]dreamEx
 		}
 	}
 	return found, nil
+}
+
+// expandCorrected gives the facts a dream just corrected their search queries in the same run. Only facts without
+// queries are asked about, and a failed call leaves the fact to the next dream; the fact is corrected either way. The
+// snapshot the next dream compares against takes the version the expansion wrote.
+func expandCorrected(s *store.Store, corrected []store.Fact, saw map[string]int, rec *dreamRecord) error {
+	var bare []store.Fact
+	for _, f := range corrected {
+		if len(f.Queries) == 0 {
+			bare = append(bare, f)
+		}
+	}
+	if len(bare) == 0 {
+		return nil
+	}
+	expanded, err := expandStep(s, bare, rec)
+	if err != nil {
+		return err
+	}
+	for _, e := range expanded {
+		saw[e.fact.ID] = e.fact.Version
+	}
+	return nil
 }
 
 // renderSplitInput is the JSON the split prompt reads: the id and text of each fact.
