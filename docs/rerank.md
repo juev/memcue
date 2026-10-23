@@ -29,7 +29,7 @@ request limits and timeouts under the judge namespace.
 | `MEMCUE_JUDGE_URL` | decisions endpoint, e.g. `https://openrouter.ai/api/alpha/decisions` |
 | `MEMCUE_JUDGE_MODEL` | e.g. `typesafe/jev-1.14` |
 | `MEMCUE_JUDGE_KEY` | bearer token |
-| `MEMCUE_JUDGE_RERANK_MIN` | probability below which a fact is not given (default 0.5) |
+| `MEMCUE_JUDGE_RERANK_MIN` | probability below which a fact is not given (default 0.5; 0.5 and 0.55 serve the same useful prompts, above 0.55 the cut starts to cost — [research/threshold-2026-10.md](research/threshold-2026-10.md)) |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in BM25 order (default 20; 10 from each source before #232) |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request (default 2 s) |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request (default 2 s) |
