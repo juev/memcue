@@ -369,7 +369,9 @@ remote call and keeps a fact the trees score at 0.5 or above. On the gold set it
 171 prompts, as the words do (45), with 30 noise facts against their 66; Jev served 92 with 44
 ([docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md)). It is not the default: the trees
 learnt one large base with expanded facts, and on a small fresh base they turned down a fact that held every term of
-the prompt. Without a Jev key and without `MEMCUE_RERANK` the words decide.
+the prompt. End to end, on 40 real prompts in `claude -p`, it scored as the words do (0.95 against 0.96 of 2; the judge
+1.01), so the noise it removes on the gold set buys no better answers. Without a Jev key and without `MEMCUE_RERANK` the
+words decide.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host

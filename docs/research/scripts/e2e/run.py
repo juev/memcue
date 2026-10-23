@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One e2e run: a real prompt, one memory mode, `claude -p` in plan mode on a clone of the repository as of the prompt.
 
-    run.py one  --prompt-id N --arm none|files|memcue --rep R
+    run.py one  --prompt-id N --arm none|files|memcue|judge|stubs|local --rep R
     run.py all  --ids ids.json --reps 2 --jobs 4
 
 Modes differ only in memory. none: memcue hook silenced (MEMCUE_BIN=true), built-in memory off. files: built-in memory
@@ -10,6 +10,8 @@ memcue: the plugin hook over a copy of the snapshot base, built-in memory off, e
 alone). judge: memcue with the Jev reranker, its endpoint taken from MEMCUE_JUDGE_* of the calling environment.
 stubs: memcue whose prompt hook (stubs_hook.py) injects five one-line stubs of the words' candidates and a line telling
 the agent to read the ones that may bear on the task with `memcue-show ID` (shim-stubs); the session card as in memcue.
+local: memcue with the built-in tree reader (MEMCUE_RERANK=local, #321), from the binary MEMCUE_LOCAL_BIN names (one
+built from main while the installed release lacks the reader).
 """
 import argparse, json, os, random, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -26,7 +28,7 @@ DENY = ["Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(glab *)", "Bash(gh 
         "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)"]
 ARCHIVE = os.path.expanduser("~/.claude/archive/memory-2026-10-19")
 CLAUDE = os.path.expanduser("~/.claude")
-ARMS = ("none", "files", "memcue", "judge", "stubs")
+ARMS = ("none", "files", "memcue", "judge", "stubs", "local")
 JUDGE_ENV = ("MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY")
 
 
@@ -123,6 +125,11 @@ def run_one(pid, arm, rep):
     if arm == "stubs":
         senv.update(MEMCUE_BIN=os.path.join(E, "stubs_hook.py"), MEMCUE_REAL=MEMCUE,
                     PATH=os.path.join(E, "shim-stubs") + ":" + senv["PATH"])
+    if arm == "local":  # the same hook with the tree reader built into memcue
+        local = os.environ.get("MEMCUE_LOCAL_BIN")
+        if not local:
+            raise SystemExit("local mode needs MEMCUE_LOCAL_BIN, a memcue binary with MEMCUE_RERANK=local")
+        senv.update(MEMCUE_BIN=local, MEMCUE_RERANK="local")
     if arm == "judge":  # the same hook with the Jev reranker of the live setup
         missing = [k for k in JUDGE_ENV if not os.environ.get(k)]
         if missing:

@@ -355,7 +355,10 @@ dependency is reduced instead of removed:
 1. **The tree ranker becomes the local reader** (`MEMCUE_RERANK=local`, `leaves` in pure Go, the model shipped as
    JSON) and replaces both the words' gate and the listwise fallback when the judge is off, unconfigured or paused.
    Without a judge key memcue then makes no model call on the read path, and serves half the noise the words serve
-   today. This is the next implementation issue.
+   today. This is the next implementation issue. **Done in #321, as an opt-in reader:** on a small fresh base it turned down a
+   fact that held every prompt term, so without a judge key the words stay the default, and the listwise fallback is
+   gone. End to end on 40 prompts it scored 0.95 against the words' 0.96: the noise it removes on the gold set does
+   not reach the agent's answers ([e2e-files](e2e-files-2026-10.md#a-sixth-mode-local-321)).
 2. **Prompts keep being collected** (`MEMCUE_RECALL_LOG=1`) and Jev keeps scoring them offline, so the fine-tuned
    cross-encoder can be measured again once the pool is several times its 1442 prompts; it is the one local reader that
    gains from more data.

@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 E = os.path.dirname(os.path.abspath(__file__))
 PASS = int(sys.argv[2]) if len(sys.argv) > 2 else 1  # grading pass: two passes measure the grader's own noise
-ARMS = ("none", "files", "memcue", "judge", "stubs")
+ARMS = ("none", "files", "memcue", "judge", "stubs", "local")
 
 PROMPT = """Ты оцениваешь ответы агента на реплику пользователя. Агент работал в режиме планирования: только читал
 репозиторий, без сети и без записи. Дан эталон — начало реального ответа, который пользователь получил в настоящей
@@ -121,7 +121,8 @@ def cmd_report():
               f" {st.median(r['sec']):5.0f}  {r['errors']:4d}  {st.mean(r['served']):.1f}")
     print("\npairwise by prompt (mean of two reps): wins / ties / losses")
     for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none"), ("judge", "memcue"), ("judge", "files"),
-                 ("judge", "none"), ("stubs", "memcue"), ("stubs", "judge"), ("stubs", "none")):
+                 ("judge", "none"), ("stubs", "memcue"), ("stubs", "judge"), ("stubs", "none"),
+                 ("local", "memcue"), ("local", "judge"), ("local", "none")):
         w = t = l = 0
         for pid, d in per.items():
             if a in d and b in d:
