@@ -82,8 +82,8 @@ estimate the base false rate, and 0 `FALSE` is not evidence that the base is cle
 | `MEMCUE_EMBED_MODE`, `_MARGIN`, `_MIN_SCORE`, `_MAX_FACTS` | removed | vector is a candidate generator, not a standalone reader; Jev decides |
 
 Operational flags stay: `MEMCUE_VET`, `MEMCUE_VET_POLICY`, `MEMCUE_VET_TTL_DAYS`, `MEMCUE_DREAM`,
-`MEMCUE_MEMORY_DIR`, `MEMCUE_MIN_COVERAGE`, `MEMCUE_EXTRACT`, `MEMCUE_FACTS`, `MEMCUE_RECALL_LOG`,
-`MEMCUE_HOST`, `CLAUDE_CONFIG_DIR`, `XDG_STATE_HOME`.
+`MEMCUE_MEMORY_DIR`, `MEMCUE_MIN_COVERAGE`, `MEMCUE_MAX_FACTS`, `MEMCUE_EXTRACT`, `MEMCUE_FACTS`,
+`MEMCUE_RECALL_LOG`, `MEMCUE_HOST`, `CLAUDE_CONFIG_DIR`, `XDG_STATE_HOME`.
 
 ## Recall flow
 

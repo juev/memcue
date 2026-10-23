@@ -25,6 +25,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
   min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15);
           with a judge configured it gates the words' own answer and the fallback only, because the judge reads
           the facts the gate turned away
+  max_facts: facts one prompt may get (passed to memcue as MEMCUE_MAX_FACTS; default 2). The cut is applied after
+          the ranking, so a larger value adds context, not coverage
   host: name of this machine for fact scope and the recall tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway,
@@ -261,6 +263,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
         self._tick = _TICK
         self._min_coverage = self._config.get("min_coverage")
+        self._max_facts = self._config.get("max_facts")
         self._host = str(self._config.get("host") or "")
         self._suppress_mirrored = bool(self._config.get("suppress_mirrored", True))
         self._usage_log = _on(self._config.get("usage_log"))
@@ -471,6 +474,8 @@ class MemcueMemoryProvider(MemoryProvider):
             env["MEMCUE_HOST"] = self._host
         if self._min_coverage is not None:
             env["MEMCUE_MIN_COVERAGE"] = str(self._min_coverage)
+        if self._max_facts is not None:
+            env["MEMCUE_MAX_FACTS"] = str(self._max_facts)
         try:
             r = subprocess.run([binary] + args, input=stdin, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=timeout, env=env, check=False)

@@ -266,7 +266,19 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 			p.MinCoverage = f
 		}
 	}
+	p.MaxFacts = maxFactsFromEnv(p.MaxFacts)
 	return recallFacts(s, prompt, tier.Of(cwd, claudeDir()), p)
+}
+
+// maxFactsFromEnv reads MEMCUE_MAX_FACTS, how many facts one prompt may get. A value outside 1..10 is ignored and
+// def stays: recall itself treats a non-positive MaxFacts as "no cap", so an accidental 0 in the environment would
+// hand the prompt the whole candidate list.
+func maxFactsFromEnv(def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("MEMCUE_MAX_FACTS")))
+	if err != nil || n < 1 || n > 10 {
+		return def
+	}
+	return n
 }
 
 // reHarness matches a prompt the harness wrote instead of the user: a background task's notice. Its words are file
