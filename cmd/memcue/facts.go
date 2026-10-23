@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,7 +94,7 @@ func withStore(fn func(*store.Store) error) error {
 func runAdd(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
-	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory)")
+	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory, empty outside a repository)")
 	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
@@ -122,7 +123,7 @@ func runAdd(args []string, out io.Writer) error {
 		m.Review = store.Candidate
 	}
 	return withStore(func(s *store.Store) error {
-		f, err := s.AddWith(content, keywordsList, *origin, *expires, m)
+		f, err := s.AddWith(content, keywordsList, *origin, eventExpires(*kind, *expires), m)
 		if err != nil {
 			return err
 		}
@@ -226,31 +227,47 @@ func defaultOriginAt(dir string) string {
 		var err error
 		dir, err = os.Getwd()
 		if err != nil {
-			return time.Now().Format(time.DateOnly)
+			return ""
 		}
 	}
-	return strings.TrimSpace(originName(dir) + " " + time.Now().Format(time.DateOnly))
+	return originAt(dir, time.Now().Format(time.DateOnly))
 }
 
-// originName names the place a fact was learnt for its origin: the repository tier inside a repository, the
-// directory's own name outside one (a container workspace, a mounted volume), and "" when dir is unknown or is the
-// filesystem root. A bare date is not an origin: it matches no repository and hides where the fact came from.
-func originName(dir string) string {
+// originAt names a fact by where it was learnt: the repository tier prefix and the date. Outside a repository the
+// origin stays empty — a scratch directory's name is a wrong answer, not a weak one, and it hides that nobody knows
+// where the fact came from (#287). A bare date would be just as wrong: it matches no repository.
+func originAt(dir, date string) string {
 	if dir == "" {
 		return ""
 	}
-	if name := tier.Of(dir, claudeDir()); name != "" {
-		return name
-	}
-	abs, err := filepath.Abs(dir)
-	if err != nil {
+	name := tier.Of(dir, claudeDir())
+	if name == "" {
 		return ""
 	}
-	base := filepath.Base(abs)
-	if base == "." || base == string(filepath.Separator) {
+	return strings.TrimSpace(name + " " + date)
+}
+
+// defaultEventTTL is how long a fact that records what happened stays recalled. Knowledge outlives the run that
+// produced it; an event fact without an expiry keeps answering questions about that run for months, which is exactly
+// what the base did before (#287).
+const defaultEventTTL = 7
+
+// eventExpires gives an event fact a short life unless the caller set one, and MEMCUE_EVENT_TTL_DAYS says how long;
+// 0 keeps event facts without an expiry. A rule, a decision or a pitfall has no default expiry: it is knowledge.
+func eventExpires(kind, expires string) string {
+	if expires != "" || kind != "event" {
+		return expires
+	}
+	days := defaultEventTTL
+	if v := strings.TrimSpace(os.Getenv("MEMCUE_EVENT_TTL_DAYS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			days = n
+		}
+	}
+	if days == 0 {
 		return ""
 	}
-	return base
+	return time.Now().AddDate(0, 0, days).Format(time.DateOnly)
 }
 
 func runCorrect(args []string, out io.Writer) error {

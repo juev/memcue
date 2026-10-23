@@ -15,7 +15,6 @@ import (
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/store"
-	"github.com/juev/memcue/internal/tier"
 	"github.com/juev/memcue/internal/transcript"
 )
 
@@ -48,7 +47,7 @@ func runExtract(args []string, out io.Writer) error {
 		return err
 	}
 	extract.Model = *model
-	origin := strings.TrimSpace(tier.Of(sess.CWD, claudeDir()) + " " + sess.Start)
+	origin := originAt(sess.CWD, sess.Start)
 	x, err := extractText(origin+"; "+hostLine(), sess.Text)
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
@@ -71,6 +70,7 @@ func runExtract(args []string, out io.Writer) error {
 		defer func() { _ = s.Close() }()
 		for _, fact := range facts {
 			sf, err := s.AddBatch([]store.FactInput{{Content: fact.Content, Keywords: fact.Keywords, Origin: origin,
+				Expires: eventExpires(fact.Kind, ""),
 				Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source,
 					Evidence: fact.Evidence, Review: store.Candidate}}})
 			if err != nil {

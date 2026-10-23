@@ -474,24 +474,35 @@ func TestFactsPathExpandsHome(t *testing.T) {
 	}
 }
 
-// Outside a repository the origin names the directory, not a bare date: a container workspace has no .git, and a date
-// alone loses where the fact was learnt and the repository tie-break with it.
-func TestOriginNameFallsBackToTheDirectory(t *testing.T) {
+// Outside a repository a fact has no origin: a scratch directory's name says nothing about where the fact came from
+// and hides that nobody knows it (#287).
+func TestOriginIsEmptyOutsideARepository(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "workspace")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := originName(dir), "workspace"; got != want {
-		t.Errorf("originName(%q) = %q, want %q", dir, got, want)
+	if got := defaultOriginAt(dir); got != "" {
+		t.Errorf("defaultOriginAt(%q) = %q, want empty", dir, got)
 	}
-	if got, want := defaultOriginAt(dir), "workspace "+time.Now().Format(time.DateOnly); got != want {
-		t.Errorf("defaultOriginAt(%q) = %q, want %q", dir, got, want)
+	if got := originAt(dir, "2026-10-19"); got != "" {
+		t.Errorf("originAt(%q) = %q, want empty", dir, got)
 	}
-	if got := originName(""); got != "" {
-		t.Errorf("originName(\"\") = %q, want empty", got)
+	if got := originAt(string(filepath.Separator), "2026-10-19"); got != "" {
+		t.Errorf("originAt(root) = %q, want empty", got)
 	}
-	if got := originName(string(filepath.Separator)); got != "" {
-		t.Errorf("originName(root) = %q, want empty", got)
+	if got := originAt("", "2026-10-19"); got != "" {
+		t.Errorf("originAt(\"\") = %q, want empty", got)
+	}
+}
+
+// Inside a repository the origin names the repository tier and the date, which is what the tie-break reads.
+func TestOriginNamesTheRepository(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := originAt(dir, "2026-10-19"), "repo 2026-10-19"; got != want {
+		t.Errorf("originAt(%q) = %q, want %q", dir, got, want)
 	}
 }
 
