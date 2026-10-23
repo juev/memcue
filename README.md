@@ -413,12 +413,15 @@ retirement is final, so a changed fact is added as a new fact, and the review pa
 rejection. The full rules are in [Use](#use).
 
 `vet` also checks the approved facts that this binary finds suspect: a fact that names a `MEMCUE_*` variable or a
-`` `memcue X` `` verb it does not have, a memcue version older than its own (a release build only), or a reminder
-whose dates have all passed. Code can find such a fact but cannot tell a stale one from a record of history, so the main
-model reads each with what was found and retires those that describe a past state as current. Every fact asked about is
-remembered with its version and the binary's version in `vet.checked` in the state directory, so a kept fact is not
-asked about again until its text or the binary changes. `-no-model` only lists the suspects; `-dry-run` asks and
-changes nothing.
+`` `memcue X` `` verb it does not have, a memcue version older than its own (a release build only, either right after
+the word or a few words later behind "бинарь", "версия", "сборка", "релиз" or "тег"), or a reminder whose dates have all
+passed. Code can find such a fact but cannot tell a stale one from a record of history, so the main model reads each
+with what was found and retires those that describe a past state as current. The model is asked at temperature 0 and
+every retirement needs a second, independent answer that agrees with the first: a wrong retirement cannot be undone
+from the binary, and one bad sample must not take a true fact out of recall. A fact the two answers disagree about is
+kept and logged as such. Every fact asked about is remembered with its version and the binary's version in `vet.checked`
+in the state directory, so a kept fact is not asked about again until its text or the binary changes. `-no-model` only
+lists the suspects; `-dry-run` asks and changes nothing.
 
 ## Harness support
 

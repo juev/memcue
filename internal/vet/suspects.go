@@ -27,9 +27,14 @@ type Suspect struct {
 }
 
 var (
-	envName     = regexp.MustCompile(`MEMCUE_[A-Z0-9_]*[A-Z0-9]`)
-	verbName    = regexp.MustCompile("`memcue ([a-z][a-z-]*)")
-	versionName = regexp.MustCompile(`(?i)\bmemcue\s+v?(\d+)\.(\d+)\.(\d+)`)
+	envName  = regexp.MustCompile(`MEMCUE_[A-Z0-9_]*[A-Z0-9]`)
+	verbName = regexp.MustCompile("`memcue ([a-z][a-z-]*)")
+	// A version right after the word, and a version a few words later when a word that carries it stands in between
+	// ("memcue установлен на двух машинах: бинарь 0.1.2"). The second pattern needs that keyword, so a version of
+	// another tool in the same sentence is not read as memcue's (#296). No \b before the keyword: Go's \b is
+	// ASCII-only and never holds next to a Cyrillic letter.
+	versionName  = regexp.MustCompile(`(?i)\bmemcue\s+v?(\d+)\.(\d+)\.(\d+)`)
+	versionLabel = regexp.MustCompile(`(?i)\bmemcue\b[^;\n]{0,60}[\s:—–-](?:бинарь|бинар[а-я]*|верси[а-я]+|version|сборк[а-я]+|релиз[а-я]*|тег|tag)\s*:?\s*v?(\d+)\.(\d+)\.(\d+)`)
 	// A reminder fact starts with the word; one that only mentions a scheduler or a branch named reminder is not one.
 	reminder = regexp.MustCompile(`(?i)^\s*(напоминание|напомнить|reminder|remind)`)
 	isoDate  = regexp.MustCompile(`\b(\d{4})-(\d{2})-(\d{2})\b`)
@@ -104,17 +109,20 @@ func unknownVerbs(text string, known map[string]bool) []string {
 	return out
 }
 
-// olderVersion returns the oldest memcue version text names that is older than current, or "".
+// olderVersion returns the oldest memcue version text names that is older than current, or "". Both signals count: the
+// version right after the word, and the one a version word carries a few words later.
 func olderVersion(text, current string) string {
 	cur, ok := parseVersion(current)
 	if !ok {
 		return ""
 	}
 	oldest, found := [3]int{}, ""
-	for _, m := range versionName.FindAllStringSubmatch(text, -1) {
-		v, _ := parseVersion(m[1] + "." + m[2] + "." + m[3])
-		if less(v, cur) && (found == "" || less(v, oldest)) {
-			oldest, found = v, fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2])
+	for _, re := range []*regexp.Regexp{versionName, versionLabel} {
+		for _, m := range re.FindAllStringSubmatch(text, -1) {
+			v, _ := parseVersion(m[1] + "." + m[2] + "." + m[3])
+			if less(v, cur) && (found == "" || less(v, oldest)) {
+				oldest, found = v, fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2])
+			}
 		}
 	}
 	return found

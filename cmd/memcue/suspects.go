@@ -131,6 +131,32 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 		for _, d := range got.Decisions {
 			byID[d.ID] = d
 		}
+		// A retire is the failure this step must not make, and the model samples even at temperature zero (#296), so
+		// every fact it wants to retire is asked about a second time and retired only when both answers agree.
+		confirmed := map[string]bool{}
+		var retiring []vet.Suspect
+		for _, sp := range batch {
+			if d, ok := byID[sp.Fact.ID]; ok && d.Verdict == extract.RetireSuspect {
+				retiring = append(retiring, sp)
+			}
+		}
+		if len(retiring) > 0 {
+			again, err := askSuspects(retiring, k, now)
+			switch {
+			case err != nil:
+				if rec.Error == "" {
+					rec.Error = "suspects: second answer: " + err.Error()
+				}
+			default:
+				rec.CostUSD += again.CostUSD
+				rec.Tokens.Add(again.Tokens)
+				for _, d := range again.Decisions {
+					if d.Verdict == extract.RetireSuspect {
+						confirmed[d.ID] = true
+					}
+				}
+			}
+		}
 		for _, sp := range batch {
 			d, ok := byID[sp.Fact.ID]
 			if !ok {
@@ -140,6 +166,12 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 			reason := "; " + strings.TrimSpace(d.Reason)
 			if d.Verdict != extract.RetireSuspect {
 				lines = append(lines, line(sp, "kept", string(vet.Keep), "model", reason))
+				done = append(done, checkKey(sp.Fact, version))
+				continue
+			}
+			if !confirmed[sp.Fact.ID] {
+				lines = append(lines, line(sp, "kept", string(vet.Keep), "model",
+					reason+"; the second answer did not agree"))
 				done = append(done, checkKey(sp.Fact, version))
 				continue
 			}
