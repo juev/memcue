@@ -337,7 +337,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
-| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
+| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with a judge configured it gates the words' own answer and the fallback only | 0.15 |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once an hour | off |
 | `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |

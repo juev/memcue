@@ -22,7 +22,9 @@ Config, all optional (``memory.memcue`` in config.yaml):
           applies to a RESULT block; 0 turns tool output off). Tool output is kept because a fact whose source is a
           tool can only quote its evidence from a RESULT block, and memcue's write policy drops it without one
   extract_max_message_chars: cut a message to this many characters before extraction (default 4000)
-  min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15)
+  min_coverage: share of the prompt's terms a fact must hold to be recalled (passed to memcue; default 0.15);
+          with a judge configured it gates the words' own answer and the fallback only, because the judge reads
+          the facts the gate turned away
   host: name of this machine for fact scope and the recall tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   suppress_mirrored: hide facts that only mirror the built-in memory notes, which are in the prompt anyway,

@@ -76,5 +76,11 @@ $0.0166 and 0.79 s median.
 ## Known limits
 
 - Cost and latency are paid per prompt while the judge is configured; on a laptop without a key it is off.
+- The lexical gate stops filtering once a judge is configured: the judge reads the facts the gate turned away, so
+  `MEMCUE_MIN_COVERAGE` and the matched-term count decide the words' own answer and the fallback only (#57, #232).
+- The cut is not stable between two identical runs. Jev answers the same candidate a few hundredths differently, so the
+  served pair changed on 5–7 of 12 live prompts over six runs; a tie band that orders near-equal scores by the words was
+  measured and does not change that, because the flips come from the fixed threshold and from gaps wider than the
+  jitter ([research/judge-cut-2026-10.md](research/judge-cut-2026-10.md)).
 - The labels are one model's opinion; the later 60-fact truth sample was 52 TRUE_NOW / 8 STALE, but it was not random.
 - Jev is a judge, not a retriever: do not ask it to search the whole base.
