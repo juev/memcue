@@ -141,6 +141,11 @@ holds, and served nothing; the words serve it. The trees learnt the gold base, w
 and a base unlike it falls outside what they saw. How large or how expanded a base must be for the reader to help was
 not measured.
 
+End to end it changes nothing ([e2e-files](e2e-files-2026-10.md#a-sixth-mode-local-321)): on 40 real prompts in
+`claude -p`, two repetitions, it scored 0.95 against 0.96 for the words and 1.01 for the judge, with 112 facts served
+against the words' 114 and the same median time. 39 of those prompts are in the training pool, which can only have
+helped it. The half of the noise it removes on the gold set does not show in the agent's answers.
+
 ## Limits
 
 - One base, one user's prompts; 171 test prompts. A difference of a few prompts is noise.
