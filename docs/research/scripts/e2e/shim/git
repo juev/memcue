@@ -1,0 +1,16 @@
+#!/bin/sh
+# read-only git for the e2e replay: options with a value (-C, -c, --git-dir, --work-tree) are skipped with it
+skip=0; sub=""
+for a in "$@"; do
+  if [ $skip = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -C|-c|--git-dir|--work-tree|--namespace) skip=1;;
+    -*) ;;
+    *) sub="$a"; break;;
+  esac
+done
+case "$sub" in
+  push|commit|merge|rebase|reset|checkout|switch|pull|fetch|clone|cherry-pick|revert|am|apply|stash|tag|worktree|clean|restore|rm|mv|add|branch|remote|config|gc|update-ref|notes|submodule)
+    echo "git $sub: blocked in the e2e run (read-only replay)" >&2; exit 126;;
+esac
+exec /usr/bin/git "$@"
