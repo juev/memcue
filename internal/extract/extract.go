@@ -164,14 +164,6 @@ func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input st
 	return envelope(out.Bytes())
 }
 
-func parse(b []byte) (Result, error) {
-	rp, err := envelope(b)
-	if err != nil {
-		return Result{}, err
-	}
-	return decode(rp)
-}
-
 // envelope takes the answer out of the JSON `claude -p` prints.
 func envelope(b []byte) (reply, error) {
 	var env struct {

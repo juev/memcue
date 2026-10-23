@@ -280,3 +280,42 @@ func TestRecallJudgeMarksAPausedJudge(t *testing.T) {
 		t.Errorf("a failure marked as a pause: paused %v, fallback %q", trace.Paused, trace.Fallback)
 	}
 }
+
+// The judge path keeps the ticket exactness rule too: PROJ-1235 cannot reach PROJ-1234 through a shared keyword.
+func TestRecallJudgeKeepsTheTicketGate(t *testing.T) {
+	s, other, wanted := ticketBase(t)
+	hits, err := RecallJudge(s, "PROJ-1235 postgres port", "x", rankedParams(),
+		&fakeRanker{min: 0.5, scores: map[string]float64{"": 0.9}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].ID != wanted {
+		t.Fatalf("hits = %v, want %s", ids(hits), wanted)
+	}
+	for _, h := range hits {
+		if h.ID == other {
+			t.Fatalf("a prompt for PROJ-1235 recalled PROJ-1234: %v", ids(hits))
+		}
+	}
+}
+
+// A fact the session already got gives way to the next one, with the judge on as well.
+func TestRecallJudgeSkipsWhatTheSessionSaw(t *testing.T) {
+	s, _ := rankedBase(t)
+	p := rankedParams()
+	r := &fakeRanker{min: 0.5, scores: map[string]float64{"JAVA_HOME": 0.93}}
+	first, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", "", p, r)
+	if err != nil || len(first) == 0 {
+		t.Fatalf("first = %v, %v", ids(first), err)
+	}
+	p.Seen = map[string]bool{first[0].ID: true}
+	second, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", "", p, r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range second {
+		if h.ID == first[0].ID {
+			t.Fatal("a fact the session already got came again")
+		}
+	}
+}

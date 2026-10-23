@@ -9,6 +9,17 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
+// Ranker scores how much each of the facts the words found would help answer the prompt, on 0..1. A nil Ranker turns
+// the pass off.
+type Ranker interface {
+	Scores(ctx context.Context, prompt string, facts []string) ([]float64, error)
+	Min() float64
+	Candidates() int
+}
+
+// minRankCandidates is the smallest candidate list worth asking about: with one fact there is nothing to choose.
+const minRankCandidates = 2
+
 // RecallJudge is recall with the facts the words found in front of a judge, which orders them and drops what is below
 // its threshold. The judge reads the first Candidates facts in the search's BM25 order, whether the term and coverage
 // gate let them pass or not: the gate was tuned for recall by words alone, and with a judge the facts it turns away
