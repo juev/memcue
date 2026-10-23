@@ -3,6 +3,9 @@
   python3 -I judge_ab_report.py label  candidates.jsonl labels.json RESULT.jsonl...   [LABELLER=deepseek]
   python3 -I judge_ab_report.py report candidates.jsonl labels.json RESULT.jsonl...
 
+THRESHOLDS (comma separated, default 0.3,0.5,0.7) sets the thresholds the label and report stages walk: #278 needed
+0.3,0.5,0.55,0.6,0.65,0.7 to find where the noise falls and what that costs in useful prompts.
+
 A reader serves what recall would: the facts at or above the threshold, approved before provisional, by score, at most
 two (recall.Default.MaxFacts). `label` asks Opus through `claude -p` about every pair any reader served at any
 threshold of THRESHOLDS that labels.json does not hold yet. Opus does not see which reader served a pair; pairs of one
@@ -20,7 +23,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-THRESHOLDS = (0.3, 0.5, 0.7)
+THRESHOLDS = tuple(float(t) for t in os.environ.get("THRESHOLDS", "0.3,0.5,0.7").split(","))
 MAX_FACTS = 2
 
 mode, cand_path, labels_path, results = sys.argv[1], sys.argv[2], Path(sys.argv[3]), sys.argv[4:]
@@ -130,5 +133,5 @@ for name, run in runs.items():
             top1 += bool(ls) and ls[0] == "USEFUL"
             anyu += "USEFUL" in ls
             empty += not ls
-        print(f"{name:<14}{t:>5.1f}{top1:>7}{anyu:>6}{dist['USEFUL']:>8}{dist['RELATED']:>9}{dist['NOISE']:>7}"
+        print(f"{name:<14}{t:>5.2f}{top1:>7}{anyu:>6}{dist['USEFUL']:>8}{dist['RELATED']:>9}{dist['NOISE']:>7}"
               f"{empty:>6}{dist['UNLABELLED']:>7}")
