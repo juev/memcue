@@ -132,7 +132,9 @@ environment:
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got (recall.log in the state directory; holds prompt text)
-  MEMCUE_MIN_COVERAGE raise the share of a prompt's terms a fact must hold to be recalled (default 0.15)
+  MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15); with a judge
+                  configured this gates the words' own answer and the fallback only, because the judge reads the
+                  facts the gate turned away
   MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage and recall rerank; off
                   unless all three are set
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
