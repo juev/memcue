@@ -9,12 +9,12 @@ import (
 	"github.com/juev/memcue/internal/extract"
 )
 
-// fakeAddExpand answers the expansion call of add with one query per fact, or fails, and counts the calls.
-func fakeAddExpand(t *testing.T, fail error) *int {
+// fakeExpandOnce answers the expansion call of add and correct with one query per fact, or fails, and counts the calls.
+func fakeExpandOnce(t *testing.T, fail error) *int {
 	t.Helper()
 	calls := 0
-	old := addExpandFn
-	addExpandFn = func(input string) (extract.ExpandResult, error) {
+	old := expandOneFn
+	expandOneFn = func(input string) (extract.ExpandResult, error) {
 		calls++
 		if fail != nil {
 			return extract.ExpandResult{}, fail
@@ -23,7 +23,7 @@ func fakeAddExpand(t *testing.T, fail error) *int {
 		id = id[:strings.Index(id, `"`)]
 		return extract.ExpandResult{Facts: []extract.Expansion{{ID: id, Queries: []string{"какой порт у postgres"}}}}, nil
 	}
-	t.Cleanup(func() { addExpandFn = old })
+	t.Cleanup(func() { expandOneFn = old })
 	return &calls
 }
 
@@ -47,7 +47,7 @@ func addFactForTest(t *testing.T, args ...string) string {
 func TestAddExpandsTheFact(t *testing.T) {
 	env(t)
 	withAPI(t, "https://api.example.test")
-	calls := fakeAddExpand(t, nil)
+	calls := fakeExpandOnce(t, nil)
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
 	if f := vetStatus(t, id); *calls != 1 || len(f.Queries) != 1 || f.Queries[0] != "какой порт у postgres" {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
@@ -58,7 +58,7 @@ func TestAddExpandsTheFact(t *testing.T) {
 func TestAddKeepsTheFactWhenExpansionFails(t *testing.T) {
 	env(t)
 	withAPI(t, "https://api.example.test")
-	calls := fakeAddExpand(t, errors.New("endpoint down"))
+	calls := fakeExpandOnce(t, errors.New("endpoint down"))
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
 	if f := vetStatus(t, id); *calls != 1 || len(f.Queries) != 0 || f.Content == "" {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
@@ -68,7 +68,7 @@ func TestAddKeepsTheFactWhenExpansionFails(t *testing.T) {
 // A candidate (the Hermes mirror writes them on the turn's path) and an add without an API endpoint call no model.
 func TestAddCallsNoModelForCandidatesOrWithoutAPI(t *testing.T) {
 	env(t)
-	calls := fakeAddExpand(t, nil)
+	calls := fakeExpandOnce(t, nil)
 	addFactForTest(t, "-origin", "x 2026-10-22", "Без endpoint запрос не идёт.")
 	withAPI(t, "https://api.example.test")
 	addFactForTest(t, "-candidate", "-origin", "x 2026-10-22", "Кандидат ждёт vet.")
