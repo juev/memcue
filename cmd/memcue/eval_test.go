@@ -14,9 +14,7 @@ import (
 // panicked while slicing the hits with a negative index.
 func TestEvalNonPositiveMaxFactsServesEveryFact(t *testing.T) {
 	// Keep the eval pass lexical: an endpoint configured in the developer's environment would change the answer.
-	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY"} {
-		t.Setenv(k, "")
-	}
+	lexicalOnly(t)
 	dir := env(t)
 	s, err := store.Open(factsPath())
 	if err != nil {

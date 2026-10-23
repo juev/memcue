@@ -8,10 +8,12 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// lexicalOnly turns the judge off, whatever the developer's environment holds.
+// lexicalOnly turns every rerank reader off, whatever the developer's environment holds: without Jev the ranker
+// falls back to the listwise reader on the main model, so its endpoint goes too.
 func lexicalOnly(t *testing.T) {
 	t.Helper()
-	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL"} {
+	for _, k := range []string{"MEMCUE_RERANK", "MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY",
+		"MEMCUE_API_URL", "MEMCUE_MODEL", "MEMCUE_API_KEY"} {
 		t.Setenv(k, "")
 	}
 }
