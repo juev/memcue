@@ -10,6 +10,7 @@ import http.server
 import importlib.util
 import inspect
 import json
+import re
 import threading
 import time
 import os
@@ -420,6 +421,32 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(self.facts(), [])
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {})))
         self.assertIn("error", json.loads(self.p.handle_tool_call("nope", {})))
+
+    def test_cron_run_dreams_but_writes_no_facts(self):
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        p.initialize("c1", hermes_home=self.home, agent_context="cron")
+        self.assertEqual([s["name"] for s in p.get_tool_schemas()],
+                         ["memcue_search", "memcue_dream_prepare", "memcue_dream_apply"])
+        self.assertIn("error", json.loads(p.handle_tool_call("memcue_add", {"content": "x"})))
+        self.assertIn("result", json.loads(p.handle_tool_call("memcue_dream_prepare", {"since": "all"})))
+
+    def test_dream_tools_prepare_and_apply(self):
+        ids = []
+        for content in ("Workflow nightly-sync.yml в example/nightly-sync каждую ночь подписывает bot на все репозитории.",
+                        "Репозиторий example/nightly-sync каждую ночь запускает nightly-sync.yml, он подписывает bot на все репозитории."):
+            added = json.loads(self.p.handle_tool_call("memcue_add", {"content": content, "keywords": "nightly-sync, workflow"}))
+            ids.append(added["result"].split()[0])
+        packet = json.loads(self.p.handle_tool_call("memcue_dream_prepare", {"since": "all"}))["result"]
+        self.assertIn("memcue dream -apply", packet)
+        packet_id = re.search(r'"packet": "([^"]+)"', packet).group(1)
+        keep, gone = sorted(ids)
+        answer = json.dumps({"packet": packet_id, "actions": [
+            {"op": "retire", "id": gone, "by": keep, "kind": "duplicate", "reason": "the same workflow"}]})
+        applied = json.loads(self.p.handle_tool_call("memcue_dream_apply", {"answer": answer}))
+        self.assertIn(f"retire {gone}", applied["result"])
+        self.assertEqual([l.split()[0] for l in self.facts() if l.strip()], [keep])
+        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_dream_apply", {"answer": answer})))
+        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_dream_apply", {})))
 
     def test_add_carries_kind_and_scope(self):
         added = json.loads(self.p.handle_tool_call("memcue_add", {

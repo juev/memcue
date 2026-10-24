@@ -29,7 +29,11 @@ memcue fact base:
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   `memcue_search` takes an optional `limit`; `memcue_correct` can set `keywords` and an `expires` date, as the CLI
   does. Search is lexical, like `memcue search`: the host and repository preference belongs to recall, not the tool.
-  Subagents, cron and flush runs get only `memcue_search` and do not write.
+  Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
+  tools below.
+- **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
+  instructions and the facts to split, give search queries and review in groups (`since: all` for the first dream
+  on a base), the second takes the JSON answer and reports what memcue applied and refused. See [Dream](#dream).
 - **Session extraction** (optional): `MEMCUE_EXTRACT=0` in the gateway's environment turns it off and wins over
   `extract_url`; otherwise the new messages of a session go to `memcue extract-messages` in the
   background, which sends them to an OpenAI-compatible model with the same prompt Claude Code sessions get, and adds
@@ -53,6 +57,20 @@ Mirrored built-in memory writes and extracted facts are **candidates**: the base
 
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
 …). The built-in `MEMORY.md`/`USER.md` stays on either way.
+
+## Dream
+
+memcue starts no model for the dream: Hermes's own model does it, in a cron job. One job every four hours, with its
+output kept out of the chats:
+
+```sh
+hermes cron create 'every 4h' --name memcue-dream --deliver local \
+  'Tidy long-term memory: call memcue_dream_prepare, follow its instructions, answer with memcue_dream_apply, and repeat while it still returns facts. Stop when it says "nothing for the dream".'
+```
+
+The first dream on a base needs `since: all` (the whole base) or a date; the job's first run can be told so once,
+or run `memcue dream -prepare -all` by hand. A packet holds up to 40 fresh facts and 30 groups, so a large backlog
+takes a few runs; the rules are in [Dream](../../README.md#dream).
 
 ## Install
 

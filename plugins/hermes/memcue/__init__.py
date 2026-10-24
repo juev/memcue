@@ -66,6 +66,7 @@ logger = logging.getLogger(__name__)
 
 _RECALL_TIMEOUT = 5  # memcue answers in ~10 ms; anything slower is broken
 _WRITE_TIMEOUT = 15
+_DREAM_TIMEOUT = 60  # a packet groups up to 40 facts by recall, and an answer writes up to a few hundred versions
 _ORIGIN = "hermes"
 _ORIGIN_MIRROR = "hermes-memory"  # a fact that only mirrors a built-in memory note; prefetch hides those
 _THRESHOLD = 20000  # characters of new messages that make a run worth a model call
@@ -253,6 +254,16 @@ CORRECT_SCHEMA = _schema(
 RETIRE_SCHEMA = _schema(
     "memcue_retire", "Stop recalling a stored fact that no longer holds (the history keeps it).",
     {"id": "Fact ID from memcue_search."}, ["id"])
+DREAM_PREPARE_SCHEMA = _schema(
+    "memcue_dream_prepare", "Start tidying long-term memory (the memcue dream): returns the instructions and the facts "
+    "to split, to give search queries and to review in groups. Answer it with memcue_dream_apply. "
+    "'nothing for the dream' means there is nothing to do.",
+    {"since": "Optional: 'all' reviews every fact, a date (YYYY-MM-DD) the facts written since; the default is "
+              "the facts new since the last dream. The first dream on a base needs one of them."}, [])
+DREAM_APPLY_SCHEMA = _schema(
+    "memcue_dream_apply", "Apply the answer to the packet memcue_dream_prepare returned: memcue checks it and "
+    "reports what it changed and what it refused.",
+    {"answer": "The JSON answer, in the form the instructions give, with the packet id."}, ["answer"])
 
 
 class MemcueMemoryProvider(MemoryProvider):
@@ -266,6 +277,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = ""
         self._writes = True
         self._context = "primary"
+        self._dreams = True
         self._generation = 0  # grows with every compression: the facts of an earlier context may come again
         self._session_card = _on(self._config.get("session_card", True))
         self._card_generation = -1  # the generation whose card has already been delivered
@@ -406,6 +418,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
         self._context = str(kwargs.get("agent_context") or "primary")
+        # The dream is a cron job's work (#358): a cron run writes no facts, but it may tidy them.
+        self._dreams = self._context in ("primary", "cron")
         self._card_generation = -1
         if self._writes:
             # A batch that was in flight when the gateway stopped is still on disk: retry it on the next flush.
@@ -1053,9 +1067,12 @@ class MemcueMemoryProvider(MemoryProvider):
     # -- tools ------------------------------------------------------------------
 
     def get_tool_schemas(self) -> list[dict[str, Any]]:
-        if not self._writes:
-            return [SEARCH_SCHEMA]
-        return [SEARCH_SCHEMA, ADD_SCHEMA, CORRECT_SCHEMA, RETIRE_SCHEMA]
+        schemas = [SEARCH_SCHEMA]
+        if self._writes:
+            schemas += [ADD_SCHEMA, CORRECT_SCHEMA, RETIRE_SCHEMA]
+        if self._dreams:
+            schemas += [DREAM_PREPARE_SCHEMA, DREAM_APPLY_SCHEMA]
+        return schemas
 
     def handle_tool_call(self, tool_name: str, args: dict[str, Any], **kwargs) -> str:
         def arg(name: str) -> str:
@@ -1080,8 +1097,30 @@ class MemcueMemoryProvider(MemoryProvider):
                 except ValueError:  # an older binary without -json prints text
                     return json.dumps({"result": out or "No stored facts match."}, ensure_ascii=False)
             return tool_error(out)
-        if tool_name not in ("memcue_add", "memcue_correct", "memcue_retire"):
+        if tool_name not in ("memcue_add", "memcue_correct", "memcue_retire", "memcue_dream_prepare",
+                             "memcue_dream_apply"):
             return tool_error(f"Unknown tool: {tool_name}")
+        if tool_name.startswith("memcue_dream_") and not self._dreams:
+            return tool_error("the dream is off in this context")
+        if tool_name == "memcue_dream_prepare":
+            cmd = ["dream", "-prepare"]
+            if arg("since") == "all":
+                cmd.append("-all")
+            elif arg("since"):
+                cmd += ["-since", arg("since")]
+            ok, out = self._run(cmd, timeout=_DREAM_TIMEOUT)
+            return json.dumps({"result": out}, ensure_ascii=False) if ok else tool_error(out)
+        if tool_name == "memcue_dream_apply":
+            if not arg("answer"):
+                return tool_error("answer is required")
+            fd, path = tempfile.mkstemp(prefix="memcue-dream-", suffix=".json")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(arg("answer"))
+                ok, out = self._run(["dream", "-apply", path], timeout=_DREAM_TIMEOUT)
+            finally:
+                os.unlink(path)
+            return json.dumps({"result": out}, ensure_ascii=False) if ok else tool_error(out)
         if not self._writes:
             return tool_error("memory writes are off in this context")
         if tool_name == "memcue_add":
