@@ -1056,6 +1056,13 @@ type Hit struct {
 
 // Search returns up to limit active facts holding any of the terms, best BM25 first.
 func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
+	return s.SearchIn(terms, limit, nil)
+}
+
+// SearchIn is Search over the facts that hold in places: a fact scoped to a repository or a directory (repo:, dir:)
+// is left out unless its scope is one of places; every other scope holds anywhere. The filter runs before the limit,
+// so a fact of another place never takes a candidate's slot (#345). Nil places filter nothing.
+func (s *Store) SearchIn(terms []string, limit int, places []string) ([]Hit, error) {
 	if len(terms) == 0 {
 		return nil, nil
 	}
@@ -1063,10 +1070,21 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	for i, t := range terms {
 		q[i] = text.Query(t)
 	}
+	where, args := "", []any{strings.Join(q, " OR ")}
+	if _, noScope := s.absent["scope"]; places != nil && !noScope { // a base read before scopes has none to filter
+		where = ` AND (lower(f.scope) NOT LIKE 'repo:%' AND lower(f.scope) NOT LIKE 'dir:%'`
+		if len(places) > 0 {
+			where += ` OR lower(f.scope) IN (` + strings.TrimSuffix(strings.Repeat("?, ", len(places)), ", ") + `)`
+			for _, p := range places {
+				args = append(args, strings.ToLower(p))
+			}
+		}
+		where += `)`
+	}
 	rows, err := s.db.Query(`SELECT i.stems, bm25(fact_fts), `+s.cols("f")+`
 		FROM fact_fts JOIN fact_index i ON i.rid = fact_fts.rowid
 		JOIN facts f ON f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = i.id)
-		WHERE fact_fts MATCH ? ORDER BY bm25(fact_fts) LIMIT ?`, strings.Join(q, " OR "), limit)
+		WHERE fact_fts MATCH ?`+where+` ORDER BY bm25(fact_fts) LIMIT ?`, append(args, limit)...)
 	if err != nil {
 		return nil, err
 	}

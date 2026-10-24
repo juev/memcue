@@ -5,7 +5,8 @@
 // serve. A variant acts only on facts scoped repo: or dir: that do not hold in the session's project; global, host:,
 // service: and empty scopes are never filtered and never ranked down. A session with no project (no cwd, a directory
 // memcue gives no key, or the Claude config directory) gets the baseline in every variant. One JSON line per prompt
-// goes to stdout, the totals to stderr. Experiment only, not part of memcue.
+// goes to stdout, the totals to stderr, with how often recall itself, since #345 shipped the gate, serves what the
+// gate0.25 and filter variants do. Experiment only, not part of memcue.
 //
 // usage: go run -tags research ./docs/research/scripts/scope FACTS.db eval.json CLAUDE_DIR > scope.jsonl
 //
@@ -40,7 +41,8 @@ type row struct {
 	Keys    []string            `json:"keys"`
 	Project bool                `json:"project"`
 	Anchors []string            `json:"anchors,omitempty"` // scopes the prompt names
-	Shipped []string            `json:"shipped"`           // what recall serves today
+	Shipped []string            `json:"shipped"`           // what recall serves with recall.Default
+	Filter  []string            `json:"filter"`            // what recall serves with FilterForeign
 	Picks   map[string][]string `json:"picks"`             // variant -> served facts
 	Foreign int                 `json:"foreign"`           // passing facts in the shipped pool that do not hold here
 }
@@ -91,16 +93,18 @@ func main() {
 		}
 	}
 	enc := json.NewEncoder(os.Stdout)
-	var prompts, withProject, differ int
-	same := 0
+	var prompts, withProject, differ, gate, filter int
 	for _, p := range in.Prompts {
 		r := run(s, byID, names, claudeDir, p.ID, p.Text, p.CWD)
 		prompts++
 		if r.Project {
 			withProject++
 		}
-		if slices.Equal(r.Shipped, r.Picks["base"]) {
-			same++
+		if slices.Equal(r.Shipped, r.Picks["gate0.25"]) {
+			gate++
+		}
+		if slices.Equal(r.Filter, r.Picks["filter"]) {
+			filter++
 		}
 		for v, ids := range r.Picks {
 			if v != "base" && !slices.Equal(ids, r.Picks["base"]) {
@@ -112,8 +116,9 @@ func main() {
 			panic(err)
 		}
 	}
-	fmt.Fprintf(os.Stderr, "prompts %d, with a project %d, simulated base equals shipped recall in %d, some variant "+
-		"differs from base in %d\n", prompts, withProject, same, differ)
+	fmt.Fprintf(os.Stderr, "prompts %d, with a project %d, some variant differs from base in %d; recall.Default "+
+		"serves what gate0.25 does in %d, FilterForeign what filter does in %d\n", prompts, withProject, differ, gate,
+		filter)
 }
 
 var reToken = regexp.MustCompile(`[\p{L}\p{N}_.-]+`)
@@ -143,8 +148,18 @@ func run(s *store.Store, byID map[string]store.Fact, names map[string][]string, 
 	for _, h := range shipped {
 		r.Shipped = append(r.Shipped, h.ID)
 	}
+	pf := p
+	pf.FilterForeign = true
+	filtered, err := recall.Recall(s, prompt, r.Keys, pf)
+	if err != nil {
+		panic(err)
+	}
+	for _, h := range filtered {
+		r.Filter = append(r.Filter, h.ID)
+	}
 	all := p
 	all.Candidates = unlimited
+	all.ForeignCoverage = 0 // the variants are built from the gates as they were before #345
 	tr := &recall.Trace{}
 	all.Trace = tr
 	if _, err := recall.Recall(s, prompt, r.Keys, all); err != nil {

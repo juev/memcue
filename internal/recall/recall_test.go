@@ -387,3 +387,97 @@ func TestAnyProjectKeyWinsTies(t *testing.T) {
 		t.Errorf("first is %q, want the upstream's fact", got[0].Origin)
 	}
 }
+
+// foreignSetup stores the same text under five scopes, so that every fact holds the same share of a prompt, and one
+// more fact that makes "логи" a known term the five do not hold.
+func foreignSetup(t *testing.T) *store.Store {
+	t.Helper()
+	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	for _, sc := range []string{"repo:example.com/me/app", "repo:example.com/them/lib", "dir:/srv/work", "global",
+		"service:queue"} {
+		if _, err := s.AddWith("Брокер rabbitmq слушает 5672, панель на 15672 ("+sc+").", []string{"rabbitmq"},
+			"x 2026-10-01", "", store.Meta{Scope: sc}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.Add("Логи nginx лежат в /var/log/nginx.", nil, "x 2026-10-01"); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func scopesOf(hits []Hit) map[string]bool {
+	out := map[string]bool{}
+	for _, h := range hits {
+		out[h.Scope] = true
+	}
+	return out
+}
+
+// In a repository's session a fact of another repository or directory passes only with ForeignCoverage; its own
+// repository's fact and the places that hold anywhere pass as before (#345).
+func TestForeignFactNeedsItsCoverage(t *testing.T) {
+	s := foreignSetup(t)
+	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10}
+	prompt := "брокер rabbitmq панель логи" // the facts hold three of the four terms
+	got, err := Recall(s, prompt, []string{"example.com/me/app"}, p)
+	if err != nil || len(got) != 5 {
+		t.Fatalf("no ForeignCoverage: want all five, got %v %v", scopesOf(got), err)
+	}
+	p.ForeignCoverage = 0.99
+	tr := &Trace{}
+	p.Trace = tr
+	got, err = Recall(s, prompt, []string{"example.com/me/app"}, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"repo:example.com/me/app": true, "global": true, "service:queue": true}
+	if sc := scopesOf(got); len(sc) != len(want) || !sc["repo:example.com/me/app"] || !sc["global"] || !sc["service:queue"] {
+		t.Errorf("served %v, want %v", sc, want)
+	}
+	foreign := 0
+	for _, st := range tr.Lexical {
+		if st.Verdict == VerdictForeign {
+			foreign++
+		}
+	}
+	if foreign != 2 {
+		t.Errorf("trace has %d facts turned away as another project's, want 2: %+v", foreign, tr.Lexical)
+	}
+}
+
+// FilterForeign leaves the facts of another project out of the search itself: they never reach the gates.
+func TestFilterForeignLeavesThemOutOfTheSearch(t *testing.T) {
+	s := foreignSetup(t)
+	tr := &Trace{}
+	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10, FilterForeign: true,
+		Trace: tr}
+	got, err := Recall(s, "брокер rabbitmq панель", []string{"example.com/me/app"}, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sc := scopesOf(got); len(sc) != 3 || sc["repo:example.com/them/lib"] || sc["dir:/srv/work"] {
+		t.Errorf("served %v, want the own repository, global and the service", sc)
+	}
+	if len(tr.Lexical) != 3 {
+		t.Errorf("the search returned %d facts, want 3", len(tr.Lexical))
+	}
+}
+
+// A session with no repository key has no other project: the Claude config directory, a directory outside git and
+// a session with no key serve every place as before.
+func TestSessionWithoutRepositoryHasNoForeignFacts(t *testing.T) {
+	s := foreignSetup(t)
+	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10, ForeignCoverage: 0.99,
+		FilterForeign: true}
+	for _, project := range [][]string{nil, {"_global"}, {"dir:/opt/data"}} {
+		got, err := Recall(s, "брокер rabbitmq панель логи", project, p)
+		if err != nil || len(got) != 5 {
+			t.Errorf("project %v: want all five, got %v %v", project, scopesOf(got), err)
+		}
+	}
+}
