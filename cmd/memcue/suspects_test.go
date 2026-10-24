@@ -51,7 +51,7 @@ func TestKnownSelfReadsTheHelp(t *testing.T) {
 			t.Errorf("command %q missing", c)
 		}
 	}
-	for _, c := range []string{"label", "embed", "audit", "environment:", "MEMCUE_FACTS"} {
+	for _, c := range []string{"label", "embed", "review", "audit", "environment:", "MEMCUE_FACTS"} {
 		if k.Commands[c] {
 			t.Errorf("%q taken for a command", c)
 		}

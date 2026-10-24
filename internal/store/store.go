@@ -138,7 +138,7 @@ var ErrNotCandidate = errors.New("fact is not a candidate")
 // ErrRetired: the fact was retired; a correction cannot bring it back.
 var ErrRetired = errors.New("fact is retired")
 
-// ErrAlreadyCandidate: undo would put a fact back into review when it is already there.
+// ErrAlreadyCandidate: a step meant for an approved fact met one that still waits for review.
 var ErrAlreadyCandidate = errors.New("fact is already a candidate")
 
 // ErrChanged is returned when a fact got a new version after the caller read it.
@@ -679,21 +679,6 @@ func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 		return out[i].ID > out[j].ID
 	})
 	return out, nil
-}
-
-// Reopen adds a version that puts a fact back into review: the undo of an approval or a rejection. The content and
-// its metadata stay; only the review state changes, so the history keeps both decisions.
-func (s *Store) Reopen(id string) (Fact, error) {
-	cur, err := s.Get(id)
-	if err != nil {
-		return Fact{}, err
-	}
-	if cur.Status == Active && cur.Review == Candidate {
-		return Fact{}, fmt.Errorf("%w: %s", ErrAlreadyCandidate, id)
-	}
-	f := cur
-	f.Version, f.Created, f.Author, f.Status, f.Review = cur.Version+1, s.now().UTC(), s.author, Active, Candidate
-	return f, s.write(f)
 }
 
 // Relabel adds a version of an active fact with the given kind, scope and expiry; the content and everything else

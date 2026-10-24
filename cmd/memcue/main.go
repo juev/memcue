@@ -110,7 +110,6 @@ commands:
   candidates list the facts that wait for approval: memcue candidates [-json]
   vet       decide the candidates without asking: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]
   approve   take candidates into recall: memcue approve ID...
-  review    approve or reject candidates on a local page: memcue review [-addr 127.0.0.1:0] [-no-open]
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
@@ -205,8 +204,6 @@ func main() {
 		err = runVet(os.Args[2:], os.Stdout)
 	case "approve":
 		err = runApprove(os.Args[2:], os.Stdout)
-	case "review":
-		err = runReview(os.Args[2:], os.Stdout)
 	case "retire":
 		err = runRetire(os.Args[2:], os.Stdout)
 	case "reopen":

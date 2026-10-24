@@ -159,7 +159,7 @@ stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 
 Nothing to do in a session: facts arrive with prompts and are extracted at the end. Extracted facts are candidates:
 recall gives them only after someone approves them — `memcue vet` by a rule or a model, or by hand (`memcue candidates`,
-`memcue approve ID`, the `memcue review` page; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
+`memcue approve ID`; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
 an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
 extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
@@ -182,7 +182,6 @@ memcue vet -dry-run                  # what the rules and the judge would decide
 memcue vet                           # decide it: approve what belongs in the base, retire what does not
 memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
 memcue approve ID [ID ...]           # take candidates into recall
-memcue review                        # local page: approve or reject candidates; undo the last action
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
 memcue recall -explain "text"        # every step: terms, lexical gate, judge scores, final cut
@@ -192,12 +191,6 @@ memcue dream -since 2026-10-19 -dry-run
 memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
 memcue dream -apply plan.json              # carry it out later, without the model
 ```
-
-`memcue review` serves a page on `127.0.0.1` and opens it. It shows each candidate with its kind, scope, source,
-evidence, origin and date; filters by kind and source; approves or rejects several at once; and undoes the last
-action. Rejecting retires the fact and writes `rejected in review` to `review.log` in the state directory
-(`$XDG_STATE_HOME/memcue` for the default base); an approval is logged there too. The page has no external assets and
-works offline. `-addr` must stay a loopback address, and `-no-open` only prints the URL.
 
 `memcue add` and `memcue correct` refuse text that looks like a token or a password; `-force` stores it anyway.
 `migrate` and `import` skip such facts and report them without echoing the value, because the base may be synced
@@ -354,7 +347,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/review.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
 With a judge configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
 whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
@@ -421,10 +414,10 @@ Measured while building memcue; details and method in [docs/evaluation.md](docs/
 Facts written by extraction, and facts mirrored from Hermes' built-in memory, are **candidates**: they are stored and
 visible in `memcue candidates`, but recall ignores them until someone approves them. `memcue vet` applies the
 deterministic rules and the review model to the queue, `memcue approve ID...` takes candidates into recall, and
-`memcue review` serves the local batch page; `memcue retire ID` rejects one. A fact written by `memcue add` is active at
+`memcue retire ID` rejects one. A fact written by `memcue add` is active at
 once, and an explicit `correct` of an approved fact writes a new active version. A retired fact cannot be corrected:
-retirement is final, so a changed fact is added as a new fact, and the review page's undo remains the way back from a
-rejection. The full rules are in [Use](#use).
+retirement is final, so a changed fact is added as a new fact, and `memcue reopen ID` is the way back from a
+rejection. The local review page (`memcue review`) is removed (#325): its template alone cost 2.3 MB of the binary. The full rules are in [Use](#use).
 
 `vet` also checks the approved facts that this binary finds suspect: a fact that names a `MEMCUE_*` variable or a
 `` `memcue X` `` verb it does not have, a memcue version older than its own (a release build only, either right after
