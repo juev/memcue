@@ -96,7 +96,7 @@ func runAdd(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "comma-separated words someone would ask with")
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory, empty outside a repository)")
-	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory)")
+	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory; an empty value is no project)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
@@ -116,7 +116,7 @@ func runAdd(args []string, out io.Writer) error {
 	if !*force && hasSecret(content, keywordsList) {
 		return errors.New("add: the fact looks like a secret; use a password manager, or pass -force to store it anyway")
 	}
-	if *origin == "" {
+	if *origin == "" && !emptyFlag(fs, "cwd") {
 		*origin = defaultOriginAt(*cwd)
 	}
 	if *scope == "repo" {
@@ -237,6 +237,18 @@ func defaultOriginAt(dir string) string {
 		}
 	}
 	return originAt(dir, time.Now().Format(time.DateOnly))
+}
+
+// emptyFlag reports whether the flag name was passed with an empty value. A host that knows its session has no project
+// says so with -cwd "" (#347): an unset -cwd still means the process's working directory, as on the command line.
+func emptyFlag(fs *flag.FlagSet, name string) bool {
+	empty := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name && f.Value.String() == "" {
+			empty = true
+		}
+	})
+	return empty
 }
 
 // originAt names a fact by where it was learnt: the project key (tier.Of: the remote, the go.mod module, or the

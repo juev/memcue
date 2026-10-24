@@ -255,3 +255,16 @@ func cutDir(key string) (string, bool) {
 	}
 	return "", false
 }
+
+// An empty directory is a session with no working directory, not the process's: a Hermes chat has no project even
+// when memcue runs inside a repository (#347).
+func TestEmptyDirectoryHasNoProject(t *testing.T) {
+	isolate(t)
+	t.Chdir(repo(t, filepath.Join(t.TempDir(), "r"), "origin", "git@example.com:o/r.git"))
+	if got := Keys("", ""); got != nil {
+		t.Errorf("Keys(\"\") = %v, want none", got)
+	}
+	if got := Keys(".", ""); len(got) != 1 || got[0] != "example.com/o/r" {
+		t.Errorf("Keys(\".\") = %v, want the repository of the working directory", got)
+	}
+}
