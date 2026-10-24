@@ -2,7 +2,7 @@
 # memcue.sh runs the memcue binary for the Claude Code hooks: memcue.sh COMMAND [ARGS...].
 #
 # The binary is, in order: MEMCUE_BIN; `memcue` on PATH when it is this plugin's release or newer; the copy this
-# script installed in ${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/; an older `memcue` on PATH, so recall keeps
+# script installed in ${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/; an older `memcue` on PATH, so the hooks keep
 # working. session-start installs the plugin's release when none of them is current (MEMCUE_AUTO_INSTALL=0 turns that
 # off), exports its directory on the session's PATH for the skill, and says what is missing instead of failing.
 # Every other command exits quietly without a binary.
