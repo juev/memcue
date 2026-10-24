@@ -742,6 +742,34 @@ func TestExtractMessagesOriginFromCwd(t *testing.T) {
 	}
 }
 
+// extract-messages -cwd "" is a session with no project: the origin stays empty even inside a repository (#347).
+func TestExtractMessagesEmptyCwdHasNoProject(t *testing.T) {
+	env(t)
+	repo := filepath.Join(t.TempDir(), "demo")
+	gitRepo(t, repo)
+	t.Chdir(repo)
+	got := "unset"
+	old := extractFn
+	extractFn = func(origin, _ string) (extracted, error) {
+		got = origin
+		return extracted{}, nil
+	}
+	t.Cleanup(func() { extractFn = old })
+	msgs := `[{"role":"user","content":"Факт про порт 3000."}]`
+	if err := runExtractMessages([]string{"-cwd", "", "-min-chars", "0"}, strings.NewReader(msgs)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "; ") { // the model is told the origin, then the host
+		t.Errorf("origin = %q, want none before the host", got)
+	}
+	if err := runExtractMessages([]string{"-min-chars", "0"}, strings.NewReader(msgs)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "example.com/team/demo ") {
+		t.Errorf("no -cwd: origin = %q, want the working directory's project", got)
+	}
+}
+
 // MEMCUE_EXTRACT=0 is the documented off switch; a host that calls extract-messages directly must honour it too.
 func TestExtractMessagesHonoursTheOffSwitch(t *testing.T) {
 	env(t)

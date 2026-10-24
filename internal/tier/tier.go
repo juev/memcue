@@ -33,8 +33,12 @@ func Of(dir, claudeDir string) string {
 
 // Keys returns every key a fact may hold in a session in dir: the key of Of first, then the keys of the other
 // remotes (upstream, mirrors) in name order. A fact written in a fork's upstream or on a mirror's other host holds in
-// the fork and on every host of the mirror.
+// the fork and on every host of the mirror. An empty dir is a session with no working directory, such as a Hermes chat
+// or a Hermes session outside git (#347): it has no project, rather than the process's.
 func Keys(dir, claudeDir string) []string {
+	if dir == "" {
+		return nil
+	}
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil

@@ -643,3 +643,38 @@ func TestAddScopeRepoTakesTheProject(t *testing.T) {
 		t.Error("add -scope repo outside a project succeeded")
 	}
 }
+
+// add -cwd "" is a session with no project, even when memcue runs inside a repository; an unset -cwd is still the
+// process's working directory (#347).
+func TestAddEmptyCwdHasNoProject(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	key := gitRepo(t, repo)
+	t.Chdir(repo)
+	origin := func(args ...string) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runAdd(append(args, "--", "факт "+strings.Join(args, " ")), &out); err != nil {
+			t.Fatal(err)
+		}
+		s, err := store.Open(factsPath())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = s.Close() }()
+		f, err := s.Get(strings.TrimSpace(out.String()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.Origin
+	}
+	if got := origin("-cwd", ""); got != "" {
+		t.Errorf("-cwd \"\": origin %q, want none", got)
+	}
+	if got := origin("-source", "agent"); !strings.HasPrefix(got, key+" ") {
+		t.Errorf("no -cwd: origin %q, want the working directory's project", got)
+	}
+	if err := runAdd([]string{"-cwd", "", "-scope", "repo", "--", "без проекта"}, &bytes.Buffer{}); err == nil {
+		t.Error("add -cwd \"\" -scope repo succeeded")
+	}
+}
