@@ -567,17 +567,23 @@ class ProviderTest(unittest.TestCase):
 
     def test_session_cwd_is_the_project_only_in_git(self):
         """The session's cwd names the project when it lies in a git repository; outside git (Hermes's own
-        directories) and without one memcue gets an empty -cwd, so it does not fall back to its own directory (#347)."""
+        directories) memcue gets an empty -cwd, so it does not fall back to its own directory (#347). A session
+        without a cwd takes the directory Hermes falls back to, TERMINAL_CWD here (#354)."""
         repo = Path(self.home) / "repo"
         (repo / ".git").mkdir(parents=True)
         (repo / "sub").mkdir()
         plain = Path(self.home) / "plain"
         plain.mkdir()
-        for cwd, want in ((str(repo), str(repo)), (str(repo / "sub"), str(repo / "sub")), (str(plain), ""),
-                          ("hermes", ""), (None, "")):
-            with self.subTest(cwd=cwd):
-                calls = Path(self.home) / f"args-{abs(hash(str(cwd)))}"
-                script = Path(self.home) / f"bin-{abs(hash(str(cwd)))}"
+        old = os.environ.get("TERMINAL_CWD")
+        self.addCleanup(lambda: os.environ.__setitem__("TERMINAL_CWD", old) if old is not None
+                        else os.environ.pop("TERMINAL_CWD", None))
+        for cwd, terminal, want in ((str(repo), str(plain), str(repo)), (str(repo / "sub"), "", str(repo / "sub")),
+                                    (str(plain), str(repo), ""), ("hermes", "", ""), (None, str(plain), ""),
+                                    (None, str(repo), str(repo))):
+            os.environ["TERMINAL_CWD"] = terminal
+            with self.subTest(cwd=cwd, terminal=terminal):
+                calls = Path(self.home) / f"args-{abs(hash((cwd, terminal)))}"
+                script = Path(self.home) / f"bin-{abs(hash((cwd, terminal)))}"
                 script.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" >> {shlex.quote(str(calls))}\n"
                                   "cat >/dev/null\nexit 0\n", encoding="utf-8")
                 script.chmod(0o755)
@@ -594,6 +600,18 @@ class ProviderTest(unittest.TestCase):
                 args = calls.read_text(encoding="utf-8").splitlines()
                 i = args.index("-cwd")
                 self.assertEqual(args[i + 1] if i + 1 < len(args) else "", want)
+
+    def test_session_cwd_follows_hermes_when_it_resolves_one(self):
+        """With agent.runtime_cwd present, a session without a cwd takes what Hermes resolves (#354)."""
+        repo = Path(self.home) / "resolved"
+        (repo / ".git").mkdir(parents=True)
+        mod = types.ModuleType("agent.runtime_cwd")
+        mod.resolve_agent_cwd = lambda: repo
+        sys.modules["agent.runtime_cwd"] = mod
+        self.addCleanup(sys.modules.pop, "agent.runtime_cwd", None)
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.assertEqual(p._workspace, str(repo))
 
     def test_final_flushes_pass_min_chars(self):
         """session_end, pre_compress and shutdown are the last chance for a tail; threshold and idle wait."""

@@ -145,7 +145,8 @@ comes from where the session works, read from the files and never by running git
 - **A repository without a remote** is `dir:<path of its main worktree>`.
 - **Outside git** the project is the `module` of the nearest `go.mod`, or else `dir:<working directory>`.
 - **No working directory** is no project: a host passes an empty `cwd` for such a session (`-cwd ""` to `add` and
-  `extract-messages`). The Hermes plugin does so for a chat and for a session outside git (#347).
+  `extract-messages`). The Hermes plugin does so for a session outside git (#347); a session Hermes gives no `cwd`
+  takes the directory Hermes falls back to (#354).
 - **The Claude config directory** is the global tier; **a temporary directory** names nothing.
 
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
