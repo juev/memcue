@@ -10,10 +10,6 @@ type Trace struct {
 	MinMatched  int     // the gate actually used: a short prompt or a ticket key lowers it
 	MinCoverage float64 // the gate actually used
 	Lexical     []Step  // every fact FTS5 returned, in its order, with the gate's verdict
-	JudgeMin    float64 // score below which the judge drops a fact
-	Judge       []Step  // what the judge was asked about, in the order asked, with its score
-	Fallback    string  // why the lexical answer was given instead of the judge's; empty when it was not
-	Paused      bool    // the judge was skipped because the shared breaker is leaving the endpoint alone
 	Final       []Step  // the facts that reached the cut, in order: served or cut
 }
 
@@ -29,40 +25,26 @@ type Step struct {
 	Content  string
 	Matched  []string // prompt terms the fact holds (lexical)
 	Coverage float64  // IDF-weighted share of the prompt's terms (lexical)
-	Score    float64  // the judge's score (judge, and final when the judge decided)
 	Verdict  string
 }
 
 // Verdicts of the steps.
 const (
-	VerdictPassed       = "passed"
-	VerdictSeen         = "seen in this session"
-	VerdictExpired      = "expired"
-	VerdictOtherTicket  = "no ticket of the prompt"
-	VerdictFewTerms     = "too few terms"
-	VerdictLowCoverage  = "low coverage"
-	VerdictForeign      = "another project, below its coverage"
-	VerdictOverJudge    = "passed, over the judge's candidate limit"
-	VerdictGatedToJudge = "below the gate, sent to the judge"
-	VerdictAboveMin     = "above min"
-	VerdictBelowMin     = "below min"
-	VerdictServed       = "served"
-	VerdictCut          = "cut by max facts"
+	VerdictPassed      = "passed"
+	VerdictSeen        = "seen in this session"
+	VerdictExpired     = "expired"
+	VerdictOtherTicket = "no ticket of the prompt"
+	VerdictFewTerms    = "too few terms"
+	VerdictLowCoverage = "low coverage"
+	VerdictForeign     = "another project, below its coverage"
+	VerdictServed      = "served"
+	VerdictCut         = "cut by max facts"
 )
 
 func (t *Trace) lexical(f store.Fact, matched []string, coverage float64, verdict string) {
 	if t != nil {
 		t.Lexical = append(t.Lexical, Step{ID: f.ID, Content: f.Content, Matched: matched, Coverage: coverage,
 			Verdict: verdict})
-	}
-}
-
-// relabel changes the verdict of the fact in steps, if it is there.
-func relabel(steps []Step, id, verdict string) {
-	for i := range steps {
-		if steps[i].ID == id {
-			steps[i].Verdict = verdict
-		}
 	}
 }
 
@@ -77,7 +59,7 @@ func (t *Trace) final(hits []Hit, served int) {
 		if i >= served {
 			verdict = VerdictCut
 		}
-		t.Final = append(t.Final, Step{ID: h.ID, Content: h.Content, Coverage: h.Coverage, Score: h.Meaning,
+		t.Final = append(t.Final, Step{ID: h.ID, Content: h.Content, Coverage: h.Coverage,
 			Verdict: verdict})
 	}
 }
@@ -85,28 +67,5 @@ func (t *Trace) final(hits []Hit, served int) {
 func (t *Trace) stop(why string) {
 	if t != nil {
 		t.Stopped = why
-	}
-}
-
-func (t *Trace) fallback(why string) {
-	if t != nil {
-		t.Fallback = why
-	}
-}
-
-// judge records the judge's score of each candidate against its threshold.
-func (t *Trace) judge(candidates []Hit, scores []float64, minScore float64) {
-	if t == nil {
-		return
-	}
-	t.JudgeMin = minScore
-	t.Judge = nil
-	for i, h := range candidates {
-		verdict := VerdictAboveMin
-		if scores[i] < minScore {
-			verdict = VerdictBelowMin
-		}
-		t.Judge = append(t.Judge, Step{ID: h.ID, Content: h.Content, Coverage: h.Coverage, Score: scores[i],
-			Verdict: verdict})
 	}
 }

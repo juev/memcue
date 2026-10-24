@@ -131,26 +131,13 @@ environment:
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got (recall.log in the state directory; holds prompt text)
-  MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15); with a judge
-                  configured this gates the words' own answer and the fallback only, because the judge reads the
-                  facts the gate turned away
+  MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15)
   MEMCUE_MIN_TERMS  prompt terms the facts must know before any fact is examined (default 2; a ticket key or a
                   prompt of numbers only needs 1)
   MEMCUE_MIN_MATCHED  distinct prompt terms a fact must hold (default 3; never more than the prompt's known terms)
   MEMCUE_FOREIGN_COVERAGE  share a fact scoped to another repository or directory must hold in a repository's
                   session (default 0.25); 0 leaves such facts out of the search, a value at or below
                   MEMCUE_MIN_COVERAGE gates them as any other fact
-  MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage and recall rerank; off
-                  unless all three are set
-  MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
-  MEMCUE_JUDGE_RERANK_CANDIDATES  facts the judge reads, in the search's BM25 order (default 20)
-  MEMCUE_JUDGE_RERANK_TIMEOUT  one rerank request (default 2s)
-  MEMCUE_RERANK  which reader orders the recall candidates: judge (Jev), listwise (the main model, MEMCUE_API_URL)
-                  or off (the words); unset or any other value keeps the words, even with the Jev endpoint set
-  MEMCUE_MAIN_RERANK_CANDIDATES  facts the listwise reader reads, in the search's BM25 order (default 20)
-  MEMCUE_MAIN_RERANK_TIMEOUT  one listwise request (default 2s)
-  MEMCUE_JUDGE_TRIAGE_TIMEOUT  one triage request (default 2s)
-  MEMCUE_JUDGE_TRIAGE_MIN  probability of a dream action that sends a group to the main model (default 0.2)
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
   MEMCUE_DREAM    1 runs a dream after an extraction once an hour (dream.log in the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
@@ -170,7 +157,6 @@ func main() {
 		extract.Model = m
 	}
 	extract.API.URL, extract.API.Key = os.Getenv("MEMCUE_API_URL"), os.Getenv("MEMCUE_API_KEY")
-	configureJudge()
 	var err error
 	switch os.Args[1] {
 	case "session-start":
@@ -273,7 +259,7 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 	p.MinMatched = floorFromEnv("MEMCUE_MIN_MATCHED", p.MinMatched)
 	p.MaxFacts = maxFactsFromEnv(p.MaxFacts)
 	p.ForeignCoverage, p.FilterForeign = foreignFromEnv(p.ForeignCoverage)
-	return recallFacts(s, prompt, tier.Keys(cwd, claudeDir()), p)
+	return recall.Recall(s, prompt, tier.Keys(cwd, claudeDir()), p)
 }
 
 // foreignFromEnv reads MEMCUE_FOREIGN_COVERAGE, the share a fact of another project must hold (#345): 0 leaves such
@@ -417,7 +403,6 @@ type recallRecord struct {
 	Facts     []recallFact `json:"facts,omitempty"`
 	Ms        float64      `json:"ms"`
 	Displaced bool         `json:"host_displaced,omitempty"`
-	Judge     string       `json:"judge,omitempty"` // "paused": the breaker kept the judge out, the words decided
 	// Stopped is why no fact was examined, as recall -explain says it; a prompt with no facts and no Stopped had
 	// candidates that none passed (#355).
 	Stopped string `json:"stopped,omitempty"`
@@ -428,7 +413,6 @@ type recallFact struct {
 	Coverage    float64 `json:"coverage"`
 	Source      string  `json:"source,omitempty"`
 	Provisional bool    `json:"provisional,omitempty"`
-	Meaning     float64 `json:"meaning,omitempty"` // judge score
 	Scope       string  `json:"scope,omitempty"`
 	Displaced   bool    `json:"displaced,omitempty"`
 }
@@ -451,15 +435,12 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 	}
 	rec := recallRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: session, Tier: tier.Of(cwd, claudeDir()),
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
-	if trace != nil && trace.Paused {
-		rec.Judge = "paused"
-	}
 	if trace != nil {
 		rec.Stopped = trace.Stopped
 	}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,
-			Source: h.Source, Provisional: h.Provisional, Meaning: math.Round(h.Meaning*1000) / 1000,
+			Source: h.Source, Provisional: h.Provisional,
 			Scope: h.Scope, Displaced: h.Displaced})
 		if h.Displaced {
 			rec.Displaced = true
@@ -498,13 +479,6 @@ func render(hits []recall.Hit) string {
 }
 
 // meaning shows the judge's score of a fact, when the judge decided.
-func meaning(sim float64) string {
-	if sim <= 0 {
-		return ""
-	}
-	return fmt.Sprintf(" meaning=%.2f", sim)
-}
-
 func runRecall(args []string, out io.Writer) error {
 	fl := flag.NewFlagSet("recall", flag.ContinueOnError)
 	cwd := fl.String("cwd", ".", "session working directory (its repository wins ties)")
@@ -537,8 +511,8 @@ func runRecall(args []string, out io.Writer) error {
 			if h.Provisional {
 				prov = " provisional"
 			}
-			if _, err := fmt.Fprintf(out, "%.2f %d %s%s%s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
-				prov, meaning(h.Meaning), strings.Join(strings.Fields(h.Content), " ")); err != nil {
+			if _, err := fmt.Fprintf(out, "%.2f %d %s%s%s | %s\n", h.Coverage, h.Matched, h.Origin, scope,
+				prov, strings.Join(strings.Fields(h.Content), " ")); err != nil {
 				return err
 			}
 		}

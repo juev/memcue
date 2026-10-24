@@ -8,16 +8,6 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// lexicalOnly turns every rerank reader off, whatever the developer's environment holds: a reader named in
-// MEMCUE_RERANK and every endpoint go.
-func lexicalOnly(t *testing.T) {
-	t.Helper()
-	for _, k := range []string{"MEMCUE_RERANK", "MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY",
-		"MEMCUE_API_URL", "MEMCUE_MODEL", "MEMCUE_API_KEY"} {
-		t.Setenv(k, "")
-	}
-}
-
 // gradleID returns the id of the fact seed writes.
 func gradleID(t *testing.T) string {
 	t.Helper()
@@ -35,14 +25,12 @@ func gradleID(t *testing.T) string {
 
 func TestRecallExplainPrintsEveryStep(t *testing.T) {
 	env(t)
-	lexicalOnly(t)
 	seed(t)
 	var out bytes.Buffer
 	if err := runRecall([]string{"-explain", "gradle без make, какой JAVA_HOME для JDK"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"terms: ", "gate: ", "lexical:\n  passed", "fallback to the words: no rerank reader configured",
-		"final:\n  served", gradleID(t)} {
+	for _, want := range []string{"terms: ", "gate: ", "lexical:\n  passed", "final:\n  served", gradleID(t)} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
@@ -51,7 +39,6 @@ func TestRecallExplainPrintsEveryStep(t *testing.T) {
 
 func TestRecallExplainFactNamesWhereItWasLost(t *testing.T) {
 	env(t)
-	lexicalOnly(t)
 	seed(t)
 	id := gradleID(t)
 
@@ -86,7 +73,6 @@ func TestRecallExplainFactNamesWhereItWasLost(t *testing.T) {
 
 func TestRecallExplainFactRejectsAnUnknownID(t *testing.T) {
 	env(t)
-	lexicalOnly(t)
 	seed(t)
 	if err := runRecall([]string{"-fact", "nope", "gradle jdk"}, &bytes.Buffer{}); err == nil {
 		t.Error("an unknown id gave no error")

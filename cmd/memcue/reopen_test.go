@@ -9,7 +9,6 @@ import (
 // retire then reopen leaves the fact active with the same content, scope and source, and recall returns it.
 func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	env(t)
-	lexicalOnly(t)
 	var out bytes.Buffer
 	if err := runAdd([]string{"-keywords", "gradle, jdk", "-origin", "lists 2026-10-09", "-scope", "repo:lists",
 		"-source", "user", "--", "Gradle вне make требует JAVA_HOME=/opt/homebrew/opt/openjdk@21."}, &out); err != nil {

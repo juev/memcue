@@ -14,7 +14,6 @@ import (
 // panicked while slicing the hits with a negative index.
 func TestEvalNonPositiveMaxFactsServesEveryFact(t *testing.T) {
 	// Keep the eval pass lexical: an endpoint configured in the developer's environment would change the answer.
-	lexicalOnly(t)
 	dir := env(t)
 	s, err := store.Open(factsPath())
 	if err != nil {

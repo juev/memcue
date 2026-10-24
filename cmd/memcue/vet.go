@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
-	judgepkg "github.com/juev/memcue/internal/judge"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/vet"
@@ -30,34 +29,6 @@ var errVetBusy = errors.New("another vet run is in progress")
 
 // reviewFn is the model step, replaced in tests.
 var reviewFn = extract.Review
-
-// configureJudge reads the one Jev endpoint and the role knobs. The endpoint is shared by triage and rerank; only the
-// thresholds and timeouts stay role-specific.
-func configureJudge() {
-	if dir, err := stateDir(); err == nil {
-		judgepkg.Configure(filepath.Join(dir, "judge.pause"))
-	}
-	extract.JevJudge.URL = os.Getenv("MEMCUE_JUDGE_URL")
-	extract.JevJudge.Model = os.Getenv("MEMCUE_JUDGE_MODEL")
-	extract.JevJudge.Key = os.Getenv("MEMCUE_JUDGE_KEY")
-	extract.JevJudge.TriageTimeout = extract.DefaultTriageTimeout
-	if v := strings.TrimSpace(os.Getenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT")); v != "" {
-		if d, err := time.ParseDuration(v); err == nil && d >= 200*time.Millisecond && d <= 10*time.Second {
-			extract.JevJudge.TriageTimeout = d
-		}
-	}
-
-	extract.Triage.Min = triageMin
-	extract.Triage.Enabled = extract.JevJudgeOn()
-	if v := os.Getenv("MEMCUE_JUDGE_TRIAGE_MIN"); v != "" {
-		m, err := strconv.ParseFloat(v, 64)
-		if err != nil || m < 0 || m > 1 {
-			extract.Triage.Enabled = false
-		} else {
-			extract.Triage.Min = m
-		}
-	}
-}
 
 // vetLine is one decision as vet.log records it.
 type vetLine struct {

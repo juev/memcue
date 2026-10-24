@@ -45,62 +45,6 @@ const (
 )
 
 const (
-	triageMin      = 0.2 // measured: keeps 42 of the 43 groups Opus acted on, sends on 191 of 395
-	triageParallel = 8
-)
-
-// triageFn is the triage step, replaced in tests.
-var triageFn = func(facts []string) (extract.TriageResult, error) {
-	ctx, cancel := contextTimeout()
-	defer cancel()
-	return extract.TriageGroup(ctx, facts)
-}
-
-// triageRecord says what triage did in a dream.
-type triageRecord struct {
-	Dropped int `json:"dropped"` // groups not sent to the model
-	Errors  int `json:"errors"`  // groups sent on because triage failed on them
-	Input   int `json:"input_tokens"`
-}
-
-// triageGroups keeps the groups triage does not rule out. A group triage fails on goes on, so a broken triage can cost
-// money but never hide a group.
-func triageGroups(groups [][]store.Fact) ([][]store.Fact, *triageRecord) {
-	res := make([]extract.TriageResult, len(groups))
-	errs := make([]error, len(groups))
-	sem := make(chan struct{}, triageParallel)
-	var wg sync.WaitGroup
-	for i, g := range groups {
-		texts := make([]string, len(g))
-		for j, f := range g {
-			texts[j] = f.Content
-		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer func() { <-sem; wg.Done() }()
-			res[i], errs[i] = triageFn(texts)
-		}()
-	}
-	wg.Wait()
-	rec := &triageRecord{}
-	var kept [][]store.Fact
-	for i, g := range groups {
-		rec.Input += res[i].Input
-		switch {
-		case errs[i] != nil:
-			rec.Errors++
-			kept = append(kept, g)
-		case res[i].PAct >= extract.Triage.Min:
-			kept = append(kept, g)
-		default:
-			rec.Dropped++
-		}
-	}
-	return kept, rec
-}
-
-const (
 	splitBatch    = 20 // facts one split call reads
 	splitParallel = 8
 )
@@ -156,7 +100,6 @@ type dreamRecord struct {
 	CostUSD      float64        `json:"cost_usd"`
 	Tokens       extract.Tokens `json:"tokens"`
 	Plan         string         `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
-	Triage       *triageRecord  `json:"triage,omitempty"`
 	Error        string         `json:"error,omitempty"`
 }
 
@@ -396,9 +339,6 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 	if list {
 		_, err := io.WriteString(out, renderGroups(groups, freshSet(fresh)))
 		return rec, err
-	}
-	if extract.TriageOn() {
-		groups, rec.Triage = triageGroups(groups)
 	}
 	// The facts this dream corrects are expanded after the groups are judged: the expansion step above runs before
 	// them, and a corrected fact with the queries of its old text is what #297 filed.
@@ -659,7 +599,7 @@ type dreamSplit struct {
 }
 
 // splitStep asks the model which fresh facts hold several claims and, unless the record is a dry run, replaces them
-// with their parts. A failed call leaves its facts as they are and is counted, the way triage fails open; an answer
+// with their parts. A failed call leaves its facts as they are and is counted; an answer
 // about a fact that was not sent, a second answer about one fact or fewer than two parts is refused. A fact that
 // changed while the model ran is refused too, since the parts were read off its old text.
 func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writer) ([]dreamSplit, error) {

@@ -13,7 +13,7 @@ import (
 const explainWidth = 100
 
 // explainRecall prints every step of one recall: the prompt terms, the gate's verdict for each lexical candidate, the
-// vectors, the judge's scores and the final cut.
+// and the final cut.
 func explainRecall(t *recall.Trace, out io.Writer) error {
 	var b strings.Builder
 	if t.Stopped != "" {
@@ -32,15 +32,6 @@ func explainRecall(t *recall.Trace, out io.Writer) error {
 		for _, s := range t.Lexical {
 			fmt.Fprintf(&b, "  %-24s %.2f [%s] %s\n", s.Verdict, s.Coverage, strings.Join(s.Matched, " "), factLine(s))
 		}
-	}
-	if len(t.Judge) > 0 {
-		fmt.Fprintf(&b, "judge (min %.2f):\n", t.JudgeMin)
-		for _, s := range t.Judge {
-			fmt.Fprintf(&b, "  %-24s %.2f %s\n", s.Verdict, s.Score, factLine(s))
-		}
-	}
-	if t.Fallback != "" {
-		fmt.Fprintf(&b, "fallback to the words: %s\n", t.Fallback)
 	}
 	b.WriteString("final:\n")
 	if len(t.Final) == 0 {
@@ -77,15 +68,6 @@ func explainFact(s *store.Store, t *recall.Trace, id string, out io.Writer) erro
 			t.MinCoverage, strings.Join(st.Matched, " "), t.MinMatched)
 	} else if t.Stopped == "" {
 		b.WriteString("lexical: not among the FTS5 results (holds none of the prompt terms, or others ranked higher)\n")
-	}
-
-	if st, ok := findStep(t.Judge, id); ok {
-		fmt.Fprintf(&b, "judge: %s, score %.2f of %.2f\n", st.Verdict, st.Score, t.JudgeMin)
-	} else if len(t.Judge) > 0 {
-		b.WriteString("judge: not asked\n")
-	}
-	if t.Fallback != "" {
-		fmt.Fprintf(&b, "fallback to the words: %s\n", t.Fallback)
 	}
 
 	if st, ok := findStep(t.Final, id); ok {
