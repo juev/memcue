@@ -40,11 +40,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.6.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.7.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.7.0 | 5 | 0.7.0 | 0.7.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.7.0 (`hermes-agent` 0.15.2) |
 | 0.6.0 | 5 | 0.6.0 | 0.6.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.6.0 (`hermes-agent` 0.15.2) |
 | 0.5.3 | 5 | 0.5.3 | 0.5.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.3 (`hermes-agent` 0.15.2) |
 | 0.5.2 | 5 | 0.5.2 | 0.5.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.2 (`hermes-agent` 0.15.2) |
@@ -158,6 +159,14 @@ the share; `0` leaves such facts out of the search entirely, which cut 37% of th
 about 20 of those prompts.
 
 ## Upgrade
+
+### 0.7.0: recall without a judge, no review page
+
+- Recall uses the words alone unless `MEMCUE_RERANK=judge` asks for Jev (#331): a configured Jev endpoint no longer
+  turns the judge on. A setup that relied on that needs `MEMCUE_RERANK=judge`.
+- `memcue review`, the local review page, is removed (#325); `memcue candidates`, `approve`, `retire` and `vet` stay.
+- `MEMCUE_RERANK=local` is gone with the tree reader (#324) and now keeps the words.
+- Run the project-key migration below once on every machine that writes to the base.
 
 ### Hermes sessions (#347)
 
