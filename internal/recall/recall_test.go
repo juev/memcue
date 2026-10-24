@@ -2,6 +2,7 @@ package recall
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,18 +109,54 @@ func TestFactFromAnotherRepositoryIsRecalled(t *testing.T) {
 	}
 }
 
+// The same text learnt in two places ties on BM25: the session's repository wins, and outside one the global fact.
 func TestOwnRepositoryWinsTies(t *testing.T) {
 	s := setup(t)
+	for _, origin := range []string{"loadtest 2026-09-10", "_global 2026-08-01"} {
+		if _, err := s.Add("Брокер rabbitmq слушает 5672, панель управления на 15672.", []string{"rabbitmq"},
+			origin); err != nil {
+			t.Fatal(err)
+		}
+	}
 	p := Default
 	p.MinMatched = 2
 	for tier, want := range map[string]string{"loadtest": "loadtest 2026-09-10", "": "_global 2026-08-01"} {
-		got, err := Recall(s, "прокси mihomo", tier, p)
-		if err != nil || len(got) != 2 || got[0].Coverage != got[1].Coverage {
+		got, err := Recall(s, "брокер rabbitmq", tier, p)
+		if err != nil || len(got) != 2 || got[0].bm25 != got[1].bm25 {
 			t.Fatalf("want a tie of two, got %+v %v", got, err)
 		}
 		if got[0].Origin != want {
 			t.Errorf("tier %q: first is %q, want %q", tier, got[0].Origin, want)
 		}
+	}
+}
+
+// The facts that pass the gates are served in BM25 order: the coverage share gates, it does not rank (#338). A short
+// fact on the two rarest prompt terms comes before a long one that holds every term with a larger share.
+func TestPassingFactsAreServedInBM25Order(t *testing.T) {
+	s := setup(t)
+	short, err := s.Add("Конфиг kafka без zookeeper.", []string{"kafka", "zookeeper"}, "infra 2026-10-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	filler := strings.Repeat("брокеры топики ретеншн мониторинг алерты дашборды бэкапы ротация ", 8)
+	long, err := s.Add("Кластер kafka в staging: "+filler+"zookeeper больше не нужен, конфиг лежит в репозитории.",
+		[]string{"kafka"}, "infra 2026-10-02")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := Default
+	p.MinMatched, p.MinCoverage = 2, 0
+	hs, err := Recall(s, "конфиг кластера kafka zookeeper", "", p)
+	if err != nil || len(hs) != 2 {
+		t.Fatalf("got %+v %v, want two facts", hs, err)
+	}
+	byID := map[string]Hit{hs[0].ID: hs[0], hs[1].ID: hs[1]}
+	if !(byID[short.ID].Coverage < byID[long.ID].Coverage && byID[short.ID].bm25 < byID[long.ID].bm25) {
+		t.Fatalf("setup: want the short fact below on coverage and above on BM25, got %+v", hs)
+	}
+	if hs[0].ID != short.ID {
+		t.Errorf("first is %q, want the BM25 leader %q", hs[0].Content, short.Content)
 	}
 }
 

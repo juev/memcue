@@ -358,7 +358,10 @@ facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-mo
 file once (#260); the empty `fact_vectors` table stays, so the schema and older binaries are unaffected.
 
 Without `MEMCUE_RERANK` the words decide, even with the Jev endpoint configured for the dream (#331); so does a value
-memcue does not know. After 0.6.0 a setup that relied on the implicit judge needs `MEMCUE_RERANK=judge`. `local`, the
+memcue does not know. The words serve the facts that pass the gate in the search's BM25 order, approved before
+provisional; the coverage share only gates. On 409 blind-labelled Claude Code prompts where the two orders differ,
+BM25 order gave a useful fact to 205 prompts against 180 for a coverage sort, with 30% noise against 41% (#338,
+[docs/research/search-chain-2026-10.md](docs/research/search-chain-2026-10.md)). After 0.6.0 a setup that relied on the implicit judge needs `MEMCUE_RERANK=judge`. `local`, the
 built-in tree reader of 0.6, is removed (#324) and is such a value now: end to end, on 40 real prompts in `claude -p`,
 it scored as the words do (0.95 against 0.96; the judge 1.01)
 ([docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md)).

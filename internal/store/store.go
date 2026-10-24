@@ -1011,10 +1011,12 @@ func (s *Store) query(q string, args ...any) ([]Fact, error) {
 	return out, rows.Err()
 }
 
-// Hit is an active fact found by Search, with the stems it was indexed by.
+// Hit is an active fact found by Search, with the stems it was indexed by and its BM25 score (lower is better, as
+// FTS5 reports it).
 type Hit struct {
 	Fact
 	Stems []string
+	BM25  float64
 }
 
 // Search returns up to limit active facts holding any of the terms, best BM25 first.
@@ -1026,7 +1028,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	for i, t := range terms {
 		q[i] = text.Query(t)
 	}
-	rows, err := s.db.Query(`SELECT i.stems, `+s.cols("f")+`
+	rows, err := s.db.Query(`SELECT i.stems, bm25(fact_fts), `+s.cols("f")+`
 		FROM fact_fts JOIN fact_index i ON i.rid = fact_fts.rowid
 		JOIN facts f ON f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = i.id)
 		WHERE fact_fts MATCH ? ORDER BY bm25(fact_fts) LIMIT ?`, strings.Join(q, " OR "), limit)
@@ -1038,7 +1040,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	for rows.Next() {
 		var h Hit
 		var stems, keywords, created, queries string
-		if err := rows.Scan(&stems, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
+		if err := rows.Scan(&stems, &h.BM25, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
 			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion, &queries); err != nil {
 			return nil, err
 		}
