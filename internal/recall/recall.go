@@ -1,8 +1,9 @@
 // Package recall decides which facts a prompt should bring into the agent's context.
 //
-// Candidates come from FTS5 over all facts. A fact passes when it holds enough of the prompt's informative terms:
-// a minimum number of them and a minimum IDF-weighted share. Where a fact was learnt does not filter it; facts
-// learnt in the session's repository only win ties.
+// Candidates come from FTS5 over all facts, in BM25 order. A fact passes when it holds enough of the prompt's
+// informative terms: a minimum number of them and a minimum IDF-weighted share. The facts that pass are served in
+// BM25 order: the share gates, it does not rank (#338). Where a fact was learnt does not filter it; facts learnt in
+// the session's repository only win ties.
 package recall
 
 import (
@@ -52,8 +53,9 @@ type Hit struct {
 	Provisional bool   // auto-approved for a TTL, recalled after approved facts
 	// Meaning is the judge score after rerank; 0 when the words alone decided.
 	Meaning float64
-	rank    int  // position in the search's BM25 order
-	gated   bool // the term or coverage gate turned the fact away
+	rank    int     // position in the search's BM25 order
+	bm25    float64 // the search's BM25 score, lower is better
+	gated   bool    // the term or coverage gate turned the fact away
 }
 
 // Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
@@ -62,14 +64,17 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	if err != nil {
 		return nil, err
 	}
-	// Ties: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
-	// then the newer fact. The host only orders facts of equal coverage; it never excludes another host's fact.
+	// BM25 order, approved before provisional. The coverage sort that stood here served a useful fact to fewer
+	// prompts with more noise: on 409 blind-labelled Claude Code prompts where the two orders differ, 180 against 205
+	// with 41% noise against 30% (docs/research/search-chain-2026-10.md). Ties of equal BM25, such as the same text
+	// stored twice: a fact of this host, then one learnt in the session's repository, then a global one, then the rest;
+	// then the newer fact. The host only orders tied facts; it never excludes another host's fact.
 	sort.SliceStable(hits, func(i, j int) bool {
 		if hits[i].Provisional != hits[j].Provisional {
 			return !hits[i].Provisional
 		}
-		if hits[i].Coverage != hits[j].Coverage {
-			return hits[i].Coverage > hits[j].Coverage
+		if hits[i].bm25 != hits[j].bm25 {
+			return hits[i].bm25 < hits[j].bm25
 		}
 		if pi, pj := place(hits[i], sessionTier, p.Host), place(hits[j], sessionTier, p.Host); pi != pj {
 			return pi < pj
@@ -102,8 +107,8 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 	return served, nil
 }
 
-// place ranks a fact for a tie of equal coverage: this host first, then the session's repository, then a global
-// origin, then everything else. The host only orders facts; it never excludes another host's fact.
+// place ranks a fact for a tie of equal BM25 score or judge score: this host first, then the session's repository,
+// then a global origin, then everything else. The host only orders facts; it never excludes another host's fact.
 func place(h Hit, sessionTier, host string) int {
 	switch {
 	case hostScope(h.Scope, host):
@@ -247,7 +252,7 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hi
 		}
 		cov := got / sum
 		h := Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
-			Provisional: f.Review == store.Provisional, rank: rank}
+			Provisional: f.Review == store.Provisional, rank: rank, bm25: f.BM25}
 		switch {
 		case matched < minMatched:
 			p.Trace.lexical(f.Fact, held, cov, VerdictFewTerms)

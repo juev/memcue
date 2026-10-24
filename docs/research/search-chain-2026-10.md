@@ -110,6 +110,13 @@ re-sorts. The Hermes tie above does not contradict this: it rests on 23 prompts,
 the gate and as the trace's number. This is a change of behaviour for every prompt, so it comes as its own issue, with
 the Hermes set rerun on the new order.
 
+**Done in #338.** `Recall` serves the passing facts in BM25 order. A tie of equal BM25, such as the same text learnt
+twice, still falls to the place and then the newer fact. On the Claude Code prompts the new order serves the
+measured BM25 picks in 961 of 966 prompts that get facts (in 3 of the other 5 a provisional fact moves after an
+approved one; the last 2 were not traced):
+205 of the 409 labelled prompts get a useful fact. On the labelled Hermes set: 37 of 113 prompts with a useful fact,
+as before, with N 6 against 7.
+
 ### 3. FTS5 against the gate's term test: they agree
 
 On all 1,788 searched prompts, every fact FTS5 returned holds at least one prompt term by `text.Covers`. `Query` and

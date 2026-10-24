@@ -91,8 +91,8 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		if scores[order[i]] != scores[order[j]] {
 			return scores[order[i]] > scores[order[j]]
 		}
-		// Equal score: the same tie-break as the lexical pass, so enabling the judge does not silently drop the
-		// host or repository preference.
+		// Equal score: the same place tie-break as the lexical pass, so enabling the judge does not silently drop
+		// the host or repository preference.
 		if pi, pj := place(candidates[order[i]], sessionTier, p.Host),
 			place(candidates[order[j]], sessionTier, p.Host); pi != pj {
 			return pi < pj
