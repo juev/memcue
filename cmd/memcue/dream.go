@@ -433,6 +433,11 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	plan.Groups = planGroups(groups, ok)
 	rec.Fresh = len(p.Split)
 	applied, err := applyPlan(dir, plan, rec, out)
+	applied.Groups = len(p.Groups) // the groups the model reviewed, not only those it acted on
+	if err == nil {
+		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d retired or corrected, %d promoted, %d refused\n",
+			len(applied.Splits), applied.Expanded, len(applied.Actions), len(applied.Promoted), len(applied.Refused))
+	}
 	if err == nil {
 		err = os.Remove(filepath.Join(dir, packetFile))
 	}
