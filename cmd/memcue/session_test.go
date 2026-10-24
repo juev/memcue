@@ -30,9 +30,13 @@ func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp.HookSpecificOutput.HookEventName != "SessionStart" ||
-		!strings.Contains(resp.HookSpecificOutput.AdditionalContext, "memcue add") {
+	ctx := resp.HookSpecificOutput.AdditionalContext
+	if resp.HookSpecificOutput.HookEventName != "SessionStart" || !strings.Contains(ctx, "memcue add") {
 		t.Errorf("got %+v", resp)
+	}
+	// The agent searches itself (#361): the note tells it to, and no longer promises facts with the prompt.
+	if !strings.Contains(ctx, `memcue search "<words>"`) || strings.Contains(ctx, "stored facts") {
+		t.Errorf("note does not ask the agent to search: %q", ctx)
 	}
 }
 
@@ -89,25 +93,6 @@ func TestSessionCardOnlyReturnsTheCard(t *testing.T) {
 	}
 	if strings.Contains(resp.HookSpecificOutput.AdditionalContext, "memcue add") {
 		t.Errorf("session-card leaked the session note: %q", resp.HookSpecificOutput.AdditionalContext)
-	}
-}
-
-func TestSessionCardResetsSeenOnCompact(t *testing.T) {
-	env(t)
-	path, err := seenPath("s-card-compact")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte("01ARZ3NDEKTSV4RRFFQ69G5FAV\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	in, _ := json.Marshal(map[string]string{"session_id": "s-card-compact", "source": "compact"})
-	var out bytes.Buffer
-	if err := runSessionCard(bytes.NewReader(in), &out); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("seen file still exists: %v", err)
 	}
 }
 

@@ -13,17 +13,27 @@ import (
 
 const gradleFact = "Gradle вне make требует JAVA_HOME=/opt/homebrew/opt/openjdk@21, иначе сборка не находит JDK."
 
-// An explicit add is active at once and says the user stated it; a candidate is not recalled until it is approved.
+// searched is what memcue search prints for query.
+func searched(t *testing.T, query string) string {
+	t.Helper()
+	var out bytes.Buffer
+	if err := runSearch([]string{query}, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.String()
+}
+
+// An explicit add is active at once and says the user stated it; a candidate is not searched until it is approved.
 func TestAddCandidateApprove(t *testing.T) {
-	dir := env(t)
+	env(t)
 	var out bytes.Buffer
 	if err := runAdd([]string{"-candidate", "-source", "memory", "-kind", "environment", "-keywords", "gradle,jdk",
 		gradleFact}, &out); err != nil {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out.String())
-	if ctx := hookContext(t, dir, "s1", gradlePrompt); strings.Contains(ctx, "openjdk@21") {
-		t.Fatalf("a candidate was recalled: %q", ctx)
+	if ctx := searched(t, gradlePrompt); strings.Contains(ctx, "openjdk@21") {
+		t.Fatalf("a candidate was found: %q", ctx)
 	}
 	out.Reset()
 	if err := runCandidates([]string{"-json"}, &out); err != nil {
@@ -38,8 +48,8 @@ func TestAddCandidateApprove(t *testing.T) {
 	if err := runApprove([]string{id}, &out); err != nil || !strings.HasPrefix(out.String(), id+" v2") {
 		t.Fatalf("approve %q: %v", out.String(), err)
 	}
-	if ctx := hookContext(t, dir, "s2", gradlePrompt); !strings.Contains(ctx, "openjdk@21") {
-		t.Errorf("an approved fact is not recalled: %q", ctx)
+	if ctx := searched(t, gradlePrompt); !strings.Contains(ctx, "openjdk@21") {
+		t.Errorf("an approved fact is not found: %q", ctx)
 	}
 	if err := runApprove([]string{id}, &bytes.Buffer{}); err == nil {
 		t.Error("approving an active fact again succeeded")

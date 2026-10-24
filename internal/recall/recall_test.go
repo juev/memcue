@@ -62,7 +62,7 @@ func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 1, MinCoverage: 0.1, MaxFacts: 3}
-	hits, err := Recall(s, "caddy reload path", nil, p)
+	hits, err := Recall(s, "caddy reload path", p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,17 +83,9 @@ func splitKW(s string) []string {
 	return []string{s}
 }
 
-// project is the key set of a session in the repository tier, none outside one.
-func project(tier string) []string {
-	if tier == "" {
-		return nil
-	}
-	return []string{tier}
-}
-
-func recall(t *testing.T, s *store.Store, prompt, tier string) []Hit {
+func recall(t *testing.T, s *store.Store, prompt string) []Hit {
 	t.Helper()
-	hs, err := Recall(s, prompt, project(tier), Default)
+	hs, err := Recall(s, prompt, testParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,38 +95,8 @@ func recall(t *testing.T, s *store.Store, prompt, tier string) []Hit {
 func TestConfirmationsRecallNothing(t *testing.T) {
 	s := setup(t)
 	for _, p := range []string{"да, запускай эксперимент", "давай закрывать", "ок", "продолжаем"} {
-		if got := recall(t, s, p, "server-migration"); len(got) != 0 {
+		if got := recall(t, s, p); len(got) != 0 {
 			t.Errorf("%q recalled %v", p, got)
-		}
-	}
-}
-
-func TestFactFromAnotherRepositoryIsRecalled(t *testing.T) {
-	s := setup(t)
-	got := recall(t, s, "Хочу запустить gradle руками без make, какой JAVA_HOME выставить для JDK?", "perigee")
-	if len(got) == 0 || got[0].Origin != "lists 2026-10-09" {
-		t.Errorf("got %+v", got)
-	}
-}
-
-// The same text learnt in two places ties on BM25: the session's repository wins, and outside one the global fact.
-func TestOwnRepositoryWinsTies(t *testing.T) {
-	s := setup(t)
-	for _, origin := range []string{"loadtest 2026-09-10", "_global 2026-08-01"} {
-		if _, err := s.Add("Брокер rabbitmq слушает 5672, панель управления на 15672.", []string{"rabbitmq"},
-			origin); err != nil {
-			t.Fatal(err)
-		}
-	}
-	p := Default
-	p.MinMatched = 2
-	for tier, want := range map[string]string{"loadtest": "loadtest 2026-09-10", "": "_global 2026-08-01"} {
-		got, err := Recall(s, "брокер rabbitmq", project(tier), p)
-		if err != nil || len(got) != 2 || got[0].bm25 != got[1].bm25 {
-			t.Fatalf("want a tie of two, got %+v %v", got, err)
-		}
-		if got[0].Origin != want {
-			t.Errorf("tier %q: first is %q, want %q", tier, got[0].Origin, want)
 		}
 	}
 }
@@ -153,9 +115,9 @@ func TestPassingFactsAreServedInBM25Order(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Default
+	p := testParams
 	p.MinMatched, p.MinCoverage = 2, 0
-	hs, err := Recall(s, "конфиг кластера kafka zookeeper", nil, p)
+	hs, err := Recall(s, "конфиг кластера kafka zookeeper", p)
 	if err != nil || len(hs) != 2 {
 		t.Fatalf("got %+v %v, want two facts", hs, err)
 	}
@@ -170,9 +132,9 @@ func TestPassingFactsAreServedInBM25Order(t *testing.T) {
 
 func TestAtMostMaxFacts(t *testing.T) {
 	s := setup(t)
-	p := Default
+	p := testParams
 	p.MaxFacts, p.MinMatched, p.MinCoverage = 1, 1, 0
-	hs, err := Recall(s, "прокси mihomo caddy gradle", nil, p)
+	hs, err := Recall(s, "прокси mihomo caddy gradle", p)
 	if err != nil || len(hs) != 1 {
 		t.Errorf("got %d %v", len(hs), err)
 	}
@@ -182,11 +144,11 @@ func TestAtMostMaxFacts(t *testing.T) {
 // fact instead of none and must never slice the hits with a negative index. A positive value still truncates.
 func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 	s := setup(t)
-	p := Default
+	p := testParams
 	p.MinMatched, p.MinCoverage = 1, 0
 	const prompt = "прокси mihomo caddy gradle"
 	p.MaxFacts = 100 // a cap above any candidate list: "no cap" as well
-	all, err := Recall(s, prompt, nil, p)
+	all, err := Recall(s, prompt, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +157,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 	}
 	for _, maxFacts := range []int{0, -1} {
 		p.MaxFacts = maxFacts
-		got, err := Recall(s, prompt, nil, p)
+		got, err := Recall(s, prompt, p)
 		if err != nil {
 			t.Fatalf("MaxFacts %d: %v", maxFacts, err)
 		}
@@ -209,7 +171,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 		}
 	}
 	p.MaxFacts = 1
-	got, err := Recall(s, prompt, nil, p)
+	got, err := Recall(s, prompt, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +183,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 // A two-word prompt asks about two terms: the dev-set minimum of three matched terms silenced every fact about them.
 func TestShortPromptWithKnownTermsRecalls(t *testing.T) {
 	s := setup(t)
-	hs := recall(t, s, "прокси mihomo", "loadtest")
+	hs := recall(t, s, "прокси mihomo")
 	if len(hs) == 0 {
 		t.Fatalf(`"прокси mihomo" recalled nothing`)
 	}
@@ -241,16 +203,16 @@ func TestTicketKeyRecallsExactOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	for prompt, want := range map[string]string{"давай брать PROJ-1234": a.ID, "PROJ-1235": b.ID} {
-		got := recall(t, s, prompt, "x")
+		got := recall(t, s, prompt)
 		if len(got) == 0 || got[0].ID != want {
 			t.Errorf("%q recalled %+v, want %s", prompt, got, want)
 		}
 	}
-	if got := recall(t, s, "давай брать PROJ-1236", "x"); len(got) != 0 {
+	if got := recall(t, s, "давай брать PROJ-1236"); len(got) != 0 {
 		t.Errorf("PROJ-1236 recalled %+v", got)
 	}
 	// A prompt naming the wrong ticket must not reach the other one through the shared keyword "PROJ".
-	if got := recall(t, s, "PROJ-1235 postgres port", "x"); len(got) != 1 || got[0].ID != b.ID {
+	if got := recall(t, s, "PROJ-1235 postgres port"); len(got) != 1 || got[0].ID != b.ID {
 		t.Errorf("wrong ticket plus postgres recalled %+v", got)
 	}
 }
@@ -267,54 +229,12 @@ func TestVersionedPromptIsNotATicket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hs, err := Recall(s, "Which port does postgres-16 use?", nil, Default)
+	hs, err := Recall(s, "Which port does postgres-16 use?", testParams)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(hs) == 0 || hs[0].ID != f.ID {
 		t.Errorf("versioned prompt recalled %+v, want %s", hs, f.ID)
-	}
-}
-
-// At equal coverage a fact of this host wins the tie, without excluding the other host.
-func TestCurrentHostWinsTies(t *testing.T) {
-	s := setup(t)
-	a, err := s.AddWith("Кэш memcached на этом хосте.", []string{"кэш", "memcached"},
-		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:mac"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.AddWith("Кэш memcached на этом хосте.", []string{"кэш", "memcached"},
-		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:loffe"}); err != nil {
-		t.Fatal(err)
-	}
-	p := Default
-	p.Host = "mac"
-	p.MinMatched, p.MinCoverage, p.MaxFacts = 2, 0, 1
-	hs, err := Recall(s, "кэш memcached", nil, p)
-	if err != nil || len(hs) != 1 || hs[0].ID != a.ID {
-		t.Errorf("got %+v %v, want %s", hs, err, a.ID)
-	}
-}
-
-// A fact of another host that takes a slot while a fact of this host is left out is marked in the hit and the log.
-func TestOtherHostDisplacementIsMarked(t *testing.T) {
-	s := setup(t)
-	if _, err := s.AddWith("Кэш на этом хосте.", []string{"кэш"}, "loadtest 2026-10-10", "",
-		store.Meta{Kind: "environment", Scope: "host:mac"}); err != nil {
-		t.Fatal(err)
-	}
-	b, err := s.AddWith("Кэш redis на 127.0.0.1:6379, порт по умолчанию.", []string{"кэш", "redis"},
-		"loadtest 2026-10-10", "", store.Meta{Kind: "environment", Scope: "host:loffe"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := Default
-	p.Host = "mac"
-	p.MinMatched, p.MinCoverage, p.MaxFacts = 1, 0, 1
-	hs, err := Recall(s, "кэш redis", nil, p)
-	if err != nil || len(hs) != 1 || hs[0].ID != b.ID || !hs[0].Displaced {
-		t.Errorf("got %+v %v, want displaced %s", hs, err, b.ID)
 	}
 }
 
@@ -325,9 +245,9 @@ func TestExpiredFactIsNotRecalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Default
+	p := testParams
 	p.Today = "2026-10-19"
-	hs, err := Recall(s, "на каком порту поднимается стенд нагрузки в staging", []string{"loadtest"}, p)
+	hs, err := Recall(s, "на каком порту поднимается стенд нагрузки в staging", p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +257,7 @@ func TestExpiredFactIsNotRecalled(t *testing.T) {
 		}
 	}
 	p.Today = "2026-10-05" // still inside its last day
-	hs, err = Recall(s, "на каком порту поднимается стенд нагрузки в staging", []string{"loadtest"}, p)
+	hs, err = Recall(s, "на каком порту поднимается стенд нагрузки в staging", p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,116 +288,3 @@ func TestNewerOrdersByCreatedThenID(t *testing.T) {
 	}
 }
 
-// A fact learnt under any key of the session's project wins a tie: a fork's session prefers a fact of its upstream
-// over the same text learnt elsewhere.
-func TestAnyProjectKeyWinsTies(t *testing.T) {
-	s := setup(t)
-	for _, origin := range []string{"example.com/elsewhere/z 2026-09-10", "example.com/them/upstream 2026-08-01"} {
-		if _, err := s.Add("Брокер nats слушает 4222, мониторинг на 8222.", []string{"nats"}, origin); err != nil {
-			t.Fatal(err)
-		}
-	}
-	p := Default
-	p.MinMatched = 2
-	got, err := Recall(s, "брокер nats", []string{"example.com/me/fork", "example.com/them/upstream"}, p)
-	if err != nil || len(got) != 2 || got[0].bm25 != got[1].bm25 {
-		t.Fatalf("want a tie of two, got %+v %v", got, err)
-	}
-	if got[0].Origin != "example.com/them/upstream 2026-08-01" {
-		t.Errorf("first is %q, want the upstream's fact", got[0].Origin)
-	}
-}
-
-// foreignSetup stores the same text under five scopes, so that every fact holds the same share of a prompt, and one
-// more fact that makes "логи" a known term the five do not hold.
-func foreignSetup(t *testing.T) *store.Store {
-	t.Helper()
-	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = s.Close() })
-	for _, sc := range []string{"repo:example.com/me/app", "repo:example.com/them/lib", "dir:/srv/work", "global",
-		"service:queue"} {
-		if _, err := s.AddWith("Брокер rabbitmq слушает 5672, панель на 15672 ("+sc+").", []string{"rabbitmq"},
-			"x 2026-10-01", "", store.Meta{Scope: sc}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := s.Add("Логи nginx лежат в /var/log/nginx.", nil, "x 2026-10-01"); err != nil {
-		t.Fatal(err)
-	}
-	return s
-}
-
-func scopesOf(hits []Hit) map[string]bool {
-	out := map[string]bool{}
-	for _, h := range hits {
-		out[h.Scope] = true
-	}
-	return out
-}
-
-// In a repository's session a fact of another repository or directory passes only with ForeignCoverage; its own
-// repository's fact and the places that hold anywhere pass as before (#345).
-func TestForeignFactNeedsItsCoverage(t *testing.T) {
-	s := foreignSetup(t)
-	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10}
-	prompt := "брокер rabbitmq панель логи" // the facts hold three of the four terms
-	got, err := Recall(s, prompt, []string{"example.com/me/app"}, p)
-	if err != nil || len(got) != 5 {
-		t.Fatalf("no ForeignCoverage: want all five, got %v %v", scopesOf(got), err)
-	}
-	p.ForeignCoverage = 0.99
-	tr := &Trace{}
-	p.Trace = tr
-	got, err = Recall(s, prompt, []string{"example.com/me/app"}, p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := map[string]bool{"repo:example.com/me/app": true, "global": true, "service:queue": true}
-	if sc := scopesOf(got); len(sc) != len(want) || !sc["repo:example.com/me/app"] || !sc["global"] || !sc["service:queue"] {
-		t.Errorf("served %v, want %v", sc, want)
-	}
-	foreign := 0
-	for _, st := range tr.Lexical {
-		if st.Verdict == VerdictForeign {
-			foreign++
-		}
-	}
-	if foreign != 2 {
-		t.Errorf("trace has %d facts turned away as another project's, want 2: %+v", foreign, tr.Lexical)
-	}
-}
-
-// FilterForeign leaves the facts of another project out of the search itself: they never reach the gates.
-func TestFilterForeignLeavesThemOutOfTheSearch(t *testing.T) {
-	s := foreignSetup(t)
-	tr := &Trace{}
-	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10, FilterForeign: true,
-		Trace: tr}
-	got, err := Recall(s, "брокер rabbitmq панель", []string{"example.com/me/app"}, p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sc := scopesOf(got); len(sc) != 3 || sc["repo:example.com/them/lib"] || sc["dir:/srv/work"] {
-		t.Errorf("served %v, want the own repository, global and the service", sc)
-	}
-	if len(tr.Lexical) != 3 {
-		t.Errorf("the search returned %d facts, want 3", len(tr.Lexical))
-	}
-}
-
-// A session with no repository key has no other project: the Claude config directory, a directory outside git and
-// a session with no key serve every place as before.
-func TestSessionWithoutRepositoryHasNoForeignFacts(t *testing.T) {
-	s := foreignSetup(t)
-	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 2, MinCoverage: 0.1, MaxFacts: 10, ForeignCoverage: 0.99,
-		FilterForeign: true}
-	for _, project := range [][]string{nil, {"_global"}, {"dir:/opt/data"}} {
-		got, err := Recall(s, "брокер rabbitmq панель логи", project, p)
-		if err != nil || len(got) != 5 {
-			t.Errorf("project %v: want all five, got %v %v", project, scopesOf(got), err)
-		}
-	}
-}

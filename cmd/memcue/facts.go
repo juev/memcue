@@ -434,8 +434,8 @@ func runFacts(out io.Writer) error {
 	})
 }
 
-// runSearch lists the facts holding any word of the text, best first, with their IDs: the way to find the fact to
-// correct or retire. Unlike recall it has no threshold.
+// runSearch lists the facts holding any word of the text, best first, with their IDs: how the agent reads its memory
+// (#361), and the way to find the fact to correct or retire. It has no threshold: the agent reads what it asked for.
 func runSearch(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	n := fs.Int("n", 10, "how many facts")
