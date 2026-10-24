@@ -71,10 +71,14 @@ func runEval(args []string, out io.Writer) error {
 			if r := []rune(text); len(r) > maxPrompt {
 				text = string(r[:maxPrompt])
 			}
-			if r != nil {
-				return recall.RecallJudge(s, text, tier, p, r)
+			var project []string
+			if tier != "" {
+				project = []string{tier}
 			}
-			return recall.Recall(s, text, tier, p)
+			if r != nil {
+				return recall.RecallJudge(s, text, project, p, r)
+			}
+			return recall.Recall(s, text, project, p)
 		}
 
 		if len(ev.Questions) > 0 {

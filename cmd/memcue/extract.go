@@ -71,7 +71,7 @@ func runExtract(args []string, out io.Writer) error {
 		for _, fact := range facts {
 			sf, err := s.AddBatch([]store.FactInput{{Content: fact.Content, Keywords: fact.Keywords, Origin: origin,
 				Expires: eventExpires(fact.Kind, ""),
-				Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source,
+				Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: repoScope(fact.Scope, origin), Source: fact.Source,
 					Evidence: fact.Evidence, Review: store.Candidate}}})
 			if err != nil {
 				return err

@@ -232,7 +232,7 @@ ADD_SCHEMA = _schema(
      "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
                 "omit for a fact that stays true.",
      "kind": "Optional: rule, decision, pitfall or environment. A rule the user stated belongs on the session card.",
-     "scope": "Optional: global, host:<name>, repo:<name> or service:<name>. Use global for a rule of every project."},
+     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project."},
     ["content"])
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",

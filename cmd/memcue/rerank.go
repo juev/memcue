@@ -63,13 +63,13 @@ var listwisePause = sync.OnceValue(func() *judgepkg.Breaker {
 
 // recallFacts is the one way recall is decided: the words, plus the configured reader. A missing reader keeps the
 // lexical answer.
-func recallFacts(s *store.Store, prompt, tier string, p recall.Params) ([]recall.Hit, error) {
+func recallFacts(s *store.Store, prompt string, project []string, p recall.Params) ([]recall.Hit, error) {
 	r := ranker()
 	if r == nil {
 		if p.Trace != nil {
 			p.Trace.Fallback = "no rerank reader configured"
 		}
-		return recall.Recall(s, prompt, tier, p)
+		return recall.Recall(s, prompt, project, p)
 	}
-	return recall.RecallJudge(s, prompt, tier, p, r)
+	return recall.RecallJudge(s, prompt, project, p, r)
 }

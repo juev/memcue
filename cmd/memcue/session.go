@@ -132,7 +132,7 @@ func sessionCard(cwd string) (string, []string, error) {
 		return "", nil, err
 	}
 	defer func() { _ = s.Close() }()
-	facts, err := s.CardFacts(tier.Of(cwd, claudeDir()), store.Today())
+	facts, err := s.CardFacts(projectScopes(cwd), store.Today())
 	if err != nil {
 		return "", nil, err
 	}
@@ -432,8 +432,8 @@ func storeExtracted(text string, rec *extractRecord, minChars int) error {
 	for _, fact := range keep {
 		batch = append(batch, store.FactInput{Content: fact.Content, Keywords: fact.Keywords, Origin: rec.Origin,
 			Expires: eventExpires(fact.Kind, ""),
-			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: fact.Scope, Source: fact.Source, Evidence: fact.Evidence,
-				Review: store.Candidate}})
+			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: repoScope(fact.Scope, rec.Origin), Source: fact.Source,
+				Evidence: fact.Evidence, Review: store.Candidate}})
 	}
 	stored, err := s.AddBatch(batch)
 	if err != nil {

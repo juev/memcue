@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -642,12 +643,12 @@ func (s *Store) Candidates() ([]Fact, error) {
 		ORDER BY f.created DESC, f.id DESC`, Active, Candidate)
 }
 
-// CardFacts returns the facts a session-start card carries: global rules and the rules and decisions of the given
-// repository, the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
+// CardFacts returns the facts a session-start card carries: global rules and the rules and decisions whose scope is
+// one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
 // goes first because the date says little on a migrated base, where most rules share the day of the migration (#229).
 // It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. today
 // is a local "YYYY-MM-DD" date; empty means today.
-func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
+func (s *Store) CardFacts(scopes []string, today string) ([]Fact, error) {
 	if today == "" {
 		today = Today()
 	}
@@ -662,7 +663,9 @@ func (s *Store) CardFacts(tier, today string) ([]Fact, error) {
 		}
 		switch {
 		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
-		case (f.Kind == "decision" || f.Kind == "rule") && tier != "" && strings.EqualFold(f.Scope, "repo:"+tier):
+		case (f.Kind == "decision" || f.Kind == "rule") && slices.ContainsFunc(scopes, func(sc string) bool {
+			return sc != "" && strings.EqualFold(f.Scope, sc)
+		}):
 		default:
 			continue
 		}

@@ -21,7 +21,7 @@ type Fact struct {
 	Content  string   `json:"content"`
 	Keywords []string `json:"keywords"`
 	Kind     string   `json:"kind,omitempty"`     // rule, decision, pitfall, environment, or another word the policy drops
-	Scope    string   `json:"scope,omitempty"`    // global, host:<name>, repo:<name>
+	Scope    string   `json:"scope,omitempty"`    // global, host:<name>, repo (the session's project), service:<name>
 	Source   string   `json:"source,omitempty"`   // user, user_confirmed, tool, agent
 	Evidence string   `json:"evidence,omitempty"` // the words of the record the fact rests on, verbatim
 	Queries  []string `json:"queries,omitempty"`  // how a user would ask about the fact; recall searches them

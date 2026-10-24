@@ -61,8 +61,9 @@ func splitKeywords(s string) []string {
 var (
 	// kinds are the fact kinds the base understands; the card uses rule and decision.
 	kinds = map[string]bool{"rule": true, "decision": true, "pitfall": true, "environment": true}
-	// reScope is where a fact holds: global, or a named host, repository or service.
-	reScope = regexp.MustCompile(`^(global|host:[^ ]+|repo:[^ ]+|service:[^ ]+)$`)
+	// reScope is where a fact holds: global, a named host, repository or service, a directory, or bare repo for the
+	// project of the working directory.
+	reScope = regexp.MustCompile(`^(global|repo|host:[^ ]+|repo:[^ ]+|service:[^ ]+|dir:/.+)$`)
 )
 
 // validKindScope checks the values a caller may pass to add. An empty value means "not stated" and is allowed.
@@ -71,7 +72,7 @@ func validKindScope(kind, scope string) error {
 		return fmt.Errorf("add: unknown -kind %q; use rule, decision, pitfall or environment", kind)
 	}
 	if scope != "" && !reScope.MatchString(scope) {
-		return fmt.Errorf("add: -scope %q must be global, host:<name>, repo:<name> or service:<name>", scope)
+		return fmt.Errorf("add: -scope %q must be global, repo, host:<name>, repo:<key>, service:<name> or dir:<path>", scope)
 	}
 	return nil
 }
@@ -100,7 +101,7 @@ func runAdd(args []string, out io.Writer) error {
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
 	kind := fs.String("kind", "", "rule, decision, pitfall or environment")
-	scope := fs.String("scope", "", "where it holds: global, host:<name>, repo:<name>, service:<name>")
+	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>")
 	force := fs.Bool("force", false, "store it even when it looks like a secret")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -117,6 +118,11 @@ func runAdd(args []string, out io.Writer) error {
 	}
 	if *origin == "" {
 		*origin = defaultOriginAt(*cwd)
+	}
+	if *scope == "repo" {
+		if *scope = repoScope(*scope, *origin); *scope == "" {
+			return errors.New("add: -scope repo needs a project: run it in one, or pass -cwd or -origin")
+		}
 	}
 	m := store.Meta{Kind: *kind, Scope: *scope, Source: *source}
 	if *candidate {
@@ -233,9 +239,9 @@ func defaultOriginAt(dir string) string {
 	return originAt(dir, time.Now().Format(time.DateOnly))
 }
 
-// originAt names a fact by where it was learnt: the repository tier prefix and the date. Outside a repository the
-// origin stays empty — a scratch directory's name is a wrong answer, not a weak one, and it hides that nobody knows
-// where the fact came from (#287). A bare date would be just as wrong: it matches no repository.
+// originAt names a fact by where it was learnt: the project key (tier.Of: the remote, the go.mod module, or the
+// directory) and the date. In a temporary directory the origin stays empty: a scratch directory is a wrong answer, not
+// a weak one (#287, #343). A bare date would be just as wrong: it matches no project.
 func originAt(dir, date string) string {
 	if dir == "" {
 		return ""
@@ -245,6 +251,42 @@ func originAt(dir, date string) string {
 		return ""
 	}
 	return strings.TrimSpace(name + " " + date)
+}
+
+// repoScope turns the scope a model or a caller chose into the one stored: a repo scope, bare or named, becomes the
+// scope of the project the origin names (tier.Scope of its key), so a repository is never named by the model (#343).
+// Outside a project, which leaves the origin empty, a repo scope has nothing to hold in and is dropped. Every other
+// scope is kept as it is.
+func repoScope(scope, origin string) string {
+	if scope != "repo" && !strings.HasPrefix(strings.ToLower(scope), "repo:") {
+		return scope
+	}
+	return tier.Scope(originKey(origin))
+}
+
+// originKey is the project key at the head of an origin "<key> <date>"; "" when the origin does not end in a date.
+func originKey(origin string) string {
+	origin = strings.TrimSpace(origin)
+	i := strings.LastIndexByte(origin, ' ')
+	if i < 0 {
+		return ""
+	}
+	if _, err := time.Parse(time.DateOnly, origin[i+1:]); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(origin[:i])
+}
+
+// projectScopes are the scopes of the project of dir, one per key, for the session card: a rule or decision written
+// on a mirror's other host or in a fork's upstream belongs to the session too. The global tier has none.
+func projectScopes(dir string) []string {
+	var out []string
+	for _, k := range tier.Keys(dir, claudeDir()) {
+		if k != tier.Global {
+			out = append(out, tier.Scope(k))
+		}
+	}
+	return out
 }
 
 // defaultEventTTL is how long a fact that records what happened stays recalled. Knowledge outlives the run that

@@ -352,7 +352,7 @@ func TestCardFactsSkipExpired(t *testing.T) {
 	expiredDecision := add("Expired decision.", "decision", "repo:shop", "2026-10-19")
 	liveDecision := add("Live decision.", "decision", "repo:shop", "")
 
-	got, err := s.CardFacts("shop", "2026-10-20")
+	got, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestCardFactsSkipExpired(t *testing.T) {
 	}
 
 	old := add("Ancient rule.", "rule", "global", "2000-01-01")
-	got, err = s.CardFacts("shop", "")
+	got, err = s.CardFacts([]string{"repo:shop"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1177,7 +1177,7 @@ func TestCardFactsCarryRepositoryRules(t *testing.T) {
 	own := add("Shop rule.", "rule", "repo:shop")
 	other := add("Lists rule.", "rule", "repo:lists")
 	pitfall := add("Shop pitfall.", "pitfall", "repo:shop")
-	got, err := s.CardFacts("shop", "2026-10-20")
+	got, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1446,7 +1446,7 @@ func TestCardFactsPutStatedRulesFirst(t *testing.T) {
 	stated := add("Stated rule.", "user")
 	confirmed := add("Confirmed rule.", "user_confirmed")
 	written := add("Written rule.", "tool")
-	got, err := s.CardFacts("", "2026-10-20")
+	got, err := s.CardFacts(nil, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1456,5 +1456,32 @@ func TestCardFactsPutStatedRulesFirst(t *testing.T) {
 	}
 	if want := []string{confirmed.ID, stated.ID, written.ID}; !slices.Equal(order, want) {
 		t.Errorf("card order %v, want the stated rules newest first, then %s", order, written.ID)
+	}
+}
+
+// The card takes the rules and decisions of every scope of the session's project: one written on a mirror's other host
+// or in a fork's upstream belongs to the session too.
+func TestCardFactsTakeEveryScopeOfTheProject(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, scope string) Fact {
+		f, err := s.AddWith(content, nil, "", "", Meta{Kind: "decision", Scope: scope})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	here := add("Решение на этом хосте зеркала.", "repo:example.com/me/x")
+	mirror := add("Решение на другом хосте зеркала.", "repo:example.org/me/x")
+	other := add("Решение другого проекта.", "repo:example.com/me/y")
+	got, err := s.CardFacts([]string{"repo:example.com/me/x", "repo:example.org/me/x"}, "2026-10-24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, f := range got {
+		ids[f.ID] = true
+	}
+	if !ids[here.ID] || !ids[mirror.ID] || ids[other.ID] {
+		t.Errorf("card %v: want both hosts of the mirror and not the other project", ids)
 	}
 }

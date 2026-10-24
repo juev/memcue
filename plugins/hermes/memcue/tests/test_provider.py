@@ -571,6 +571,8 @@ class ProviderTest(unittest.TestCase):
         workspace = Path(self.home) / "demo"
         workspace.mkdir()
         (workspace / ".git").mkdir()
+        # The project is named by its remote, not by the directory (#343).
+        (workspace / ".git" / "config").write_text('[remote "origin"]\n\turl = git@example.com:team/demo.git\n')
         p.initialize("sess-9", hermes_home=self.home, agent_workspace=str(workspace), agent_context="primary")
         p.on_session_end([{"role": "system", "content": "prompt"},
                           {"role": "user",
@@ -583,7 +585,7 @@ class ProviderTest(unittest.TestCase):
         facts = self.facts_of(p)
         self.assertEqual(len(facts), 1)
         self.assertIn("deepseek-flash", facts[0])
-        self.assertIn(" demo ", facts[0])
+        self.assertIn(" example.com/team/demo ", facts[0])
         self.assertEqual((seen["model"], seen["auth"]), ("m1", "Bearer k1"))
         self.assertNotIn("SYSTEM", seen["text"])
 

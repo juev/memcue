@@ -24,7 +24,7 @@ func TestTraceRecordsTheLexicalDecision(t *testing.T) {
 	tr := &Trace{}
 	p := Default
 	p.MaxFacts, p.MinMatched, p.Trace = 1, 2, tr
-	hits, err := Recall(s, "прокси mihomo смешанный порт caddy", "", p)
+	hits, err := Recall(s, "прокси mihomo смешанный порт caddy", nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestTraceNamesSeenAndExpiredFacts(t *testing.T) {
 	tr := &Trace{}
 	p := Default
 	p.Seen, p.Trace = seen, tr
-	if _, err := Recall(s, "прокси mihomo смешанный порт", "", p); err != nil {
+	if _, err := Recall(s, "прокси mihomo смешанный порт", nil, p); err != nil {
 		t.Fatal(err)
 	}
 	if got := step(t, tr.Lexical, "смешанный").Verdict; got != VerdictSeen {
@@ -76,7 +76,7 @@ func TestTraceNamesAnEarlyStop(t *testing.T) {
 	tr := &Trace{}
 	p := Default
 	p.Trace = tr
-	if _, err := Recall(s, "да", "", p); err != nil {
+	if _, err := Recall(s, "да", nil, p); err != nil {
 		t.Fatal(err)
 	}
 	if tr.Stopped == "" || len(tr.Lexical) != 0 {
@@ -92,7 +92,7 @@ func TestTraceRecordsTheJudge(t *testing.T) {
 	tr := &Trace{}
 	p := rankedParams()
 	p.Trace = tr
-	hits, err := RecallJudge(s, "порог coverage шумовых фактов, а caddy", "", p, r)
+	hits, err := RecallJudge(s, "порог coverage шумовых фактов, а caddy", nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestTraceNamesTheFallback(t *testing.T) {
 	tr := &Trace{}
 	p := Default
 	p.Trace = tr
-	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг", "", p,
+	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг", nil, p,
 		&fakeRanker{min: 0.5, err: errors.New("down")}); err != nil {
 		t.Fatal(err)
 	}

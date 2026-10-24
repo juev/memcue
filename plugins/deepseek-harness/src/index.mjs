@@ -834,7 +834,7 @@ export function apply(ctx, config) {
 			origin: { type: 'string', description: 'Where the fact was learnt. Defaults to the repository of the session workspace and today.' },
 			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD (for a one-off reminder).' },
 			kind: { type: 'string', description: 'Optional: rule, decision, pitfall or environment. A rule the user stated belongs on the session card.' },
-			scope: { type: 'string', description: 'Optional: global, host:<name>, repo:<name> or service:<name>. Use global for a rule of every project.' },
+			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project.' },
 		},
 		output: factResult,
 		async execute(args, exec) {

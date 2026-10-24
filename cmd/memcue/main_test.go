@@ -344,12 +344,24 @@ func TestResumeKeepsSeenFacts(t *testing.T) {
 	}
 }
 
+// gitRepo makes path a repository whose origin is git@example.com:team/<basename>.git, so its project key is
+// example.com/team/<basename> (#343): the key comes from the remote, not from the directory.
+func gitRepo(t *testing.T, path string) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(path, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := "[remote \"origin\"]\n\turl = git@example.com:team/" + filepath.Base(path) + ".git\n"
+	if err := os.WriteFile(filepath.Join(path, ".git", "config"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return "example.com/team/" + filepath.Base(path)
+}
+
 func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	key := gitRepo(t, repo)
 	t.Chdir(repo)
 	var out bytes.Buffer
 	if err := runAdd([]string{"-keywords", "k", "факт без origin"}, &out); err != nil {
@@ -367,7 +379,7 @@ func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "shop " + time.Now().Format(time.DateOnly); f.Origin != want {
+	if want := key + " " + time.Now().Format(time.DateOnly); f.Origin != want {
 		t.Errorf("origin %q, want %q", f.Origin, want)
 	}
 	all, _ := s.Active()
@@ -381,9 +393,7 @@ func TestAddNamesWorkingRepositoryByDefault(t *testing.T) {
 func TestAddUsesCwdForDefaultOrigin(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	key := gitRepo(t, repo)
 	var out bytes.Buffer
 	if err := runAdd([]string{"-cwd", repo, "-source", "agent", "--", "факт из сессии"}, &out); err != nil {
 		t.Fatal(err)
@@ -397,7 +407,7 @@ func TestAddUsesCwdForDefaultOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "shop " + time.Now().Format(time.DateOnly); f.Origin != want {
+	if want := key + " " + time.Now().Format(time.DateOnly); f.Origin != want {
 		t.Errorf("origin %q, want %q", f.Origin, want)
 	}
 	if f.Source != "agent" {
@@ -474,9 +484,9 @@ func TestFactsPathExpandsHome(t *testing.T) {
 	}
 }
 
-// Outside a repository a fact has no origin: a scratch directory's name says nothing about where the fact came from
-// and hides that nobody knows it (#287).
-func TestOriginIsEmptyOutsideARepository(t *testing.T) {
+// In a temporary directory a fact has no origin: a scratch directory says nothing about where the fact came from and
+// hides that nobody knows it (#287). A working directory outside git is named by its path (#343, internal/tier).
+func TestOriginIsEmptyInATemporaryDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "workspace")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -487,21 +497,17 @@ func TestOriginIsEmptyOutsideARepository(t *testing.T) {
 	if got := originAt(dir, "2026-10-19"); got != "" {
 		t.Errorf("originAt(%q) = %q, want empty", dir, got)
 	}
-	if got := originAt(string(filepath.Separator), "2026-10-19"); got != "" {
-		t.Errorf("originAt(root) = %q, want empty", got)
-	}
 	if got := originAt("", "2026-10-19"); got != "" {
 		t.Errorf("originAt(\"\") = %q, want empty", got)
 	}
 }
 
-// Inside a repository the origin names the repository tier and the date, which is what the tie-break reads.
+// Inside a repository the origin names the project key and the date, which is what the tie-break reads. The key is
+// the remote's, wherever the clone lives.
 func TestOriginNamesTheRepository(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "repo")
-	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := originAt(dir, "2026-10-19"), "repo 2026-10-19"; got != want {
+	key := gitRepo(t, dir)
+	if got, want := originAt(dir, "2026-10-19"), key+" 2026-10-19"; got != want {
 		t.Errorf("originAt(%q) = %q, want %q", dir, got, want)
 	}
 }
@@ -592,5 +598,48 @@ func TestHookLogsAPausedJudge(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log")); err != nil ||
 		strings.Contains(string(b), `"judge"`) {
 		t.Errorf("a prompt without a judge is marked: %s %v", b, err)
+	}
+}
+
+// The model never names a repository: a repo scope, bare or with any name, becomes the scope of the origin's project,
+// and without a project it has nothing to hold in (#343).
+func TestRepoScopeComesFromTheOrigin(t *testing.T) {
+	for _, tc := range []struct{ scope, origin, want string }{
+		{"repo", "example.com/team/shop 2026-10-24", "repo:example.com/team/shop"},
+		{"repo:shop", "example.com/team/shop 2026-10-24", "repo:example.com/team/shop"},
+		{"Repo:other/name", "example.com/team/shop 2026-10-24", "repo:example.com/team/shop"},
+		{"repo", "dir:/srv/work/notes 2026-10-24", "dir:/srv/work/notes"},
+		{"repo", "", ""},
+		{"repo", "explicit origin without a date", ""},
+		{"global", "example.com/team/shop 2026-10-24", "global"},
+		{"host:db1", "", "host:db1"},
+		{"service:mail", "example.com/team/shop 2026-10-24", "service:mail"},
+	} {
+		if got := repoScope(tc.scope, tc.origin); got != tc.want {
+			t.Errorf("repoScope(%q, %q) = %q, want %q", tc.scope, tc.origin, got, tc.want)
+		}
+	}
+}
+
+// add -scope repo takes the working directory's project, and refuses where there is none.
+func TestAddScopeRepoTakesTheProject(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	key := gitRepo(t, repo)
+	var out bytes.Buffer
+	if err := runAdd([]string{"-cwd", repo, "-kind", "decision", "-scope", "repo", "--", "мержить squash"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.Get(strings.TrimSpace(out.String()))
+	_ = s.Close()
+	if err != nil || f.Scope != "repo:"+key {
+		t.Errorf("scope %q %v, want repo:%s", f.Scope, err, key)
+	}
+	if err := runAdd([]string{"-cwd", t.TempDir(), "-scope", "repo", "--", "без проекта"}, &bytes.Buffer{}); err == nil {
+		t.Error("add -scope repo outside a project succeeded")
 	}
 }
