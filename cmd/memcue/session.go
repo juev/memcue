@@ -78,6 +78,9 @@ func runSessionStart(in io.Reader, out io.Writer) error {
 			logCard(h, ids, len([]rune(card)))
 		}
 	}
+	if hint := dreamHint(); hint != "" {
+		context += "\n\n" + hint
+	}
 	var resp struct {
 		HookSpecificOutput struct {
 			HookEventName     string `json:"hookEventName"`
@@ -87,6 +90,25 @@ func runSessionStart(in io.Reader, out io.Writer) error {
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = context
 	return json.NewEncoder(out).Encode(resp)
+}
+
+// dreamHint is the line the session start adds when a dream is due: the session's model does it with the
+// memcue-dream skill when the user's task allows. A failure to tell says nothing; the session must start either way.
+func dreamHint() string {
+	if _, err := os.Stat(factsPath()); err != nil {
+		return "" // no base yet: the hint must not create one
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return ""
+	}
+	n, last, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
+	if err != nil || n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("memcue: %d facts wait for the dream (last dream %s). When the user's task allows, run the "+
+		"memcue-dream skill to tidy the memory; never interrupt the user's work for it.", n,
+		last.Local().Format("2006-01-02 15:04"))
 }
 
 // runSessionCard returns only the card, for a host whose own system prompt already carries the memory note. It
@@ -358,9 +380,8 @@ func runExtractSession(args []string) error {
 	if lerr := appendLog(filepath.Join(dir, "extract.log"), rec); err == nil {
 		err = lerr
 	}
-	_ = lock.Close()  // the session's next run need not wait for the dream
-	maybeVet(rec.IDs) // before the dream: it only sees approved facts
-	maybeDream()
+	_ = lock.Close() // the session's next run need not wait for the vet
+	maybeVet(rec.IDs)
 	return err
 }
 
@@ -559,6 +580,5 @@ func runExtractMessages(args []string, in io.Reader) error {
 	}
 	err = errors.Join(err, appendLog(filepath.Join(dir, "extract.log"), rec))
 	maybeVet(rec.IDs)
-	maybeDream()
 	return err
 }

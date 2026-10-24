@@ -21,7 +21,7 @@ import (
 // knownEnv is every MEMCUE_* variable memcue and its plugins read; a fact naming another one was likely written about a
 // release that had it (#289). TestKnownEnvCoversTheSource checks it against the os.Getenv calls of the source.
 var knownEnv = []string{
-	"MEMCUE_API_KEY", "MEMCUE_API_URL", "MEMCUE_DREAM", "MEMCUE_EVENT_TTL_DAYS", "MEMCUE_EXTRACT", "MEMCUE_FACTS",
+	"MEMCUE_API_KEY", "MEMCUE_API_URL", "MEMCUE_DREAM_EVERY", "MEMCUE_EVENT_TTL_DAYS", "MEMCUE_EXTRACT", "MEMCUE_FACTS",
 	"MEMCUE_FOREIGN_COVERAGE",
 	"MEMCUE_HOST",
 	"MEMCUE_MEMORY_DIR", "MEMCUE_MIN_COVERAGE", "MEMCUE_MIN_MATCHED", "MEMCUE_MIN_TERMS", "MEMCUE_MODEL",

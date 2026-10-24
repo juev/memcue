@@ -1,47 +1,21 @@
 package extract
 
 import (
-	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-// SplitFacts sends the split prompt and reads the compound facts, with their parts trimmed and empty ones dropped.
-func TestSplitFactsReadsTheAnswer(t *testing.T) {
-	oldAPI, oldModel := API, Model
-	t.Cleanup(func() { API, Model = oldAPI, oldModel })
-	answer, _ := json.Marshal(`{"splits":[{"id":" 01a ","parts":[" Port 3000. ","","Path /srv."],"reason":" two claims "}]}`)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		var req struct {
-			Messages []struct{ Role, Content string }
+// The instructions of a packet carry the three tasks with their rules and the answer form with the packet's id, so
+// the session's model needs nothing else to answer it.
+func TestDreamInstructionsCarryTheTasksAndThePacket(t *testing.T) {
+	got := DreamInstructions("2026-10-24T18:00:00Z")
+	for _, want := range []string{splitPrompt, expandPrompt, dreamPrompt, `"packet": "2026-10-24T18:00:00Z"`,
+		"memcue dream -apply"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("instructions lack %.60q", want)
 		}
-		if err := json.Unmarshal(b, &req); err != nil || len(req.Messages) != 2 ||
-			!strings.HasPrefix(req.Messages[0].Content, splitPrompt) {
-			t.Errorf("request %s", b)
-		}
-		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":`+string(answer)+`},"finish_reason":"stop"}],`+
-			`"usage":{"prompt_tokens":300,"completion_tokens":20}}`)
-	}))
-	t.Cleanup(srv.Close)
-	API.URL, API.Key, Model = srv.URL, "k", "cheap"
-
-	r, err := SplitFacts(context.Background(), `{"facts":[{"id":"01a","text":"Port 3000; path /srv."}]}`)
-	if err != nil {
-		t.Fatal(err)
 	}
-	if len(r.Splits) != 1 {
-		t.Fatalf("splits %+v", r.Splits)
-	}
-	if s := r.Splits[0]; s.ID != "01a" || s.Reason != "two claims" || len(s.Parts) != 2 || s.Parts[0] != "Port 3000." ||
-		s.Parts[1] != "Path /srv." {
-		t.Errorf("split %+v", s)
-	}
-	if r.Tokens != (Tokens{Input: 300, Output: 20}) {
-		t.Errorf("tokens %+v", r.Tokens)
+	if strings.Contains(got, "%s") {
+		t.Error("an unfilled placeholder is left")
 	}
 }

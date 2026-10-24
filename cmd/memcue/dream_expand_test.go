@@ -3,9 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -51,7 +48,7 @@ func TestDreamExpandsFactsWithoutQueries(t *testing.T) {
 	sent := fakeExpand(t, nil)
 	fakeDream(t, func(string) []extract.Action { return nil })
 	var out bytes.Buffer
-	if err := runDream([]string{"-all"}, &out); err != nil {
+	if err := dreamModel([]string{"-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if len(*sent) != 3 || strings.Contains(strings.Join(*sent, " "), other) {
@@ -69,7 +66,7 @@ func TestDreamExpandsFactsWithoutQueries(t *testing.T) {
 		t.Errorf("record %+v", r[len(r)-1])
 	}
 	*sent = nil
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*sent) != 0 {
@@ -77,18 +74,22 @@ func TestDreamExpandsFactsWithoutQueries(t *testing.T) {
 	}
 }
 
-// The parts of a split have no queries yet, so the same dream expands them.
+// The parts of a split have no queries yet, and are new to the next dream, so it expands them. The compound fact
+// itself is not expanded: its split goes first.
 func TestDreamExpandsTheParts(t *testing.T) {
 	env(t)
 	compound, _ := splitBase(t)
 	fakeSplit(t, splitByText)
-	sent := fakeExpand(t, nil)
+	fakeExpand(t, nil)
 	fakeDream(t, func(string) []extract.Action { return nil })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(strings.Join(*sent, " "), compound) {
-		t.Errorf("the compound fact was expanded: %q", *sent)
+	if f := vetStatus(t, compound); f.Status != store.Retired || len(f.Queries) != 0 {
+		t.Errorf("the compound fact was expanded instead of split: %+v", f)
+	}
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
 	defer func() { _ = s.Close() }()
@@ -100,31 +101,15 @@ func TestDreamExpandsTheParts(t *testing.T) {
 	}
 }
 
-// A dry run puts the queries in the plan; -apply writes them without the model and still applies the groups whose
-// facts it expanded, since that change is the plan's own.
-func TestDreamPlanCarriesQueries(t *testing.T) {
+// An answer that expands a fact and acts on its group applies both: the version the expansion writes is the answer's
+// own, so it does not make the group look changed.
+func TestDreamAppliesQueriesAndTheGroupOfTheFact(t *testing.T) {
 	dir := env(t)
 	_, a, b, _ := dreamBase(t)
-	sent := fakeExpand(t, nil)
+	fakeExpand(t, nil)
 	fakeDream(t, mergeAnswer(a, b))
-	plan := filepath.Join(dir, "plan.json")
-	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
-	}
-	if f := vetStatus(t, a); f.Version != 1 || len(f.Queries) != 0 {
-		t.Fatalf("a dry run wrote %+v", f)
-	}
-	var p dreamPlan
-	raw, _ := os.ReadFile(plan)
-	if err := json.Unmarshal(raw, &p); err != nil || len(p.Expansions) != 4 {
-		t.Fatalf("plan %s: %v", raw, err)
-	}
-	*sent = nil
-	if err := runDream([]string{"-apply", plan}, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
-	}
-	if len(*sent) != 0 {
-		t.Errorf("-apply called the model: %q", *sent)
 	}
 	if f := vetStatus(t, a); f.Status != store.Retired {
 		t.Errorf("the group action was refused after the expansion: %+v", f)
@@ -138,31 +123,13 @@ func TestDreamPlanCarriesQueries(t *testing.T) {
 	}
 }
 
-// A failed expansion call leaves the facts for the next dream and does not stop this one.
-func TestDreamExpansionFailureIsCounted(t *testing.T) {
-	dir := env(t)
-	_, a, _, _ := dreamBase(t)
-	fakeExpand(t, errors.New("rate limited"))
-	calls := fakeDream(t, func(string) []extract.Action { return nil })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
-	}
-	if f := vetStatus(t, a); len(f.Queries) != 0 {
-		t.Errorf("a failed call wrote queries: %+v", f)
-	}
-	recs := readDreamLog(t, dir)
-	if r := recs[len(recs)-1]; r.ExpandErrors != 1 || r.Error != "" || len(*calls) != 1 {
-		t.Errorf("record %+v, dream calls %d", r, len(*calls))
-	}
-}
-
 // Versions that only added search queries or new labels do not make a fact new to the next dream: a whole base expanded
 // or labelled at once must not send every fact to the split step and the groups again.
 func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 	env(t)
 	_, a, b, _ := dreamBase(t)
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
@@ -181,7 +148,7 @@ func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 	_ = s.Close()
 	splits := fakeSplit(t, func(input string) ([]extract.Split, error) { return nil, nil })
 	*calls = nil
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	sent := strings.Join(*splits, " ")
@@ -193,35 +160,35 @@ func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 	}
 }
 
-// Facts a dream does not see as fresh still get queries: up to expandBacklog a dream, the newest first, without a review
+// Facts a dream does not see as fresh still get queries: up to packetExpand a dream, the newest first, without a review
 // of their text. A base written before extraction wrote queries is expanded over a few dreams (#276).
 func TestDreamExpandsTheBacklog(t *testing.T) {
 	env(t)
 	old, a, b, other := dreamBase(t)
 	byAge := []string{old, a, b, other}
 	slices.Sort(byAge) // ids order by time
-	oldBacklog := expandBacklog
-	expandBacklog = 2
-	t.Cleanup(func() { expandBacklog = oldBacklog })
+	oldExpand := packetExpand
+	packetExpand = 2
+	t.Cleanup(func() { packetExpand = oldExpand })
 	sent := fakeExpand(t, nil)
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
 	nothingFresh := []string{"-since", time.Now().Add(time.Hour).Format(time.RFC3339)}
 
-	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nothingFresh, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{byAge[3], byAge[2]}; !slices.Equal(*sent, want) {
 		t.Fatalf("first dream sent %q, want the two newest %q", *sent, want)
 	}
 	*sent = nil
-	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nothingFresh, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{byAge[1], byAge[0]}; !slices.Equal(*sent, want) {
 		t.Fatalf("second dream sent %q, want the rest %q", *sent, want)
 	}
 	*sent = nil
-	if err := runDream(nothingFresh, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nothingFresh, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*sent) != 0 {

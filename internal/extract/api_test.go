@@ -121,27 +121,6 @@ func TestMergePartsIgnoresUnknownNumbers(t *testing.T) {
 	}
 }
 
-func TestDreamAnswerBecomesActions(t *testing.T) {
-	content, _ := json.Marshal(`{"actions":[{"op":"retire","id":"A","reason":"дубль B"},{"op":"correct","id":"B","content":" слито ","keywords":["k"],"reason":"слияние"}]}`)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		if !strings.Contains(string(b), `\"actions\"`) || !strings.Contains(string(b), "Группа 1") {
-			t.Errorf("request %s", b)
-		}
-		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":`+string(content)+`},"finish_reason":"stop"}],
-			"usage":{"prompt_tokens":300,"completion_tokens":40}}`)
-	}))
-	t.Cleanup(srv.Close)
-	useEndpoint(t, srv.URL)
-	r, err := Dream(context.Background(), "## Группа 1\n- id A …")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(r.Actions) != 2 || r.Actions[1].Content != "слито" || r.Actions[0].Reason != "дубль B" || r.Tokens.Input != 300 {
-		t.Errorf("got %+v", r)
-	}
-}
-
 // The review and suspect calls judge text that is already written, so they ask the endpoint not to sample; the
 // extraction call writes new text and keeps the endpoint default (#296).
 func TestQuickCallAsksForNoSampling(t *testing.T) {
