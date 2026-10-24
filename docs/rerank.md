@@ -6,6 +6,9 @@ facts (default 20) the words found, in BM25 order, whether the lexical gate let 
 ([research/one-model-2026-10.md](research/one-model-2026-10.md)). The rest of this note is the history of the
 measurements.
 
+**Status 2026-10-24 (#357):** the judge, the listwise reader and `MEMCUE_RERANK` are removed. Recall is the words
+alone, in BM25 order; nothing below describes the current binary.
+
 The words find the facts; they do not order them well. On a gold set built for the purpose, FTS5 put a useful fact
 first for 44 of 120 prompts. A semantic retriever alone did worse (bge-m3 21, Jev over the whole base 12), but a useful
 fact was among the candidates for 95 prompts: the loss was in the ranking, not in candidate generation.

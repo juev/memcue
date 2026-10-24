@@ -258,7 +258,7 @@ memcue vet -no-model                 # only the deterministic rules; undecided c
 memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
 memcue recall -cwd . "text"          # what a prompt would get
-memcue recall -explain "text"        # every step: terms, lexical gate, judge scores, final cut
+memcue recall -explain "text"        # every step: terms, lexical gate, final cut
 memcue recall -fact ID "text"        # where this fact dropped out for this prompt
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -since 2026-10-19 -dry-run
@@ -380,21 +380,14 @@ parts or delete an entry before `-apply`. Splits apply first, so a group the dry
 refused as changed, and the parts are left for the next dream to group with their neighbours. The queries are under
 `expansions`; they apply after the splits, and the version they write does not count as a change of the groups.
 
-Most groups need no action, and the Jev judge can tell them apart. With `MEMCUE_JUDGE_URL`, `MEMCUE_JUDGE_MODEL` and
-`MEMCUE_JUDGE_KEY` set, a dream first asks the judge about each group and sends on only the groups whose probability of
-an action reaches `MEMCUE_JUDGE_TRIAGE_MIN` (default 0.2). The endpoint speaks the typed decisions API of RouterAI,
-for example `https://routerai.ru/api/v1/decisions` with `typesafe/jev-1.14`. Triage only classifies: the main model
-still writes every change. A group triage fails on goes on, and `dream.log` records how many groups triage dropped.
-Without the judge, or with a threshold that is not a probability, there is no triage. Measured on 395 groups against an Opus dry run, 0.2 sent on 191 groups and kept 42 of the 43 Opus acted on.
-The research behind it, with the alternatives that did not work (vectors, pairwise questions), is in
-[docs/research/dream-triage-2026-10.md](docs/research/dream-triage-2026-10.md). What it costs to ask the
-same model about the whole base in one request, with no index at all, is in
-[docs/research/jev-judge-2026-10.md](docs/research/jev-judge-2026-10.md).
+The Jev triage that sorted out the groups needing no action before the model saw them is removed with the rest of the
+judge (#357); its measurements are in [docs/research/dream-triage-2026-10.md](docs/research/dream-triage-2026-10.md).
 
 ## Configuration
 
-The three model roles are described in [docs/models.md](docs/models.md). The table is the
-contract this release uses; there is no separate review or triage endpoint.
+memcue calls one model, the main chat model, for extraction, review and the dream; recall calls none. The judge and
+embeddings roles of [docs/models.md](docs/models.md) are removed (#250, #357). The table is the contract this release
+uses.
 
 | Variable | Meaning | Default |
 |---|---|---|
@@ -403,23 +396,12 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_MODEL` | model of the extraction and review | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
-| `MEMCUE_JUDGE_URL` | the one Jev decisions endpoint, e.g. `https://openrouter.ai/api/alpha/decisions` | unset: no judge |
-| `MEMCUE_JUDGE_MODEL` | model of that endpoint, e.g. `typesafe/jev-1.14` | unset: no judge |
-| `MEMCUE_JUDGE_KEY` | key for that endpoint | unset: no judge |
-| `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
-| `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in the search's BM25 order | `20` |
-| `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
-| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` (the words and the coverage gate); any other value keeps the words | the words: a configured Jev endpoint does not turn the judge on (#331) |
-| `MEMCUE_MAIN_RERANK_CANDIDATES` | facts the listwise reader reads, in the search's BM25 order | `20` |
-| `MEMCUE_MAIN_RERANK_TIMEOUT` | one listwise request | `2s` |
-| `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
-| `MEMCUE_JUDGE_TRIAGE_MIN` | probability of an action that sends a dream group to the main model | `0.2` |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_FOREIGN_COVERAGE` | share a fact scoped to another repository or directory must hold in a repository's session; `0` leaves such facts out of the search; a value at or below `MEMCUE_MIN_COVERAGE` gates them as any other fact | 0.25 |
-| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with `MEMCUE_RERANK=judge` it gates the words' own answer and the fallback only | 0.15 |
+| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
 | `MEMCUE_MIN_TERMS` | prompt terms the facts must know before any fact is examined; a prompt with fewer gets nothing (a ticket key or a prompt of numbers only needs one) | `2` |
 | `MEMCUE_MIN_MATCHED` | distinct prompt terms a fact must hold; never more than the terms the prompt shares with the facts | `3` |
 | `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
@@ -430,38 +412,29 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
-With `MEMCUE_RERANK=judge` and the Jev endpoint configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
-whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
-tuned for words alone. Recall does not read vectors: on a gold set of 180 prompts, twenty facts in BM25 order gave a
-useful fact to 119–124 prompts, as many as the vector candidates and the judge together (121–124), with noise of 17–23
-facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)). `memcue embed` and
-`MEMCUE_EMBED_*` are removed (#250). Opening a base deletes the vectors an older memcue stored and compacts the
-file once (#260); the empty `fact_vectors` table stays, so the schema and older binaries are unaffected.
-
-Without `MEMCUE_RERANK` the words decide, even with the Jev endpoint configured for the dream (#331); so does a value
-memcue does not know. The words serve the facts that pass the gate in the search's BM25 order, approved before
+Recall is the words alone: the facts that pass the gate are served in the search's BM25 order, approved before
 provisional; the coverage share only gates. On 409 blind-labelled Claude Code prompts where the two orders differ,
 BM25 order gave a useful fact to 205 prompts against 180 for a coverage sort, with 30% noise against 41% (#338,
-[docs/research/search-chain-2026-10.md](docs/research/search-chain-2026-10.md)). After 0.6.0 a setup that relied on the implicit judge needs `MEMCUE_RERANK=judge`. `local`, the
-built-in tree reader of 0.6, is removed (#324) and is such a value now: end to end, on 40 real prompts in `claude -p`,
-it scored as the words do (0.95 against 0.96; the judge 1.01)
-([docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md)).
+[docs/research/search-chain-2026-10.md](docs/research/search-chain-2026-10.md)). The readers that once ordered the
+candidates are removed: the vectors (#250), the tree reader (#324), the Jev judge and the listwise main-model reader
+(#357). None of them served more useful facts than the words for its cost
+([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md),
+[docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md),
+[docs/research/listwise-2026-10.md](docs/research/listwise-2026-10.md)). `MEMCUE_RERANK` and `MEMCUE_JUDGE_*` are
+no longer read. Opening a base deletes the vectors an older memcue stored and compacts the file once (#260); the empty
+`fact_vectors` table stays, so the schema and older binaries are unaffected.
 
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
-displaced one of this host; `"judge":"paused"` marks a prompt the judge never read because the shared breaker had
-paused it after a failure, so the words alone decided. `stopped` says why a prompt got nothing before any fact was
+displaced one of this host. `stopped` says why a prompt got nothing before any fact was
 examined (too few terms, a harness notice); a line with no facts and no `stopped` had candidates that none passed. It stays on your machine and is what you judge recall by; it is off by default because it
 keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
-that lost it: the search (not among its results), the lexical gate (too few terms or low coverage; with a judge,
-"below the gate, sent to the judge" means it was read anyway, and "over the judge's candidate limit" that it came too
-late in the BM25 order), the judge (score below the minimum) or the cut to the first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
+that lost it: the search (not among its results), the lexical gate (too few terms or low coverage) or the cut to the first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
-`cost_usd` in `extract.log`, `vet.log` and `dream.log` holds only what a caller reports in dollars: `claude -p` and
-the Jev endpoint. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
+`cost_usd` in `extract.log`, `vet.log` and `dream.log` holds only what a caller reports in dollars: `claude -p`. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
 `tokens` (`input`, of which `cached` came from the prompt cache, and `output`) times the provider's price; memcue
 keeps no price table, since prices change and differ by account (#258).
 
@@ -534,8 +507,7 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Candidate review and vet | binary | binary | binary |
 
 State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
-`$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule, a vet lock or a judge
-pause. `MEMCUE_STATE_DIR` overrides the whole path. DSH keeps its extraction checkpoints in
+`$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule or a vet lock. `MEMCUE_STATE_DIR` overrides the whole path. DSH keeps its extraction checkpoints in
 `$XDG_STATE_HOME/memcue/dsh`, and Hermes keeps its mirror, seen and pending files under `$HERMES_HOME/memcue`; the
 binary's logs, locks and dream schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
 (or `~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH

@@ -12,7 +12,7 @@ candidate facts without knowing which system produced them, and labelled every f
 that reader is and cannot say whether another reader is better — a semantic reader can only keep or lose these wins.
 Comparing readers needs a pool that all of them propose into; that experiment is in
 [gold-set-2026-10.md](research/gold-set-2026-10.md), and it is the one that changed the design (the words choose the
-candidates, a judge orders them).
+candidates, a judge orders them; the judge was later removed, #357, and the words order them too).
 
 ## Recall: what reaches the agent
 
