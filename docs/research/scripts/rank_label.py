@@ -4,6 +4,10 @@ both picks U/R/N, blind to which ranker proposed a fact, in a shuffled order.
 
   python3 -I rank_label.py chain.jsonl FACTS.db labels.json
 
+A run of the scope replay (#345, rows with "picks") works the same way: for every prompt where some variant serves
+other facts than the baseline, the facts of all variants that labels.json does not hold for that prompt yet are
+labelled and merged into its entry.
+
 The labels follow the Hermes set of #327 (U useful for this prompt, R on topic but not needed, N noise or outdated,
 plus whether the prompt needs memory at all). There is no assistant reply for the Claude Code prompts, so the judge
 sees the prompt alone. A run that stops halfway keeps what it has: labels.json is rewritten after every answer, and a
@@ -46,19 +50,27 @@ def content(fact_id):
     return row[0]
 
 
+out = json.loads(out_path.read_text()) if out_path.exists() else {}
 tasks = []
 for line in open(chain_path):
     r = json.loads(line)
-    served, top = r.get("served") or [], r.get("bm25_top") or []
-    if not served or set(served) == set(top):
-        continue
-    ids = sorted(set(served) | set(top))
+    if "picks" in r:
+        base = r["picks"]["base"]
+        if all(v == base for v in r["picks"].values()):
+            continue
+        ids = sorted({i for v in r["picks"].values() for i in v} - set(out.get(r["id"], {}).get("labels", {})))
+        if not ids:
+            continue
+    else:
+        served, top = r.get("served") or [], r.get("bm25_top") or []
+        if not served or set(served) == set(top) or r["id"] in out:
+            continue
+        ids = sorted(set(served) | set(top))
     random.Random(r["id"]).shuffle(ids)
     tasks.append({"id": r["id"], "prompt": r["text"][:2500],
                   "facts": [{"key": f"F{n + 1}", "id": i, "text": content(i)} for n, i in enumerate(ids)]})
 
-out = json.loads(out_path.read_text()) if out_path.exists() else {}
-todo = [t for t in tasks if t["id"] not in out]
+todo = tasks
 lock = threading.Lock()
 cost = [0.0]
 
@@ -83,7 +95,8 @@ def call(t):
         labels = {keys[x["key"]]: x["label"] for x in ans["labels"] if x["key"] in keys}
         if set(labels) == set(keys.values()):
             with lock:
-                out[t["id"]] = {"needed": ans["needed"], "labels": labels}
+                old = out.get(t["id"], {"needed": ans["needed"], "labels": {}})
+                out[t["id"]] = {"needed": old["needed"], "labels": {**old["labels"], **labels}}
                 out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1))
             return None
     return t["id"]
