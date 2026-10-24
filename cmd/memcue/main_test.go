@@ -563,7 +563,7 @@ func TestHookLogsAPausedJudge(t *testing.T) {
 	}
 	_ = s.Close()
 	t.Setenv("MEMCUE_RECALL_LOG", "1")
-	for k, v := range map[string]string{"MEMCUE_JUDGE_URL": "http://127.0.0.1:1/decisions",
+	for k, v := range map[string]string{"MEMCUE_RERANK": "judge", "MEMCUE_JUDGE_URL": "http://127.0.0.1:1/decisions",
 		"MEMCUE_JUDGE_MODEL": "typesafe/jev-1.14", "MEMCUE_JUDGE_KEY": "k"} {
 		t.Setenv(k, v)
 	}

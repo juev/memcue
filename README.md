@@ -329,7 +329,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_JUDGE_RERANK_MIN` | probability below which a recall candidate is not given | `0.5` |
 | `MEMCUE_JUDGE_RERANK_CANDIDATES` | facts the judge reads, in the search's BM25 order | `20` |
 | `MEMCUE_JUDGE_RERANK_TIMEOUT` | one rerank request | `2s` |
-| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` (the words and the coverage gate) | `judge` when the Jev endpoint is set, `off` otherwise |
+| `MEMCUE_RERANK` | which reader orders the recall candidates: `judge` (Jev), `listwise` (the main model, needs `MEMCUE_API_URL`) or `off` (the words and the coverage gate); any other value keeps the words | the words: a configured Jev endpoint does not turn the judge on (#331) |
 | `MEMCUE_MAIN_RERANK_CANDIDATES` | facts the listwise reader reads, in the search's BM25 order | `20` |
 | `MEMCUE_MAIN_RERANK_TIMEOUT` | one listwise request | `2s` |
 | `MEMCUE_JUDGE_TRIAGE_TIMEOUT` | one triage request | `2s` |
@@ -338,7 +338,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
-| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with a judge configured it gates the words' own answer and the fallback only | 0.15 |
+| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with `MEMCUE_RERANK=judge` it gates the words' own answer and the fallback only | 0.15 |
 | `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
 | `MEMCUE_MAX_FACTS` | facts one prompt may get; the cut is applied after the ranking, so a larger value adds context, not coverage: on the 68 prompts that needed memory a third fact left the number with a useful fact unchanged, 58 of 68 either way ([docs/research/max-facts-2026-10.md](docs/research/max-facts-2026-10.md)) | `2` |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
@@ -349,7 +349,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
 | `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log`, `memcue/judge.pause`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
 
-With a judge configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
+With `MEMCUE_RERANK=judge` and the Jev endpoint configured, the judge reads the first `MEMCUE_JUDGE_RERANK_CANDIDATES` facts the words found, in the search's BM25 order,
 whether the lexical gate (`MEMCUE_MIN_COVERAGE` and the number of matched terms) let them pass or not: the gate was
 tuned for words alone. Recall does not read vectors: on a gold set of 180 prompts, twenty facts in BM25 order gave a
 useful fact to 119–124 prompts, as many as the vector candidates and the judge together (121–124), with noise of 17–23
@@ -357,7 +357,8 @@ facts against 17–18 ([docs/research/one-model-2026-10.md](docs/research/one-mo
 `MEMCUE_EMBED_*` are removed (#250). Opening a base deletes the vectors an older memcue stored and compacts the
 file once (#260); the empty `fact_vectors` table stays, so the schema and older binaries are unaffected.
 
-Without a Jev key and without `MEMCUE_RERANK` the words decide; so does a value memcue does not know. `local`, the
+Without `MEMCUE_RERANK` the words decide, even with the Jev endpoint configured for the dream (#331); so does a value
+memcue does not know. After 0.6.0 a setup that relied on the implicit judge needs `MEMCUE_RERANK=judge`. `local`, the
 built-in tree reader of 0.6, is removed (#324) and is such a value now: end to end, on 40 real prompts in `claude -p`,
 it scored as the words do (0.95 against 0.96; the judge 1.01)
 ([docs/research/local-readers-2026-10.md](docs/research/local-readers-2026-10.md)).

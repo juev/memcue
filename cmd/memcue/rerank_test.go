@@ -6,9 +6,9 @@ import (
 	"github.com/juev/memcue/internal/rerank"
 )
 
-// MEMCUE_RERANK names the reader. Without it Jev runs when it is configured and the words decide otherwise, whether
-// the main model is configured or not: the listwise reader is opt-in (#321); `off` keeps the words. `local`, the
-// removed tree reader (#324), is an unknown value like any other and gets the default.
+// MEMCUE_RERANK names the reader. Without it the words decide, whatever endpoints are configured: Jev and the listwise
+// reader are opt-in (#331, #321). `local`, the removed tree reader (#324), is an unknown value like any other and gets
+// the words.
 func TestRerankReaderPrecedence(t *testing.T) {
 	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY", "MEMCUE_API_URL",
 		"MEMCUE_MODEL", "MEMCUE_API_KEY", "MEMCUE_RERANK"} {
@@ -35,8 +35,12 @@ func TestRerankReaderPrecedence(t *testing.T) {
 	t.Setenv("MEMCUE_JUDGE_URL", "http://127.0.0.1:1/decisions")
 	t.Setenv("MEMCUE_JUDGE_MODEL", "typesafe/jev-1.14")
 	t.Setenv("MEMCUE_JUDGE_KEY", "k")
+	if r := ranker(); r != nil {
+		t.Fatalf("both configured, no reader named: ranker = %#v, want nil", r)
+	}
+	t.Setenv("MEMCUE_RERANK", "judge")
 	if _, ok := ranker().(*rerank.Ranker); !ok {
-		t.Fatalf("both configured: ranker = %#v, want the Jev pass", ranker())
+		t.Fatalf("judge: ranker = %#v, want the Jev pass", ranker())
 	}
 
 	for _, name := range []string{"listwise", "main"} {
@@ -48,8 +52,8 @@ func TestRerankReaderPrecedence(t *testing.T) {
 
 	for _, name := range []string{"local", "unknown"} {
 		t.Setenv("MEMCUE_RERANK", name)
-		if _, ok := ranker().(*rerank.Ranker); !ok {
-			t.Fatalf("%s with Jev configured: ranker = %#v, want the Jev pass", name, ranker())
+		if r := ranker(); r != nil {
+			t.Fatalf("%s with Jev configured: ranker = %#v, want nil", name, r)
 		}
 	}
 
@@ -63,5 +67,10 @@ func TestRerankReaderPrecedence(t *testing.T) {
 	t.Setenv("MEMCUE_API_URL", "")
 	if r := ranker(); r != nil {
 		t.Fatalf("listwise without an endpoint: ranker = %#v, want nil", r)
+	}
+	t.Setenv("MEMCUE_RERANK", "judge")
+	t.Setenv("MEMCUE_JUDGE_URL", "")
+	if r := ranker(); r != nil {
+		t.Fatalf("judge without an endpoint: ranker = %#v, want nil", r)
 	}
 }
