@@ -707,6 +707,38 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	return f, s.write(f)
 }
 
+// Retag adds a version of a fact with a new origin and scope; the content and everything else stay, the creation time
+// too, as for Relabel. It is how a migration moves facts onto a new project key (#343): a version, not an edit in
+// place, so a base merged from another machine sees the change instead of two copies that disagree. Like Relabel, it
+// refuses a fact edited since version (ErrChanged) and a retired fact.
+func (s *Store) Retag(id string, version int, origin, scope string) (Fact, error) {
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Version != version {
+		return Fact{}, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
+	}
+	if cur.Status == Retired {
+		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
+	}
+	f := cur
+	f.Version, f.Author, f.Origin, f.Scope = cur.Version+1, s.author, origin, scope
+	return f, s.write(f)
+}
+
+// Current returns the latest version of every fact that is not retired, candidates and provisional facts included.
+func (s *Store) Current() ([]Fact, error) {
+	return s.query(`SELECT `+s.cols("f")+` FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? ORDER BY f.id`, Active)
+}
+
+// Backup writes a consistent copy of the base to path, which must not exist.
+func (s *Store) Backup(path string) error {
+	_, err := s.db.Exec(`VACUUM INTO ?`, path)
+	return err
+}
+
 // SetQueries adds a version of a fact with the search queries the main model wrote for it; the content and everything
 // else stay. Like Relabel, it refuses a fact edited since version (ErrChanged) and a retired fact.
 func (s *Store) SetQueries(id string, version int, queries []string) (Fact, error) {
