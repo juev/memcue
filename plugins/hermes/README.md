@@ -6,11 +6,11 @@ memcue fact base:
 - **No facts come with a message** (#361). The system prompt block tells the model to search the base with
   `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
   system's name and both languages if the first try finds nothing.
-- **The session card** (global rules and the decisions of the current repository) rides with the first turn and
-  again after a compression, through the same `memcue session-card` call Claude Code and DSH use; a cron run gets
-  none. It stays in the
-  conversation instead of being repeated in the system prompt; `session_card: false` turns it off. A failed card
-  is retried after five minutes, not on every turn, and reported to the log at most every ten minutes.
+- **The session card** (global rules, every rule the user stated and the decisions of the current repository) is part
+  of the system prompt, through the same `memcue session-card` call Claude Code and DSH use (#363). Hermes caches the
+  system prompt and rebuilds it after a compression or a reset, and each rebuild asks for a fresh card; a cron run
+  gets none, and `session_card: false` turns it off. A failed card leaves the memory note without it until the next
+  rebuild and is reported to the log at most every ten minutes.
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's
   `cwd`), named by its remote as in Claude Code: it names the origin of the facts a session learns, the `repo`
   scope, the card's decisions and the search tie-break. A chat with no working directory and a session in one of

@@ -142,14 +142,13 @@ class ProviderTest(unittest.TestCase):
     def test_the_current_binary_is_compatible(self):
         self.assertTrue(self.p._binary_ok())
 
-    def test_a_failed_session_card_is_retried_after_a_pause(self):
+    def test_a_failed_session_card_leaves_the_note_and_is_asked_again(self):
         counter = Path(self.home, "card-count")
         stub = Path(self.home, "card-fail-memcue")
         stub.write_text("#!/bin/sh\n"
                         "case \"$1\" in\n"
                         "  version) printf '{\"version\":\"0.4.0\"}\\n' ;;\n"
                         f"  session-card) echo x >> {counter}; echo locked >&2; exit 1 ;;\n"
-                        "  hook) printf '{}\\n' ;;\n"
                         "esac\nexit 0\n", encoding="utf-8")
         stub.chmod(0o755)
         base = str(Path(self.home) / "card.db")
@@ -157,13 +156,12 @@ class ProviderTest(unittest.TestCase):
                        env=dict(os.environ, MEMCUE_FACTS=base), check=True, capture_output=True)
         p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "facts": base})
         p.initialize("s1", hermes_home=self.home)
-        self.assertEqual(p._card_text(), "")
+        block = p.system_prompt_block()
+        self.assertIn("memcue_search", block)  # the note stays without the card
+        self.assertNotIn("memcue: rules and decisions", block)
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
-        # Within the pause the provider does not spawn the failing call again.
-        self.assertEqual(p._card_text(), "")
-        self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
-        p._card_retry_at = 0.0
-        p._card_text()
+        # Hermes asks again only when it rebuilds the system prompt; that rebuild asks for the card again.
+        p.system_prompt_block()
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
 
     def test_the_environment_off_switch_wins_over_the_endpoint(self):
@@ -299,23 +297,31 @@ class ProviderTest(unittest.TestCase):
         subprocess.run(cmd + ["--", content], check=True, capture_output=True,
                        env=dict(os.environ, MEMCUE_FACTS=self.p._facts))
 
-    def test_session_card_is_delivered_once_and_after_compression(self):
+    def test_session_card_is_in_the_system_prompt_not_in_the_prefetch(self):
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
                     "Всегда отвечай пользователю по-русски.")
-        first = self.p.prefetch("любой вопрос", session_id="s1")
-        self.assertIn("memcue: rules and decisions", first)
-        self.assertIn("Всегда отвечай", first)
-        # A second turn keeps the card from the conversation instead of paying for it again.
-        self.assertNotIn("Всегда отвечай", self.p.prefetch("любой вопрос", session_id="s1"))
+        block = self.p.system_prompt_block()
+        self.assertIn("memcue_search", block)
+        self.assertIn("memcue: rules and decisions", block)
+        self.assertIn("Всегда отвечай", block)
+        self.assertEqual(self.p.prefetch("любой вопрос", session_id="s1"), "")
+        # A rebuild after a compression carries the card again, as a view of the base.
         self.p.on_pre_compress([])
-        self.assertIn("Всегда отвечай", self.p.prefetch("любой вопрос", session_id="s1"))
+        self.assertIn("Всегда отвечай", self.p.system_prompt_block())
+
+    def test_a_cron_run_gets_no_card(self):
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Всегда отвечай пользователю по-русски.")
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        p.initialize("s-cron", hermes_home=self.home, agent_context="cron")
+        self.assertNotIn("Всегда отвечай", p.system_prompt_block())
 
     def test_session_card_can_be_turned_off(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "session_card": False})
         p.initialize("s-card-off", hermes_home=self.home, agent_context="primary")
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
                     "Всегда отвечай пользователю по-русски.")
-        self.assertEqual(p.prefetch("любой вопрос", session_id="s-card-off"), "")
+        self.assertNotIn("Всегда отвечай", p.system_prompt_block())
 
     def test_session_switch_rebinds_and_resets_state(self):
         self.p._generation = 3

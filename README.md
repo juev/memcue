@@ -507,7 +507,7 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Capability | Claude Code | DeepSeek Harness | Hermes Agent |
 |---|---|---|---|
 | Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool |
-| Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` with the first turn and after compression |
+| Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` in the system prompt, rebuilt after compression |
 | Session extraction | `PreCompact` / `SessionEnd` | `turn/end` / `session/disposed` | threshold, idle, pre-compress, session end |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
