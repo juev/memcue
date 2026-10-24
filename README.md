@@ -126,7 +126,46 @@ the download; DSH and Hermes download in the background and log failures as warn
 needs `curl`, `tar` and `sha256sum` or `shasum`. A binary installed this way is not on your shell's `PATH`: to run
 `memcue install` or other commands by hand, call it by its path or add the directory to `PATH`.
 
+## Projects
+
+A fact's origin is `<project key> <date>`, and a fact that holds only in one project has the scope of that key. The key
+comes from where the session works, read from the files and never by running git (#343):
+
+- **A git repository** is named by its remote, normalized to `host/path`: `git@example.com:owner/name.git`,
+  `ssh://git@example.com:443/owner/name.git` and `https://example.com/owner/name` are all `example.com/owner/name`.
+  The remote named `origin` writes the key, or the only remote when there is no `origin`. A session holds the keys of
+  all its remotes, so a fact learnt in a fork's `upstream` or on a mirror's other host holds in it too. Remotes are
+  read from the repository's config (the main repository's for a linked worktree, plus `config.worktree` under
+  `extensions.worktreeConfig`), with the `url.<base>.insteadOf` rewrites of that config and of the global one applied;
+  `[include] path` is followed, `includeIf` is not. The directory's own name plays no part.
+- **A repository without a remote** is `dir:<path of its main worktree>`.
+- **Outside git** the project is the `module` of the nearest `go.mod`, or else `dir:<working directory>`.
+- **The Claude config directory** is the global tier; **a temporary directory** names nothing.
+
+The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
+writes the key. `memcue add -scope repo` does the same for the working directory.
+
 ## Upgrade
+
+### Project keys (#343)
+
+Facts written before #343 carry the directory's name (`<name> <date>`, `repo:<name>`), and a session no longer
+matches them. Move them once on every machine that writes to the base:
+
+```sh
+memcue migrate -repos -root ~/src           # report only: what maps, what does not
+memcue migrate -repos -apply -root ~/src    # back the base up, then write the changes
+```
+
+The map comes from this machine's clones: the working directories of the Claude Code transcripts and every repository
+under each `-root`. `repo:<owner>/<name>` scopes map by their suffix. A name with no clone here, or with two clones
+that now have different keys, stays as it is and is listed. So is every key that facts hold and no clone here has: a
+repository of another machine, or one whose remote changed, with the clones' keys it may have become. A changed key
+moves only by an explicit pair: `memcue migrate -repos -apply OLD=NEW`. `-apply` first copies the base to
+`backup/facts.db.pre-repos-<time>` in the state directory, and writes each change as a new version that keeps the
+fact's date, so a base merged from another machine sees it.
+
+### Schema 5
 
 The fact base schema is 5: it adds the search queries of a fact, which the index holds next to its words. memcue
 0.4.0 refuses a version-5 base with `update memcue`, because its merge, its writes and its index rebuild would drop the
@@ -164,9 +203,9 @@ an approved fact also writes a new active version: it is a deliberate correction
 extracted and mirrored facts wait for review. A fact comes once per session
 (again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
 a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
-for more words than the base holds. By hand (`add` without `-origin` names the repository of the working directory and
-today; outside a repository the origin stays empty, because a scratch directory's name says nothing about where the
-fact came from). A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
+for more words than the base holds. By hand (`add` without `-origin` names the project of the working directory and
+today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
+came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -58,7 +59,7 @@ func runMigrateRepos(roots, pairs []string, apply bool, out io.Writer) error {
 		origin, scope string
 	}
 	var changes []change
-	unmapped, ambiguous := map[string]int{}, map[string]int{}
+	unmapped, ambiguous, orphans := map[string]int{}, map[string]int{}, map[string]int{}
 	note := func(name string, why map[string]int) {
 		if name != "" {
 			why[name]++
@@ -89,6 +90,15 @@ func runMigrateRepos(roots, pairs []string, apply bool, out io.Writer) error {
 		if origin != f.Origin || scope != f.Scope {
 			changes = append(changes, change{f, origin, scope})
 		}
+		// A key no clone here has is either a repository of another machine or one whose remote changed; once per
+		// fact, whether its origin, its scope or both name it.
+		seen := map[string]bool{}
+		for _, k := range []string{originKey(origin), strings.TrimPrefix(scope, "repo:")} {
+			if !seen[k] && m.orphan(k) {
+				seen[k] = true
+				orphans[k]++
+			}
+		}
 	}
 	if _, err := fmt.Fprintf(out, "facts %d, to change %d; names known on this machine %d\n", len(facts), len(changes),
 		len(m.legacy)); err != nil {
@@ -98,6 +108,9 @@ func runMigrateRepos(roots, pairs []string, apply bool, out io.Writer) error {
 		return err
 	}
 	if err := report(out, "ambiguous (several keys; pass old=new)", ambiguous); err != nil {
+		return err
+	}
+	if err := m.reportOrphans(out, orphans); err != nil {
 		return err
 	}
 	if !apply || len(changes) == 0 {
@@ -183,6 +196,55 @@ func (m *repoMap) resolve(name string) (string, resolved) {
 		return "", several
 	}
 	return "", unknown
+}
+
+// orphan reports whether k is a remote key that no clone on this machine has. A path is not checked: dir: keys belong
+// to the machine that wrote them.
+func (m *repoMap) orphan(k string) bool {
+	return k != "" && k != tier.Global && !strings.HasPrefix(k, tier.DirPrefix) && isKey(k) && !slices.Contains(m.keys, k)
+}
+
+// candidates are the keys of this machine's clones a key with no clone may have become: the same host and owner with
+// another name (a renamed repository), or the same name under another host or owner (a moved one). At most three.
+func (m *repoMap) candidates(k string) []string {
+	dir, name := path.Split(k)
+	var out []string
+	for _, c := range m.keys {
+		cdir, cname := path.Split(c)
+		if c != k && (cdir == dir || cname == name) {
+			out = append(out, c)
+		}
+	}
+	slices.Sort(out)
+	return out[:min(len(out), 3)]
+}
+
+// reportOrphans prints the keys facts hold that no clone here has, most facts first, with the candidates they may
+// have become. The pair to move them is the user's call: a key of a repository cloned only on another machine is
+// listed too.
+func (m *repoMap) reportOrphans(out io.Writer, orphans map[string]int) error {
+	if len(orphans) == 0 {
+		return nil
+	}
+	list := make([]string, 0, len(orphans))
+	for k := range orphans {
+		list = append(list, k)
+	}
+	slices.SortFunc(list, func(a, b string) int { return cmp.Or(cmp.Compare(orphans[b], orphans[a]), cmp.Compare(a, b)) })
+	if _, err := fmt.Fprintf(out, "keys with no clone on this machine %d (another machine's, or a changed remote: pass old=new):\n",
+		len(list)); err != nil {
+		return err
+	}
+	for _, k := range list {
+		line := fmt.Sprintf("  %s %d", k, orphans[k])
+		if c := m.candidates(k); len(c) > 0 {
+			line += "   maybe: " + strings.Join(c, ", ")
+		}
+		if _, err := fmt.Fprintln(out, line); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // isKey reports whether name is already a project key: the global tier, a path, or a host/path whose host has a dot.
