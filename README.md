@@ -452,7 +452,8 @@ it scored as the words do (0.95 against 0.96; the judge 1.01)
 With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
 characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
 displaced one of this host; `"judge":"paused"` marks a prompt the judge never read because the shared breaker had
-paused it after a failure, so the words alone decided. It stays on your machine and is what you judge recall by; it is off by default because it
+paused it after a failure, so the words alone decided. `stopped` says why a prompt got nothing before any fact was
+examined (too few terms, a harness notice); a line with no facts and no `stopped` had candidates that none passed. It stays on your machine and is what you judge recall by; it is off by default because it
 keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
 that lost it: the search (not among its results), the lexical gate (too few terms or low coverage; with a judge,
 "below the gate, sent to the judge" means it was read anyway, and "over the judge's candidate limit" that it came too
