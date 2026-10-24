@@ -30,8 +30,18 @@ func runMigrate(args []string, out io.Writer) error {
 	all := fs.Bool("all", false, "migrate every note of the built-in memory")
 	jobs := fs.Int("j", 4, "notes sent to the model at once")
 	list := fs.Bool("list", false, "only list the notes that would be migrated")
+	repos := fs.Bool("repos", false, "move facts written under directory names onto project keys (#343); args are old=new pairs")
+	apply := fs.Bool("apply", false, "with -repos: back the base up and write the changes instead of reporting them")
+	var roots multiFlag
+	fs.Var(&roots, "root", "with -repos: a directory to look for clones under (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *repos {
+		return runMigrateRepos(roots, fs.Args(), *apply, out)
+	}
+	if *apply || len(roots) > 0 {
+		return errors.New("migrate: -apply and -root go with -repos")
 	}
 	var named, found []note
 	for _, p := range fs.Args() {
@@ -44,7 +54,8 @@ func runMigrate(args []string, out io.Writer) error {
 		}
 	}
 	if len(named)+len(found) == 0 {
-		return errors.New("usage: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md ...]")
+		return errors.New("usage: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md ...]\n" +
+			"       memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW ...]")
 	}
 	var s *store.Store
 	if _, err := os.Stat(factsPath()); err == nil || (!*dry && !*list) {

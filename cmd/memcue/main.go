@@ -115,7 +115,7 @@ commands:
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
   dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
-  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]
+  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
   merge     git merge driver: memcue merge BASE OURS THEIRS
