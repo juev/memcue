@@ -573,7 +573,9 @@ class ProviderTest(unittest.TestCase):
         (workspace / ".git").mkdir()
         # The project is named by its remote, not by the directory (#343).
         (workspace / ".git" / "config").write_text('[remote "origin"]\n\turl = git@example.com:team/demo.git\n')
-        p.initialize("sess-9", hermes_home=self.home, agent_workspace=str(workspace), agent_context="primary")
+        # Hermes passes the session's directory as cwd; agent_workspace is the constant "hermes" (#347).
+        p.initialize("sess-9", hermes_home=self.home, agent_workspace="hermes", cwd=str(workspace),
+                     agent_context="primary")
         p.on_session_end([{"role": "system", "content": "prompt"},
                           {"role": "user",
                            "content": "на server1 у hermes модель по умолчанию deepseek-flash. " * 60},
@@ -588,6 +590,36 @@ class ProviderTest(unittest.TestCase):
         self.assertIn(" example.com/team/demo ", facts[0])
         self.assertEqual((seen["model"], seen["auth"]), ("m1", "Bearer k1"))
         self.assertNotIn("SYSTEM", seen["text"])
+
+    def test_session_cwd_is_the_project_only_in_git(self):
+        """The session's cwd names the project when it lies in a git repository; outside git (Hermes's own
+        directories) and without one memcue gets an empty -cwd, so it does not fall back to its own directory (#347)."""
+        repo = Path(self.home) / "repo"
+        (repo / ".git").mkdir(parents=True)
+        (repo / "sub").mkdir()
+        plain = Path(self.home) / "plain"
+        plain.mkdir()
+        for cwd, want in ((str(repo), str(repo)), (str(repo / "sub"), str(repo / "sub")), (str(plain), ""),
+                          ("hermes", ""), (None, "")):
+            with self.subTest(cwd=cwd):
+                calls = Path(self.home) / f"args-{abs(hash(str(cwd)))}"
+                script = Path(self.home) / f"bin-{abs(hash(str(cwd)))}"
+                script.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" >> {shlex.quote(str(calls))}\n"
+                                  "cat >/dev/null\nexit 0\n", encoding="utf-8")
+                script.chmod(0o755)
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "extract_url": "http://x",
+                                                           "extract_model": "m"})
+                kwargs = {"hermes_home": self.home, "agent_workspace": "hermes", "agent_context": "primary"}
+                if cwd is not None:
+                    kwargs["cwd"] = cwd
+                p.initialize("s1", **kwargs)
+                done = threading.Event()
+                p._extract_in_background([{"role": "user", "content": "x"}], "idle", "s1",
+                                         on_done=lambda ok: done.set())
+                self.assertTrue(done.wait(5))
+                args = calls.read_text(encoding="utf-8").splitlines()
+                i = args.index("-cwd")
+                self.assertEqual(args[i + 1] if i + 1 < len(args) else "", want)
 
     def test_final_flushes_pass_min_chars(self):
         """session_end, pre_compress and shutdown are the last chance for a tail; threshold and idle wait."""

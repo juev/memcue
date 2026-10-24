@@ -195,6 +195,19 @@ def _identifiers(text: str) -> list[str]:
     return out[:6]
 
 
+def _project_dir(cwd: str) -> str:
+    """The session's working directory when it lies in a git repository, else "": the project memcue names facts
+    by. Hermes passes the session's cwd; outside git it is one of its own directories (/opt/data, /opt/hermes, a
+    scratch directory), and those are no project (#347). memcue reads "" as a session with no project."""
+    if not cwd or not os.path.isabs(cwd):
+        return ""
+    d = Path(cwd)
+    for c in (d, *d.parents):
+        if (c / ".git").exists():
+            return cwd
+    return ""
+
+
 def _on(v: Any) -> bool:
     """A config switch: true, or a string a YAML file or a person would mean as true."""
     return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
@@ -390,7 +403,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._keep_state_for_base()
         Path(self._state).mkdir(parents=True, exist_ok=True)
         self._install_in_background()
-        self._workspace = str(kwargs.get("agent_workspace") or "")
+        # agent_workspace is the constant "hermes", not a directory; cwd is the session's working directory.
+        self._workspace = _project_dir(str(kwargs.get("cwd") or ""))
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
         self._context = str(kwargs.get("agent_context") or "primary")
@@ -582,12 +596,12 @@ class MemcueMemoryProvider(MemoryProvider):
         return env
 
     def _extract_command(self, binary: str, event: str, session: str) -> list[str]:
-        """The command that extracts one batch. The workspace names the repository in origin, as it does for Claude
-        Code and DSH. A final flush is the last chance for this tail, so it lowers memcue's minimum; a threshold or
-        idle run waits for the next trigger instead."""
-        cmd = [binary, "extract-messages", "-session", session or self._session_id, "-event", event]
-        if self._workspace:
-            cmd += ["-cwd", self._workspace]
+        """The command that extracts one batch. The session's repository names the origin, as it does for Claude
+        Code and DSH; an empty -cwd says there is none, so memcue does not take its own directory instead. A final
+        flush is the last chance for this tail, so it lowers memcue's minimum; a threshold or idle run waits for the
+        next trigger instead."""
+        cmd = [binary, "extract-messages", "-session", session or self._session_id, "-event", event,
+               "-cwd", self._workspace]
         if event in _FINAL_EVENTS:
             cmd += ["-min-chars", "1"]
         return cmd
@@ -1075,9 +1089,7 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_add":
             if not arg("content"):
                 return tool_error("content is required")
-            cmd = ["add", "-source", "agent"]  # the model writes it, not the user
-            if self._workspace:
-                cmd += ["-cwd", self._workspace]
+            cmd = ["add", "-source", "agent", "-cwd", self._workspace]  # the model writes it, not the user
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]
             if arg("expires"):
