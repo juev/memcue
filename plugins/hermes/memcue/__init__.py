@@ -535,7 +535,10 @@ class MemcueMemoryProvider(MemoryProvider):
             logger.warning("memcue session card failed (session %s): %s", session or "-", reason)
 
     def _remember_found(self, session: str, facts: list[Any]) -> None:
-        """Keep the identifiers of the facts a search returned, so the reply of this turn can be judged by them."""
+        """Keep the identifiers of the facts a search returned, so the reply of this turn can be judged by them. Only
+        with the usage log on: a subagent or cron run searches without a sync_turn that would clear them."""
+        if not (self._usage_log or os.environ.get("MEMCUE_USAGE_LOG") == "1"):
+            return
         for fact in facts:
             content = fact.get("content") if isinstance(fact, dict) else None
             tokens = _identifiers(str(content or ""))
