@@ -1,12 +1,12 @@
 # The lexical search chain: what each step does to the answer, October 2026
 
 Status: **measured 2026-10-24 ([#330](https://github.com/juev/memcue/issues/330)); nothing in the chain loses an answer
-today, two simplifications are open.** With recall local by default (#331), the words are the whole decision. They
+today; serving in BM25 order instead of by coverage is measured better on Claude Code; the per-term count is #337.** With recall local by default (#331), the words are the whole decision. They
 go through two rankers and a cut between them. FTS5 returns facts by BM25 over any prompt term and cuts at 80. The
 gates in Go then keep the facts that hold enough terms. Coverage picks two of those. On 1,724 Claude Code prompts and
 168 Hermes prompts the cut at 80 never changed what a prompt got, and FTS5 and the gate never disagreed on a term. The
-two rankers disagree on 30–42% of the prompts that get facts, but the labelled Hermes set cannot tell which one is
-better. The one real cost is the per-term count, up to 24 ms on a long prompt.
+two rankers disagree on 30–42% of the prompts that get facts. On the 409 Claude Code prompts where they disagree,
+labelled blind, the BM25 order serves a useful fact to 205 prompts against 180, with 30% noise against 41%. The one real cost is the per-term count, up to 24 ms on a long prompt.
 
 ## The chain
 
@@ -86,9 +86,29 @@ On the labelled Hermes prompts:
 The two orders tie. 40% of the picks have no label: the labels cover the judge's pool, not the words'. One blind
 judge and 23 differing prompts cannot carry a decision.
 
-**Open.** Serving the gated pool in BM25 order would remove the coverage sort and keep coverage only as a gate. The
-cheapest test is to label the facts on which the two orders differ: 409 Claude Code prompts, two facts per side at
-most. The labelling is offline and does not touch the read path.
+**Labelled on Claude Code (2026-10-24): BM25 order is better.** All 409 Claude Code prompts on which the two orders
+pick different facts were labelled by [rank_label.py](scripts/rank_label.py). For each prompt, Claude Opus 5.5 got the
+union of both picks through `claude -p`, shuffled, without knowing which order proposed which fact. The labels are U/R/N
+as in the Hermes set, plus whether the prompt needs memory at all. There is no assistant reply in these transcripts,
+so the judge saw the prompt alone. Cost: $40.48.
+
+| two facts per prompt, 409 prompts | U | R | N | noise | prompts with a U | prompts with only N |
+|---|---|---|---|---|---|---|
+| by coverage (today) | 215 | 265 | 338 | 41% | 180 | 96 |
+| first two passing in BM25 order | 262 | 314 | 242 | 30% | **205** | 69 |
+| the 253 prompts that need memory: coverage | 210 | 163 | 133 | 26% | 175 | 25 |
+| the 253 prompts that need memory: BM25 | 251 | 175 | 80 | **16%** | **194** | 13 |
+
+Paired by prompt, only BM25 has a useful fact in 59 prompts and only coverage in 34; both have one in 146, neither in
+170. The two-sided sign test on the 93 discordant prompts gives p = 0.012. Six facts of the base are provisional, and
+only 3 of the 409 prompts touch one, so the approved-before-provisional order does not explain the gap.
+
+Read plainly: the coverage gate is a good filter, and the coverage sort is a worse ranker than the BM25 order it
+re-sorts. The Hermes tie above does not contradict this: it rests on 23 prompts, 40% of them unlabelled.
+
+**Proposed:** serve the facts that pass the gates in BM25 order, still approved before provisional. Coverage stays as
+the gate and as the trace's number. This is a change of behaviour for every prompt, so it comes as its own issue, with
+the Hermes set rerun on the new order.
 
 ### 3. FTS5 against the gate's term test: they agree
 
@@ -109,14 +129,14 @@ Number terms (`MEMCUE_NUMBER_TERMS=1`) were not part of this run. **Nothing to f
 slowest Hermes prompt (5,481 B, 24 known terms) spent 24 ms there. A pasted log is exactly the prompt where most of
 those counts buy nothing.
 
-**Open.** The candidates are counting the terms in one query, or capping the number of terms before counting them.
+**Open, [#337](https://github.com/juev/memcue/issues/337).** The candidates are counting the terms in one query, or capping the number of terms before counting them.
 The cap has to keep the rarest terms, and rarity is what the count measures, so it needs a cheaper proxy such as term
 length or the stemmer's output. Either one wants a measurement against the same prompts.
 
 ## Limitations
 
-- No labels for the Claude Code prompts. Many of them are delegation instructions from `claude -p`, not questions,
-  so "got a fact" is not "got a useful fact".
+- The Claude Code labels cover only the 409 prompts where the two orders differ, with one judge and no assistant
+  reply. 156 of them do not need memory at all (many are delegation instructions from `claude -p`).
 - The Hermes labels were made for the judge's pool. Words-only picks outside that pool are unlabelled.
 - The times come from two machines: Claude Code on darwin/arm64, Hermes on loffe. They compare steps within one
   machine, not one machine against the other.
@@ -129,6 +149,7 @@ length or the stemmer's output. Either one wants a measurement against the same 
 python3 -I docs/research/scripts/prompt_pool.py /dev/null prompts.json ~/.claude/projects
 cp ~/.claude/archive/memcue-2026-10-23/facts.db cc.db       # always a copy: recall may migrate the base
 env -u MEMCUE_NUMBER_TERMS go run -tags research ./docs/research/scripts/chain cc.db prompts.json > chain.jsonl
+python3 -I docs/research/scripts/rank_label.py chain.jsonl cc.db labels.json   # claude -p, resumable
 ```
 
 For Hermes, cross-compile the tool (`GOOS=linux GOARCH=amd64 go build -tags research`) and run it on a copy of
