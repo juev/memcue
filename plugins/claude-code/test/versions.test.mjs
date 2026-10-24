@@ -31,7 +31,7 @@ test('the README describes the per-base state and the Hermes card', async () => 
 	const readme = await readFile(new URL('README.md', root), 'utf8')
 	assert.match(readme, /MEMCUE_STATE_DIR/)
 	assert.match(readme, /per-base subdirectory/)
-	assert.match(readme, /first turn and after compression/)
+	assert.match(readme, /in the system prompt, rebuilt after compression/)
 	assert.ok(!readme.includes('version 0.1'), 'README still says version 0.1')
 	assert.ok(!readme.includes('no separate card'), 'README still says Hermes has no card')
 
