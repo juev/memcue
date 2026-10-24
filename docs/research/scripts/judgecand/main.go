@@ -85,7 +85,7 @@ func main() {
 			text = string(r[:4000])
 		}
 		rec := &recorder{}
-		words, err := recall.RecallJudge(s, text, p.Tier, recall.Default, rec)
+		words, err := recall.RecallJudge(s, text, []string{p.Tier}, recall.Default, rec)
 		if err != nil {
 			panic(err)
 		}

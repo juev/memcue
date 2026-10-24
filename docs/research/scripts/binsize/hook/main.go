@@ -25,7 +25,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	hits, err := recall.Recall(s, req.Prompt, tier.Of(req.CWD, ""), recall.Default)
+	hits, err := recall.Recall(s, req.Prompt, tier.Keys(req.CWD, ""), recall.Default)
 	if err != nil {
 		panic(err)
 	}
