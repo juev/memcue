@@ -27,7 +27,7 @@ printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >>
 printf 'facts: %s\\n' "$MEMCUE_FACTS" >> "$MEMCUE_STUB_LOG"
 case "$1" in
   version)
-    printf '{"version":"0.4.0"}\\n'
+    printf '{"version":"0.8.0"}\\n'
     ;;
   session-card)
     payload=$(cat)
@@ -825,6 +825,23 @@ test('memcue_search passes the session cwd and id for the tie order and the sear
 	await tools.get('memcue_search').execute({ query: 'harness base' }, exec)
 	const text = await waitForLog('arg: search ')
 	assert.ok(text.includes(`arg: search -json -n 5 -cwd /repo/demo -session ${memcueSessionId('session:7')} -- harness base`), text)
+})
+
+test('memcue_search gives a binary older than 0.8.0 only the flags it knows (#368)', async () => {
+	const oldLog = join(dir, 'search-070.log')
+	const oldBinary = join(dir, 'memcue-070.sh')
+	await writeFile(oldBinary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"0.7.0"}\\n' ;;
+  search) printf '%s\\n' "$*" >> "${oldLog}"; printf '[]\\n' ;;
+esac
+exit 0
+`)
+	await chmod(oldBinary, 0o755)
+	const { tools } = mount({ binary: oldBinary })
+	const exec = { agent: { session: { id: 's-old', header: { cwd: '/repo/demo' } } } }
+	await tools.get('memcue_search').execute({ query: 'harness base' }, exec)
+	assert.equal((await readFile(oldLog, 'utf8')).trim(), 'search -json -n 5 -- harness base')
 })
 
 test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
