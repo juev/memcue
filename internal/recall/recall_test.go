@@ -357,12 +357,12 @@ func TestExpiredFactIsNotRecalled(t *testing.T) {
 func TestNewerOrdersByCreatedThenID(t *testing.T) {
 	old := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
 	recent := old.Add(time.Hour)
-	byCreated := Hit{Fact: store.Fact{ID: "01AAA", Created: recent}}
-	byID := Hit{Fact: store.Fact{ID: "01ZZZ", Created: old}}
+	byCreated := store.Fact{ID: "01AAA", Created: recent}
+	byID := store.Fact{ID: "01ZZZ", Created: old}
 	if !newer(byCreated, byID) || newer(byID, byCreated) {
 		t.Fatal("newer did not prefer the later created time")
 	}
-	same := Hit{Fact: store.Fact{ID: "01ZZZ", Created: recent}}
+	same := store.Fact{ID: "01ZZZ", Created: recent}
 	if !newer(same, byCreated) {
 		t.Fatal("equal created times must fall back to the larger id")
 	}

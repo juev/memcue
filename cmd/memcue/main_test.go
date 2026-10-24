@@ -523,6 +523,43 @@ func TestSearchJSONCarriesIDAndContent(t *testing.T) {
 	}
 }
 
+func TestSearchLogsTheQueryAndTheFacts(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	t.Setenv("MEMCUE_SEARCH_LOG", "1")
+	for _, q := range []string{"gradle jdk", "kubernetes"} {
+		if err := runSearch([]string{"-session", "s1", "-cwd", dir, q}, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "search.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("log %q: want a line per search, the empty one included", b)
+	}
+	var rec searchRecord
+	if err := json.Unmarshal([]byte(lines[0]), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Session != "s1" || rec.Query != "gradle jdk" || len(rec.Facts) != 1 || rec.Host == "" {
+		t.Errorf("got %+v", rec)
+	}
+}
+
+func TestSearchLogOffByDefault(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	if err := runSearch([]string{"gradle"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "state", "memcue", "search.log")); !os.IsNotExist(err) {
+		t.Errorf("search.log written without MEMCUE_SEARCH_LOG: %v", err)
+	}
+}
+
 func TestAddExpiresAndFactsShowsIt(t *testing.T) {
 	env(t)
 	var out bytes.Buffer

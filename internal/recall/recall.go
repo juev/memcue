@@ -84,10 +84,10 @@ func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, e
 		if hits[i].bm25 != hits[j].bm25 {
 			return hits[i].bm25 < hits[j].bm25
 		}
-		if pi, pj := place(hits[i], project, p.Host), place(hits[j], project, p.Host); pi != pj {
+		if pi, pj := place(hits[i].Fact, project, p.Host), place(hits[j].Fact, project, p.Host); pi != pj {
 			return pi < pj
 		}
-		return newer(hits[i], hits[j])
+		return newer(hits[i].Fact, hits[j].Fact)
 	})
 	served := hits
 	if maxFacts := capFacts(p.MaxFacts, len(hits)); len(hits) > maxFacts {
@@ -119,7 +119,7 @@ func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, e
 // then a global origin, then everything else. A fact was learnt in the session's project when its origin starts with
 // any of the project's keys: a mirror's other host or a fork's upstream counts. The host only orders facts; it never
 // excludes another host's fact.
-func place(h Hit, project []string, host string) int {
+func place(h store.Fact, project []string, host string) int {
 	switch {
 	case hostScope(h.Scope, host):
 		return 0
@@ -133,7 +133,7 @@ func place(h Hit, project []string, host string) int {
 
 // newer orders two facts of the same rank: by creation time first, because a base written before the monotonic ids
 // can hold same-millisecond facts whose ids are in random order, then by id for a stable order.
-func newer(a, b Hit) bool {
+func newer(a, b store.Fact) bool {
 	if !a.Created.Equal(b.Created) {
 		return a.Created.After(b.Created)
 	}
