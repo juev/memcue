@@ -140,3 +140,52 @@ func TestMigrateReposLeavesAnAmbiguousName(t *testing.T) {
 		t.Errorf("ambiguous name rewritten: %q", got.Origin)
 	}
 }
+
+// The report lists the keys facts hold that no clone here has, with the clones' keys they may have become: the same
+// host and owner under a new name, or the same name elsewhere. A key a pair maps, or one a clone has, is not listed,
+// and nothing is rewritten for a key without a pair.
+func TestMigrateReposReportsKeysWithNoClone(t *testing.T) {
+	dir := env(t)
+	root := filepath.Join(dir, "src")
+	key := gitRepo(t, filepath.Join(root, "notes-app")) // example.com/team/notes-app
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := func(origin string) store.Fact {
+		f, err := s.AddWith("Факт под "+origin, nil, origin, "", store.Meta{Kind: "decision"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	renamed := add("example.com/team/notes 2026-10-01")
+	add("example.com/team/notes 2026-10-02")
+	add("example.net/someone/unrelated 2026-10-03")
+	add(key + " 2026-10-04")
+	add("example.com/team/mapped 2026-10-05")
+	_ = s.Close()
+
+	var out bytes.Buffer
+	if err := runMigrate([]string{"-repos", "-apply", "-root", root, "example.com/team/mapped=" + key}, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, want := range []string{
+		"keys with no clone on this machine 2",
+		"  example.com/team/notes 2   maybe: " + key + "\n",
+		"  example.net/someone/unrelated 1\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("report lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "example.com/team/mapped ") || strings.Contains(got, "  "+key+" ") {
+		t.Errorf("a mapped or a cloned key is listed:\n%s", got)
+	}
+	s, _ = store.Open(factsPath())
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(renamed.ID); f.Origin != "example.com/team/notes 2026-10-01" {
+		t.Errorf("a key without a pair was rewritten: %q", f.Origin)
+	}
+}
