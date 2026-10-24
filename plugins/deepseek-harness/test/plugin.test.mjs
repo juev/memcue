@@ -20,9 +20,7 @@ let dir
 let binary
 let log
 
-/** A stub memcue: records each call, answers `hook` and `search`, accepts `add`. When
- * MEMCUE_STUB_SEEN_DIR is set, it mimics memcue's seen file: a valid session id gets one line per
- * delivered fact, and a fact already in the file is not delivered again. */
+/** A stub memcue: records each call, answers `session-card` with an empty card and `search`, accepts `add`. */
 const STUB = `#!/bin/sh
 printf 'arg: %s\\n' "$*" >> "$MEMCUE_STUB_LOG"
 printf 'env: %s|%s|%s\\n' "$MEMCUE_MODEL" "$MEMCUE_API_URL" "$MEMCUE_API_KEY" >> "$MEMCUE_STUB_LOG"
@@ -35,26 +33,6 @@ case "$1" in
     payload=$(cat)
     printf 'card-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
     printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":""}}\\n'
-    ;;
-  hook)
-    payload=$(cat)
-    printf 'hook-input: %s\\n' "$payload" >> "$MEMCUE_STUB_LOG"
-    sid=$(printf '%s' "$payload" | sed -n 's/.*"session_id":"\\([^"]*\\)".*/\\1/p')
-    emit=1
-    if [ -n "$MEMCUE_STUB_SEEN_DIR" ] && [ -n "$sid" ] && [ \${#sid} -le 128 ]; then
-      case "$sid" in
-        .|..) ;;
-        *[!A-Za-z0-9._-]*) ;;
-        *)
-          seenfile="$MEMCUE_STUB_SEEN_DIR/$sid.recalled"
-          if [ -e "$seenfile" ]; then emit=0; else printf 'stub-fact-1\\n' >> "$seenfile"; fi
-          ;;
-      esac
-    fi
-    case "$payload" in
-      *NOTHING-MATCHES*) ;;
-      *) if [ "$emit" -eq 1 ]; then printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"memcue: stored facts\\\\n- ${FACT} (learnt: test 2026-10-20)\\\\n"}}\\n'; fi ;;
-    esac
     ;;
   search)
     printf '[{"id":"f1","content":"${FACT}","origin":"test 2026-10-20"}]\\n'
@@ -207,16 +185,14 @@ function lastPayload(text, marker) {
 	return line.slice(marker.length)
 }
 
-test('a matching fact reaches the step as a recall message', async () => {
+test('no fact comes with a prompt: the model searches itself (#361)', async () => {
+	await resetLog()
 	const { listeners } = mount()
 	const decision = await preStep(listeners, [userMessage('what is the harness base?')])
 	assert.equal(decision.kind, 'enter')
-	assert.equal(decision.messages.length, 2)
-	const recall = decision.messages[1]
-	assert.equal(recall.role, 'user')
-	assert.equal(recall.source.kind, 'memcue')
-	assert.equal(recall.source.form, 'recall')
-	assert.match(recall.content[0].text, /STUB-FACT-7743/)
+	assert.equal(decision.messages.length, 1)
+	const text = await waitForLog('card-input')
+	assert.equal(text.includes('arg: hook'), false)
 })
 
 test('the card comes once and again after compaction', async () => {
@@ -232,11 +208,6 @@ case "$1" in
     printf 'card-input: %s\\n' "$payload" >> "${cardLog}"
     printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"memcue: rules card\\\\n"}}\\n'
     ;;
-  hook)
-    payload=$(cat)
-    printf 'hook-input: %s\\n' "$payload" >> "${cardLog}"
-    printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"memcue: stored facts\\\\n- fact\\\\n"}}\\n'
-    ;;
 esac
 exit 0
 `)
@@ -245,12 +216,11 @@ exit 0
 	const session = { id: 's85', header: { cwd: dir } }
 
 	const first = await preStep(listeners, [userMessage('question one')], session)
-	assert.equal(first.messages.length, 3)
+	assert.equal(first.messages.length, 2)
 	assert.equal(first.messages[1].source.form, 'notice')
-	assert.equal(first.messages[2].source.form, 'recall')
 
 	const second = await preStep(listeners, [userMessage('question two')], session)
-	assert.equal(second.messages.length, 2)
+	assert.equal(second.messages.length, 1)
 	let cardLines = (await readFile(cardLog, 'utf8')).split('\n').filter((line) => line.startsWith('card-input: '))
 	assert.equal(cardLines.length, 1)
 
@@ -258,25 +228,25 @@ exit 0
 		listener(session, { type: 'compaction/end', data: {} })
 	}
 	const third = await preStep(listeners, [userMessage('question three')], session)
-	assert.equal(third.messages.length, 3)
+	assert.equal(third.messages.length, 2)
 	cardLines = (await readFile(cardLog, 'utf8')).split('\n').filter((line) => line.startsWith('card-input: '))
 	assert.equal(cardLines.length, 2)
 	const sources = cardLines.map((line) => JSON.parse(line.slice('card-input: '.length)).source)
 	assert.deepEqual(sources, ['startup', 'compact'])
 })
 
-test('the binary is asked with the real prompt, not with injected context', async () => {
+test('the card is asked for the session and its cwd', async () => {
 	await resetLog()
 	const { listeners } = mount()
 	await preStep(listeners, [
 		userMessage('what is the harness base?'),
 		userMessage('Current runtime context. Snapshot 42.', { kind: 'runtime-context', form: 'snapshot', sections: [] }),
-	])
-	const text = await waitForLog('hook-input')
-	const input = JSON.parse(lastPayload(text, 'hook-input: '))
-	assert.equal(input.prompt, 'what is the harness base?')
-	assert.equal(input.session_id, 's1')
+	], { id: 's-card-input', header: { cwd: dir } })
+	const text = await waitForLog('card-input')
+	const input = JSON.parse(lastPayload(text, 'card-input: '))
+	assert.equal(input.session_id, 's-card-input')
 	assert.equal(input.cwd, dir)
+	assert.equal(input.source, 'startup')
 })
 
 test('the session header cwd wins over the process cwd', async () => {
@@ -284,11 +254,11 @@ test('the session header cwd wins over the process cwd', async () => {
 	const { listeners } = mount()
 	const workspace = join(dir, 'session-workspace')
 	await preStep(listeners, [userMessage('what is the harness base?')], {
-		id: 's1',
+		id: 's-workspace',
 		header: { cwd: workspace },
 	})
-	const text = await waitForLog('hook-input')
-	assert.equal(JSON.parse(lastPayload(text, 'hook-input: ')).cwd, workspace)
+	const text = await waitForLog('card-input')
+	assert.equal(JSON.parse(lastPayload(text, 'card-input: ')).cwd, workspace)
 })
 
 test('memcueSessionId keeps a valid id and hashes anything else', () => {
@@ -306,38 +276,19 @@ test('memcueSessionId keeps a valid id and hashes anything else', () => {
 	}
 })
 
-test('a colon-containing session id reaches memcue sanitized and counts once', async () => {
+test('a colon-containing session id reaches memcue sanitized', async () => {
 	await resetLog()
-	const seenDir = join(dir, 'seen-129-colon')
-	await mkdir(seenDir, { recursive: true })
-	process.env.MEMCUE_STUB_SEEN_DIR = seenDir
-	try {
-		const { listeners } = mount()
-		const session = { id: 'session:129 with spaces', header: { cwd: dir } }
-		const scope = memcueSessionId(session.id)
-		assert.match(scope, /^[A-Za-z0-9._-]{1,128}$/)
-		assert.notEqual(scope, session.id)
-
-		const first = await preStep(listeners, [userMessage('what is the harness base?')], session)
-		assert.equal(first.messages.length, 2) // the recall; the default stub's card is empty
-		const second = await preStep(listeners, [userMessage('and again?')], session)
-		assert.equal(second.messages.length, 1) // a correctly scoped fact is not recalled twice
-
-		const text = await readFile(log, 'utf8')
-		const inputs = text.split('\n').filter((line) => line.startsWith('hook-input: '))
-			.map((line) => JSON.parse(line.slice('hook-input: '.length)))
-		assert.equal(inputs.length, 2)
-		for (const input of inputs) assert.equal(input.session_id, scope)
-		assert.equal(JSON.parse(lastPayload(text, 'card-input: ')).session_id, scope)
-
-		const seen = (await readFile(join(seenDir, `${scope}.recalled`), 'utf8')).trim().split('\n')
-		assert.deepEqual(seen, ['stub-fact-1'])
-	} finally {
-		delete process.env.MEMCUE_STUB_SEEN_DIR
-	}
+	const { listeners } = mount()
+	const session = { id: 'session:129 with spaces', header: { cwd: dir } }
+	const scope = memcueSessionId(session.id)
+	assert.match(scope, /^[A-Za-z0-9._-]{1,128}$/)
+	assert.notEqual(scope, session.id)
+	await preStep(listeners, [userMessage('what is the harness base?')], session)
+	const text = await waitForLog('card-input')
+	assert.equal(JSON.parse(lastPayload(text, 'card-input: ')).session_id, scope)
 })
 
-test('a session id over 128 characters reaches recall and extraction sanitized', async () => {
+test('a session id over 128 characters reaches the card and extraction sanitized', async () => {
 	await resetLog()
 	const stateDir = join(dir, 'state-129-long')
 	const { listeners } = mount({ stateDir, minNewChars: 1 })
@@ -349,9 +300,9 @@ test('a session id over 128 characters reaches recall and extraction sanitized',
 		id: raw,
 		header: { cwd: dir },
 	})
-	assert.equal(decision.messages.length, 2)
-	const hookText = await waitForLog('hook-input')
-	assert.equal(JSON.parse(lastPayload(hookText, 'hook-input: ')).session_id, scope)
+	assert.equal(decision.messages.length, 1) // the default stub's card is empty
+	const cardText = await waitForLog('card-input')
+	assert.equal(JSON.parse(lastPayload(cardText, 'card-input: ')).session_id, scope)
 
 	const events = [
 		{ type: 'user/message', data: userMessage('remember the long session id') },
@@ -364,12 +315,6 @@ test('a session id over 128 characters reaches recall and extraction sanitized',
 	assert.equal(extractText.includes(`-session ${raw}`), false)
 	await waitForState(join(stateDir, `${scope}.json`),
 		(state) => state.pending === null && Object.keys(state.seen).length === 1)
-})
-
-test('no facts mean no message', async () => {
-	const { listeners } = mount()
-	const decision = await preStep(listeners, [userMessage('NOTHING-MATCHES here')])
-	assert.equal(decision.messages.length, 1)
 })
 
 test('a turn end sends the new messages to extract-messages', async () => {
@@ -611,13 +556,12 @@ test('promptOf ignores goal, schedule and checkpoint messages', async () => {
 		userMessage('goal round body', { kind: 'goal', goalId: 'g1' }),
 		userMessage('scheduled reminder body', { kind: 'schedule' }),
 		userMessage('compacted summary body', { kind: 'compact-checkpoint', compactionId: 'c1' }),
-	])
-	const text = await waitForLog('hook-input')
-	assert.equal(JSON.parse(lastPayload(text, 'hook-input: ')).prompt, 'the real human question')
-	assert.equal(decision.messages.length, 5) // four inputs plus the recall message
+	], { id: 's-prompt-of', header: { cwd: dir } })
+	await waitForLog('card-input') // the real question lets the card through
+	assert.equal(decision.messages.length, 4) // the four inputs; the default stub's card is empty
 })
 
-test('a batch of only injected messages does not call recall', async () => {
+test('a batch of only injected messages does not ask for the card', async () => {
 	await resetLog()
 	const { listeners } = mount()
 	const decision = await preStep(listeners, [
@@ -626,7 +570,7 @@ test('a batch of only injected messages does not call recall', async () => {
 	])
 	assert.equal(decision.messages.length, 2)
 	await new Promise((resolve) => setTimeout(resolve, 150))
-	assert.equal((await readFile(log, 'utf8')).includes('hook-input'), false)
+	assert.equal((await readFile(log, 'utf8')).includes('card-input'), false)
 })
 
 test('a subagent session is not extracted', async () => {
@@ -726,7 +670,6 @@ test('an older binary turns the card and extraction off with one warning', async
 	await writeFile(oldBinary, `#!/bin/sh
 case "$1" in
   version) printf '{"version":"0.3.0"}\\n' ;;
-  hook) printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}\\n' ;;
   session-card) printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"card"}}\\n' ;;
 esac
 exit 0
@@ -760,13 +703,12 @@ exit 0
 	}
 })
 
-test('a failed recall is reported once and the step still runs', async () => {
-	const failBinary = join(dir, 'recall-fail.sh')
+test('a failed card is reported once and the step still runs', async () => {
+	const failBinary = join(dir, 'card-fail.sh')
 	await writeFile(failBinary, `#!/bin/sh
 case "$1" in
   version) printf '{"version":"0.4.0"}\\n' ;;
-  session-card) printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":""}}\\n' ;;
-  hook) echo 'base is locked' >&2; exit 1 ;;
+  session-card) echo 'base is locked' >&2; exit 1 ;;
 esac
 exit 0
 `)
@@ -780,9 +722,9 @@ exit 0
 		const second = await preStep(listeners, [userMessage('again')])
 		assert.equal(first.messages.length, 1)
 		assert.equal(second.messages.length, 1)
-		const recallWarnings = warnings.filter((warning) => warning.includes('recall failed'))
-		assert.equal(recallWarnings.length, 1, warnings.join('\n'))
-		assert.match(recallWarnings[0], /base is locked/)
+		const cardWarnings = warnings.filter((warning) => warning.includes('session-card failed'))
+		assert.equal(cardWarnings.length, 1, warnings.join('\n'))
+		assert.match(cardWarnings[0], /base is locked/)
 	} finally {
 		console.warn = original
 	}
@@ -802,7 +744,6 @@ case "$1" in
     if [ "$n" -eq 1 ]; then echo 'transient lock' >&2; exit 1; fi
     printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":"retried card"}}\\n'
     ;;
-  hook) printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":""}}\\n' ;;
 esac
 exit 0
 `)
@@ -866,7 +807,7 @@ test('memcue_search passes a limit and a leading dash safely', async () => {
 	const { tools } = mount()
 	await tools.get('memcue_search').execute({ query: '-dash query', limit: 3 }, {})
 	const text = await waitForLog('arg: search ')
-	assert.match(text, /arg: search -json -n 3 -- -dash query/)
+	assert.match(text, new RegExp(`arg: search -json -n 3 -cwd ${process.cwd()} -- -dash query`))
 })
 
 test('memcue_search passes a leading dash as a query', async () => {
@@ -874,7 +815,16 @@ test('memcue_search passes a leading dash as a query', async () => {
 	const { tools } = mount()
 	await tools.get('memcue_search').execute({ query: '-v' }, {})
 	const text = await waitForLog('arg: search ')
-	assert.match(text, /arg: search -json -n 5 -- -v/)
+	assert.match(text, new RegExp(`arg: search -json -n 5 -cwd ${process.cwd()} -- -v`))
+})
+
+test('memcue_search passes the session cwd and id for the tie order and the search log', async () => {
+	await resetLog()
+	const { tools } = mount()
+	const exec = { agent: { session: { id: 'session:7', header: { cwd: '/repo/demo' } } } }
+	await tools.get('memcue_search').execute({ query: 'harness base' }, exec)
+	const text = await waitForLog('arg: search ')
+	assert.ok(text.includes(`arg: search -json -n 5 -cwd /repo/demo -session ${memcueSessionId('session:7')} -- harness base`), text)
 })
 
 test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
