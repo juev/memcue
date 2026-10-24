@@ -299,7 +299,7 @@ func TestSessionStartCardDropsExpiredFacts(t *testing.T) {
 		return f
 	}
 	add("EXPIRED-RULE: old.", "rule", "global", "2026-01-01")
-	liveRule := add("LIVE-RULE: current.", "rule", "global", time.Now().UTC().Format(time.DateOnly))
+	liveRule := add("LIVE-RULE: current.", "rule", "global", store.Today()) // the local day Expired judges by
 	add("EXPIRED-DECISION: old.", "decision", "repo:example.com/team/shop", "2026-01-01")
 	liveDecision := add("LIVE-DECISION: current.", "decision", "repo:example.com/team/shop", "")
 	_ = s.Close()
