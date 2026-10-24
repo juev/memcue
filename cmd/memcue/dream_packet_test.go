@@ -175,3 +175,33 @@ func TestSessionStartCarriesTheDreamHint(t *testing.T) {
 		t.Errorf("no hint when due: %s", got)
 	}
 }
+
+// A correction to nothing but spaces is refused by the check, before anything is written, so the rest of the answer
+// applies and the dream is marked.
+func TestDreamRefusesABlankCorrection(t *testing.T) {
+	dir := env(t)
+	_, a, b, _ := dreamBase(t)
+	fakeDream(t, func(groups string) []extract.Action {
+		if !strings.Contains(groups, a) {
+			return nil
+		}
+		return []extract.Action{{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "dup"},
+			{Op: "correct", ID: b, Content: "   ", Reason: "blank"}}
+	})
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, a); f.Status != store.Retired {
+		t.Errorf("a %+v", f)
+	}
+	if f := vetStatus(t, b); f.Version != 1 {
+		t.Errorf("a blank correction was written: %+v", f)
+	}
+	recs := readDreamLog(t, dir)
+	if last := recs[len(recs)-1]; last.Error != "" || len(last.Refused) != 1 || !strings.Contains(last.Refused[0], "no content") {
+		t.Errorf("record %+v", last)
+	}
+	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); !ok {
+		t.Error("the dream was not marked")
+	}
+}

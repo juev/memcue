@@ -202,6 +202,14 @@ func freshFacts(s *store.Store, active []store.Fact, from time.Time, seen map[st
 func dreamDue(dir string, every time.Duration) (int, time.Time, error) {
 	last, ok := lastDream(dir)
 	if !ok {
+		unlock, err := lockDream(dir)
+		if err != nil {
+			return 0, time.Time{}, nil // a dream is running: it marks the base itself
+		}
+		defer unlock()
+		if _, ok := lastDream(dir); ok {
+			return 0, time.Time{}, nil
+		}
 		return 0, time.Time{}, markBase(dir)
 	}
 	if time.Since(last) < every {
@@ -427,6 +435,11 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 		for _, id := range slices.Sorted(maps.Keys(g)) {
 			groups[i] = append(groups[i], store.Fact{ID: id, Version: g[id]})
 		}
+	}
+	for i := range a.Actions {
+		// The store trims the text of a correction and refuses an empty one mid-apply; the check must see what the
+		// store will.
+		a.Actions[i].Content = strings.TrimSpace(a.Actions[i].Content)
 	}
 	ok, refused := checkActions(groups, a.Actions)
 	rec.Refused = append(rec.Refused, refused...)
