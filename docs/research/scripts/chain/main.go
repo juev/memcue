@@ -119,7 +119,7 @@ func run(s *store.Store, id, prompt string) row {
 	tr := &recall.Trace{}
 	p.Trace = tr
 	start := time.Now()
-	hits, err := recall.Recall(s, prompt, "", p)
+	hits, err := recall.Recall(s, prompt, nil, p)
 	r.RecallMs = ms(time.Since(start))
 	if err != nil {
 		panic(err)
@@ -171,7 +171,7 @@ func run(s *store.Store, id, prompt string) row {
 	all.Candidates = unlimited
 	trAll := &recall.Trace{}
 	all.Trace = trAll
-	hitsAll, err := recall.Recall(s, prompt, "", all)
+	hitsAll, err := recall.Recall(s, prompt, nil, all)
 	if err != nil {
 		panic(err)
 	}

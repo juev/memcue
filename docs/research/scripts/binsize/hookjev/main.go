@@ -30,7 +30,7 @@ func main() {
 	if set := rerank.FromEnv(); set != nil {
 		r = rerank.New(set)
 	}
-	hits, err := recall.RecallJudge(s, req.Prompt, tier.Of(req.CWD, ""), recall.Default, r)
+	hits, err := recall.RecallJudge(s, req.Prompt, tier.Keys(req.CWD, ""), recall.Default, r)
 	if err != nil {
 		panic(err)
 	}

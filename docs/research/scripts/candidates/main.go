@@ -56,7 +56,7 @@ func main() {
 	for _, f := range active {
 		q := p
 		q.Seen = map[string]bool{f.ID: true}
-		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), "", q)
+		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), nil, q)
 		if err != nil {
 			panic(err)
 		}
