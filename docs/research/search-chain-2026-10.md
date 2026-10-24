@@ -1,7 +1,7 @@
 # The lexical search chain: what each step does to the answer, October 2026
 
 Status: **measured 2026-10-24 ([#330](https://github.com/juev/memcue/issues/330)); nothing in the chain loses an answer
-today; serving in BM25 order instead of by coverage is measured better on Claude Code; the per-term count is #337.** With recall local by default (#331), the words are the whole decision. They
+today; serving in BM25 order instead of by coverage is measured better on Claude Code; the per-term count is one statement since #337.** With recall local by default (#331), the words are the whole decision. They
 go through two rankers and a cut between them. FTS5 returns facts by BM25 over any prompt term and cuts at 80. The
 gates in Go then keep the facts that hold enough terms. Coverage picks two of those. On 1,724 Claude Code prompts and
 168 Hermes prompts the cut at 80 never changed what a prompt got, and FTS5 and the gate never disagreed on a term. The
@@ -139,6 +139,22 @@ those counts buy nothing.
 **Open, [#337](https://github.com/juev/memcue/issues/337).** The candidates are counting the terms in one query, or capping the number of terms before counting them.
 The cap has to keep the rarest terms, and rarity is what the count measures, so it needs a cheaper proxy such as term
 length or the stemmer's output. Either one wants a measurement against the same prompts.
+
+**Done in #337: one statement.** [docfreq](scripts/docfreq/main.go) timed three ways of counting on a fresh
+connection per prompt, with identical counts on all 1,883 prompts:
+
+| loffe, median ms | 1–5 terms | 11–20 | 21–40 | 81+ |
+|---|---|---|---|---|
+| one `MATCH` per term (before) | 0.51 | 1.38 | 2.39 | 11.16 |
+| `UNION ALL`, one statement | 0.39 | 0.93 | 1.54 | 6.35 |
+| one pass over `fact_index.stems` in Go | 4.73 | 11.89 | 13.57 | 42.40 |
+
+These are the Hermes prompts. The Claude Code prompts on loffe give the same picture (81+ terms: 10.76, 5.66 and
+1161 ms). The Go pass decodes every row of the index for every prompt, so it never wins. The cap was not taken: it
+would change the weights, and the statement already removes most of the cost. `DocFreq` now counts in statements of
+200 terms, under SQLite's limit of 500 parts in one compound SELECT. Rerun of the chain on Hermes (loffe): `DocFreq`
+p95 12.7 → 8.1 ms, recall p95 17.6 → 11.6 ms, max 23.5 → 16.0 ms. On Claude Code (darwin) recall is unchanged at a
+median of 3.7 ms. The served facts are identical on all 1,892 prompts.
 
 ## Limitations
 

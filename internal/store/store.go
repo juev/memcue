@@ -1057,19 +1057,48 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	return out, rows.Err()
 }
 
-// DocFreq returns how many active facts hold each term, and the number of active facts.
+// docFreqChunk is how many terms one DocFreq statement counts. SQLite refuses a compound SELECT of more than 500
+// parts, and a 4000-character prompt can hold more distinct terms than that.
+const docFreqChunk = 200
+
+// DocFreq returns how many active facts hold each term, and the number of active facts. The terms are counted in
+// statements of UNION ALL rather than one query each: on a long prompt the counting was the largest step of recall,
+// and one statement of the same counts took 30-45% less on loffe (#337, docs/research/search-chain-2026-10.md).
 func (s *Store) DocFreq(terms []string) (map[string]int, int, error) {
 	df := make(map[string]int, len(terms))
-	for _, t := range terms {
-		var n int
-		if err := s.db.QueryRow(`SELECT count(*) FROM fact_fts WHERE fact_fts MATCH ?`, text.Query(t)).Scan(&n); err != nil {
+	total := 0
+	for start := 0; start == 0 || start < len(terms); start += docFreqChunk {
+		chunk := terms[start:min(start+docFreqChunk, len(terms))]
+		parts := make([]string, 0, len(chunk)+1)
+		args := make([]any, 0, len(chunk))
+		if start == 0 {
+			parts = append(parts, `SELECT -1, count(*) FROM fact_index`)
+		}
+		for i, t := range chunk {
+			parts = append(parts, fmt.Sprintf(`SELECT %d, count(*) FROM fact_fts WHERE fact_fts MATCH ?`, start+i))
+			args = append(args, text.Query(t))
+		}
+		rows, err := s.db.Query(strings.Join(parts, " UNION ALL "), args...)
+		if err != nil {
 			return nil, 0, err
 		}
-		df[t] = n
-	}
-	var total int
-	if err := s.db.QueryRow(`SELECT count(*) FROM fact_index`).Scan(&total); err != nil {
-		return nil, 0, err
+		for rows.Next() {
+			var i, n int
+			if err := rows.Scan(&i, &n); err != nil {
+				_ = rows.Close()
+				return nil, 0, err
+			}
+			if i < 0 {
+				total = n
+			} else {
+				df[terms[i]] = n
+			}
+		}
+		err = rows.Err()
+		_ = rows.Close()
+		if err != nil {
+			return nil, 0, err
+		}
 	}
 	return df, total, nil
 }
