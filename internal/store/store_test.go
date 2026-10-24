@@ -273,6 +273,36 @@ func TestDocFreqCountsActiveFacts(t *testing.T) {
 	}
 }
 
+// A prompt can hold more distinct terms than SQLite takes in one compound SELECT (500): DocFreq counts them in
+// several statements, with the same numbers as one MATCH per term, and an empty prompt still gets the total.
+func TestDocFreqCountsManyTermsAsOneMatchEach(t *testing.T) {
+	s, _ := open(t)
+	_, _ = s.Add("прокси mihomo на порту 1080", nil, "")
+	_, _ = s.Add("прокси для контейнеров задаётся env", nil, "")
+	_, _ = s.Add("база данных freshgo в sqlite", nil, "")
+	terms := text.Terms("прокси контейнеров sqlite mihomo")
+	for i := range 2*docFreqChunk + 150 {
+		terms = append(terms, fmt.Sprintf("term%d", i))
+	}
+	df, total, err := s.DocFreq(terms)
+	if err != nil || total != 3 || len(df) != len(terms) {
+		t.Fatalf("df of %d terms, total %d, err %v", len(df), total, err)
+	}
+	for _, term := range terms {
+		var want int
+		if err := s.db.QueryRow(`SELECT count(*) FROM fact_fts WHERE fact_fts MATCH ?`, text.Query(term)).
+			Scan(&want); err != nil {
+			t.Fatal(err)
+		}
+		if df[term] != want {
+			t.Errorf("%s: %d, want %d", term, df[term], want)
+		}
+	}
+	if df, total, err := s.DocFreq(nil); err != nil || total != 3 || len(df) != 0 {
+		t.Errorf("no terms: df %v total %d err %v", df, total, err)
+	}
+}
+
 func TestExpiryIsStoredAndKeptByCorrection(t *testing.T) {
 	s, _ := open(t)
 	f, err := s.AddExpiring("Крон memcue-dream-check придёт 21 октября.", []string{"dream"}, "hermes 2026-10-19",
