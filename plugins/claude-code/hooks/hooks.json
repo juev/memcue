@@ -1,5 +1,5 @@
 {
-  "description": "memcue: recall facts before each prompt, extract facts at compaction and session end",
+  "description": "memcue: the session card and the note to search memory at session start, extract facts at compaction and session end",
   "hooks": {
     "SessionStart": [
       {
@@ -8,17 +8,6 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start || true",
             "timeout": 90
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook || true",
-            "timeout": 10
           }
         ]
       }

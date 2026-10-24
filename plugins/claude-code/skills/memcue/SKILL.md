@@ -1,12 +1,12 @@
 ---
 name: memcue
-description: Write to long-term memory (memcue). Use when the user asks to remember, note or keep something for later ("запомни", "remember this"), to forget it or says a stored fact is wrong or outdated, or when a "memcue: stored facts" block shows a fact this session proved wrong.
+description: Write to long-term memory (memcue). Use when the user asks to remember, note or keep something for later ("запомни", "remember this"), to forget it or says a stored fact is wrong or outdated, or when a fact found with memcue search turns out wrong in this session.
 ---
 
 # memcue: writing to memory
 
-Memory is a base of atomic facts. Facts come to you before each prompt in a `memcue: stored facts` block, and are
-extracted from every session automatically when it is compacted or ends. Write by hand only what the user asks for
+Memory is a base of atomic facts. You read it with `memcue search "<words>"`, as the session-start note says; facts
+are extracted from every session automatically when it is compacted or ends. Write by hand only what the user asks for
 and corrections; the session extraction covers the rest.
 
 ## Remember

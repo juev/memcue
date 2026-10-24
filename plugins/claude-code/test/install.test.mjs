@@ -65,7 +65,7 @@ test('session-start installs the release of the plugin when no binary is on PATH
 	assert.ok(existsSync(installed), 'the binary was not installed')
 	assert.match(out, /^installed session-start/)
 	assert.match(readFileSync(join(root, 'env'), 'utf8'), new RegExp(`export PATH="${join(root, 'data', 'memcue', version)}:\\$PATH"`))
-	assert.match(run(env, ['hook'], 'prompt'), /^installed hook\nprompt/, 'the next hook must use the installed copy')
+	assert.match(run(env, ['hook-extract'], 'payload'), /^installed hook-extract\npayload/, 'the next hook must use the installed copy')
 	assert.match(readFileSync(join(root, 'state', 'memcue', 'install.log'), 'utf8'), /installed/)
 })
 
@@ -108,23 +108,23 @@ test('an older binary on PATH is replaced by the installed release', { skip: !os
 	fakeBinary(join(bin, 'memcue'), { current: false, name: 'old' })
 	assert.match(run(env, ['session-start']), /^installed session-start/)
 	assert.ok(existsSync(installed))
-	assert.match(run(env, ['hook']), /^installed hook/)
+	assert.match(run(env, ['hook-extract']), /^installed hook-extract/)
 })
 
 test('an older binary stays in use when the release cannot be installed', { skip: !os || !arch }, () => {
 	const { env, bin } = setup({ badChecksum: true })
 	fakeBinary(join(bin, 'memcue'), { current: false, name: 'old' })
 	assert.match(run(env, ['session-start']), /older than/)
-	assert.match(run(env, ['hook']), /^old hook/, 'recall must keep working on the older binary')
+	assert.match(run(env, ['hook-extract']), /^old hook-extract/, 'the hooks must keep working on the older binary')
 })
 
 test('MEMCUE_BIN wins over everything', { skip: !os || !arch }, () => {
 	const { env, root } = setup()
 	fakeBinary(join(root, 'pinned'), { name: 'pinned' })
-	assert.match(run({ ...env, MEMCUE_BIN: join(root, 'pinned') }, ['hook']), /^pinned hook/)
+	assert.match(run({ ...env, MEMCUE_BIN: join(root, 'pinned') }, ['hook-extract']), /^pinned hook-extract/)
 })
 
 test('a hook without a binary does nothing', { skip: !os || !arch }, () => {
 	const { env } = setup()
-	assert.equal(run(env, ['hook'], '{"prompt":"x"}'), '')
+	assert.equal(run(env, ['hook-extract'], '{"session_id":"x"}'), '')
 })
