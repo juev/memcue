@@ -17,8 +17,8 @@ import (
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/policy"
+	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
-	"github.com/juev/memcue/internal/text"
 	"github.com/juev/memcue/internal/tier"
 )
 
@@ -440,14 +440,19 @@ func runSearch(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	n := fs.Int("n", 10, "how many facts")
 	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
+	cwd := fs.String("cwd", ".", "session working directory: facts of its repository win ties")
+	session := fs.String("session", "", "session id for the search log")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	query := strings.Join(fs.Args(), " ")
 	return withStore(func(s *store.Store) error {
-		hits, err := s.Search(text.Terms(strings.Join(fs.Args(), " ")), *n)
+		start := time.Now()
+		hits, err := recall.Search(s, query, tier.Keys(*cwd, claudeDir()), currentHost(), *n)
 		if err != nil {
 			return err
 		}
+		logSearch(*session, *cwd, query, hits, time.Since(start))
 		if *asJSON {
 			return json.NewEncoder(out).Encode(searchJSON(hits))
 		}
@@ -458,6 +463,39 @@ func runSearch(args []string, out io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// searchRecord is one line of search.log: a query the agent wrote and the facts it got, the record the read side is
+// judged by since the agent searches itself (#361).
+type searchRecord struct {
+	Time    string   `json:"time"`
+	Session string   `json:"session,omitempty"`
+	Tier    string   `json:"tier,omitempty"`
+	Host    string   `json:"host,omitempty"`
+	Query   string   `json:"query"`
+	Facts   []string `json:"facts,omitempty"`
+	Ms      float64  `json:"ms"`
+}
+
+// logQuery is how much of a query search.log keeps: an agent's query is a few words, a longer one is a pasted text.
+const logQuery = 500
+
+// logSearch appends a search to search.log in the state directory, searches that found nothing included. It keeps
+// the text of queries, so it is off unless MEMCUE_SEARCH_LOG=1. A failure to log never fails the search.
+func logSearch(session, cwd, query string, hits []store.Hit, took time.Duration) {
+	if os.Getenv("MEMCUE_SEARCH_LOG") != "1" {
+		return
+	}
+	dir, err := stateDir()
+	if err != nil {
+		return
+	}
+	rec := searchRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: session, Tier: tier.Of(cwd, claudeDir()),
+		Host: currentHost(), Query: clip(query, logQuery), Ms: float64(took.Microseconds()) / 1000}
+	for _, h := range hits {
+		rec.Facts = append(rec.Facts, h.ID)
+	}
+	_ = appendJSON(filepath.Join(dir, "search.log"), rec)
 }
 
 // searchFact is one fact as search -json prints it: what a caller needs to show, correct or retire it.

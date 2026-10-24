@@ -103,7 +103,7 @@ commands:
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-cwd DIR] [-session ID] [-event E] [-min-chars N]
-  search    find facts by words, with their IDs: memcue search [-n N] [-json] TEXT
+  search    find facts by words, with their IDs: memcue search [-n N] [-json] [-cwd DIR] [-session ID] TEXT
   recall    print what a prompt would recall: memcue recall [-cwd DIR] [-explain] [-fact ID] TEXT
   eval      measure recall and noise against labelled sets
   add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] -- TEXT
@@ -131,6 +131,7 @@ environment:
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_RECALL_LOG 1 logs what each prompt got (recall.log in the state directory; holds prompt text)
+  MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
   MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15)
   MEMCUE_MIN_TERMS  prompt terms the facts must know before any fact is examined (default 2; a ticket key or a
                   prompt of numbers only needs 1)
