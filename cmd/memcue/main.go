@@ -374,7 +374,7 @@ func runHook(in io.Reader, out io.Writer) error {
 	}
 	start := time.Now()
 	if reHarness.MatchString(req.Prompt) {
-		logRecall(req.SessionID, req.CWD, req.Prompt, nil, time.Since(start), nil)
+		logRecall(req.SessionID, req.CWD, req.Prompt, nil, time.Since(start), &recall.Trace{Stopped: "a harness notice"})
 		return nil
 	}
 	s, err := store.Open(factsPath())
@@ -418,6 +418,9 @@ type recallRecord struct {
 	Ms        float64      `json:"ms"`
 	Displaced bool         `json:"host_displaced,omitempty"`
 	Judge     string       `json:"judge,omitempty"` // "paused": the breaker kept the judge out, the words decided
+	// Stopped is why no fact was examined, as recall -explain says it; a prompt with no facts and no Stopped had
+	// candidates that none passed (#355).
+	Stopped string `json:"stopped,omitempty"`
 }
 
 type recallFact struct {
@@ -450,6 +453,9 @@ func logRecall(session, cwd, prompt string, hits []recall.Hit, took time.Duratio
 		Host: currentHost(), Prompt: prompt, Ms: float64(took.Microseconds()) / 1000}
 	if trace != nil && trace.Paused {
 		rec.Judge = "paused"
+	}
+	if trace != nil {
+		rec.Stopped = trace.Stopped
 	}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, recallFact{ID: h.ID, Coverage: math.Round(h.Coverage*1000) / 1000,

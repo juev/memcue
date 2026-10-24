@@ -208,6 +208,44 @@ func TestHookLogsEveryPrompt(t *testing.T) {
 	if first.Session != "s1" || len(first.Facts) != 1 || first.Facts[0].Coverage <= 0 || second.Prompt != "ок" || len(second.Facts) != 0 {
 		t.Errorf("records %+v %+v", first, second)
 	}
+	if first.Stopped != "" || second.Stopped != "the prompt has too few terms" {
+		t.Errorf("stop reasons %q %q", first.Stopped, second.Stopped)
+	}
+}
+
+func TestHookLogsTermGateApartFromNoMatch(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	t.Setenv("MEMCUE_RECALL_LOG", "1")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add("Vaultwarden отдаёт vault.example.org через proxy на этом хосте.", []string{"vaultwarden", "proxy"},
+		"x 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	// "gradle" is the one known word of the first prompt: it stops at the prompt-level floor. The second has three
+	// known terms and reaches the facts, but no fact holds all three.
+	for _, p := range []string{"gradle kotlin", "gradle jdk proxy"} {
+		_ = hookContext(t, dir, "s1", p)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "recall.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	var gated, unmatched recallRecord
+	if len(lines) != 2 || json.Unmarshal([]byte(lines[0]), &gated) != nil || json.Unmarshal([]byte(lines[1]), &unmatched) != nil {
+		t.Fatalf("log %q", b)
+	}
+	if gated.Stopped != "too few prompt terms occur in any fact" || len(gated.Facts) != 0 {
+		t.Errorf("gated %+v", gated)
+	}
+	if unmatched.Stopped != "" || len(unmatched.Facts) != 0 {
+		t.Errorf("unmatched %+v", unmatched)
+	}
 }
 
 func TestHookLogOffByDefault(t *testing.T) {
@@ -228,12 +266,12 @@ func TestMinTermsFromEnv(t *testing.T) {
 	// "gradle" is the only word of the prompt a fact knows: the default floor of two terms stops it.
 	for _, v := range []string{"", "0", "-1", "x"} {
 		t.Setenv("MEMCUE_MIN_TERMS", v)
-		if got := hookContext(t, dir, "", "что там с gradle"); got != "" {
+		if got := hookContext(t, dir, "", "gradle kotlin"); got != "" {
 			t.Errorf("MEMCUE_MIN_TERMS=%q: got %q", v, got)
 		}
 	}
 	t.Setenv("MEMCUE_MIN_TERMS", "1")
-	if got := hookContext(t, dir, "", "что там с gradle"); !strings.Contains(got, "openjdk@21") {
+	if got := hookContext(t, dir, "", "gradle kotlin"); !strings.Contains(got, "openjdk@21") {
 		t.Errorf("MEMCUE_MIN_TERMS=1: got %q", got)
 	}
 }
@@ -299,7 +337,8 @@ func TestHookSkipsTaskNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rec recallRecord
-	if json.Unmarshal(b, &rec) != nil || !strings.HasPrefix(rec.Prompt, "<task-notification>") || len(rec.Facts) != 0 {
+	if json.Unmarshal(b, &rec) != nil || !strings.HasPrefix(rec.Prompt, "<task-notification>") || len(rec.Facts) != 0 ||
+		rec.Stopped != "a harness notice" {
 		t.Errorf("log %q", b)
 	}
 	if got := hookContext(t, dir, "s1", gradlePrompt); !strings.Contains(got, "openjdk@21") {
