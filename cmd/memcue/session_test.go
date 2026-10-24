@@ -169,7 +169,7 @@ func TestSessionStartCardStaysWithinBudget(t *testing.T) {
 	}
 	for i := 0; i < 20; i++ {
 		if _, err := s.AddWith(fmt.Sprintf("Правило %d: %s", i, strings.Repeat("слово ", 80)), nil, "test 2026-10-20",
-			"", store.Meta{Kind: "rule", Scope: "global", Source: "user"}); err != nil {
+			"", store.Meta{Kind: "rule", Scope: "global", Source: "agent"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -185,6 +185,47 @@ func TestSessionStartCardStaysWithinBudget(t *testing.T) {
 	}
 	if strings.Count(card, "\n- ") >= 20 {
 		t.Errorf("the budget carried every fact: %q", card)
+	}
+}
+
+// Every rule the user stated is on the card, past the budget (#363); the facts nobody stated fill the budget as before.
+func TestSessionCardCarriesEveryStatedRule(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 12; i++ {
+		for _, src := range []string{"user", "agent"} {
+			text := fmt.Sprintf("Правило %s-%d: %s", src, i, strings.Repeat("слово ", 50))
+			if _, err := s.AddWith(text, nil, "test 2026-10-20", "",
+				store.Meta{Kind: "rule", Scope: "global", Source: src}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	_ = s.Close()
+	card, _, err := sessionCard(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 12; i++ {
+		if !strings.Contains(card, fmt.Sprintf("Правило user-%d:", i)) {
+			t.Errorf("stated rule %d is not on the card", i)
+		}
+	}
+	unstated := strings.Count(card, "Правило agent-")
+	if unstated == 0 || unstated == 12 {
+		t.Errorf("%d unstated rules on the card, want some within the budget and not all", unstated)
+	}
+	stated := 0
+	for _, line := range strings.Split(card, "\n") {
+		if strings.HasPrefix(line, "- Правило user-") {
+			stated += len([]rune(line)) + 1
+		}
+	}
+	if rest := len([]rune(card)) - stated; rest > cardBudget {
+		t.Errorf("the unstated part is %d runes, budget %d", rest, cardBudget)
 	}
 }
 
