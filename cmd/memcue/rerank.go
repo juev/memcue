@@ -7,18 +7,16 @@ import (
 	"sync"
 
 	judgepkg "github.com/juev/memcue/internal/judge"
-	"github.com/juev/memcue/internal/localrank"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/rerank"
 	"github.com/juev/memcue/internal/store"
 )
 
 // ranker builds the rerank pass from the environment. MEMCUE_RERANK names the reader: `judge` is Jev scoring each
-// candidate, `local` is the tree model built into memcue (#321), `listwise` is the main chat model asking one listwise
-// question (#281), `off` keeps the words. Without the variable Jev runs when its endpoint is configured and the words
-// decide otherwise, so recall without a judge key makes no model call. The local reader is opt-in: on the gold base it
-// served a useful fact to as many prompts as the words with half their noise (docs/research/local-readers-2026-10.md),
-// but it learnt that base, and on a small fresh base it scored a fact that held every prompt term below its threshold.
+// candidate, `listwise` is the main chat model asking one listwise question (#281), `off` keeps the words. Without the
+// variable, or with a value it does not know, Jev runs when its endpoint is configured and the words decide otherwise,
+// so recall without a judge key makes no model call. `local`, the tree reader of #321, was removed in #324 and is one
+// of those unknown values now: end to end it changed nothing against the words (docs/research/local-readers-2026-10.md).
 // The listwise reader is opt-in too: it served as many useful prompts as Jev with two more noise facts and three times
 // the latency (docs/research/listwise-2026-10.md). A nil Ranker keeps recall lexical, with the words choosing and the
 // coverage gate deciding.
@@ -28,8 +26,6 @@ func ranker() recall.Ranker {
 		return nil
 	case "listwise", "main":
 		return listwiseRanker()
-	case "local":
-		return localrank.Ranker{}
 	}
 	if r := jevRanker(); r != nil {
 		return r

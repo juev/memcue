@@ -980,28 +980,6 @@ func (s *Store) History(id string) ([]Fact, error) {
 	return s.query(`SELECT `+s.cols("")+` FROM facts WHERE id = ? ORDER BY version`, id)
 }
 
-// Newest returns the creation time of the newest fact version, of any status; zero on an empty base. The text order of
-// created is the time order only to the second (a whole second has no fraction), so it reads the latest few by text
-// and parses them.
-func (s *Store) Newest() (time.Time, error) {
-	rows, err := s.db.Query(`SELECT created FROM facts ORDER BY created DESC LIMIT 32`)
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer func() { _ = rows.Close() }()
-	var newest time.Time
-	for rows.Next() {
-		var created string
-		if err := rows.Scan(&created); err != nil {
-			return time.Time{}, err
-		}
-		if t, err := time.Parse(time.RFC3339Nano, created); err == nil && t.After(newest) {
-			newest = t
-		}
-	}
-	return newest, rows.Err()
-}
-
 // Rows returns every version of every fact, ordered by id and version.
 func (s *Store) Rows() ([]Fact, error) {
 	return s.query(`SELECT ` + s.cols("") + ` FROM facts ORDER BY id, version`)
