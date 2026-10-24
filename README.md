@@ -15,9 +15,11 @@ through hooks:
   skill.
 
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
-takes about 10 ms per prompt. A fact keeps where and when it was learnt and where it holds (`scope`), but facts from
-every repository are searched: what you learnt in one project is recalled in another. On equal scores a fact of the
-current host comes first; nothing is excluded, because working on a server from a laptop is normal. An uppercase
+takes about 10 ms per prompt. A fact keeps where and when it was learnt and where it holds (`scope`), and facts from
+every repository are searched: what you learnt in one project is recalled in another, but in a repository's session a
+fact that holds only in another repository must match the prompt more closely (see [Projects](#projects)). On equal
+scores a fact of the current host comes first; no host is excluded, because working on a server from a laptop is
+normal. An uppercase
 ticket key such as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a prompt naming it recalls that ticket
 and not another number; bare numbers, ports and versions are still left out of the index. A versioned name such as
 `PostgreSQL-16` is not a ticket: it keeps `PostgreSQL` and drops `16`.
@@ -145,7 +147,22 @@ comes from where the session works, read from the files and never by running git
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
 writes the key. `memcue add -scope repo` does the same for the working directory.
 
+In a session of a repository, a fact scoped to another repository or a directory needs 0.25 of the prompt's weight
+instead of 0.15 to be recalled (#345, [scope-filter-2026-10.md](docs/research/scope-filter-2026-10.md)). On 432
+Claude Code prompts where this changes what is served, it cut the noise facts by 19% and, checked by hand, lost a
+needed fact in 3 prompts. Facts that hold everywhere, on a host or in a service are untouched. So is a session with
+no repository key, such as the Claude config directory or a directory outside git. `MEMCUE_FOREIGN_COVERAGE` changes
+the share; `0` leaves such facts out of the search entirely, which cut 37% of the noise but lost a needed fact in
+about 20 of those prompts.
+
 ## Upgrade
+
+### Facts of other projects (#345)
+
+In a repository's session a fact scoped to another repository now needs a larger share of the prompt (0.25 instead
+of 0.15). Nothing in the base changes. `MEMCUE_FOREIGN_COVERAGE=0.15` restores the recall before #345. The gate
+needs the project keys of #343: until `memcue migrate -repos` has run, facts under the old directory names count as
+another project's.
 
 ### Project keys (#343)
 
@@ -377,6 +394,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
+| `MEMCUE_FOREIGN_COVERAGE` | share a fact scoped to another repository or directory must hold in a repository's session; `0` leaves such facts out of the search; a value at or below `MEMCUE_MIN_COVERAGE` gates them as any other fact | 0.25 |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with `MEMCUE_RERANK=judge` it gates the words' own answer and the fallback only | 0.15 |
 | `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
 | `MEMCUE_MAX_FACTS` | facts one prompt may get; the cut is applied after the ranking, so a larger value adds context, not coverage: on the 68 prompts that needed memory a third fact left the number with a useful fact unchanged, 58 of 68 either way ([docs/research/max-facts-2026-10.md](docs/research/max-facts-2026-10.md)) | `2` |

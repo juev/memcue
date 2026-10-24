@@ -58,6 +58,19 @@ from wrong to right and none the other way, which is a direction, not a signific
 
 The hook takes about 10 ms per prompt with a base of 2335 facts.
 
+### Facts of other projects (October 2026)
+
+Since #345 recall is stricter about a fact scoped to another repository: in a repository's session, such a fact
+needs 0.25 of the prompt's weight instead of 0.15. The measurement used 432 Claude Code prompts, those where the place
+of a fact changes what is served. The facts were labelled by a blind judge, checked against what the agent then did,
+and the disputed ones by hand.
+
+- **The gate** cut the noise facts by 19% and lost a needed fact in 3 prompts.
+- **A hard filter**, which leaves such facts out entirely, cut 37% and lost a needed fact in about 20 prompts.
+
+The judge's USEFUL was right about 40% of the time on the disputed pairs. The judge-labelled usefulness elsewhere in
+this file was not checked by hand, so it may be inflated the same way. Method and tables: [scope-filter-2026-10.md](research/scope-filter-2026-10.md).
+
 ## Writing: how facts get into the base
 
 ### Migration of existing notes
