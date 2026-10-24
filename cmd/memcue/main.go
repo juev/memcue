@@ -114,7 +114,7 @@ commands:
   retire    take a fact out of recall: memcue retire ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
-  dream     retire duplicate and contradicted facts new since the last dream: memcue dream [-since DATE|-all] [-dry-run [-plan FILE]] [-list] | -apply FILE
+  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
@@ -139,9 +139,10 @@ environment:
                   session (default 0.25); 0 leaves such facts out of the search, a value at or below
                   MEMCUE_MIN_COVERAGE gates them as any other fact
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
-  MEMCUE_DREAM    1 runs a dream after an extraction once an hour (dream.log in the state directory)
+  MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in
+                  the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
-                  claude is on PATH), after storing them and before the dream; undecided ones become provisional for
+                  claude is on PATH), after storing them; undecided ones become provisional for
                   MEMCUE_VET_TTL_DAYS
   MEMCUE_VET_POLICY  provisional (default) turns an unsure candidate into a provisional fact; quarantine
                   (or "memcue vet -quarantine") keeps the human queue

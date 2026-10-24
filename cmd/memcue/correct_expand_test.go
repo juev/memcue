@@ -68,34 +68,44 @@ func TestCorrectCallsNoModelForACandidate(t *testing.T) {
 	}
 }
 
-// A dream that corrects a fact gives it queries in the same run: its expansion step runs before the groups are judged,
-// so the corrected text would otherwise wait for the next dream (#297).
-func TestDreamExpandsACorrectedFact(t *testing.T) {
+// A correction the model gives with queries writes them for the new text in the same dream (#297).
+func TestDreamCorrectionCarriesItsQueries(t *testing.T) {
 	env(t)
 	_, a, b, _ := dreamBase(t)
 	fakeDream(t, func(string) []extract.Action {
-		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"nightly-sync"}, Reason: "merge"},
+		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"nightly-sync"},
+			Queries: []string{"ночная подписка", " "}, Reason: "merge"},
 			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 	})
-	asked := 0
-	old := expandFn
-	expandFn = func(input string) (extract.ExpandResult, error) {
-		asked++
-		// Only the corrected text is answered: the facts of the base stay unexpanded, so the call can only come from
-		// the new step after the correction.
-		if !strings.Contains(input, "слитый текст") {
-			return extract.ExpandResult{}, nil
-		}
-		id := input[strings.Index(input, `"id":"`)+6:]
-		id = id[:strings.Index(id, `"`)]
-		return extract.ExpandResult{Facts: []extract.Expansion{{ID: id, Queries: []string{"какой порт у postgres"}}}}, nil
-	}
-	t.Cleanup(func() { expandFn = old })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	f := vetStatus(t, b)
-	if asked == 0 || len(f.Queries) != 1 || f.Queries[0] != "какой порт у postgres" {
-		t.Fatalf("asked %d, corrected fact %+v", asked, f)
+	if f := vetStatus(t, b); f.Content != "слитый текст" || len(f.Queries) != 1 || f.Queries[0] != "ночная подписка" {
+		t.Fatalf("corrected fact %+v", f)
+	}
+}
+
+// A correction without queries drops the old ones, so the next dream gives the new text queries without reviewing it
+// again (#297).
+func TestDreamCorrectionWithoutQueriesIsExpandedNext(t *testing.T) {
+	env(t)
+	_, a, b, _ := dreamBase(t)
+	calls := fakeDream(t, mergeAnswer(a, b))
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if f := vetStatus(t, b); f.Content != "слитый текст" || len(f.Queries) != 0 {
+		t.Fatalf("corrected fact %+v", f)
+	}
+	sent := fakeExpand(t, nil)
+	*calls = nil
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(*sent, " "), b) || len(*calls) != 0 {
+		t.Errorf("expanded %q, groups %q", *sent, *calls)
+	}
+	if f := vetStatus(t, b); len(f.Queries) != 1 {
+		t.Errorf("corrected fact after the next dream %+v", f)
 	}
 }

@@ -25,7 +25,7 @@ func env(t *testing.T) string {
 	// A dream asks the model to split facts before it groups them; a test that is not about splitting gets no split
 	// and no network call.
 	oldSplit := splitFn
-	splitFn = func(string) (extract.SplitResult, error) { return extract.SplitResult{}, nil }
+	splitFn = func(string) (splitReply, error) { return splitReply{}, nil }
 	t.Cleanup(func() { splitFn = oldSplit })
 	oldExpand := expandFn
 	expandFn = func(string) (extract.ExpandResult, error) { return extract.ExpandResult{}, nil }

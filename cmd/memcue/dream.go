@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -23,7 +22,9 @@ import (
 )
 
 // A dream is a pass over the facts written since the last one: each new fact is grouped with the stored facts close
-// to it in words, and the model says which of them to retire as duplicates or contradicted, and which to correct.
+// to it in words, and the session's own model says which of them to retire as duplicates or contradicted, and which
+// to correct. memcue starts no model for it: -prepare hands the work to the model of the session that runs it (a Claude
+// Code skill, a Hermes cron job), and -apply checks and carries out the answer.
 // Extraction never sees the base, so this is where two sessions' copies of one fact, or an old fact and the fact
 // that disproved it, meet.
 
@@ -39,45 +40,18 @@ var dreamNeighbours = recall.Params{
 }
 
 const (
-	maxGroup      = 6         // facts in one group: a chain of neighbours longer than that is cut
-	groupsPerCall = 10        // groups the model sees at once
-	dreamEvery    = time.Hour // with no new fact and none left without queries, a dream calls no model
+	maxGroup   = 6         // facts in one group: a chain of neighbours longer than that is cut
+	dreamEvery = time.Hour // default of MEMCUE_DREAM_EVERY
 )
 
-const (
-	splitBatch    = 20 // facts one split call reads
-	splitParallel = 8
+// The bounds of one packet keep the context a session spends on a dream small: the fresh facts it reviews, the groups
+// it holds and the facts without search queries it gives them to. What is left waits for the next packet: a base
+// written before extraction wrote queries is expanded over a few dreams (#276).
+var (
+	packetFresh  = 40
+	packetGroups = 30
+	packetExpand = 50
 )
-
-const (
-	expandBatch    = 25 // facts one expansion call reads
-	expandParallel = 6
-)
-
-// expandBacklog is how many facts outside the dream's fresh set one dream gives queries to: the facts of a base written
-// before extraction wrote queries, which no later dream sees as fresh (#276). 500 facts are 20 calls without reasoning.
-var expandBacklog = 500
-
-// expandFn is the expansion step, replaced in tests.
-var expandFn = func(input string) (extract.ExpandResult, error) {
-	ctx, cancel := contextTimeout()
-	defer cancel()
-	return extract.ExpandFacts(ctx, input)
-}
-
-// splitFn is the split step, replaced in tests.
-var splitFn = func(input string) (extract.SplitResult, error) {
-	ctx, cancel := contextTimeout()
-	defer cancel()
-	return extract.SplitFacts(ctx, input)
-}
-
-// dreamFn is the model step, replaced in tests.
-var dreamFn = func(groups string) (extract.DreamResult, error) {
-	ctx, cancel := contextTimeout()
-	defer cancel()
-	return extract.Dream(ctx, groups)
-}
 
 // dreamRecord is one line of dream.log: what a dream changed and why, the record its decisions are checked by.
 type dreamRecord struct {
@@ -85,26 +59,19 @@ type dreamRecord struct {
 	Since   string           `json:"since"`
 	Fresh   int              `json:"fresh"`
 	Groups  int              `json:"groups"`
-	DryRun  bool             `json:"dry_run,omitempty"`
 	Splits  []extract.Split  `json:"splits,omitempty"` // compound facts replaced by their parts
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
 	// Promoted are the facts that became global: a duplicate of them was learnt in another project (#346).
 	Promoted []string `json:"promoted,omitempty"`
-	// SplitErrors counts split calls that failed; their facts stay as they are until the next dream reviews them.
-	SplitErrors int `json:"split_errors,omitempty"`
-	// Expanded counts the facts that got search queries; ExpandErrors the expansion calls that failed, whose facts
-	// wait for the next dream.
-	Expanded     int            `json:"expanded,omitempty"`
-	ExpandErrors int            `json:"expand_errors,omitempty"`
-	CostUSD      float64        `json:"cost_usd"`
-	Tokens       extract.Tokens `json:"tokens"`
-	Plan         string         `json:"plan,omitempty"` // the plan file a dry run wrote, or -apply applied
-	Error        string         `json:"error,omitempty"`
+	// Expanded counts the facts that got search queries.
+	Expanded int    `json:"expanded,omitempty"`
+	Packet   string `json:"packet,omitempty"` // the packet -prepare wrote, or -apply applied
+	Error    string `json:"error,omitempty"`
 }
 
-// dreamPlan is what a dry run decided, for -apply to carry out later without the model: the actions of each group
-// with the versions of the facts they were decided on, and what the dream would have counted as seen.
+// dreamPlan is a checked answer: the actions of each group with the versions of the facts they were decided on, and
+// what the dream counts as seen.
 type dreamPlan struct {
 	Start  time.Time        `json:"start"`
 	Seen   map[string]int   `json:"seen"`
@@ -120,8 +87,7 @@ type dreamPlanExpansion struct {
 	Queries []string `json:"queries"`
 }
 
-// dreamPlanSplit is a compound fact the dry run would split, with the version the model read. The owner may edit the
-// parts or delete the entry before -apply.
+// dreamPlanSplit is a compound fact to split, with the version the model read.
 type dreamPlanSplit struct {
 	ID      string   `json:"id"`
 	Version int      `json:"version"`
@@ -138,30 +104,29 @@ func runDream(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("dream", flag.ContinueOnError)
 	since := fs.String("since", "", "review facts written since this date or RFC 3339 time (default: since the last dream)")
 	all := fs.Bool("all", false, "review every active fact")
-	dryRun := fs.Bool("dry-run", false, "ask the model but change nothing")
-	list := fs.Bool("list", false, "print the groups and stop, without the model")
-	plan := fs.String("plan", "", "with -dry-run: write the checked actions to this file for -apply")
-	applyFile := fs.String("apply", "", "apply a plan written by -dry-run -plan, without the model")
+	prep := fs.Bool("prepare", false, "print the work of the dream for the session's model and keep it for -apply")
+	list := fs.Bool("list", false, "print the groups and stop")
+	applyFile := fs.String("apply", "", "check and carry out the model's answer to the packet -prepare printed")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *plan != "" && (!*dryRun || *list) {
-		return errors.New("-plan needs -dry-run")
-	}
-	if *applyFile != "" && (*since != "" || *all || *dryRun || *list || *plan != "") {
+	if *applyFile != "" && (*since != "" || *all || *prep || *list) {
 		return errors.New("-apply takes no other flag")
+	}
+	if *applyFile == "" && !*prep && !*list {
+		return errors.New("memcue dream needs -prepare, -list or -apply FILE")
 	}
 	dir, err := stateDir()
 	if err != nil {
 		return err
 	}
+	unlock, err := lockDream(dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if *applyFile != "" {
-		unlock, err := lockDream(dir)
-		if err != nil {
-			return err
-		}
-		defer unlock()
-		rec, err := applyPlan(dir, *applyFile, out)
+		rec, err := applyAnswer(dir, *applyFile, out)
 		if err != nil {
 			rec.Error = err.Error()
 		}
@@ -184,73 +149,32 @@ func runDream(args []string, out io.Writer) error {
 			return err
 		}
 	}
-	unlock, err := lockDream(dir)
-	if err != nil {
+	rec, err := prepare(dir, from, seen, *list, out)
+	switch {
+	case *list:
 		return err
-	}
-	defer unlock()
-	rec, err := dream(dir, from, seen, *dryRun, *list, *plan, out)
-	if *list {
-		return err
-	}
-	if err != nil {
+	case err != nil:
 		rec.Error = err.Error()
+	case rec.Packet != "":
+		return nil // the dream is logged when its answer is applied
 	}
 	return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 }
 
-// maybeDream runs a dream after an extraction when MEMCUE_DREAM=1 and an hour has passed since the last one. The first
-// call only marks the start and the facts the base holds, so the base a machine already had is not swept by surprise
-// (memcue dream -all does that).
-// Its failures go to dream.log and never fail the extraction.
-func maybeDream() {
-	if os.Getenv("MEMCUE_DREAM") != "1" {
-		return
+// dreamEveryFromEnv reads MEMCUE_DREAM_EVERY, how long after a dream the session start says the next one is due: a Go
+// duration of at least a minute, or def.
+func dreamEveryFromEnv(def time.Duration) time.Duration {
+	d, err := time.ParseDuration(strings.TrimSpace(os.Getenv("MEMCUE_DREAM_EVERY")))
+	if err != nil || d < time.Minute {
+		return def
 	}
-	dir, err := stateDir()
-	if err != nil {
-		return
-	}
-	from, ok := lastDream(dir)
-	if !ok {
-		_ = markBase(dir)
-		return
-	}
-	if time.Since(from) < dreamEvery {
-		return
-	}
-	unlock, err := lockDream(dir)
-	if err != nil {
-		return // another dream is running
-	}
-	defer unlock()
-	if from, ok = lastDream(dir); !ok || time.Since(from) < dreamEvery { // it may have just finished
-		return
-	}
-	seen, err := readDreamSeen(dir) // unreadable: the dream falls back to the facts written since the mark, and says why
-	rec, derr := dream(dir, from, seen, false, false, "", io.Discard)
-	if err = errors.Join(err, derr); err != nil {
-		rec.Error = err.Error()
-	}
-	_ = appendJSON(filepath.Join(dir, "dream.log"), rec)
+	return d
 }
 
-// dream reviews the facts the last dream did not see: those of seen, the facts and versions it saw, missing. A fact
-// pulled from another machine is new to it whenever it was written. Without seen, it reviews the facts written since
-// from; the zero time means every active fact. A dry run with planPath writes what it decided there, once every group
-// has an answer.
-func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, planPath string, out io.Writer) (dreamRecord, error) {
-	start := time.Now()
-	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339), DryRun: dryRun}
-	s, err := store.Open(factsPath())
-	if err != nil {
-		return rec, err
-	}
-	defer func() { _ = s.Close() }()
-	active, err := s.Active()
-	if err != nil {
-		return rec, err
-	}
+// freshFacts are the active facts the last dream did not see: those of seen, the facts and versions it saw, missing. A
+// fact pulled from another machine is new whenever it was written. Without seen, they are the facts written since
+// from; the zero time means every active fact.
+func freshFacts(s *store.Store, active []store.Fact, from time.Time, seen map[string]int) ([]store.Fact, error) {
 	var fresh []store.Fact
 	for _, f := range active {
 		if seen != nil && seen[f.ID] != f.Version {
@@ -258,7 +182,7 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 			// text, and saw this one already.
 			same, err := onlyLabelsSince(s, f.ID, seen[f.ID])
 			if err != nil {
-				return rec, err
+				return nil, err
 			}
 			if !same {
 				fresh = append(fresh, f)
@@ -269,146 +193,250 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 			fresh = append(fresh, f)
 		}
 	}
-	saw := versions(active) // what the next dream counts as seen: the base now, with this dream's own changes
-	rec.Fresh = len(fresh)
-	plan := dreamPlan{Start: start, Seen: versions(active)}
-	if !list {
-		// Splitting comes first: a part that repeats another fact is then grouped with it and retired as a duplicate.
-		// A dry run keeps the originals and puts the splits in the plan.
-		splits, err := splitStep(s, fresh, &rec, out)
-		if err != nil {
-			return rec, err
-		}
-		for _, sp := range splits {
-			if dryRun {
-				plan.Splits = append(plan.Splits, sp.plan)
-				continue
-			}
-			active = replaceFact(active, sp.plan.ID, sp.parts)
-			fresh = replaceFact(fresh, sp.plan.ID, sp.parts)
-			saw[sp.plan.ID] = sp.plan.Version + 1
-			for _, p := range sp.parts {
-				saw[p.ID] = p.Version
-			}
-		}
-		// Then every fresh fact without search queries gets them, the parts of a split included, so the groups and
-		// recall find it by the words a user asks with. A dry run leaves out the facts it would split.
-		splitIDs := map[string]bool{}
-		for _, sp := range plan.Splits {
-			splitIDs[sp.ID] = true
-		}
-		var bare []store.Fact
-		for _, f := range fresh {
-			if len(f.Queries) == 0 && !splitIDs[f.ID] {
-				bare = append(bare, f)
-			}
-		}
-		// Facts the dream has seen and will not see again get them too, up to expandBacklog a dream, the newest first:
-		// an old base is expanded over a few dreams. They are not reviewed, only expanded.
-		isFresh, backlog := freshSet(fresh), 0
-		for i := len(active) - 1; i >= 0 && backlog < expandBacklog; i-- {
-			if f := active[i]; !isFresh[f.ID] && len(f.Queries) == 0 && !splitIDs[f.ID] {
-				bare = append(bare, f)
-				backlog++
-			}
-		}
-		expanded, err := expandStep(s, bare, &rec)
-		if err != nil {
-			return rec, err
-		}
-		for _, e := range expanded {
-			if dryRun {
-				plan.Expansions = append(plan.Expansions, e.plan)
-				continue
-			}
-			active = replaceFact(active, e.fact.ID, []store.Fact{e.fact})
-			fresh = replaceFact(fresh, e.fact.ID, []store.Fact{e.fact})
-			saw[e.fact.ID] = e.fact.Version
-		}
-		if rec.Expanded > 0 {
-			if _, err := fmt.Fprintf(out, "expanded %d facts\n", rec.Expanded); err != nil {
-				return rec, err
-			}
-		}
+	return fresh, nil
+}
+
+// dreamDue says how many facts wait for the dream when one is due: the interval since the last one has passed and some
+// fact is fresh. The first call on a machine only marks the base, so the facts it already had are not swept by
+// surprise (memcue dream -prepare -all does that).
+func dreamDue(dir string, every time.Duration) (int, time.Time, error) {
+	last, ok := lastDream(dir)
+	if !ok {
+		return 0, time.Time{}, markBase(dir)
 	}
-	groups, err := groupFacts(s, active, fresh)
+	if time.Since(last) < every {
+		return 0, last, nil
+	}
+	seen, err := readDreamSeen(dir)
+	if err != nil {
+		return 0, last, err
+	}
+	s, err := store.Open(factsPath())
+	if err != nil {
+		return 0, last, err
+	}
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
+		return 0, last, err
+	}
+	fresh, err := freshFacts(s, active, last, seen)
+	return len(fresh), last, err
+}
+
+// dreamPacket is what -prepare handed to the model, kept in the state directory for -apply: the facts and versions
+// each part of the work was read at, and what the dream counts as seen once the answer is applied.
+type dreamPacket struct {
+	ID     string           `json:"id"`
+	Start  time.Time        `json:"start"`
+	Seen   map[string]int   `json:"seen"`
+	Split  map[string]int   `json:"split"`
+	Expand map[string]int   `json:"expand"`
+	Groups []map[string]int `json:"groups"`
+}
+
+// dreamAnswer is what the model gives back for a packet.
+type dreamAnswer struct {
+	Packet     string              `json:"packet"`
+	Splits     []extract.Split     `json:"splits"`
+	Expansions []extract.Expansion `json:"expansions"`
+	Actions    []extract.Action    `json:"actions"`
+}
+
+const packetFile = "dream.packet.json"
+
+// prepare writes the work of a dream for the session's model: the fresh facts to split, the facts without search
+// queries to expand, and the groups of similar facts to review, with the instructions for each. It keeps the packet
+// for -apply and prints it. Fresh facts left out by the packet bounds are not counted as seen, so the next packet
+// takes them.
+func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.Writer) (dreamRecord, error) {
+	start := time.Now()
+	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339)}
+	s, err := store.Open(factsPath())
 	if err != nil {
 		return rec, err
 	}
-	rec.Groups = len(groups)
-	if list {
-		_, err := io.WriteString(out, renderGroups(groups, freshSet(fresh)))
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
 		return rec, err
 	}
-	// The facts this dream corrects are expanded after the groups are judged: the expansion step above runs before
-	// them, and a corrected fact with the queries of its old text is what #297 filed.
-	var corrected []store.Fact
-	for batch := range slices.Chunk(groups, groupsPerCall) {
-		r, err := dreamFn(renderGroups(batch, freshSet(fresh)))
-		rec.CostUSD += r.CostUSD
-		rec.Tokens.Add(r.Tokens)
-		if err != nil {
-			return rec, err
-		}
-		ok, refused := checkActions(batch, r.Actions)
-		rec.Refused = append(rec.Refused, refused...)
-		plan.Groups = append(plan.Groups, planGroups(batch, ok)...)
-		// The model decided on the text of the groups as they were sent; a fact corrected or retired while it ran
-		// makes them stale, so the whole group is refused, as a plan does. A dry run changes nothing and keeps the
-		// versions for -apply to check then.
-		stale := make([]string, len(batch))
-		if !dryRun && len(ok) > 0 {
-			for i, g := range batch {
-				if stale[i], err = changedFact(s, g); err != nil {
-					return rec, err
-				}
+	fresh, err := freshFacts(s, active, from, seen)
+	if err != nil {
+		return rec, err
+	}
+	rec.Fresh = len(fresh)
+	batch := fresh
+	if len(batch) > packetFresh {
+		batch = batch[:packetFresh]
+	}
+	groups, err := groupFacts(s, active, batch)
+	if err != nil {
+		return rec, err
+	}
+	if len(groups) > packetGroups {
+		// A fresh fact of a group left out waits for the next packet with the rest of its group.
+		left := map[string]bool{}
+		for _, g := range groups[packetGroups:] {
+			for _, f := range g {
+				left[f.ID] = true
 			}
 		}
-		groupOf := groupsOf(batch)
-		for _, a := range ok {
-			if changed := stale[groupOf[a.ID]]; changed != "" {
-				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since it was sent ("+changed+")")
-				continue
-			}
-			if !dryRun {
-				f, err := apply(s, a)
-				if err != nil {
-					return rec, err
-				}
-				saw[f.ID] = f.Version // a retired fact is not active, so its entry is never compared again
-				if a.Op != "retire" {
-					corrected = append(corrected, f)
-				}
-			}
-			rec.Actions = append(rec.Actions, a)
-			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
-				return rec, err
-			}
-			if err := promote(s, a, dryRun, saw, &rec, out); err != nil {
-				return rec, err
+		groups = groups[:packetGroups]
+		batch = slices.DeleteFunc(slices.Clone(batch), func(f store.Fact) bool { return left[f.ID] })
+	}
+	rec.Groups = len(groups)
+	if list {
+		_, err := io.WriteString(out, renderGroups(groups, freshSet(batch)))
+		return rec, err
+	}
+	// Every fact without search queries gets them, the fresh ones first, then the facts the dream has seen and will
+	// not see again, the newest first: an old base is expanded over a few dreams (#276).
+	isBatch := freshSet(batch)
+	var bare []store.Fact
+	for _, f := range batch {
+		if len(f.Queries) == 0 {
+			bare = append(bare, f)
+		}
+	}
+	isFresh := freshSet(fresh)
+	for i := len(active) - 1; i >= 0 && len(bare) < packetExpand; i-- {
+		if f := active[i]; !isFresh[f.ID] && len(f.Queries) == 0 {
+			bare = append(bare, f)
+		}
+	}
+	if len(bare) > packetExpand {
+		bare = bare[:packetExpand]
+	}
+	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
+		Split: versions(batch), Expand: versions(bare)}
+	for _, f := range fresh {
+		if !isBatch[f.ID] {
+			if v, ok := seen[f.ID]; ok {
+				p.Seen[f.ID] = v
+			} else {
+				delete(p.Seen, f.ID)
 			}
 		}
 	}
-	if !dryRun {
-		// A corrected fact has new text, and the queries of the old one no longer describe it: they are asked for in
-		// the same run, since the expansion step above goes before the groups are judged (#297). A failure leaves the
-		// fact to the next dream.
-		before := rec.Expanded
-		if err := expandCorrected(s, corrected, saw, &rec); err != nil {
-			return rec, err
-		}
-		if rec.Expanded > before {
-			if _, err := fmt.Fprintf(out, "expanded %d corrected facts\n", rec.Expanded-before); err != nil {
-				return rec, err
-			}
-		}
-		err = errors.Join(writeDreamSeen(dir, saw), markDream(dir, start))
+	for _, g := range groups {
+		p.Groups = append(p.Groups, versions(g))
 	}
-	if dryRun && planPath != "" {
-		rec.Plan = planPath
-		err = writeJSONFile(planPath, plan)
+	if len(batch) == 0 && len(bare) == 0 {
+		// Nothing to ask: the dream is done as of now.
+		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
+		return rec, errors.Join(err, writeDreamSeen(dir, p.Seen), markDream(dir, start))
 	}
+	if err := writeJSONFile(filepath.Join(dir, packetFile), p); err != nil {
+		return rec, err
+	}
+	rec.Packet = p.ID
+	text, err := renderPacket(p.ID, batch, bare, groups, isBatch)
+	if err != nil {
+		return rec, err
+	}
+	_, err = io.WriteString(out, text)
 	return rec, err
+}
+
+// renderPacket is the text the model reads: the instructions, the groups, and the facts to split and expand.
+func renderPacket(id string, split, expand []store.Fact, groups [][]store.Fact, fresh map[string]bool) (string, error) {
+	splitIn, err := renderSplitInput(split)
+	if err != nil {
+		return "", err
+	}
+	expandIn, err := renderSplitInput(expand)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	b.WriteString(extract.DreamInstructions(id))
+	b.WriteString("\n## Данные: разделение\n\n```json\n" + splitIn + "\n```\n")
+	b.WriteString("\n## Данные: поисковые запросы\n\n```json\n" + expandIn + "\n```\n")
+	b.WriteString("\n## Данные: группы\n\n")
+	if len(groups) == 0 {
+		b.WriteString("Групп нет.\n")
+	}
+	b.WriteString(renderGroups(groups, fresh))
+	return b.String(), nil
+}
+
+// applyAnswer checks the model's answer against the packet it was given and carries it out the way a plan is. An
+// answer to another packet is refused whole; an answer about a fact the packet did not give for that part, a second
+// answer about one fact or a split into fewer than two parts is refused alone.
+func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
+	rec := dreamRecord{Time: time.Now().UTC().Format(time.RFC3339)}
+	var p dreamPacket
+	b, err := os.ReadFile(filepath.Join(dir, packetFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return rec, errors.New("no dream packet: run memcue dream -prepare first")
+	}
+	if err != nil {
+		return rec, err
+	}
+	if err := json.Unmarshal(b, &p); err != nil {
+		return rec, fmt.Errorf("%s: %w", packetFile, err)
+	}
+	rec.Packet = p.ID
+	b, err = os.ReadFile(path)
+	if err != nil {
+		return rec, err
+	}
+	var a dreamAnswer
+	if err := json.Unmarshal(b, &a); err != nil {
+		return rec, fmt.Errorf("answer %s: %w", path, err)
+	}
+	if a.Packet != p.ID {
+		return rec, fmt.Errorf("answer %s is for packet %q, the current one is %q: run -prepare again", path, a.Packet, p.ID)
+	}
+	plan := dreamPlan{Start: p.Start, Seen: p.Seen}
+	done := map[string]bool{}
+	for _, sp := range a.Splits {
+		var parts []string
+		for _, part := range sp.Parts {
+			if part = strings.TrimSpace(part); part != "" {
+				parts = append(parts, part)
+			}
+		}
+		v, ok := p.Split[sp.ID]
+		switch {
+		case !ok:
+			rec.Refused = append(rec.Refused, "split "+sp.ID+": not a fact of the packet to split")
+		case done[sp.ID]:
+			rec.Refused = append(rec.Refused, "split "+sp.ID+": second split of the fact")
+		case len(parts) < 2:
+			rec.Refused = append(rec.Refused, fmt.Sprintf("split %s: %d part(s)", sp.ID, len(parts)))
+		default:
+			done[sp.ID] = true
+			plan.Splits = append(plan.Splits, dreamPlanSplit{ID: sp.ID, Version: v, Parts: parts,
+				Reason: strings.TrimSpace(sp.Reason)})
+		}
+	}
+	expanded := map[string]bool{}
+	for _, e := range a.Expansions {
+		v, ok := p.Expand[e.ID]
+		q := extract.CleanQueries(e.Queries)
+		if !ok || expanded[e.ID] || done[e.ID] || len(q) == 0 {
+			continue // a fact the packet did not give, a second answer, a split fact, or nothing to write
+		}
+		expanded[e.ID] = true
+		plan.Expansions = append(plan.Expansions, dreamPlanExpansion{ID: e.ID, Version: v, Queries: q})
+	}
+	groups := make([][]store.Fact, len(p.Groups))
+	for i, g := range p.Groups {
+		for _, id := range slices.Sorted(maps.Keys(g)) {
+			groups[i] = append(groups[i], store.Fact{ID: id, Version: g[id]})
+		}
+	}
+	ok, refused := checkActions(groups, a.Actions)
+	rec.Refused = append(rec.Refused, refused...)
+	plan.Groups = planGroups(groups, ok)
+	rec.Fresh = len(p.Split)
+	applied, err := applyPlan(dir, plan, rec, out)
+	if err == nil {
+		err = os.Remove(filepath.Join(dir, packetFile))
+	}
+	return applied, err
 }
 
 // planGroups pairs the checked actions of a batch with their groups; a group without an action needs no entry.
@@ -444,41 +472,10 @@ func groupsOf(groups [][]store.Fact) map[string]int {
 	return m
 }
 
-// changedFact re-reads the facts of a group sent to the model and returns the id of the first whose version is not the
-// one sent: a fact corrected, retired or reopened while the model ran. The live dream refuses such a group whole, as a
-// plan does; no fact with that id means the same.
-func changedFact(s *store.Store, g []store.Fact) (string, error) {
-	for _, f := range g {
-		cur, err := s.Get(f.ID)
-		if errors.Is(err, store.ErrNotFound) {
-			return f.ID, nil
-		}
-		if err != nil {
-			return "", err
-		}
-		if cur.Version != f.Version {
-			return f.ID, nil
-		}
-	}
-	return "", nil
-}
-
-// applyPlan carries out a plan written by a dry run. A group whose facts changed since then (a new version, or
-// retired) is refused whole, since its actions were decided on the old text; the rest apply, and the dream is marked
-// as of the dry run, with what it saw.
-func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
-	rec := dreamRecord{Time: time.Now().UTC().Format(time.RFC3339), Plan: path}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return rec, err
-	}
-	var plan dreamPlan
-	if err := json.Unmarshal(b, &plan); err != nil {
-		return rec, fmt.Errorf("plan %s: %w", path, err)
-	}
-	if plan.Seen == nil || plan.Start.IsZero() {
-		return rec, fmt.Errorf("plan %s: not a dream plan", path)
-	}
+// applyPlan carries out a checked answer. A group whose facts changed since the packet (a new version, or retired) is
+// refused whole, since its actions were decided on the old text; the rest apply, and the dream is marked as of the
+// packet, with what it saw. rec carries what the checks before already refused.
+func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (dreamRecord, error) {
 	rec.Since = plan.Start.UTC().Format(time.RFC3339)
 	rec.Groups = len(plan.Groups)
 	s, err := store.Open(factsPath())
@@ -490,18 +487,6 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 	// Splits go first, so a group the model saw with the compound fact in it is refused below as changed. The parts
 	// are not marked seen: the next dream groups them with their neighbours, which this plan never did.
 	for _, sp := range plan.Splits {
-		// The owner may have edited the parts: a split left with fewer than two is refused, not a reason to stop.
-		var kept []string
-		for _, p := range sp.Parts {
-			if p = strings.TrimSpace(p); p != "" {
-				kept = append(kept, p)
-			}
-		}
-		if len(kept) < 2 {
-			rec.Refused = append(rec.Refused, fmt.Sprintf("split %s: %d part(s) in the plan", sp.ID, len(kept)))
-			continue
-		}
-		sp.Parts = kept
 		parts, err := s.SplitFact(sp.ID, sp.Version, sp.Parts)
 		switch {
 		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound):
@@ -539,7 +524,7 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 	}
 	// The snapshot must name every fact of the plan, including provisional and retired ones: store.Active leaves
 	// provisional facts out, and a group with a provisional neighbour would otherwise look changed and be refused
-	// although nothing happened since the dry run.
+	// although nothing happened since the packet.
 	now := make(map[string]int)
 	for _, g := range plan.Groups {
 		for id := range g.Facts {
@@ -567,7 +552,7 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 		}
 		for _, a := range g.Actions {
 			if changed != "" {
-				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since the plan ("+changed+")")
+				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since the packet ("+changed+")")
 				continue
 			}
 			f, err := apply(s, a)
@@ -575,11 +560,14 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 				return rec, err
 			}
 			saw[f.ID] = f.Version
+			if a.Op == "correct" && f.Status == store.Active && len(f.Queries) > 0 {
+				rec.Expanded++
+			}
 			rec.Actions = append(rec.Actions, a)
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
 				return rec, err
 			}
-			if err := promote(s, a, false, saw, &rec, out); err != nil {
+			if err := promote(s, a, saw, &rec, out); err != nil {
 				return rec, err
 			}
 		}
@@ -590,95 +578,6 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 		}
 	}
 	return rec, errors.Join(writeDreamSeen(dir, saw), markDream(dir, plan.Start))
-}
-
-// dreamSplit is one checked split: what a plan keeps of it and, once written, the parts.
-type dreamSplit struct {
-	plan  dreamPlanSplit
-	parts []store.Fact
-}
-
-// splitStep asks the model which fresh facts hold several claims and, unless the record is a dry run, replaces them
-// with their parts. A failed call leaves its facts as they are and is counted; an answer
-// about a fact that was not sent, a second answer about one fact or fewer than two parts is refused. A fact that
-// changed while the model ran is refused too, since the parts were read off its old text.
-func splitStep(s *store.Store, fresh []store.Fact, rec *dreamRecord, out io.Writer) ([]dreamSplit, error) {
-	batches := slices.Collect(slices.Chunk(fresh, splitBatch))
-	res := make([]extract.SplitResult, len(batches))
-	errs := make([]error, len(batches))
-	sem := make(chan struct{}, splitParallel)
-	var wg sync.WaitGroup
-	for i, batch := range batches {
-		input, err := renderSplitInput(batch)
-		if err != nil {
-			return nil, err
-		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer func() { <-sem; wg.Done() }()
-			res[i], errs[i] = splitFn(input)
-		}()
-	}
-	wg.Wait()
-	byID := make(map[string]store.Fact, len(fresh))
-	for _, f := range fresh {
-		byID[f.ID] = f
-	}
-	var found []dreamSplit
-	done := map[string]bool{}
-	for i := range batches {
-		rec.CostUSD += res[i].CostUSD
-		rec.Tokens.Add(res[i].Tokens)
-		if errs[i] != nil {
-			rec.SplitErrors++
-			continue
-		}
-		sent := map[string]bool{}
-		for _, f := range batches[i] {
-			sent[f.ID] = true
-		}
-		for _, sp := range res[i].Splits {
-			switch {
-			case !sent[sp.ID]:
-				rec.Refused = append(rec.Refused, "split "+sp.ID+": not a fact of the batch")
-				continue
-			case done[sp.ID]:
-				rec.Refused = append(rec.Refused, "split "+sp.ID+": second split of the fact")
-				continue
-			case len(sp.Parts) < 2:
-				rec.Refused = append(rec.Refused, fmt.Sprintf("split %s: %d part(s)", sp.ID, len(sp.Parts)))
-				continue
-			}
-			done[sp.ID] = true
-			f := byID[sp.ID]
-			ds := dreamSplit{plan: dreamPlanSplit{ID: f.ID, Version: f.Version, Parts: sp.Parts, Reason: sp.Reason}}
-			if !rec.DryRun {
-				parts, err := s.SplitFact(f.ID, f.Version, sp.Parts)
-				if errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound) {
-					rec.Refused = append(rec.Refused, "split "+f.ID+": "+err.Error())
-					continue
-				}
-				if err != nil {
-					return found, err
-				}
-				ds.parts = parts
-			}
-			rec.Splits = append(rec.Splits, sp)
-			if err := printSplit(out, sp.ID, sp.Reason, ds.parts); err != nil {
-				return found, err
-			}
-			if rec.DryRun {
-				for _, p := range sp.Parts {
-					if _, err := fmt.Fprintf(out, "  + %s\n", p); err != nil {
-						return found, err
-					}
-				}
-			}
-			found = append(found, ds)
-		}
-	}
-	return found, nil
 }
 
 // onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,
@@ -712,94 +611,6 @@ func onlyLabelsSince(s *store.Store, id string, seen int) (bool, error) {
 	return prev != nil, nil
 }
 
-// dreamExpansion is one fact that got queries: what a plan keeps of it and, once written, the new version.
-type dreamExpansion struct {
-	plan dreamPlanExpansion
-	fact store.Fact
-}
-
-// expandStep asks the main model for the search queries of facts that have none and, unless the record is a dry run,
-// writes them. A failed call leaves its facts for the next dream and is counted, as a failed split call is; an answer
-// about a fact that was not sent, or with no query, is ignored; a fact changed while the model ran is refused.
-func expandStep(s *store.Store, facts []store.Fact, rec *dreamRecord) ([]dreamExpansion, error) {
-	batches := slices.Collect(slices.Chunk(facts, expandBatch))
-	res := make([]extract.ExpandResult, len(batches))
-	errs := make([]error, len(batches))
-	sem := make(chan struct{}, expandParallel)
-	var wg sync.WaitGroup
-	for i, batch := range batches {
-		input, err := renderSplitInput(batch)
-		if err != nil {
-			return nil, err
-		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer func() { <-sem; wg.Done() }()
-			res[i], errs[i] = expandFn(input)
-		}()
-	}
-	wg.Wait()
-	var found []dreamExpansion
-	for i, batch := range batches {
-		rec.CostUSD += res[i].CostUSD
-		rec.Tokens.Add(res[i].Tokens)
-		if errs[i] != nil {
-			rec.ExpandErrors++
-			continue
-		}
-		byID := make(map[string]store.Fact, len(batch))
-		for _, f := range batch {
-			byID[f.ID] = f
-		}
-		for _, e := range res[i].Facts {
-			f, ok := byID[e.ID]
-			if !ok || len(e.Queries) == 0 {
-				continue
-			}
-			delete(byID, e.ID) // a second answer about the same fact is ignored
-			x := dreamExpansion{plan: dreamPlanExpansion{ID: f.ID, Version: f.Version, Queries: e.Queries}, fact: f}
-			if !rec.DryRun {
-				nf, err := s.SetQueries(f.ID, f.Version, e.Queries)
-				if errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound) {
-					rec.Refused = append(rec.Refused, "expand "+f.ID+": "+err.Error())
-					continue
-				}
-				if err != nil {
-					return found, err
-				}
-				x.fact = nf
-			}
-			rec.Expanded++
-			found = append(found, x)
-		}
-	}
-	return found, nil
-}
-
-// expandCorrected gives the facts a dream just corrected their search queries in the same run. Only facts without
-// queries are asked about, and a failed call leaves the fact to the next dream; the fact is corrected either way. The
-// snapshot the next dream compares against takes the version the expansion wrote.
-func expandCorrected(s *store.Store, corrected []store.Fact, saw map[string]int, rec *dreamRecord) error {
-	var bare []store.Fact
-	for _, f := range corrected {
-		if len(f.Queries) == 0 {
-			bare = append(bare, f)
-		}
-	}
-	if len(bare) == 0 {
-		return nil
-	}
-	expanded, err := expandStep(s, bare, rec)
-	if err != nil {
-		return err
-	}
-	for _, e := range expanded {
-		saw[e.fact.ID] = e.fact.Version
-	}
-	return nil
-}
-
 // renderSplitInput is the JSON the split prompt reads: the id and text of each fact.
 func renderSplitInput(facts []store.Fact) (string, error) {
 	type item struct {
@@ -825,15 +636,6 @@ func printSplit(out io.Writer, id, reason string, parts []store.Fact) error {
 		}
 	}
 	return nil
-}
-
-// replaceFact puts parts in the place of the fact id.
-func replaceFact(facts []store.Fact, id string, parts []store.Fact) []store.Fact {
-	i := slices.IndexFunc(facts, func(f store.Fact) bool { return f.ID == id })
-	if i < 0 {
-		return facts
-	}
-	return slices.Concat(facts[:i:i], parts, facts[i+1:])
 }
 
 // writeJSONFile replaces path through a temporary file next to it.
@@ -1051,9 +853,9 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 
 // promote makes the fact a duplicate was retired for global when the two were learnt in different projects: a fact
 // learnt twice, independently, in two projects holds in both, so it is no project's fact (#346). The code decides
-// this, not the model, which only said that one fact covers the other. A dry run reports it without writing. The
+// this, not the model, which only said that one fact covers the other. The
 // survivor is read now, not as the group showed it: an earlier action of the batch may have corrected it.
-func promote(s *store.Store, a extract.Action, dryRun bool, saw map[string]int, rec *dreamRecord, out io.Writer) error {
+func promote(s *store.Store, a extract.Action, saw map[string]int, rec *dreamRecord, out io.Writer) error {
 	if a.Op != "retire" || a.Kind != "duplicate" || a.By == "" {
 		return nil
 	}
@@ -1069,13 +871,11 @@ func promote(s *store.Store, a extract.Action, dryRun bool, saw map[string]int, 
 	if from == "" || to == "" || from == to || by.Status != store.Active {
 		return nil
 	}
-	if !dryRun {
-		f, err := s.Relabel(by.ID, by.Version, by.Kind, "global", by.Expires)
-		if err != nil {
-			return err
-		}
-		saw[f.ID] = f.Version
+	f, err := s.Relabel(by.ID, by.Version, by.Kind, "global", by.Expires)
+	if err != nil {
+		return err
 	}
+	saw[f.ID] = f.Version
 	rec.Promoted = append(rec.Promoted, by.ID)
 	_, err = fmt.Fprintf(out, "global %s: a duplicate was learnt in %s, it in %s\n", by.ID, from, to)
 	return err
@@ -1098,7 +898,9 @@ func projectOf(f store.Fact) string {
 	return ""
 }
 
-// apply makes one checked action and returns the version it wrote.
+// apply makes one checked action and returns the version it wrote. A correction drops the queries of the old text;
+// the ones the model wrote for the new text are set in a version of their own, and without them the next packet asks
+// for them (#297).
 func apply(s *store.Store, a extract.Action) (store.Fact, error) {
 	if a.Op == "retire" {
 		return s.Retire(a.ID)
@@ -1111,7 +913,14 @@ func apply(s *store.Store, a extract.Action) (store.Fact, error) {
 		}
 		keywords = cur.Keywords
 	}
-	return s.Correct(a.ID, a.Content, keywords)
+	f, err := s.Correct(a.ID, a.Content, keywords)
+	if err != nil {
+		return f, err
+	}
+	if q := extract.CleanQueries(a.Queries); len(q) > 0 {
+		return s.SetQueries(f.ID, f.Version, q)
+	}
+	return f, nil
 }
 
 func parseSince(v string) (time.Time, error) {

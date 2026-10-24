@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,9 +18,9 @@ func fakeDream(t *testing.T, answer func(groups string) []extract.Action) *[]str
 	t.Helper()
 	var calls []string
 	old := dreamFn
-	dreamFn = func(groups string) (extract.DreamResult, error) {
+	dreamFn = func(groups string) (dreamReply, error) {
 		calls = append(calls, groups)
-		return extract.DreamResult{Actions: answer(groups), CostUSD: 0.01}, nil
+		return dreamReply{Actions: answer(groups)}, nil
 	}
 	t.Cleanup(func() { dreamFn = old })
 	return &calls
@@ -60,7 +59,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 		return []extract.Action{{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "covered by " + b}}
 	})
 	var out bytes.Buffer
-	if err := runDream([]string{"-all"}, &out); err != nil {
+	if err := dreamModel([]string{"-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if len(*calls) != 1 {
@@ -83,7 +82,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	if err != nil || json.Unmarshal(logb, &rec) != nil {
 		t.Fatalf("log %q: %v", logb, err)
 	}
-	if rec.Groups != 1 || len(rec.Actions) != 1 || rec.Actions[0].Reason == "" || rec.CostUSD != 0.01 {
+	if rec.Groups != 1 || len(rec.Actions) != 1 || rec.Actions[0].Reason == "" {
 		t.Errorf("record %+v", rec)
 	}
 	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); !ok {
@@ -161,25 +160,33 @@ func TestDreamListShowsAProvisionalNeighbour(t *testing.T) {
 	}
 }
 
-func TestDreamDryRunChangesNothing(t *testing.T) {
+// -prepare prints the work and keeps the packet, and changes nothing: neither the facts nor the dream mark.
+func TestDreamPrepareChangesNothing(t *testing.T) {
 	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
 	_, a, b, _ := dreamBase(t)
-	fakeDream(t, func(string) []extract.Action {
-		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
-			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "covered"}}
-	})
-	if err := runDream([]string{"-all", "-dry-run"}, &bytes.Buffer{}); err != nil {
+	var out bytes.Buffer
+	if err := runDream([]string{"-prepare", "-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	s, _ := store.Open(factsPath())
-	defer func() { _ = s.Close() }()
+	for _, want := range []string{"memcue dream -apply", "## Задача 1.", "## Задача 2.", "## Задача 3.",
+		"## Данные: группы", a, b} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("packet lacks %q", want)
+		}
+	}
+	var p dreamPacket
+	raw, err := os.ReadFile(filepath.Join(state, packetFile))
+	if err != nil || json.Unmarshal(raw, &p) != nil || !strings.Contains(out.String(), `"packet": "`+p.ID+`"`) {
+		t.Fatalf("packet %s: %v", raw, err)
+	}
 	for _, id := range []string{a, b} {
-		if f, _ := s.Get(id); f.Version != 1 || f.Status != store.Active {
+		if f := vetStatus(t, id); f.Version != 1 || f.Status != store.Active {
 			t.Errorf("%s changed: %+v", id, f)
 		}
 	}
-	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); ok {
-		t.Error("dry run moved dream.at")
+	if _, ok := lastDream(state); ok {
+		t.Error("-prepare moved dream.at")
 	}
 }
 
@@ -190,7 +197,7 @@ func TestDreamCorrectsMergedFact(t *testing.T) {
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Keywords: []string{"nightly-sync"}, Reason: "merge"},
 			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 	})
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
@@ -207,7 +214,7 @@ func TestDreamCorrectWithoutKeywordsKeepsThem(t *testing.T) {
 		return []extract.Action{{Op: "correct", ID: b, Content: "слитый текст", Reason: "merge"},
 			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged"}}
 	})
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
@@ -270,13 +277,13 @@ func TestDreamSinceLastRunOnly(t *testing.T) {
 	dir := env(t)
 	dreamBase(t)
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
-	if err := runDream(nil, &bytes.Buffer{}); err == nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err == nil {
 		t.Error("first dream without -since or -all must ask for one")
 	}
 	if err := markDream(filepath.Join(dir, "state", "memcue"), time.Now().Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*calls) != 0 {
@@ -284,76 +291,51 @@ func TestDreamSinceLastRunOnly(t *testing.T) {
 	}
 }
 
-func TestDreamModelErrorIsLoggedAndChangesNothing(t *testing.T) {
-	dir := env(t)
-	_, a, _, _ := dreamBase(t)
-	old := dreamFn
-	dreamFn = func(string) (extract.DreamResult, error) { return extract.DreamResult{}, errors.New("rate limited") }
-	t.Cleanup(func() { dreamFn = old })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err == nil {
-		t.Error("want the error")
-	}
-	b, _ := os.ReadFile(filepath.Join(dir, "state", "memcue", "dream.log"))
-	if !strings.Contains(string(b), "rate limited") {
-		t.Errorf("log %q", b)
-	}
-	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); ok {
-		t.Error("failed dream moved dream.at")
-	}
-	s, _ := store.Open(factsPath())
-	defer func() { _ = s.Close() }()
-	if f, _ := s.Get(a); f.Status != store.Active {
-		t.Errorf("fact changed: %+v", f)
-	}
-}
-
-func TestMaybeDreamOnlyWhenOnAndDue(t *testing.T) {
+// A dream is due once MEMCUE_DREAM_EVERY has passed since the last one and a fact is fresh; the first check on a
+// machine only marks the base. The session start says so in one line, and only then.
+func TestDreamDueOnlyAfterTheIntervalWithAFreshFact(t *testing.T) {
 	dir := env(t)
 	state := filepath.Join(dir, "state", "memcue")
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	dreamBase(t)
-	calls := fakeDream(t, func(string) []extract.Action { return nil })
-
-	t.Setenv("MEMCUE_DREAM", "")
-	maybeDream()
-	if _, err := os.Stat(filepath.Join(state, "dream.at")); !os.IsNotExist(err) {
-		t.Errorf("dream off but state written: %v", err)
+	if n, _, err := dreamDue(state, time.Hour); err != nil || n != 0 {
+		t.Fatalf("first check: %d %v", n, err)
 	}
-
-	t.Setenv("MEMCUE_DREAM", "1")
-	maybeDream() // first call marks the start only
-	if _, ok := lastDream(state); !ok || len(*calls) != 0 {
-		t.Fatalf("first call: marked %v, calls %d", ok, len(*calls))
-	}
-	maybeDream() // not an hour yet
-	if len(*calls) != 0 {
-		t.Errorf("dreamt before an hour passed")
+	if _, ok := lastDream(state); !ok {
+		t.Fatal("the first check did not mark the base")
 	}
 	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	// the first call saw the whole base, so a due dream has nothing new to review
-	maybeDream()
-	if len(*calls) != 0 {
-		t.Errorf("facts the first call saw were sent: calls %d", len(*calls))
+	// the first check saw the whole base, so a due dream has nothing new
+	if n, _, _ := dreamDue(state, time.Hour); n != 0 {
+		t.Errorf("facts the mark saw are due: %d", n)
 	}
 	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",
 		"nightly-sync", "workflow")
 	if err := markDream(state, time.Now().Add(-59*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	maybeDream() // a new fact, but the last dream was 59 minutes ago
-	if len(*calls) != 0 {
-		t.Errorf("dreamt within the hour: calls %d", len(*calls))
+	if n, _, _ := dreamDue(state, time.Hour); n != 0 {
+		t.Errorf("due within the hour: %d", n)
 	}
-	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
-		t.Fatal(err)
+	if hint := dreamHint(); hint != "" {
+		t.Errorf("hint within the hour: %q", hint)
 	}
-	maybeDream()
-	if len(*calls) != 1 {
-		t.Errorf("due dream with a new fact: calls %d", len(*calls))
+	if n, _, _ := dreamDue(state, 30*time.Minute); n != 1 {
+		t.Errorf("due after a shorter interval: %d", n)
 	}
-	if at, _ := lastDream(state); time.Since(at) > time.Minute {
-		t.Errorf("dream.at not moved: %v", at)
+	t.Setenv("MEMCUE_DREAM_EVERY", "30m")
+	if hint := dreamHint(); !strings.Contains(hint, "1 facts wait for the dream") || !strings.Contains(hint, "memcue-dream") {
+		t.Errorf("hint %q", hint)
+	}
+	for _, v := range []string{"", "soon", "10s"} {
+		t.Setenv("MEMCUE_DREAM_EVERY", v)
+		if got := dreamEveryFromEnv(dreamEvery); got != time.Hour {
+			t.Errorf("MEMCUE_DREAM_EVERY=%q gives %v", v, got)
+		}
 	}
 }
 
@@ -377,7 +359,7 @@ func TestDreamReviewsFactPulledAfterLastDream(t *testing.T) {
 	state := filepath.Join(dir, "state", "memcue")
 	_, a, _, _ := dreamBase(t)
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	pulled := addFact(t, "Репозиторий example/nightly-sync ночью подписывает bot на свои репозитории через workflow nightly-sync.yml.",
@@ -387,7 +369,7 @@ func TestDreamReviewsFactPulledAfterLastDream(t *testing.T) {
 		t.Fatal(err)
 	}
 	*calls = nil
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*calls) != 1 || !strings.Contains((*calls)[0], pulled) || !strings.Contains((*calls)[0], a) {
@@ -411,7 +393,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 		}
 		return nil
 	})
-	if err := runDream([]string{"-all"}, &bytes.Buffer{}); err != nil {
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	// a mark in the past would send every fact by when it was written; the seen list keeps them out
@@ -419,7 +401,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	*calls = nil
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*calls) != 0 {
@@ -438,7 +420,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	if err := markDream(state, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
+	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(*calls) != 1 || !strings.Contains((*calls)[0], other) || !strings.Contains((*calls)[0], b+" (origin: x 2026-10-19; записан 2026-") {
@@ -474,57 +456,8 @@ func readDreamLog(t *testing.T, dir string) []dreamRecord {
 	return recs
 }
 
-// A plan applied on an unchanged base gives what a real dream with the same answer gives, with no model call.
-func TestDreamApplyPlanMatchesRealDream(t *testing.T) {
-	dir := env(t)
-	state := filepath.Join(dir, "state", "memcue")
-	_, a, b, _ := dreamBase(t)
-	calls := fakeDream(t, mergeAnswer(a, b))
-	plan := filepath.Join(dir, "plan.json")
-	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := lastDream(state); ok {
-		t.Fatal("dry run with a plan moved dream.at")
-	}
-	*calls = nil
-	var out bytes.Buffer
-	if err := runDream([]string{"-apply", plan}, &out); err != nil {
-		t.Fatal(err)
-	}
-	if len(*calls) != 0 {
-		t.Errorf("-apply called the model %d times", len(*calls))
-	}
-	s, _ := store.Open(factsPath())
-	if f, _ := s.Get(a); f.Status != store.Retired {
-		t.Errorf("a not retired: %+v", f)
-	}
-	if f, _ := s.Get(b); f.Content != "слитый текст" || f.Version != 2 {
-		t.Errorf("b not corrected: %+v", f)
-	}
-	_ = s.Close()
-	if !strings.Contains(out.String(), "retire "+a) {
-		t.Errorf("out %q", out.String())
-	}
-	recs := readDreamLog(t, dir)
-	if last := recs[len(recs)-1]; last.Plan != plan || len(last.Actions) != 2 || last.CostUSD != 0 {
-		t.Errorf("apply record %+v", last)
-	}
-	// marked as a real dream: the next one has nothing new, and the corrected version counts as seen
-	if _, ok := lastDream(state); !ok {
-		t.Fatal("-apply did not mark the dream")
-	}
-	*calls = nil
-	if err := runDream(nil, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
-	}
-	if len(*calls) != 0 {
-		t.Errorf("after -apply the next dream sent %q", *calls)
-	}
-}
-
-// A group whose fact changed after the plan is refused and logged; the other groups still apply.
-func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
+// A group whose fact changed after the packet is refused and logged; the other groups still apply.
+func TestDreamApplyRefusesChangedGroup(t *testing.T) {
 	dir := env(t)
 	old, a, b, _ := dreamBase(t)
 	pg := addFact(t, "Postgres демо-базы на db1 слушает порт 5432, логин test.", "postgres", "порт")
@@ -538,8 +471,8 @@ func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
 		}
 		return acts
 	})
-	plan := filepath.Join(dir, "plan.json")
-	if err := runDream([]string{"-all", "-dry-run", "-plan", plan}, &bytes.Buffer{}); err != nil {
+	plan, err := prepareAnswer([]string{"-all"}, &bytes.Buffer{})
+	if err != nil {
 		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
@@ -560,12 +493,12 @@ func TestDreamApplyPlanRefusesChangedGroup(t *testing.T) {
 	}
 	recs := readDreamLog(t, dir)
 	last := recs[len(recs)-1]
-	if len(last.Refused) != 1 || !strings.Contains(last.Refused[0], "retire "+a+": group changed since the plan") {
+	if len(last.Refused) != 1 || !strings.Contains(last.Refused[0], "retire "+a+": group changed since the packet") {
 		t.Errorf("refused %q", last.Refused)
 	}
 }
 
-// A correction made while the model runs makes the group's decisions stale: the whole group is refused, so the
+// A correction made while the session's model answers makes the group's decisions stale: the whole group is refused, so the
 // corrected fact is not overwritten and its duplicate is not retired on the old text.
 func TestDreamRefusesGroupChangedDuringTheModelCall(t *testing.T) {
 	dir := env(t)
@@ -587,7 +520,7 @@ func TestDreamRefusesGroupChangedDuringTheModelCall(t *testing.T) {
 			{Op: "retire", ID: a, By: b, Kind: "duplicate", Reason: "merged into " + b}}
 	})
 	var out bytes.Buffer
-	if err := runDream([]string{"-all"}, &out); err != nil {
+	if err := dreamModel([]string{"-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	s, err := store.Open(factsPath())
@@ -609,8 +542,8 @@ func TestDreamRefusesGroupChangedDuringTheModelCall(t *testing.T) {
 	if len(last.Refused) != 2 {
 		t.Errorf("refused %q", last.Refused)
 	}
-	for _, want := range []string{"retire " + a + ": group changed since it was sent",
-		"correct " + b + ": group changed since it was sent"} {
+	for _, want := range []string{"retire " + a + ": group changed since the packet",
+		"correct " + b + ": group changed since the packet"} {
 		found := false
 		for _, r := range last.Refused {
 			if strings.Contains(r, want) {
@@ -621,15 +554,15 @@ func TestDreamRefusesGroupChangedDuringTheModelCall(t *testing.T) {
 			t.Errorf("refused %q misses %q", last.Refused, want)
 		}
 	}
-	if strings.Contains(out.String(), "retire "+a) ||
-		strings.Contains(out.String(), "correct "+b+": ") {
+	if strings.Contains(out.String(), "\nretire "+a) || strings.HasPrefix(out.String(), "retire "+a) ||
+		strings.HasPrefix(out.String(), "correct "+b+": ") || strings.Contains(out.String(), "\ncorrect "+b+": ") {
 		t.Errorf("a stale action was printed as applied: %q", out.String())
 	}
 }
 
-func TestDreamPlanFlags(t *testing.T) {
+func TestDreamFlags(t *testing.T) {
 	env(t)
-	for _, args := range [][]string{{"-all", "-plan", "p.json"}, {"-apply", "p.json", "-all"}, {"-apply", "p.json", "-dry-run"}} {
+	for _, args := range [][]string{nil, {"-all"}, {"-apply", "p.json", "-all"}, {"-apply", "p.json", "-prepare"}} {
 		if err := runDream(args, &bytes.Buffer{}); err == nil {
 			t.Errorf("%q: want an error", args)
 		}
@@ -662,7 +595,7 @@ func TestDreamSeenFile(t *testing.T) {
 }
 
 // A clean plan whose group holds a provisional neighbour applies: the staleness check must see the provisional fact,
-// which store.Active leaves out, or the whole group is refused without any change since the dry run.
+// which store.Active leaves out, or the whole group is refused without any change since the packet.
 func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 	dir := env(t)
 	state := filepath.Join(dir, "state", "memcue")
@@ -689,16 +622,8 @@ func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 			Facts:   map[string]int{approved.ID: approved.Version, prov.ID: prov.Version},
 			Actions: []extract.Action{{Op: "retire", ID: approved.ID, By: prov.ID, Kind: "duplicate", Reason: "duplicate"}},
 		}}}
-	b, err := json.Marshal(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(dir, "plan.json")
-	if err := os.WriteFile(path, b, 0o600); err != nil {
-		t.Fatal(err)
-	}
 	var out bytes.Buffer
-	rec, err := applyPlan(state, path, &out)
+	rec, err := applyPlan(state, plan, dreamRecord{}, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
