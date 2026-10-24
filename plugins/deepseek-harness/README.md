@@ -36,7 +36,7 @@ Hermes.
 ## Review and vet
 
 Session extraction writes **candidates**, not active facts: `memcue extract-messages` stores them, recall ignores
-them, and `memcue vet`, `memcue approve ID...` or `memcue review` decides. A fact written by `memcue_add` is active at
+them, and `memcue vet` or `memcue approve ID...` decides. A fact written by `memcue_add` is active at
 once; `memcue_correct` of an approved fact is a deliberate correction, not a candidate. The shared rules are in
 [Review and vet](../../README.md#review-and-vet).
 

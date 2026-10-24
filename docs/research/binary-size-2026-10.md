@@ -1,7 +1,7 @@
 # Why the release binary is 15 MB, October 2026
 
-Status: **measured 2026-10-24 ([#325](https://github.com/juev/memcue/issues/325)); no cut taken yet, the decisions are
-open.** The stripped linux/amd64 release binary is 14,794,912 B after #324. Three things make it up: the SQLite
+Status: **measured 2026-10-24 ([#325](https://github.com/juev/memcue/issues/325)); the review page and its template are
+removed (12,001,440 B); the other decisions are open.** The stripped linux/amd64 release binary is 14,794,912 B after #324. Three things make it up: the SQLite
 driver, 5.35 MB with everything it drags in; the HTTP and TLS client, 3.60 MB; and `html/template`, which costs
 2.31 MB, mostly not its own code. The template's reflection turns off the linker's removal of unused methods for the
 whole binary. Size barely moves the start of the hook: with a cold page cache every build starts in about 15 ms. The
@@ -127,7 +127,8 @@ does buy is a lighter download.
 
 ## Open decisions
 
-- Replace `html/template` on the review page with hand-written HTML: −2.31 MB and ~0.5 ms of init on every start.
+- **Taken:** the review page is removed entirely, with `html/template` (#325, 2026-10-24): 12,001,440 B, −2,793,472
+  (−18.9%) against 14,794,912, and no `<ReflectMethod>` left in the build.
 - A separate hook binary without an HTTP client: −7.1 MB for the hook, at the price of two binaries in the plugin.
   It only makes sense after #331.
 - A CI budget for the stripped linux/amd64 binary. It should be set after the first decision: 12.5 MB with the

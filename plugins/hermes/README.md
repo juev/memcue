@@ -15,7 +15,7 @@ memcue fact base:
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
-  fact (source `memory`) and waits for approval with `memcue review`/`approve`. With the default
+  fact (source `memory`) and waits for approval with `memcue approve`. With the default
   `suppress_mirrored: true`, an approved mirrored fact is still left out of `prefetch`, because the same entry already
   rides in the built-in memory block; set `suppress_mirrored: false` to let it be recalled as well. When the agent
   edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry became is
@@ -42,7 +42,7 @@ memcue fact base:
 ## Review and vet
 
 Mirrored built-in memory writes and extracted facts are **candidates**: the base stores them, recall ignores them, and
-`memcue vet`, `memcue approve ID...` or `memcue review` decides. A fact written by `memcue_add` is active at once;
+`memcue vet` or `memcue approve ID...` decides. A fact written by `memcue_add` is active at once;
 `memcue_correct` of an approved fact is a deliberate correction, not a new candidate. The shared rules are in
 [Review and vet](../../README.md#review-and-vet).
 

@@ -674,7 +674,7 @@ func TestCorrectingARetiredFactIsRefused(t *testing.T) {
 	}
 }
 
-// The review page shows the newest candidates first, so a day's batch does not start with yesterday's leftovers.
+// Candidates come newest first, so a day's batch does not start with yesterday's leftovers.
 func TestCandidatesAreNewestFirst(t *testing.T) {
 	s, _ := open(t)
 	now := time.Unix(1_700_000_000, 0)
@@ -698,39 +698,6 @@ func TestCandidatesAreNewestFirst(t *testing.T) {
 	}
 }
 
-// Undo of an approval or a rejection is a new version in review, never a deletion or a rewrite.
-func TestReopenPutsAFactBackIntoReview(t *testing.T) {
-	s, _ := open(t)
-	f, _ := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "", "", Meta{Review: Candidate})
-	if _, err := s.Approve(f.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Reopen(f.ID); err != nil {
-		t.Fatal(err)
-	}
-	got, _ := s.Get(f.ID)
-	if got.Version != 3 || got.Review != Candidate || got.Status != Active {
-		t.Errorf("after undo of approve %+v", got)
-	}
-	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
-		t.Error("a reopened fact is still found by search")
-	}
-	if _, err := s.Reopen(f.ID); !errors.Is(err, ErrAlreadyCandidate) {
-		t.Errorf("reopening a candidate: %v", err)
-	}
-	if _, err := s.Retire(f.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Reopen(f.ID); err != nil {
-		t.Fatalf("undo of reject: %v", err)
-	}
-	got, _ = s.Get(f.ID)
-	if got.Version != 5 || got.Review != Candidate || got.Status != Active {
-		t.Errorf("after undo of reject %+v", got)
-	}
-}
-
-// The base may hold evidence and secrets; a new file is 0600 and an old 0644 one is tightened on open.
 func TestBaseIsPrivate(t *testing.T) {
 	for _, existing := range []bool{false, true} {
 		path := filepath.Join(t.TempDir(), "facts.db")
