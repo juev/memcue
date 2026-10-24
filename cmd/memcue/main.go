@@ -278,7 +278,7 @@ func foreignFromEnv(def float64) (coverage float64, filter bool) {
 	v := strings.TrimSpace(os.Getenv("MEMCUE_FOREIGN_COVERAGE"))
 	f, err := strconv.ParseFloat(v, 64)
 	switch {
-	case v == "" || err != nil || f < 0 || f > 1:
+	case v == "" || err != nil || math.IsNaN(f) || f < 0 || f > 1:
 		return def, false
 	case f == 0:
 		return def, true
