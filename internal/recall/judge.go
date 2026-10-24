@@ -31,7 +31,7 @@ func RecallJudge(s *store.Store, prompt string, project []string, p Params, r Ra
 		p.Trace.fallback("no judge configured")
 		return Recall(s, prompt, project, p)
 	}
-	passed, gated, err := recallCandidates(s, prompt, p)
+	passed, gated, err := recallCandidates(s, prompt, project, p)
 	if err != nil {
 		return nil, err
 	}

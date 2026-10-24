@@ -2,8 +2,9 @@
 //
 // Candidates come from FTS5 over all facts, in BM25 order. A fact passes when it holds enough of the prompt's
 // informative terms: a minimum number of them and a minimum IDF-weighted share. The facts that pass are served in
-// BM25 order: the share gates, it does not rank (#338). Where a fact was learnt does not filter it; facts learnt in
-// the session's repository only win ties.
+// BM25 order: the share gates, it does not rank (#338). In a session of a repository, a fact scoped to another
+// repository or a directory must hold a larger share to pass (ForeignCoverage, #345), or is not searched at all
+// (FilterForeign); facts learnt in the session's repository win ties.
 package recall
 
 import (
@@ -25,22 +26,32 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
-	Host           string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
-	Seen           map[string]bool // facts the session already got: they give way to the next ones
-	Today          string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
-	Trace          *Trace          // records the decision when set; nil records nothing
+	// ForeignCoverage is the share a fact scoped to another project (repo: or dir: that is not one of the session's
+	// repository keys) must hold; one at or below MinCoverage changes nothing. A session with no repository key, such
+	// as the Claude config directory or a directory outside git, has no other project.
+	ForeignCoverage float64
+	FilterForeign   bool            // facts of another project are not searched at all
+	Host            string          // this machine: facts whose scope is host:<Host> win ties; empty means no preference
+	Seen            map[string]bool // facts the session already got: they give way to the next ones
+	Today           string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
+	Trace           *Trace          // records the decision when set; nil records nothing
 }
 
 // Default holds the values chosen on the dev set of facts (2026-10-19, 2335 facts migrated from the notes, 180 real
 // prompts): 48 prompts got facts, 77 facts, 19 useful, 40 noise; 26 of 30 recall questions found a fact of their
 // note. Three matched terms cut the noise; coverage above 0.25 starts losing facts of other repositories.
+// ForeignCoverage comes from the replay of #345 on 432 Claude Code prompts where the place changes what is served,
+// checked by hand where it changes whether a needed fact is served: 0.25 for facts of other projects cut the noise
+// facts by 19% and lost a needed fact in 3 prompts; the hard filter cut 37% and lost about 20
+// (docs/research/scope-filter-2026-10.md).
 var Default = Params{
-	Candidates:     80,
-	MinTerms:       2,
-	MinMatched:     3,
-	MinCoverage:    0.15,
-	MaxPromptTerms: 24,
-	MaxFacts:       2,
+	Candidates:      80,
+	MinTerms:        2,
+	MinMatched:      3,
+	MinCoverage:     0.15,
+	MaxPromptTerms:  24,
+	MaxFacts:        2,
+	ForeignCoverage: 0.25,
 }
 
 // Hit is a fact chosen for the prompt.
@@ -61,7 +72,7 @@ type Hit struct {
 // Recall returns the facts to inject for prompt in a session whose project has the keys of project (tier.Keys; none
 // outside a project).
 func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, error) {
-	hits, _, err := recallCandidates(s, prompt, p)
+	hits, _, err := recallCandidates(s, prompt, project, p)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +156,7 @@ func capFacts(maxFacts, available int) int {
 // recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the
 // MaxFacts cap. Recall adds the tie order and the cap; the rerank pass uses the same gates but lets the judge order.
 // gated are the facts the term and coverage gates turned away, in Search order: a judge may still read them.
-func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hit, err error) {
+func recallCandidates(s *store.Store, prompt string, project []string, p Params) (hits, gated []Hit, err error) {
 	terms := text.Terms(prompt)
 	var tickets, numbers []string
 	for _, t := range terms {
@@ -200,7 +211,12 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hi
 		}
 	}
 
-	found, err := s.Search(known, p.Candidates)
+	own := ownScopes(project)
+	var places []string
+	if own != nil && p.FilterForeign {
+		places = own
+	}
+	found, err := s.SearchIn(known, p.Candidates, places)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -265,12 +281,43 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits, gated []Hi
 			p.Trace.lexical(f.Fact, held, cov, VerdictLowCoverage)
 			h.gated = true
 			gated = append(gated, h)
+		case cov < p.ForeignCoverage && foreign(f.Scope, own):
+			p.Trace.lexical(f.Fact, held, cov, VerdictForeign)
+			h.gated = true
+			gated = append(gated, h)
 		default:
 			p.Trace.lexical(f.Fact, held, cov, VerdictPassed)
 			hits = append(hits, h)
 		}
 	}
 	return hits, gated, nil
+}
+
+// ownScopes are the scopes of the session's repository keys, tier.Scope of each; nil when the session has none, so
+// that no fact counts as another project's: the Claude config directory (global), a directory outside git (dir:,
+// every Hermes session since #343, whose project is #347's to decide) and a session with no key.
+func ownScopes(project []string) []string {
+	var out []string
+	for _, k := range project {
+		if k != "" && k != tier.Global && !strings.HasPrefix(k, tier.DirPrefix) {
+			out = append(out, tier.Scope(k))
+		}
+	}
+	return out
+}
+
+// foreign reports whether scope ties a fact to a project other than the session's: a repository or a directory that
+// is none of own. Global, host:, service: and empty scopes hold from any repository; so does everything when own is
+// nil.
+func foreign(scope string, own []string) bool {
+	if own == nil {
+		return false
+	}
+	sc := strings.ToLower(scope)
+	if !strings.HasPrefix(sc, "repo:") && !strings.HasPrefix(sc, "dir:") {
+		return false
+	}
+	return !slices.ContainsFunc(own, func(o string) bool { return strings.EqualFold(o, sc) })
 }
 
 // hostScope reports whether scope names this host.

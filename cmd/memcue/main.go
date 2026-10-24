@@ -134,6 +134,9 @@ environment:
   MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15); with a judge
                   configured this gates the words' own answer and the fallback only, because the judge reads the
                   facts the gate turned away
+  MEMCUE_FOREIGN_COVERAGE  share a fact scoped to another repository or directory must hold in a repository's
+                  session (default 0.25); 0 leaves such facts out of the search, a value at or below
+                  MEMCUE_MIN_COVERAGE gates them as any other fact
   MEMCUE_JUDGE_URL, MEMCUE_JUDGE_MODEL, MEMCUE_JUDGE_KEY  one Jev endpoint for dream triage and recall rerank; off
                   unless all three are set
   MEMCUE_JUDGE_RERANK_MIN  judge probability below which a recall candidate is not given (default 0.5)
@@ -265,7 +268,22 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 		}
 	}
 	p.MaxFacts = maxFactsFromEnv(p.MaxFacts)
+	p.ForeignCoverage, p.FilterForeign = foreignFromEnv(p.ForeignCoverage)
 	return recallFacts(s, prompt, tier.Keys(cwd, claudeDir()), p)
+}
+
+// foreignFromEnv reads MEMCUE_FOREIGN_COVERAGE, the share a fact of another project must hold (#345): 0 leaves such
+// facts out of the search, a value in (0, 1] is their coverage gate, and anything else keeps def.
+func foreignFromEnv(def float64) (coverage float64, filter bool) {
+	v := strings.TrimSpace(os.Getenv("MEMCUE_FOREIGN_COVERAGE"))
+	f, err := strconv.ParseFloat(v, 64)
+	switch {
+	case v == "" || err != nil || f < 0 || f > 1:
+		return def, false
+	case f == 0:
+		return def, true
+	}
+	return f, false
 }
 
 // maxFactsFromEnv reads MEMCUE_MAX_FACTS, how many facts one prompt may get. A value outside 1..10 is ignored and

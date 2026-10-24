@@ -41,6 +41,7 @@ const (
 	VerdictOtherTicket  = "no ticket of the prompt"
 	VerdictFewTerms     = "too few terms"
 	VerdictLowCoverage  = "low coverage"
+	VerdictForeign      = "another project, below its coverage"
 	VerdictOverJudge    = "passed, over the judge's candidate limit"
 	VerdictGatedToJudge = "below the gate, sent to the judge"
 	VerdictAboveMin     = "above min"
