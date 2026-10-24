@@ -5,7 +5,8 @@
     grade.py report  -> per-mode scores, flags, turns, tools, cost, time; pairwise wins; rep-to-rep spread
 
 E2E_ARMS picks the modes graded together, E2E_GRADES the prefix of the grade files; the pull grading of #361 ran with
-E2E_ARMS=none,memcue,push,pull,both E2E_GRADES=grades7.
+E2E_ARMS=none,memcue,push,pull,both E2E_GRADES=grades7, the pullf grading with
+E2E_ARMS=none,push,pull,both,pullf E2E_GRADES=grades8.
 """
 import json, os, random, re, statistics as st, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
@@ -127,7 +128,8 @@ def cmd_report():
     for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none"), ("judge", "memcue"), ("judge", "files"),
                  ("judge", "none"), ("stubs", "memcue"), ("stubs", "judge"), ("stubs", "none"),
                  ("local", "memcue"), ("local", "judge"), ("local", "none"), ("pull", "push"), ("both", "push"),
-                 ("both", "pull"), ("push", "none"), ("pull", "none"), ("both", "none"), ("push", "memcue")):
+                 ("both", "pull"), ("push", "none"), ("pull", "none"), ("both", "none"), ("push", "memcue"),
+                 ("pullf", "pull"), ("pullf", "push"), ("pullf", "none")):
         if a not in ARMS or b not in ARMS:
             continue
         w = t = l = 0
@@ -146,7 +148,7 @@ def cmd_report():
         print(f"  {arm}: {diff} of {sum(1 for d in per.values() if len(d.get(arm, [])) == 2)}")
 
     # The pull and both modes: how often the agent searched the base itself.
-    for arm in ("pull", "both"):
+    for arm in ("pull", "both", "pullf"):
         runs = searched = calls = 0
         for pid in ids:
             for rep in (1, 2):
