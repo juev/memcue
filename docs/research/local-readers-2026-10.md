@@ -116,6 +116,11 @@ The trees cost nothing at read time: `leaves` predicts a row in microseconds in 
 
 ## Shipped as `local` (#321)
 
+**Removed in #324.** End to end the reader scored as the words do (`e2e-files-2026-10.md`, the sixth mode), so the
+model, `leaves`, `recall.FeatureRanker` and `rankfeat` left the code; they are at commit `8be75ee` for whoever wants to
+reproduce this section. [local_train.py](scripts/local_train.py) stays as the record of how the model was trained: it
+is offline-only and nothing in memcue reads its output.
+
 The model memcue embeds is trained by [local_train.py](scripts/local_train.py) on the 1442 pool prompts alone, with
 one Jev run as the target and no Platt scaling, so the gold set is unseen by it and nothing below was fitted on it.
 recall hands the reader the features of [rankfeat](scripts/rankfeat/main.go) through `recall.FeatureRanker`;
@@ -157,6 +162,7 @@ helped it. The half of the noise it removes on the gold set does not show in the
 ## Reproducing
 
 ```sh
+# rankfeat and internal/localrank are gone since #324: check out 8be75ee for the first and last steps
 go run -tags research ./docs/research/scripts/rankfeat base.db cand.jsonl 2026-10-22 > feat.jsonl
 python3 -I docs/research/scripts/local_ranker.py cand.jsonl feat.jsonl labels.json out jev-1.jsonl jev-2.jsonl jev-3.jsonl
 python3 -I docs/research/scripts/cross_encoder.py MODEL_DIR onnx/model_qint8_arm64.onnx cand.jsonl ce-int8.jsonl

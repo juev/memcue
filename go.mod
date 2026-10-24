@@ -3,7 +3,6 @@ module github.com/juev/memcue
 go 1.27.0
 
 require (
-	github.com/dmitryikh/leaves v0.0.0-20230708180554-25d19a787328
 	github.com/kljensen/snowball v0.10.0
 	github.com/oklog/ulid/v2 v2.1.2
 	modernc.org/sqlite v1.60.1

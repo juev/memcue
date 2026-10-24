@@ -3,12 +3,12 @@ package main
 import (
 	"testing"
 
-	"github.com/juev/memcue/internal/localrank"
 	"github.com/juev/memcue/internal/rerank"
 )
 
 // MEMCUE_RERANK names the reader. Without it Jev runs when it is configured and the words decide otherwise, whether
-// the main model is configured or not: the local and the listwise readers are opt-in (#321); `off` keeps the words.
+// the main model is configured or not: the listwise reader is opt-in (#321); `off` keeps the words. `local`, the
+// removed tree reader (#324), is an unknown value like any other and gets the default.
 func TestRerankReaderPrecedence(t *testing.T) {
 	for _, k := range []string{"MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY", "MEMCUE_API_URL",
 		"MEMCUE_MODEL", "MEMCUE_API_KEY", "MEMCUE_RERANK"} {
@@ -24,9 +24,11 @@ func TestRerankReaderPrecedence(t *testing.T) {
 	if r := ranker(); r != nil {
 		t.Fatalf("main model only: ranker = %#v, want nil", r)
 	}
-	t.Setenv("MEMCUE_RERANK", "local")
-	if _, ok := ranker().(localrank.Ranker); !ok {
-		t.Fatalf("local: ranker = %#v, want the local reader", ranker())
+	for _, name := range []string{"local", "unknown"} {
+		t.Setenv("MEMCUE_RERANK", name)
+		if r := ranker(); r != nil {
+			t.Fatalf("%s without Jev: ranker = %#v, want nil", name, r)
+		}
 	}
 	t.Setenv("MEMCUE_RERANK", "")
 
@@ -44,9 +46,11 @@ func TestRerankReaderPrecedence(t *testing.T) {
 		}
 	}
 
-	t.Setenv("MEMCUE_RERANK", "local")
-	if _, ok := ranker().(localrank.Ranker); !ok {
-		t.Fatalf("local with Jev configured: ranker = %#v, want the local reader", ranker())
+	for _, name := range []string{"local", "unknown"} {
+		t.Setenv("MEMCUE_RERANK", name)
+		if _, ok := ranker().(*rerank.Ranker); !ok {
+			t.Fatalf("%s with Jev configured: ranker = %#v, want the Jev pass", name, ranker())
+		}
 	}
 
 	t.Setenv("MEMCUE_RERANK", "off")

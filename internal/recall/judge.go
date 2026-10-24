@@ -31,7 +31,7 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		p.Trace.fallback("no judge configured")
 		return Recall(s, prompt, sessionTier, p)
 	}
-	q, passed, gated, err := recallCandidates(s, prompt, p)
+	passed, gated, err := recallCandidates(s, prompt, p)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,11 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		p.Trace.fallback("fewer than two candidates for the judge")
 		return Recall(s, prompt, sessionTier, p)
 	}
-	scores, err := score(s, r, q, candidates)
+	contents := make([]string, len(candidates))
+	for i := range candidates {
+		contents[i] = candidates[i].Content
+	}
+	scores, err := r.Scores(context.Background(), prompt, contents)
 	if err != nil || len(scores) != len(candidates) {
 		switch {
 		case errors.Is(err, judge.ErrPaused):
@@ -130,21 +134,4 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		}
 	}
 	return served, nil
-}
-
-// score asks the ranker about the candidates: their text, or their features for a FeatureRanker.
-func score(s *store.Store, r Ranker, q query, candidates []Hit) ([]float64, error) {
-	if fr, ok := r.(FeatureRanker); ok {
-		newest, err := s.Newest()
-		if err != nil {
-			return nil, err
-		}
-		pf, fs := features(q, candidates, newest)
-		return fr.ScoreFeatures(context.Background(), pf, fs)
-	}
-	contents := make([]string, len(candidates))
-	for i := range candidates {
-		contents[i] = candidates[i].Content
-	}
-	return r.Scores(context.Background(), q.prompt, contents)
 }

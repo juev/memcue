@@ -69,6 +69,10 @@ It is opt-in: on a small fresh base it scored a fact that held every prompt term
 and without `MEMCUE_RERANK` the words decide; the listwise reader, the earlier fallback when the main model was
 configured, is opt-in only. A paused Jev still falls back to the words.
 
+**Update 2026-10 (#324):** the `local` reader is removed, with its model, the `leaves` dependency and the feature path
+it read. End to end it changed nothing against the words, so it never paid for itself. `MEMCUE_RERANK=local` is an
+unknown value now and gets the default: Jev when its key is set, the words otherwise.
+
 Any error, timeout or missing setting leaves the ordinary lexical answer in place, unchanged. One failure pauses
 the shared judge endpoint for 60 s, doubling to 15 minutes. The pause lives in `judge.pause` in the binary's state
 directory (`$XDG_STATE_HOME/memcue` for the default base, a per-base subdirectory otherwise, or `MEMCUE_STATE_DIR`)
