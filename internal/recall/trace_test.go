@@ -1,7 +1,6 @@
 package recall
 
 import (
-	"errors"
 	"strings"
 	"testing"
 )
@@ -81,55 +80,5 @@ func TestTraceNamesAnEarlyStop(t *testing.T) {
 	}
 	if tr.Stopped == "" || len(tr.Lexical) != 0 {
 		t.Errorf("stopped = %q, lexical = %+v", tr.Stopped, tr.Lexical)
-	}
-}
-
-// With a judge, the trace shows the vector reader's similarities, the judge's scores against its threshold and what
-// was served.
-func TestTraceRecordsTheJudge(t *testing.T) {
-	s, target := meaningBase(t)
-	r := &fakeRanker{min: 0.5, scores: map[string]float64{"Порог": 0.95, "Caddy": 0.2}}
-	tr := &Trace{}
-	p := rankedParams()
-	p.Trace = tr
-	hits, err := RecallJudge(s, "порог coverage шумовых фактов, а caddy", nil, p, r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(hits) == 0 || hits[0].ID != target {
-		t.Fatalf("hits = %v, want the target first", ids(hits))
-	}
-	if tr.Fallback != "" {
-		t.Errorf("fallback = %q", tr.Fallback)
-	}
-	if tr.JudgeMin != 0.5 {
-		t.Errorf("judge min = %v", tr.JudgeMin)
-	}
-	if j := step(t, tr.Judge, "Порог"); j.Verdict != VerdictAboveMin || j.Score != 0.95 {
-		t.Errorf("judge = %+v", j)
-	}
-	if j := step(t, tr.Judge, "Caddy"); j.Verdict != VerdictBelowMin {
-		t.Errorf("judge = %+v, want below min", j)
-	}
-	if f := step(t, tr.Final, "Порог"); f.Verdict != VerdictServed {
-		t.Errorf("final = %+v", f)
-	}
-}
-
-// A judge that fails leaves the lexical answer, and the trace says why.
-func TestTraceNamesTheFallback(t *testing.T) {
-	s, _ := meaningBase(t)
-	tr := &Trace{}
-	p := Default
-	p.Trace = tr
-	if _, err := RecallJudge(s, "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг", nil, p,
-		&fakeRanker{min: 0.5, err: errors.New("down")}); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(tr.Fallback, "down") {
-		t.Errorf("fallback = %q, want the judge's error", tr.Fallback)
-	}
-	if f := step(t, tr.Final, "Gradle"); f.Verdict != VerdictServed {
-		t.Errorf("final = %+v", f)
 	}
 }

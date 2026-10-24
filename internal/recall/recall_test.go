@@ -178,7 +178,7 @@ func TestAtMostMaxFacts(t *testing.T) {
 	}
 }
 
-// A non-positive MaxFacts means no cap, the rule Recall and RecallJudge follow: it must serve every
+// A non-positive MaxFacts means no cap, the rule Recall follows: it must serve every
 // fact instead of none and must never slice the hits with a negative index. A positive value still truncates.
 func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 	s := setup(t)

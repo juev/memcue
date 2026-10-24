@@ -5,15 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
@@ -580,19 +577,9 @@ func TestVetDoesNotRetireAnApprovedFact(t *testing.T) {
 	}
 }
 
-// vet asks no judge about duplicates (#266): the review sees each candidate's nearest approved facts and drops a
-// duplicate itself, so a configured judge endpoint gets no call.
-func TestVetAsksTheJudgeNothing(t *testing.T) {
+// The review sees each candidate's nearest approved facts and drops a duplicate itself (#266).
+func TestVetReviewDropsADuplicate(t *testing.T) {
 	env(t)
-	called := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called++
-		http.Error(w, "no", http.StatusInternalServerError)
-	}))
-	t.Cleanup(srv.Close)
-	old := extract.JevJudge
-	t.Cleanup(func() { extract.JevJudge = old })
-	extract.JevJudge.URL, extract.JevJudge.Model, extract.JevJudge.Key = srv.URL, "typesafe/jev-1.14", "k"
 	existing := approvedFact(t, "В контейнере hermes базу facts.db читают через python3: CLI sqlite3 нет.")
 	dup := vetFact(t, "В контейнере hermes нет sqlite3, базу facts.db читают модулем python3.", "hermes 2026-10-21", "tool")
 	reviewCalls := fakeJudge(t, judgeByID())
@@ -600,9 +587,6 @@ func TestVetAsksTheJudgeNothing(t *testing.T) {
 	var out bytes.Buffer
 	if err := runVet(nil, &out); err != nil {
 		t.Fatal(err)
-	}
-	if called != 0 {
-		t.Errorf("the judge endpoint got %d calls", called)
 	}
 	if len(*reviewCalls) != 1 || !strings.Contains((*reviewCalls)[0], existing) {
 		t.Errorf("the review did not see the approved neighbour: %v", *reviewCalls)
@@ -630,37 +614,6 @@ func TestVetBaseReadFailureIsAnError(t *testing.T) {
 	}
 	if err := vetFailure(rec); err == nil || !strings.Contains(err.Error(), rec.Error) {
 		t.Errorf("exit error %v, want the base error %q", err, rec.Error)
-	}
-}
-
-// The triage timeout comes from its own variable; an unset, malformed or out-of-range value keeps the default.
-func TestConfigureJudgeTimeouts(t *testing.T) {
-	env(t)
-	old := extract.JevJudge
-	t.Cleanup(func() { extract.JevJudge = old })
-	t.Setenv("MEMCUE_JUDGE_URL", "https://judge.example/decisions")
-	t.Setenv("MEMCUE_JUDGE_MODEL", "m")
-	t.Setenv("MEMCUE_JUDGE_KEY", "k")
-	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "")
-	configureJudge()
-	if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout {
-		t.Fatalf("default = %v", extract.JevJudge.TriageTimeout)
-	}
-
-	t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", "750ms")
-	configureJudge()
-	if extract.JevJudge.TriageTimeout != 750*time.Millisecond {
-		t.Fatalf("configured = %v", extract.JevJudge.TriageTimeout)
-	}
-
-	for name, value := range map[string]string{"malformed": "much", "too short": "1ms", "too long": "1m"} {
-		t.Run(name, func(t *testing.T) {
-			t.Setenv("MEMCUE_JUDGE_TRIAGE_TIMEOUT", value)
-			configureJudge()
-			if extract.JevJudge.TriageTimeout != extract.DefaultTriageTimeout {
-				t.Errorf("bad value %q = %v", value, extract.JevJudge.TriageTimeout)
-			}
-		})
 	}
 }
 

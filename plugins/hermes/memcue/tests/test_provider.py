@@ -56,8 +56,8 @@ BIN = os.environ.get("MEMCUE_BIN") or shutil.which("memcue")
 
 
 def _shell_memcue_vars() -> list:
-    """The memcue settings of the developer's shell. A judge endpoint there turns recall into a network call and
-    changes what the hook serves, so the suite runs without any of them (MEMCUE_BIN only names the binary)."""
+    """The memcue settings of the developer's shell. Any of them can
+    change what the hook serves, so the suite runs without any of them (MEMCUE_BIN only names the binary)."""
     return [k for k in os.environ if k.startswith("MEMCUE_") and k != "MEMCUE_BIN"]
 
 
@@ -91,7 +91,7 @@ class ProviderTest(unittest.TestCase):
         os.environ["XDG_STATE_HOME"] = str(Path(self.home) / "state")  # memcue's extract.log
         # The suite must never touch a live base: an inherited MEMCUE_FACTS wins over HERMES_HOME and let an earlier
         # run write test facts into a real base and migrate it to another schema. MEMCUE_USAGE_LOG from the container
-        # would turn the usage log on behind the tests that assert it is off, and a judge endpoint changes recall.
+        # would turn the usage log on behind the tests that assert it is off, and a recall setting changes what is served.
         self._kept_env = {k: os.environ.pop(k, None) for k in _shell_memcue_vars()}
         self.addCleanup(self._restore_facts_env)
         self.p = memcue_provider.MemcueMemoryProvider({"binary": BIN})

@@ -75,7 +75,7 @@ func Suspects(facts []store.Fact, k Known, today time.Time) []Suspect {
 }
 
 // unknownEnv lists the MEMCUE_* names of text the binary does not know. A name followed by "_*" is a family, such as
-// MEMCUE_JUDGE_*, and is known when any known variable belongs to it.
+// MEMCUE_VET_*, and is known when any known variable belongs to it.
 func unknownEnv(text string, known map[string]bool) []string {
 	var out []string
 	for _, loc := range envName.FindAllStringIndex(text, -1) {

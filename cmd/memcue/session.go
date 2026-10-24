@@ -257,7 +257,7 @@ func validSession(id string) bool {
 // stateDir holds the read offsets of sessions and the extraction log. It is not a cache: losing an offset means
 // extracting a session again. MEMCUE_STATE_DIR wins; otherwise the default base keeps the historical
 // $XDG_STATE_HOME/memcue, and any other base gets a subdirectory named after its absolute path. Two bases on one
-// machine must not share a dream schedule, a vet lock or a judge pause.
+// machine must not share a dream schedule or a vet lock.
 func stateDir() (string, error) {
 	dir := strings.TrimSpace(os.Getenv("MEMCUE_STATE_DIR"))
 	if dir == "" {

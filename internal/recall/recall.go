@@ -59,20 +59,16 @@ type Hit struct {
 	store.Fact
 	Coverage    float64
 	Matched     int
-	Displaced   bool   // a fact of another host took a slot while a fact of this host was left out
-	Source      string // which reader proposed the fact: lexical
-	Provisional bool   // auto-approved for a TTL, recalled after approved facts
-	// Meaning is the judge score after rerank; 0 when the words alone decided.
-	Meaning float64
-	rank    int     // position in the search's BM25 order
-	bm25    float64 // the search's BM25 score, lower is better
-	gated   bool    // the term or coverage gate turned the fact away
+	Displaced   bool    // a fact of another host took a slot while a fact of this host was left out
+	Source      string  // which reader proposed the fact: lexical
+	Provisional bool    // auto-approved for a TTL, recalled after approved facts
+	bm25        float64 // the search's BM25 score, lower is better
 }
 
 // Recall returns the facts to inject for prompt in a session whose project has the keys of project (tier.Keys; none
 // outside a project).
 func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, error) {
-	hits, _, err := recallCandidates(s, prompt, project, p)
+	hits, err := recallCandidates(s, prompt, project, p)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +115,7 @@ func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, e
 	return served, nil
 }
 
-// place ranks a fact for a tie of equal BM25 score or judge score: this host first, then the session's repository,
+// place ranks a fact for a tie of equal BM25 score: this host first, then the session's repository,
 // then a global origin, then everything else. A fact was learnt in the session's project when its origin starts with
 // any of the project's keys: a mirror's other host or a fork's upstream counts. The host only orders facts; it never
 // excludes another host's fact.
@@ -154,9 +150,8 @@ func capFacts(maxFacts, available int) int {
 }
 
 // recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the
-// MaxFacts cap. Recall adds the tie order and the cap; the rerank pass uses the same gates but lets the judge order.
-// gated are the facts the term and coverage gates turned away, in Search order: a judge may still read them.
-func recallCandidates(s *store.Store, prompt string, project []string, p Params) (hits, gated []Hit, err error) {
+// MaxFacts cap. Recall adds the tie order and the cap.
+func recallCandidates(s *store.Store, prompt string, project []string, p Params) (hits []Hit, err error) {
 	terms := text.Terms(prompt)
 	var tickets, numbers []string
 	for _, t := range terms {
@@ -179,11 +174,11 @@ func recallCandidates(s *store.Store, prompt string, project []string, p Params)
 	}
 	if len(terms) < minTerms {
 		p.Trace.stop("the prompt has too few terms")
-		return nil, nil, nil
+		return nil, nil
 	}
 	df, total, err := s.DocFreq(terms)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	weight := map[string]float64{}
 	var known []string
@@ -195,7 +190,7 @@ func recallCandidates(s *store.Store, prompt string, project []string, p Params)
 	}
 	if len(known) < minTerms {
 		p.Trace.stop("too few prompt terms occur in any fact")
-		return nil, nil, nil
+		return nil, nil
 	}
 	if p.MaxPromptTerms > 0 && len(known) > p.MaxPromptTerms {
 		sort.SliceStable(known, func(i, j int) bool { return weight[known[i]] > weight[known[j]] })
@@ -218,7 +213,7 @@ func recallCandidates(s *store.Store, prompt string, project []string, p Params)
 	}
 	found, err := s.SearchIn(known, p.Candidates, places)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// A prompt cannot match more terms than its facts know: a short question ("dream memcue") often keeps two terms,
 	// and the dev-set minimum of three then silenced every fact about them.
@@ -242,7 +237,7 @@ func recallCandidates(s *store.Store, prompt string, project []string, p Params)
 	if today == "" {
 		today = store.Today()
 	}
-	for rank, f := range found {
+	for _, f := range found {
 		if p.Seen[f.ID] {
 			p.Trace.lexical(f.Fact, nil, 0, VerdictSeen)
 			continue
@@ -271,26 +266,20 @@ func recallCandidates(s *store.Store, prompt string, project []string, p Params)
 		}
 		cov := got / sum
 		h := Hit{Fact: f.Fact, Coverage: cov, Matched: matched, Source: "lexical",
-			Provisional: f.Review == store.Provisional, rank: rank, bm25: f.BM25}
+			Provisional: f.Review == store.Provisional, bm25: f.BM25}
 		switch {
 		case matched < minMatched:
 			p.Trace.lexical(f.Fact, held, cov, VerdictFewTerms)
-			h.gated = true
-			gated = append(gated, h)
 		case cov < p.MinCoverage:
 			p.Trace.lexical(f.Fact, held, cov, VerdictLowCoverage)
-			h.gated = true
-			gated = append(gated, h)
 		case cov < p.ForeignCoverage && foreign(f.Scope, own):
 			p.Trace.lexical(f.Fact, held, cov, VerdictForeign)
-			h.gated = true
-			gated = append(gated, h)
 		default:
 			p.Trace.lexical(f.Fact, held, cov, VerdictPassed)
 			hits = append(hits, h)
 		}
 	}
-	return hits, gated, nil
+	return hits, nil
 }
 
 // ownScopes are the scopes of the session's repository keys, tier.Scope of each; nil when the session has none, so
