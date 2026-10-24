@@ -382,10 +382,40 @@ func (s *Store) ensureIndex() error {
 			return err
 		}
 		if missing == 0 && stale == 0 {
-			return nil
+			numbers, err := s.numbersMissing()
+			if err != nil {
+				return err
+			}
+			if !numbers {
+				return nil
+			}
 		}
 	}
 	return s.Rebuild()
+}
+
+// numbersMissing reports whether the index has no numeric terms while the base holds versions and dates and
+// MEMCUE_NUMBER_TERMS is on. Such an index was built before the terms existed, and a prompt naming a version
+// would be answered with nothing until Rebuild puts them in: the counts match, so nothing else would notice.
+func (s *Store) numbersMissing() (bool, error) {
+	if !text.NumbersEnabled() {
+		return false, nil
+	}
+	var indexed int
+	if err := s.db.QueryRow(`SELECT count(*) FROM fact_index WHERE instr(stems, ' nm') > 0`).Scan(&indexed); err != nil {
+		return false, err
+	}
+	if indexed > 0 {
+		return false, nil
+	}
+	var numbered int
+	err := s.db.QueryRow(`SELECT count(*) FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
+			AND f.review IN ('', 'provisional') AND f.content GLOB '*[0-9].[0-9]*'`, Active).Scan(&numbered)
+	if err != nil {
+		return false, err
+	}
+	return numbered > 0, nil
 }
 
 // Close closes the base.

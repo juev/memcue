@@ -346,6 +346,7 @@ contract this release uses; there is no separate review or triage endpoint.
 | `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
 | `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories; with a judge configured it gates the words' own answer and the fallback only | 0.15 |
+| `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
 | `MEMCUE_MAX_FACTS` | facts one prompt may get; the cut is applied after the ranking, so a larger value adds context, not coverage: on the 68 prompts that needed memory a third fact left the number with a useful fact unchanged, 58 of 68 either way ([docs/research/max-facts-2026-10.md](docs/research/max-facts-2026-10.md)) | `2` |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_DREAM` | `1` runs a dream after an extraction once an hour | off |

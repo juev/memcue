@@ -8,6 +8,7 @@
 package text
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -91,6 +92,12 @@ func Query(term string) string {
 
 func isCyrillic(r rune) bool { return r >= 'а' && r <= 'я' }
 
+// NumbersEnabled reports whether bare numbers, versions, ports and addresses are indexed as one exact term
+// instead of being dropped. Off by default: the word-only index is the shipped behaviour. With
+// MEMCUE_NUMBER_TERMS=1 the term is exact ("nm1x27" never matches "nm1x20"), so it can only add candidates and
+// rank the prompt's own version above the others.
+func NumbersEnabled() bool { return os.Getenv("MEMCUE_NUMBER_TERMS") == "1" }
+
 // words splits s into words, taking ticket keys out first so their number survives. Tickets are recognized on the
 // original text: only an uppercase key is one, so a versioned name such as PostgreSQL-16 stays an ordinary word and
 // only its number is dropped.
@@ -102,9 +109,35 @@ func words(s string) []string {
 	})
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, "ё", "е")
+	var nums []string
+	if NumbersEnabled() {
+		s = reNumeric.ReplaceAllStringFunc(s, func(m string) string {
+			nums = append(nums, numberTerm(m))
+			return " "
+		})
+	}
 	s = reNumeric.ReplaceAllString(s, " ")
 	out := strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
-	return append(out, tickets...)
+	return append(append(out, tickets...), nums...)
+}
+
+// numberTerm normalizes a version, date, port or address into one FTS token: the "nm" prefix keeps it apart from
+// an ordinary word or a ticket, and every separator becomes "x", so the unicode61 tokenizer cannot split it. The
+// boundary character the regexp swallowed (space, paren, quote) is dropped first.
+func numberTerm(s string) string {
+	s = strings.TrimLeft(s, " 	\n([{\"'")
+	s = strings.ToLower(s)
+	var b strings.Builder
+	b.WriteString("nm")
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+		default:
+			b.WriteRune('x')
+		}
+	}
+	return b.String()
 }
 
 // ticketTerm normalizes a ticket key into one FTS token. The prefix keeps it distinct from a bare number (#123)
@@ -131,6 +164,26 @@ func ticketTerm(s string) string {
 // IsTicket reports whether term is a normalized ticket key. Recall keeps such a term exact and lets it pass the
 // minimum-term gate alone, but never matches a different ticket number.
 func IsTicket(term string) bool { return reTicketTerm.MatchString(term) }
+
+// IsNumberTerm reports whether term is a normalized version, date, port or address ("nm1x27"). Such a term is
+// exact, so a prompt made of one is answered instead of silenced; it never filters, only adds and ranks.
+func IsNumberTerm(term string) bool { return strings.HasPrefix(term, "nm") && isNumberWord(term[2:]) }
+
+// isNumberWord reports whether s looks like the body of a number term: at least one digit and nothing but
+// letters, digits and the "x" separators numberTerm writes.
+func isNumberWord(s string) bool {
+	digit := false
+	for _, r := range s {
+		switch {
+		case unicode.IsDigit(r):
+			digit = true
+		case unicode.IsLetter(r), r == 'x':
+		default:
+			return false
+		}
+	}
+	return digit
+}
 
 func stem(w string) (string, bool) {
 	if stop[w] || isNumber(w) {
