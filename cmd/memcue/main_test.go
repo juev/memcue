@@ -222,6 +222,45 @@ func TestHookLogOffByDefault(t *testing.T) {
 	}
 }
 
+func TestMinTermsFromEnv(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	// "gradle" is the only word of the prompt a fact knows: the default floor of two terms stops it.
+	for _, v := range []string{"", "0", "-1", "x"} {
+		t.Setenv("MEMCUE_MIN_TERMS", v)
+		if got := hookContext(t, dir, "", "что там с gradle"); got != "" {
+			t.Errorf("MEMCUE_MIN_TERMS=%q: got %q", v, got)
+		}
+	}
+	t.Setenv("MEMCUE_MIN_TERMS", "1")
+	if got := hookContext(t, dir, "", "что там с gradle"); !strings.Contains(got, "openjdk@21") {
+		t.Errorf("MEMCUE_MIN_TERMS=1: got %q", got)
+	}
+}
+
+func TestMinMatchedFromEnv(t *testing.T) {
+	dir := env(t)
+	seed(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add("Vaultwarden отдаёт vault.example.org через proxy на этом хосте.", []string{"vaultwarden", "proxy"},
+		"x 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	// Four known terms, two in each fact: the default of three matched terms turns both away.
+	const prompt = "gradle jdk vaultwarden proxy"
+	if got := hookContext(t, dir, "", prompt); got != "" {
+		t.Errorf("default: got %q", got)
+	}
+	t.Setenv("MEMCUE_MIN_MATCHED", "2")
+	if got := hookContext(t, dir, "", prompt); !strings.Contains(got, "openjdk@21") || !strings.Contains(got, "Vaultwarden") {
+		t.Errorf("MEMCUE_MIN_MATCHED=2: got %q", got)
+	}
+}
+
 // hookContext runs the hook on prompt in session and returns what it injected.
 func hookContext(t *testing.T, dir, session, prompt string) string {
 	t.Helper()

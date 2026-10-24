@@ -134,6 +134,9 @@ environment:
   MEMCUE_MIN_COVERAGE  share of a prompt's terms a fact must hold to be recalled (default 0.15); with a judge
                   configured this gates the words' own answer and the fallback only, because the judge reads the
                   facts the gate turned away
+  MEMCUE_MIN_TERMS  prompt terms the facts must know before any fact is examined (default 2; a ticket key or a
+                  prompt of numbers only needs 1)
+  MEMCUE_MIN_MATCHED  distinct prompt terms a fact must hold (default 3; never more than the prompt's known terms)
   MEMCUE_FOREIGN_COVERAGE  share a fact scoped to another repository or directory must hold in a repository's
                   session (default 0.25); 0 leaves such facts out of the search, a value at or below
                   MEMCUE_MIN_COVERAGE gates them as any other fact
@@ -266,6 +269,8 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 			p.MinCoverage = f
 		}
 	}
+	p.MinTerms = floorFromEnv("MEMCUE_MIN_TERMS", p.MinTerms)
+	p.MinMatched = floorFromEnv("MEMCUE_MIN_MATCHED", p.MinMatched)
 	p.MaxFacts = maxFactsFromEnv(p.MaxFacts)
 	p.ForeignCoverage, p.FilterForeign = foreignFromEnv(p.ForeignCoverage)
 	return recallFacts(s, prompt, tier.Keys(cwd, claudeDir()), p)
@@ -283,6 +288,16 @@ func foreignFromEnv(def float64) (coverage float64, filter bool) {
 		return def, true
 	}
 	return f, false
+}
+
+// floorFromEnv reads one of the term floors of recall (#355): a whole number of at least 1, or def. Below 1 recall
+// would search with no prompt term at all.
+func floorFromEnv(name string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name)))
+	if err != nil || n < 1 {
+		return def
+	}
+	return n
 }
 
 // maxFactsFromEnv reads MEMCUE_MAX_FACTS, how many facts one prompt may get. A value outside 1..10 is ignored and
