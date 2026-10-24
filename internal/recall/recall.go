@@ -141,15 +141,20 @@ func capFacts(maxFacts, available int) int {
 // prompt as the gates weighed it.
 func recallCandidates(s *store.Store, prompt string, p Params) (q query, hits, gated []Hit, err error) {
 	terms := text.Terms(prompt)
-	var tickets []string
+	var tickets, numbers []string
 	for _, t := range terms {
-		if text.IsTicket(t) {
+		switch {
+		case text.IsTicket(t):
 			tickets = append(tickets, t)
+		case text.IsNumberTerm(t):
+			numbers = append(numbers, t)
 		}
 	}
-	// A ticket key is a precise anchor: on its own it says enough, without a second known term.
+	// A ticket key is a precise anchor: on its own it says enough, without a second known term. A version or date
+	// is exact too, so a prompt that is nothing but one ("0.17.4") must not be silenced either; it only ever adds
+	// candidates, it never filters the pool the way a ticket does.
 	minTerms := p.MinTerms
-	if len(tickets) > 0 {
+	if len(tickets) > 0 || (len(numbers) > 0 && len(numbers) == len(terms)) {
 		minTerms = 1
 	}
 	if p.Trace != nil {
@@ -196,7 +201,13 @@ func recallCandidates(s *store.Store, prompt string, p Params) (q query, hits, g
 	}
 	// A prompt cannot match more terms than its facts know: a short question ("dream memcue") often keeps two terms,
 	// and the dev-set minimum of three then silenced every fact about them.
-	minMatched := p.MinMatched
+	// A numeric term is a bonus, not a filter: it adds candidates and weighs in the ranking, but it must not
+	// become one of the distinct terms a fact has to hold, or facts that answer the question without repeating
+	// the number would drop out.
+	minMatched := p.MinMatched - len(numbers)
+	if minMatched < 1 {
+		minMatched = 1
+	}
 	if len(tickets) > 0 {
 		minMatched = 1
 	}
