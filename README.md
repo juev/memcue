@@ -3,11 +3,13 @@
 Long-term memory for Claude Code. memcue keeps a base of short, self-contained facts in one SQLite file and works
 through hooks:
 
-- **Before each prompt** it looks for facts that share enough rare words with the prompt and gives the agent at
-  most two of them, or nothing. Most prompts get nothing; that is intended.
-- **At session start, and again after a compaction or `/clear`** it sends a card: global rules and the rules and
-  decisions of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is how a
-  rule that never shares a word with a prompt still reaches the agent.
+- **At session start, and again after a compaction or `/clear`** it tells the agent to search memcue before it
+  answers a question that may depend on earlier sessions, and sends a card: global rules and the rules and decisions
+  of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is how a rule the
+  agent would not think to search for still reaches it.
+- **When the agent needs something from earlier sessions** it runs `memcue search` itself, with its own words:
+  synonyms, the system's name, both languages. Nothing is injected with a prompt (#361): the agent's own queries
+  answered more questions right than facts matched to the prompt's words (see [Results](#results)).
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
   added; nothing is compared or overwritten.
@@ -15,12 +17,11 @@ through hooks:
   skill.
 
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
-takes about 10 ms per prompt. A fact keeps where and when it was learnt and where it holds (`scope`), and facts from
-every repository are searched: what you learnt in one project is recalled in another, but in a repository's session a
-fact that holds only in another repository must match the prompt more closely (see [Projects](#projects)). On equal
-scores a fact of the current host comes first; no host is excluded, because working on a server from a laptop is
-normal. An uppercase
-ticket key such as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a prompt naming it recalls that ticket
+takes about 10 ms per query. A fact keeps where and when it was learnt and where it holds (`scope`), and facts from
+every repository are searched: what you learnt in one project is found in another. On equal scores a fact of the
+current host comes first, then one learnt in the session's project, then a global one; no fact is excluded, because
+working on a server from a laptop is normal. An uppercase
+ticket key such as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a query naming it finds that ticket
 and not another number; bare numbers, ports and versions are still left out of the index. A versioned name such as
 `PostgreSQL-16` is not a ticket: it keeps `PostgreSQL` and drops `16`.
 
@@ -56,7 +57,7 @@ version, and a release bumps all of them together.
 The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
 tests ran against. The binary and the adapters check each other's release: the DSH and Hermes plugins ask
 `memcue version -json` at startup and turn the session card and extraction off with one warning on a binary older
-than 0.4.0 (recall keeps working), and the Claude Code `SessionStart` hook checks `memcue version -minimum 0.4.0` and
+than 0.4.0 (search keeps working), and the Claude Code `SessionStart` hook checks `memcue version -minimum 0.4.0` and
 prints the same hint. A build from source reports a suffixed version and is treated as the current tree. Install the
 plugin and the binary from the same release.
 
@@ -111,7 +112,7 @@ plugin and the binary from the same release.
 
 All three plugins (Claude Code, DSH, Hermes) find the binary in this order: the one configured explicitly
 (`MEMCUE_BIN`, or `binary` in the DSH and Hermes config); `memcue` on `PATH` when it is the plugin's release or newer;
-the copy the plugin installed; an older `memcue` on `PATH`, so recall keeps working. When none of them is the plugin's
+the copy the plugin installed; an older `memcue` on `PATH`, so search keeps working. When none of them is the plugin's
 release, the plugin downloads that release from GitHub, checks the archive against the release's `checksums.txt`,
 and installs it:
 
@@ -150,15 +151,24 @@ comes from where the session works, read from the files and never by running git
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
 writes the key. `memcue add -scope repo` does the same for the working directory.
 
-In a session of a repository, a fact scoped to another repository or a directory needs 0.25 of the prompt's weight
-instead of 0.15 to be recalled (#345, [scope-filter-2026-10.md](docs/research/scope-filter-2026-10.md)). On 432
-Claude Code prompts where this changes what is served, it cut the noise facts by 19% and, checked by hand, lost a
-needed fact in 3 prompts. Facts that hold everywhere, on a host or in a service are untouched. So is a session with
-no repository key, such as the Claude config directory or a directory outside git. `MEMCUE_FOREIGN_COVERAGE` changes
-the share; `0` leaves such facts out of the search entirely, which cut 37% of the noise but lost a needed fact in
-about 20 of those prompts.
+The project only orders `memcue search`: of facts with equal scores, one learnt in the session's project comes before
+a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### The agent searches itself (#361)
+
+- No facts come with a prompt. The Claude Code plugin has no `UserPromptSubmit` hook; the Hermes and DSH plugins
+  deliver the session card only. The session-start note, the Hermes system prompt and the DSH system prompt tell the
+  agent to search memcue before it answers from earlier sessions.
+- `memcue hook`, `memcue recall` (with `-explain` and `-fact`) and `memcue eval` are removed, with `recall.log` and
+  the per-session `.recalled` files. An older plugin that still calls `hook` gets "unknown command": Claude Code
+  ignores it, Hermes and DSH log one warning per session. Install the plugins and the binary of the same release.
+- `MEMCUE_RECALL_LOG`, `MEMCUE_MIN_COVERAGE`, `MEMCUE_MIN_TERMS`, `MEMCUE_MIN_MATCHED`, `MEMCUE_MAX_FACTS` and
+  `MEMCUE_FOREIGN_COVERAGE` are no longer read; drop them from wrappers. The Hermes options `min_coverage`,
+  `max_facts` and `suppress_mirrored` are ignored.
+- `MEMCUE_SEARCH_LOG=1` logs every search to `search.log`, the record to judge the agent's searches by.
+- The base is untouched.
 
 ### 0.7.0: recall without a judge, no review page
 
@@ -174,13 +184,6 @@ The Hermes plugin used to pass the constant `hermes` as the working directory, s
 `hermes <date>`, and on the author's base an empty one from 2026-10-23. Now a session in a git repository names its facts by
 that repository, and every other session leaves the origin empty. Facts already stored keep their origin; nothing
 needs to be moved.
-
-### Facts of other projects (#345)
-
-In a repository's session a fact scoped to another repository now needs a larger share of the prompt (0.25 instead
-of 0.15). Nothing in the base changes. `MEMCUE_FOREIGN_COVERAGE=0.15` restores the recall before #345. The gate
-needs the project keys of #343: until `memcue migrate -repos` has run, facts under the old directory names count as
-another project's.
 
 ### Project keys (#343)
 
@@ -231,20 +234,17 @@ stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 
 ## Use
 
-Nothing to do in a session: facts arrive with prompts and are extracted at the end. Extracted facts are candidates:
-recall gives them only after someone approves them — `memcue vet` by a rule or a model, or by hand (`memcue candidates`,
+Nothing to do in a session: the agent searches the base when it needs to, and facts are extracted at the end.
+Extracted facts are candidates: search finds them only after someone approves them — `memcue vet` by a rule or a model, or by hand (`memcue candidates`,
 `memcue approve ID`; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
 an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
-extracted and mirrored facts wait for review. A fact comes once per session
-(again after a compaction or `/clear`), and a background task's notice gets none. A prompt decides by the terms its facts know:
-a short question ("dream memcue") needs two matching terms, not the three a longer prompt does, so it stops asking
-for more words than the base holds. By hand (`add` without `-origin` names the project of the working directory and
+extracted and mirrored facts wait for review. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash
-memcue search -json postgres port    # find facts and their IDs (a JSON array with -json)
+memcue search -json postgres port    # find facts and their IDs, best first (a JSON array with -json; -n N, default 10)
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
 memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
@@ -257,9 +257,6 @@ memcue vet                           # decide it: approve what belongs in the ba
 memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
 memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
-memcue recall -cwd . "text"          # what a prompt would get
-memcue recall -explain "text"        # every step: terms, lexical gate, final cut
-memcue recall -fact ID "text"        # where this fact dropped out for this prompt
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base)
 memcue dream -apply answer.json      # check and carry out the model's answer to it
@@ -283,8 +280,8 @@ run, and a split into fewer than two parts leaves the candidate in the queue. `v
 Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
 answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
 an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
-so the candidate waits for the next run. A provisional fact is recalled after approved
-facts, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
+so the candidate waits for the next run. A provisional fact is found by search like an approved
+one, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
 `MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue, and `-no-model` keeps
 every candidate the rules cannot decide in that queue as well. Every verdict goes to `vet.log` in the state
 directory with the rule or model and its reason; the page, the `approve` command and the page's undo (`store.Reopen`)
@@ -303,8 +300,7 @@ the Jev pass 8–10 and 1–4, for about 420k more input tokens
 ([docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md)).
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
-retired or expired. `card.log` records the ids it carried, so a rule shows as used even though recall never served
-it.
+retired or expired. `card.log` records the ids it carried, so a rule shows as used even though no search found it.
 
 The card holds about 3,500 characters, a dozen facts, and a labelled base has more rules than that. They are chosen
 in this order:
@@ -317,11 +313,11 @@ in this order:
 
 Measured on the author's base (65 global rules after the labelling of #219, 129 facts for the largest repository): the
 global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
-with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already serves
-are the ones the card is not needed for.
+with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already served
+were the ones the card is not needed for.
 
-An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, but recall
-skips it, so a one-off reminder does not keep coming back months later. The date is the local calendar day of the
+An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, and leaves
+the card. `memcue search` still finds it, and `search -json` shows its `expires`. The date is the local calendar day of the
 machine that judges it. A correction keeps the expiry unless it names a new one.
 
 ### Dream
@@ -394,7 +390,7 @@ judge (#357); its measurements are in [docs/research/dream-triage-2026-10.md](do
 
 ## Configuration
 
-memcue calls one model, the main chat model, for extraction and review; recall calls none, and the dream is done by the
+memcue calls one model, the main chat model, for extraction and review; search calls none, and the dream is done by the
 model of a session ([Dream](#dream)). The judge and
 embeddings roles of [docs/models.md](docs/models.md) are removed (#250, #357). The table is the contract this release
 uses.
@@ -408,25 +404,20 @@ uses.
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
-| `MEMCUE_HOST` | name of this machine for fact scope and the recall tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
-| `MEMCUE_RECALL_LOG` | `1` logs what each prompt got; the log keeps prompt text | off |
-| `MEMCUE_FOREIGN_COVERAGE` | share a fact scoped to another repository or directory must hold in a repository's session; `0` leaves such facts out of the search; a value at or below `MEMCUE_MIN_COVERAGE` gates them as any other fact | 0.25 |
-| `MEMCUE_MIN_COVERAGE` | share of a prompt's terms a fact must hold; above 0.25 starts losing facts of other repositories | 0.15 |
-| `MEMCUE_MIN_TERMS` | prompt terms the facts must know before any fact is examined; a prompt with fewer gets nothing (a ticket key or a prompt of numbers only needs one) | `2` |
-| `MEMCUE_MIN_MATCHED` | distinct prompt terms a fact must hold; never more than the terms the prompt shares with the facts | `3` |
-| `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
-| `MEMCUE_MAX_FACTS` | facts one prompt may get; the cut is applied after the ranking, so a larger value adds context, not coverage: on the 68 prompts that needed memory a third fact left the number with a useful fact unchanged, 58 of 68 either way ([docs/research/max-facts-2026-10.md](docs/research/max-facts-2026-10.md)) | `2` |
+| `MEMCUE_HOST` | name of this machine for fact scope and the search tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
+| `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |
+| `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_DREAM_EVERY` | how long after a dream the session start says the next one is due (a Go duration, at least `1m`) | `1h` |
 | `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
-| `XDG_STATE_HOME` | where `memcue/recall.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log`, per-session read offsets and the facts each session got are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log` and per-session read offsets are kept | `~/.local/state` |
 
-Recall is the words alone: the facts that pass the gate are served in the search's BM25 order, approved before
-provisional; the coverage share only gates. On 409 blind-labelled Claude Code prompts where the two orders differ,
-BM25 order gave a useful fact to 205 prompts against 180 for a coverage sort, with 30% noise against 41% (#338,
+Search is the words alone: FTS5 over the query's terms, in BM25 order, with no threshold, because the agent reads
+what it asked for. The gates that kept noise out of the facts injected with a prompt went with that injection (#361);
+the BM25 order they used beat a coverage sort on 409 blind-labelled prompts (#338,
 [docs/research/search-chain-2026-10.md](docs/research/search-chain-2026-10.md)). The readers that once ordered the
 candidates are removed: the vectors (#250), the tree reader (#324), the Jev judge and the listwise main-model reader
 (#357). None of them served more useful facts than the words for its cost
@@ -436,12 +427,10 @@ candidates are removed: the vectors (#250), the tree reader (#324), the Jev judg
 no longer read. Opening a base deletes the vectors an older memcue stored and compacts the file once (#260); the empty
 `fact_vectors` table stays, so the schema and older binaries are unaffected.
 
-With `MEMCUE_RECALL_LOG=1`, `recall.log` has one JSON line per prompt: the session, the host, the first 500
-characters of the prompt and the facts it got, if any, with their coverage, scope and whether a fact of another host
-displaced one of this host. `stopped` says why a prompt got nothing before any fact was
-examined (too few terms, a harness notice); a line with no facts and no `stopped` had candidates that none passed. It stays on your machine and is what you judge recall by; it is off by default because it
-keeps the text of your prompts. When a fact you expected did not come, `memcue recall -fact ID "prompt"` names the step
-that lost it: the search (not among its results), the lexical gate (too few terms or low coverage) or the cut to the first facts. `extract.log` has one JSON line per extraction run: session, part of the transcript
+With `MEMCUE_SEARCH_LOG=1`, `search.log` has one JSON line per search: the time, the session (when the host passes
+`-session`), the project, the host, the first 500 characters of the query and the ids of the facts it returned,
+searches that found nothing included. It stays on your machine and is what you judge the agent's searches by; it is off
+by default because it keeps the text of the queries. `extract.log` has one JSON line per extraction run: session, part of the transcript
 read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
 
 `cost_usd` in `extract.log`, `vet.log` and `dream.log` holds only what a caller reports in dollars: `claude -p`. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
@@ -457,7 +446,7 @@ Extraction is the part that costs most. On ten recorded sessions it cost $0.18�
 about $5 per million characters of transcript; tool output is the bulk of it. Sonnet was half the price but kept
 73 % of the facts worth keeping against 88 % for Opus, and nothing at all in two of the ten sessions. DeepSeek
 (`deepseek-flash` through `MEMCUE_API_URL`) cost $0.17 for all ten and kept 74 % against 87 % for Opus. Set
-`MEMCUE_EXTRACT=0` to keep recall and turn extraction off in every host.
+`MEMCUE_EXTRACT=0` to keep search and turn extraction off in every host.
 
 A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
@@ -475,7 +464,11 @@ one line.
 
 Measured while building memcue; details and method in [docs/evaluation.md](docs/evaluation.md).
 
-- **Recall on 100 unseen real prompts:** 33 % of injected facts useful and 38 % noise, against 4 % useful and 87 %
+- **The agent searching itself, end to end (#361):** on 40 real prompts, each run twice and graded blind, the agent
+  that searched memcue itself scored 1.08 of 2, against 0.89 with facts injected with the prompt and 0.76 with no
+  memory; the edge over injection is +0.19 per prompt, 95% interval [+0.03, +0.37]. Only Opus in Claude Code was
+  measured ([docs/research/pull-2026-10.md](docs/research/pull-2026-10.md)).
+- **Recall on 100 unseen real prompts (the injection before #361):** 33 % of injected facts useful and 38 % noise, against 4 % useful and 87 %
   noise for the holographic memory plugin's prefetch on a comparable set. Useful facts reached 12 of the 41 prompts
   that needed memory: lexical search misses prompts that share no rare words with the fact.
 - **End to end, 30 questions with answers in memory:** 30 of 30 correct with memcue against 27 of 30 without, one
@@ -511,9 +504,8 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 
 | Capability | Claude Code | DeepSeek Harness | Hermes Agent |
 |---|---|---|---|
-| Recall before a prompt | `UserPromptSubmit` hook | `agent/pre-step` | `prefetch` |
+| Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool |
 | Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` with the first turn and after compression |
-| Facts again after a compaction / `/clear` | yes | yes | yes |
 | Session extraction | `PreCompact` / `SessionEnd` | `turn/end` / `session/disposed` | threshold, idle, pre-compress, session end |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
@@ -530,13 +522,13 @@ same file.
 
 ## DeepSeek Harness
 
-memcue also works as a native DSH plugin: recall before each step, the session card, extraction at turn end and on
-disposal, and four fact tools. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
+memcue also works as a native DSH plugin: the session card, a search tool the model is told to use, extraction at turn
+end and on disposal, and three more fact tools. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
 
 ## Hermes Agent
 
-memcue also works as a memory provider for Hermes Agent: recall before each turn, the built-in memory tool mirrored
-into the base, tools to fix facts, and optional extraction of sessions through an OpenAI-compatible endpoint. See
+memcue also works as a memory provider for Hermes Agent: the session card, a search tool the model is told to use,
+the built-in memory tool mirrored into the base, tools to fix facts, and optional extraction of sessions through an OpenAI-compatible endpoint. See
 [plugins/hermes](plugins/hermes/README.md).
 
 ## License

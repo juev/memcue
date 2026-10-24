@@ -3,32 +3,31 @@
 A memory provider for [Hermes Agent](https://github.com/NousResearch/hermes-agent) that keeps long-term memory in a
 memcue fact base:
 
-- **Before each turn** the user's message goes to `memcue hook`; at most two matching facts come back, or nothing.
-  Hermes puts them into the turn's `<memory-context>` block. Each fact comes once per session, and again after the
-  context is compressed, which drops what the session already got. A cron run gets none: it is a background task's
-  notice, whose wrapper matches facts by accident.
+- **No facts come with a message** (#361). The system prompt block tells the model to search the base with
+  `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
+  system's name and both languages if the first try finds nothing.
 - **The session card** (global rules and the decisions of the current repository) rides with the first turn and
-  again after a compression, through the same `memcue session-card` call Claude Code and DSH use. It stays in the
+  again after a compression, through the same `memcue session-card` call Claude Code and DSH use; a cron run gets
+  none. It stays in the
   conversation instead of being repeated in the system prompt; `session_card: false` turns it off. A failed card
   is retried after five minutes, not on every turn, and reported to the log at most every ten minutes.
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's
   `cwd`), named by its remote as in Claude Code: it names the origin of the facts a session learns, the `repo`
-  scope, the card's decisions and the recall tie-break. A chat with no working directory and a session in one of
+  scope, the card's decisions and the search tie-break. A chat with no working directory and a session in one of
   Hermes's own directories outside git (`/opt/data`, `/opt/hermes`) have no project: their facts keep an empty
   origin and a `repo` scope is dropped (#347).
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
-  fact (source `memory`) and waits for approval with `memcue approve`. With the default
-  `suppress_mirrored: true`, an approved mirrored fact is still left out of `prefetch`, because the same entry already
-  rides in the built-in memory block; set `suppress_mirrored: false` to let it be recalled as well. When the agent
+  fact (source `memory`, origin `hermes-memory`) and waits for approval with `memcue approve`. When the agent
   edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry became is
   kept in `$HERMES_HOME/memcue/written.json`. An explicit `memcue_correct` of an approved fact stays active: it is a
   correction, not a new candidate.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
-  `memcue_search` takes an optional `limit`; `memcue_correct` can set `keywords` and an `expires` date, as the CLI
-  does. Search is lexical, like `memcue search`: the host and repository preference belongs to recall, not the tool.
+  `memcue_search` takes an optional `limit` and runs `memcue search` with the session's workspace and id, so facts of
+  this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the session; `memcue_correct`
+  can set `keywords` and an `expires` date, as the CLI does.
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
   tools below.
 - **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
@@ -50,7 +49,7 @@ memcue fact base:
 
 ## Review and vet
 
-Mirrored built-in memory writes and extracted facts are **candidates**: the base stores them, recall ignores them, and
+Mirrored built-in memory writes and extracted facts are **candidates**: the base stores them, search ignores them, and
 `memcue vet` or `memcue approve ID...` decides. A fact written by `memcue_add` is active at once;
 `memcue_correct` of an approved fact is a deliberate correction, not a new candidate. The shared rules are in
 [Review and vet](../../README.md#review-and-vet).
@@ -95,7 +94,7 @@ takes a few runs; the rules are in [Dream](../../README.md#dream).
    ```
 
    If the container's host name is not stable, name the machine explicitly. The provider forwards it to memcue as
-   `MEMCUE_HOST`, and recall uses it to show a fact's scope and to prefer facts of this host on equal scores:
+   `MEMCUE_HOST`, and search uses it to prefer facts of this host on equal scores:
 
    ```bash
    hermes config set memory.memcue.host mac
@@ -110,8 +109,8 @@ takes a few runs; the rules are in [Dream](../../README.md#dream).
    hermes config set memory.memcue.extract_key_env DEEPSEEK_API_KEY
    ```
 
-5. Optional: keep `usage.log`, which records for each reply whether it quoted an identifier of the facts it was
-   given. Both settings live in the provider config, so the environment of the gateway or its container stays as it
+5. Optional: keep `usage.log`, which records for each reply whether it quoted an identifier of the facts its searches
+   returned in that turn. Both settings live in the provider config, so the environment of the gateway or its container stays as it
    is; `state_dir` defaults to `$XDG_STATE_HOME`, else `~/.local/state`, and the log goes to `<state_dir>/memcue/`:
 
    ```bash
@@ -124,7 +123,7 @@ takes a few runs; the rules are in [Dream](../../README.md#dream).
 6. Restart Hermes (the gateway, if you run one).
 
 The provider asks the binary for its version when the card or extraction first runs: 0.4.0 or newer is required, and
-an older one turns those two paths off with a warning in the log while recall keeps working. A build from source
+an older one turns those two paths off with a warning in the log while search keeps working. A build from source
 reports a suffixed version and counts as the current tree.
 
 Check: `hermes memory status` should list `memcue` as available. Run the plugin's tests with the binary you
