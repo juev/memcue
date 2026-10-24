@@ -13,22 +13,19 @@ import (
 )
 
 // ranker builds the rerank pass from the environment. MEMCUE_RERANK names the reader: `judge` is Jev scoring each
-// candidate, `listwise` is the main chat model asking one listwise question (#281), `off` keeps the words. Without the
-// variable, or with a value it does not know, Jev runs when its endpoint is configured and the words decide otherwise,
-// so recall without a judge key makes no model call. `local`, the tree reader of #321, was removed in #324 and is one
-// of those unknown values now: end to end it changed nothing against the words (docs/research/local-readers-2026-10.md).
-// The listwise reader is opt-in too: it served as many useful prompts as Jev with two more noise facts and three times
-// the latency (docs/research/listwise-2026-10.md). A nil Ranker keeps recall lexical, with the words choosing and the
+// candidate, `listwise` is the main chat model asking one listwise question (#281). Without the variable, or with any
+// other value, the words decide, so recall makes no model call unless a reader is asked for (#331): a Jev key set for
+// triage or the dream no longer turns the judge on for every prompt. `local`, the tree reader of #321, was removed in
+// #324 and is one of those other values now: end to end it changed nothing against the words
+// (docs/research/local-readers-2026-10.md). The listwise reader is opt-in as well: it served as many useful prompts
+// as Jev with two more noise facts and three times the latency (docs/research/listwise-2026-10.md). A nil Ranker keeps recall lexical, with the words choosing and the
 // coverage gate deciding.
 func ranker() recall.Ranker {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("MEMCUE_RERANK"))) {
-	case "off", "none", "words", "0":
-		return nil
+	case "judge":
+		return jevRanker()
 	case "listwise", "main":
 		return listwiseRanker()
-	}
-	if r := jevRanker(); r != nil {
-		return r
 	}
 	return nil
 }
