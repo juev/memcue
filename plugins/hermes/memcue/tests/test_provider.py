@@ -493,6 +493,13 @@ class ProviderTest(unittest.TestCase):
         p.sync_turn("…", "55432", session_id="s8")
         self.assertFalse((state / "memcue" / "usage.log").exists())
 
+    def test_searches_keep_nothing_without_the_usage_log(self):
+        """A subagent or cron run searches without a sync_turn; nothing may pile up for it."""
+        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
+        for _ in range(3):
+            self.search("порт postgres demo")
+        self.assertEqual(self.p._delivered, {})
+
     def test_usage_log_is_off_without_the_flag(self):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
         self.search("порт postgres demo")
