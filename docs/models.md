@@ -8,6 +8,10 @@ Implementation: [#62](https://github.com/juev/memcue/issues/62).
 reading vectors ([#232](https://github.com/juev/memcue/issues/232)), and `memcue embed` and `MEMCUE_EMBED_*` are gone;
 the sections below keep the decision as it was made.
 
+**2026-10-24:** the judge role is removed as well ([#357](https://github.com/juev/memcue/issues/357)): recall rerank,
+dream triage and `MEMCUE_JUDGE_*` are gone, and so is the listwise reader (`MEMCUE_RERANK`). The main chat model is the
+one role left.
+
 ## Decision
 
 Keep exactly three model roles, each configured by environment variables:
