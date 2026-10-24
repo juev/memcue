@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.7.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.8.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.8.0 | 5 | 0.8.0 | 0.8.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.8.0 (`hermes-agent` 0.15.2) |
 | 0.7.0 | 5 | 0.7.0 | 0.7.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.7.0 (`hermes-agent` 0.15.2) |
 | 0.6.0 | 5 | 0.6.0 | 0.6.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.6.0 (`hermes-agent` 0.15.2) |
 | 0.5.3 | 5 | 0.5.3 | 0.5.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.5.3 (`hermes-agent` 0.15.2) |
@@ -157,7 +158,7 @@ a global one and the rest. `search -cwd DIR` names the session's directory; the 
 
 ## Upgrade
 
-### The agent searches itself (#361)
+### 0.8.0: the agent searches itself (#361)
 
 - No facts come with a prompt. The Claude Code plugin has no `UserPromptSubmit` hook; the Hermes and DSH plugins
   deliver the session card only. The session-start note, the Hermes system prompt and the DSH system prompt tell the
@@ -169,6 +170,10 @@ a global one and the rest. `search -cwd DIR` names the session's directory; the 
   `MEMCUE_FOREIGN_COVERAGE` are no longer read; drop them from wrappers. The Hermes options `min_coverage`,
   `max_facts` and `suppress_mirrored` are ignored.
 - `MEMCUE_SEARCH_LOG=1` logs every search to `search.log`, the record to judge the agent's searches by.
+- Every rule and decision you stated is on the card, past its budget (#363). Hermes carries the card in its system
+  prompt instead of the first turn.
+- A Hermes session without a working directory (a one-shot or cron run) takes the directory Hermes falls back to,
+  so a run inside a repository names that repository (#354).
 - The base is untouched.
 
 ### 0.7.0: recall without a judge, no review page
