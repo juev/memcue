@@ -19,6 +19,7 @@ import (
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
+	"github.com/juev/memcue/internal/tier"
 )
 
 // A dream is a pass over the facts written since the last one: each new fact is grouped with the stored facts close
@@ -144,6 +145,8 @@ type dreamRecord struct {
 	Splits  []extract.Split  `json:"splits,omitempty"` // compound facts replaced by their parts
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
+	// Promoted are the facts that became global: a duplicate of them was learnt in another project (#346).
+	Promoted []string `json:"promoted,omitempty"`
 	// SplitErrors counts split calls that failed; their facts stay as they are until the next dream reviews them.
 	SplitErrors int `json:"split_errors,omitempty"`
 	// Expanded counts the facts that got search queries; ExpandErrors the expansion calls that failed, whose facts
@@ -441,6 +444,9 @@ func dream(dir string, from time.Time, seen map[string]int, dryRun, list bool, p
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
 				return rec, err
 			}
+			if err := promote(s, a, dryRun, saw, &rec, out); err != nil {
+				return rec, err
+			}
 		}
 	}
 	if !dryRun {
@@ -631,6 +637,9 @@ func applyPlan(dir, path string, out io.Writer) (dreamRecord, error) {
 			saw[f.ID] = f.Version
 			rec.Actions = append(rec.Actions, a)
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
+				return rec, err
+			}
+			if err := promote(s, a, false, saw, &rec, out); err != nil {
 				return rec, err
 			}
 		}
@@ -1098,6 +1107,55 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 		}
 	}
 	return ok, refused
+}
+
+// promote makes the fact a duplicate was retired for global when the two were learnt in different projects: a fact
+// learnt twice, independently, in two projects holds in both, so it is no project's fact (#346). The code decides
+// this, not the model, which only said that one fact covers the other. A dry run reports it without writing. The
+// survivor is read now, not as the group showed it: an earlier action of the batch may have corrected it.
+func promote(s *store.Store, a extract.Action, dryRun bool, saw map[string]int, rec *dreamRecord, out io.Writer) error {
+	if a.Op != "retire" || a.Kind != "duplicate" || a.By == "" {
+		return nil
+	}
+	gone, err := s.Get(a.ID)
+	if err != nil {
+		return err
+	}
+	by, err := s.Get(a.By)
+	if err != nil {
+		return err
+	}
+	from, to := projectOf(gone), projectOf(by)
+	if from == "" || to == "" || from == to || by.Status != store.Active {
+		return nil
+	}
+	if !dryRun {
+		f, err := s.Relabel(by.ID, by.Version, by.Kind, "global", by.Expires)
+		if err != nil {
+			return err
+		}
+		saw[f.ID] = f.Version
+	}
+	rec.Promoted = append(rec.Promoted, by.ID)
+	_, err = fmt.Fprintf(out, "global %s: a duplicate was learnt in %s, it in %s\n", by.ID, from, to)
+	return err
+}
+
+// projectOf is the project a fact holds in: its repo: or dir: scope, or, with no scope, the project its origin names.
+// A global fact, one of a host or a service, and one learnt nowhere in particular (the Claude config directory, an
+// empty origin) have none.
+func projectOf(f store.Fact) string {
+	sc := strings.ToLower(f.Scope)
+	switch {
+	case strings.HasPrefix(sc, "repo:") || strings.HasPrefix(sc, "dir:"):
+		return sc
+	case sc != "":
+		return ""
+	}
+	if k := originKey(f.Origin); k != "" && k != tier.Global {
+		return tier.Scope(k)
+	}
+	return ""
 }
 
 // apply makes one checked action and returns the version it wrote.
