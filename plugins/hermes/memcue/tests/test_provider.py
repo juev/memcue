@@ -62,29 +62,6 @@ def _shell_memcue_vars() -> list:
     return [k for k in os.environ if k.startswith("MEMCUE_") and k != "MEMCUE_BIN"]
 
 
-def _gives_a_fact_once(binary: str) -> bool:
-    """Whether the binary keeps a fact from coming twice in a session (memcue 0.1.5+). Answered by trying, so a
-    build from source, whose version is 'v0.1.5-dirty' or a bare hash, is judged like a release."""
-    tmp = tempfile.mkdtemp()
-    fact = "Проверка: проект demo слушает порт 55432."
-    env = {k: v for k, v in os.environ.items() if k not in _shell_memcue_vars()}
-    env.update(MEMCUE_FACTS=os.path.join(tmp, "facts.db"), MEMCUE_EXTRACT="0",
-               XDG_STATE_HOME=os.path.join(tmp, "state"))
-    payload = json.dumps({"prompt": "на каком порту слушает проект demo?", "cwd": tmp, "session_id": "probe"})
-    try:
-        subprocess.run([binary, "add", "-origin", "test", "--", fact], env=env, check=True, capture_output=True)
-        runs = [subprocess.run([binary, "hook"], input=payload, env=env, capture_output=True, text=True).stdout
-                for _ in range(2)]
-        return bool(runs[0].strip()) and not runs[1].strip()
-    except (OSError, subprocess.SubprocessError):
-        return False
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-ONCE_PER_SESSION = _gives_a_fact_once(BIN) if BIN else False
-
-
 @unittest.skipUnless(BIN, "memcue binary not found (set MEMCUE_BIN)")
 class ProviderTest(unittest.TestCase):
     def setUp(self):
@@ -221,21 +198,19 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(self.p.prefetch("какой порт у базы demo postgres"), "")
         self.assertFalse(Path(self.p._facts).exists())
 
-    def test_mirrored_fact_is_kept_out_of_recall(self):
-        """A built-in memory note rides with every turn anyway: repeating it from the base would say it twice."""
+    def test_mirrored_fact_waits_for_review(self):
+        """A built-in memory note is mirrored as a candidate with its own origin, not as an approved fact."""
         self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertEqual(self.p.prefetch("на каком порту слушает база postgres проекта demo?"), "")
         self.assertIn("hermes-memory", self.pending()[0])
         self.assertEqual(self.facts(), [])
 
-    def test_mirrored_facts_come_back_when_suppression_is_off(self):
-        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "suppress_mirrored": False})
-        p.initialize("s1", hermes_home=self.home, agent_context="primary")
-        p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        query = "на каком порту слушает база postgres проекта demo?"
-        self.assertEqual(p.prefetch(query), "")  # a candidate until the user approves it
-        self.memcue("approve", self.pending()[0].split()[0])
-        self.assertIn("55432", p.prefetch(query))
+    def test_no_fact_comes_with_a_message(self):
+        """The model searches itself (#361): a matching approved fact stays out of the prefetch."""
+        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
+        self.assertNotIn("55432", self.p.prefetch("на каком порту слушает база postgres проекта demo?",
+                                                  session_id="s1"))
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
+        self.assertIn("55432", found["facts"][0]["content"])
 
     def test_replace_corrects_the_same_fact_and_remove_retires_it(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
@@ -312,6 +287,10 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(self.written(), {old_key: fact_id})
         self.assertEqual(len(self.pending()), 1)  # the fact is still there to be retired later
 
+    def search(self, query: str) -> str:
+        """What memcue_search returns to the model for query."""
+        return self.p.handle_tool_call("memcue_search", {"query": query})
+
     def add_fact(self, content: str, expires: str = "") -> None:
         """A fact written by another program, not by the built-in memory tool."""
         cmd = [str(BIN), "add", "-origin", "test"]
@@ -319,22 +298,6 @@ class ProviderTest(unittest.TestCase):
             cmd += ["-expires", expires]
         subprocess.run(cmd + ["--", content], check=True, capture_output=True,
                        env=dict(os.environ, MEMCUE_FACTS=self.p._facts))
-
-    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
-    def test_a_fact_comes_once_per_session(self):
-        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
-        query = "на каком порту слушает база postgres проекта demo?"
-        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
-        self.assertEqual(self.p.prefetch(query, session_id="s1"), "")  # the same fact once per session
-        self.assertIn("55432", self.p.prefetch(query, session_id="s2"))
-
-    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
-    def test_a_compressed_session_gets_the_fact_again(self):
-        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
-        query = "на каком порту слушает база postgres проекта demo?"
-        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
-        self.p.on_pre_compress([])  # the context loses what it got
-        self.assertIn("55432", self.p.prefetch(query, session_id="s1"))
 
     def test_session_card_is_delivered_once_and_after_compression(self):
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
@@ -359,14 +322,12 @@ class ProviderTest(unittest.TestCase):
         self.p._pending["s2"] = ([{"role": "user", "content": "x"}], 0.0)
         self.p._delivered["s2"] = [{"tokens": ["x"], "chars": 1}]
         self.p._inflight["s2"] = Counter({"fp": 1})
-        self.p._warned["s2"] = 1.0
         self.p.on_session_switch("s2", reset=True)
         self.assertEqual(self.p._session_id, "s2")
         self.assertEqual(self.p._generation, 0)
         self.assertNotIn("s2", self.p._pending)
         self.assertNotIn("s2", self.p._inflight)
         self.assertNotIn("s2", self.p._delivered)
-        self.assertNotIn("s2", self.p._warned)
 
     def test_rewound_session_forgets_seen_fingerprints(self):
         path = self.p._seen_path("s1")
@@ -384,12 +345,10 @@ class ProviderTest(unittest.TestCase):
         p.initialize("s3", hermes_home=self.home, agent_context="cron")
         self.assertEqual(p.prefetch("на каком порту слушает база postgres проекта demo?"), "")
 
-    @unittest.skipUnless(ONCE_PER_SESSION, "the memcue binary does not keep a fact from coming twice in a session")
     def test_a_session_id_outside_the_accepted_set_is_hashed(self):
-        self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
-        query = "на каком порту слушает база postgres проекта demo?"
-        self.assertIn("55432", self.p.prefetch(query, session_id="matrix:room/1"))
-        self.assertEqual(self.p.prefetch(query, session_id="matrix:room/1"), "")
+        scope = self.p._scope("matrix:room/1")
+        self.assertRegex(scope, r"^[0-9a-f]{32}$")
+        self.assertEqual(scope, self.p._scope("matrix:room/1"))
 
     def test_replace_of_unknown_entry_adds(self):
         self.p.on_memory_write("replace", "user", "Пользователь пишет по-русски.", {"previous_content": "x"})
@@ -496,41 +455,16 @@ class ProviderTest(unittest.TestCase):
             "expires": "2026-10-21"}))
         self.assertIn("expires=2026-10-21", self.facts()[0])
 
-    def test_expired_fact_is_not_recalled(self):
-        prompt = "dream отчёт октября"
-        self.add_fact("Проверка dream: отчёт придёт 21 октября.", expires="2020-01-01")
-        self.assertEqual(self.p.prefetch(prompt, session_id="s1"), "")
-        self.add_fact("Проверка dream: отчёт придёт 21 октября.")
-        self.assertIn("21 октября", self.p.prefetch(prompt, session_id="s2"))
-
-    def test_min_coverage_filters_weak_matches(self):
-        self.add_fact("Проект demo: кеш Redis слушает порт 6379.")
-        self.add_fact("Проект demo: кеш Memcached слушает порт 11211.")  # three of the four prompt terms
-        query = "demo redis порт кеш"
-        self.assertEqual(len(self.p.prefetch(query, session_id="s1").splitlines()), 3)  # header + two facts
-        strict = memcue_provider.MemcueMemoryProvider({"binary": BIN, "min_coverage": 0.99})
-        strict.initialize("s9", hermes_home=self.home, agent_context="primary")
-        self.assertEqual(len(strict.prefetch(query, session_id="s9").splitlines()), 2)  # only the full match
-
-    def test_max_facts_caps_the_injected_facts(self):
-        self.add_fact("Проект demo: кеш Redis слушает порт 6379.")
-        self.add_fact("Проект demo: кеш Memcached слушает порт 11211.")
-        query = "demo redis порт кеш"
-        self.assertEqual(len(self.p.prefetch(query, session_id="s1").splitlines()), 3)  # header + two facts
-        capped = memcue_provider.MemcueMemoryProvider({"binary": BIN, "max_facts": 1})
-        capped.initialize("s10", hermes_home=self.home, agent_context="primary")
-        self.assertEqual(len(capped.prefetch(query, session_id="s10").splitlines()), 2)  # header + one fact
-
     def test_usage_log_tells_used_facts_from_ignored_ones(self):
         os.environ["MEMCUE_USAGE_LOG"] = "1"
         self.addCleanup(os.environ.pop, "MEMCUE_USAGE_LOG", None)
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertIn("55432", self.p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s1"))
+        self.assertIn("55432", self.search("порт postgres demo"))
         self.p.sync_turn("на каком порту слушает база postgres проекта demo?", "База слушает 55432.",
                          session_id="s1")
         self.add_fact("Проект demo: очередь RabbitMQ на порту 5672.")
-        self.assertIn("5672", self.p.prefetch("какой порт у очереди RabbitMQ проекта demo?", session_id="s2"))
-        self.p.sync_turn("какой порт у очереди RabbitMQ проекта demo?", "Не знаю.", session_id="s2")
+        self.assertIn("5672", self.search("порт rabbitmq demo"))
+        self.p.sync_turn("какой порт у очереди RabbitMQ проекта demo?", "Не знаю.", session_id="s1")
         log = Path(self.home) / "state" / "memcue" / "usage.log"
         lines = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertEqual([(r["facts"], r["used"]) for r in lines], [(1, 1), (1, 0)])
@@ -541,7 +475,7 @@ class ProviderTest(unittest.TestCase):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "usage_log": True, "state_dir": str(state)})
         p.initialize("s7", hermes_home=self.home, agent_context="primary")
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertIn("55432", p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s7"))
+        self.assertIn("55432", p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
         p.sync_turn("на каком порту слушает база postgres проекта demo?", "База слушает 55432.", session_id="s7")
         log = state / "memcue" / "usage.log"
         lines = log.read_text(encoding="utf-8").splitlines()
@@ -555,13 +489,13 @@ class ProviderTest(unittest.TestCase):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "usage_log": "false", "state_dir": str(state)})
         p.initialize("s8", hermes_home=self.home, agent_context="primary")
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s8")
+        p.handle_tool_call("memcue_search", {"query": "порт postgres demo"})
         p.sync_turn("…", "55432", session_id="s8")
         self.assertFalse((state / "memcue" / "usage.log").exists())
 
     def test_usage_log_is_off_without_the_flag(self):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.p.prefetch("на каком порту слушает база postgres проекта demo?", session_id="s1")
+        self.search("порт postgres demo")
         self.p.sync_turn("…", "55432", session_id="s1")
         self.assertFalse((Path(self.home) / "state" / "memcue" / "usage.log").exists())
 

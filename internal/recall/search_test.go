@@ -48,6 +48,24 @@ func TestSearchOrdersTiesByHostProjectGlobal(t *testing.T) {
 	}
 }
 
+// A fact learnt under any key of the session's project wins a tie: a fork's session prefers a fact of its upstream
+// over the same text learnt elsewhere.
+func TestSearchAnyProjectKeyWinsTies(t *testing.T) {
+	s := emptyBase(t)
+	for _, origin := range []string{"example.com/elsewhere/z 2026-09-10", "example.com/them/upstream 2026-08-01"} {
+		if _, err := s.Add("Брокер nats слушает 4222, мониторинг на 8222.", []string{"nats"}, origin); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Search(s, "брокер nats", []string{"example.com/me/fork", "example.com/them/upstream"}, "", 10)
+	if err != nil || len(got) != 2 || got[0].BM25 != got[1].BM25 {
+		t.Fatalf("want a tie of two, got %+v %v", got, err)
+	}
+	if got[0].Origin != "example.com/them/upstream 2026-08-01" {
+		t.Errorf("first is %q, want the upstream's fact", got[0].Origin)
+	}
+}
+
 // The cut comes after the tie order: with room for one fact, the host's fact is the one, wherever the database put it.
 func TestSearchCutKeepsTheTieWinner(t *testing.T) {
 	s := emptyBase(t)

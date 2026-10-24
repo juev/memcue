@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// retire then reopen leaves the fact active with the same content, scope and source, and recall returns it.
+// retire then reopen leaves the fact active with the same content, scope and source, and search finds it.
 func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	env(t)
 	var out bytes.Buffer
@@ -19,7 +19,7 @@ func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	recalled := func() bool {
 		t.Helper()
 		var r bytes.Buffer
-		if err := runRecall([]string{prompt}, &r); err != nil {
+		if err := runSearch([]string{prompt}, &r); err != nil {
 			t.Fatal(err)
 		}
 		return strings.Contains(r.String(), "openjdk@21")

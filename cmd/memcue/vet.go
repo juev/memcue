@@ -473,7 +473,7 @@ func reviewInput(s *store.Store, batch []store.Fact) (string, error) {
 func judgedNeighbours(s *store.Store, f store.Fact) ([]judgedNeighbour, error) {
 	p := dreamNeighbours
 	p.Seen = map[string]bool{f.ID: true}
-	hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), nil, p)
+	hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), p)
 	if err != nil {
 		return nil, err
 	}

@@ -21,7 +21,7 @@ func TestVersionOnlyPromptRecallsTheFact(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := Recall(s, "1.27", nil, Default); err != nil {
+	if got, err := Recall(s, "1.27", testParams); err != nil {
 		t.Fatal(err)
 	} else if len(got) != 0 {
 		t.Fatalf("version recalled %v with the flag off, want nothing", got)
@@ -31,7 +31,7 @@ func TestVersionOnlyPromptRecallsTheFact(t *testing.T) {
 	if err := s.Rebuild(); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Recall(s, "1.27", nil, Default)
+	got, err := Recall(s, "1.27", testParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,9 +55,9 @@ func TestVersionDoesNotFilterThePool(t *testing.T) {
 	if _, err := s.Add("Сборка стенда идёт через make stand и требует пин версии.", nil, "notes 2026-10-20"); err != nil {
 		t.Fatal(err)
 	}
-	p := Default
+	p := testParams
 	p.MaxFacts = 3
-	got, err := Recall(s, "сборка стенда 1.27", nil, p)
+	got, err := Recall(s, "сборка стенда 1.27", p)
 	if err != nil {
 		t.Fatal(err)
 	}
