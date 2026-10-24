@@ -75,6 +75,7 @@ _SHUTDOWN_GRACE = 20  # seconds shutdown waits for in-flight extractions; a pend
 _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail no later trigger will collect
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared here
+_SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
@@ -307,6 +308,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._pending_lock = threading.Lock()
         self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts its searches returned this turn
         self._compat: Optional[bool] = None  # the binary has the commands this provider uses
+        self._version = ""  # what the binary reported, once _binary_ok asked
         self._bin: Optional[str] = None  # the binary chosen without a configured one
         self._installing: Optional[threading.Thread] = None
         self._warned_compat = False
@@ -391,6 +393,7 @@ class MemcueMemoryProvider(MemoryProvider):
         else:
             ok, out = self._run(["version"], timeout=_RECALL_TIMEOUT)
             version = out.split()[0] if ok and out else ""
+        self._version = version
         if not _version_at_least(version, _MIN_BINARY):
             self._compat = False
             if not self._warned_compat:
@@ -1035,7 +1038,10 @@ class MemcueMemoryProvider(MemoryProvider):
         if tool_name == "memcue_search":
             if not arg("query"):
                 return tool_error("query is required")
-            cmd = ["search", "-json", "-cwd", self._workspace or ".", "-session", self._session_id]
+            cmd = ["search", "-json"]
+            self._binary_ok()  # asks the version once
+            if _version_at_least(self._version, _SCOPED_SEARCH):
+                cmd += ["-cwd", self._workspace or ".", "-session", self._session_id]
             if arg("limit"):
                 try:
                     limit = int(arg("limit"))

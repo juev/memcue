@@ -51,6 +51,9 @@ const EXTRACT_TIMEOUT_MS = 300_000
 /** The oldest binary whose commands and flags this plugin uses: `session-card` and `extract-messages -min-chars`. */
 const MIN_BINARY = '0.4.0'
 
+/** The oldest binary with `search -cwd` and `-session` (#361); an older one searches without them (#368). */
+const SCOPED_SEARCH = '0.8.0'
+
 /** Defaults used when the bundle patch supplies no config. */
 const DEFAULTS = Object.freeze({
 	binary: 'memcue',
@@ -505,6 +508,7 @@ export function apply(ctx, config) {
 	const settings = settingsOf(config)
 	let extraction = settings.extract
 	let compatible = true // cleared when the binary is older than MIN_BINARY
+	let scopedSearch = true // cleared when the binary is older than SCOPED_SEARCH
 	const busy = new Set()
 	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
 	const warnedCard = new Set()
@@ -548,12 +552,13 @@ export function apply(ctx, config) {
 				if (!found) console.warn(`memcue: no memcue binary on PATH, and the plugin could not install ${version || 'its release'}: ${error.message}`)
 			}
 		}
+		scopedSearch = !found || versionAtLeast(reported, SCOPED_SEARCH)
 		if (!found || versionAtLeast(reported, MIN_BINARY)) return
 		compatible = false
 		extraction = false
-		console.warn(`memcue: binary ${reported || 'unknown'} is older than ${MIN_BINARY}; the session card and extraction are off, recall still works. Update memcue.`)
+		console.warn(`memcue: binary ${reported || 'unknown'} is older than ${MIN_BINARY}; the session card and extraction are off, search still works. Update memcue.`)
 	}
-	void checkBinary()
+	const binaryChecked = checkBinary() // memcue_search waits for it: the flags it passes depend on the version
 
 	ctx.on('agent/pre-step', async (payload, next) => {
 		const decision = await next()
@@ -786,9 +791,13 @@ export function apply(ctx, config) {
 		},
 		async execute(args, exec) {
 			const limit = Number.isInteger(args.limit) && args.limit > 0 ? args.limit : settings.searchLimit
-			const flags = ['search', '-json', '-n', String(limit), '-cwd', sessionCwd(exec)]
+			await binaryChecked
+			const flags = ['search', '-json', '-n', String(limit)]
 			const session = exec?.agent?.session?.id
-			if (session) flags.push('-session', memcueSessionId(session))
+			if (scopedSearch) {
+				flags.push('-cwd', sessionCwd(exec))
+				if (session) flags.push('-session', memcueSessionId(session))
+			}
 			const { code, out, err } = await runMemcue(settings, [...flags, '--', String(args.query)], { timeoutMs: 15_000 })
 			if (code !== 0) throw new Error(`memcue search exited ${code}: ${err.trim().slice(0, 500)}`)
 			return { facts: factsOf(out) }

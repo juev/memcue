@@ -613,6 +613,26 @@ class ProviderTest(unittest.TestCase):
         p.initialize("s1", hermes_home=self.home, agent_context="primary")
         self.assertEqual(p._workspace, str(repo))
 
+    def test_search_scopes_only_a_binary_that_knows_the_flags(self):
+        """-cwd and -session appeared in 0.8.0 (#361); an older binary must get the search it understands (#368)."""
+        for version, scoped in (("0.7.0", False), ("0.8.0", True), ("dev", True)):
+            with self.subTest(version=version):
+                calls = Path(self.home) / f"search-args-{version}"
+                stub = Path(self.home) / f"search-memcue-{version}"
+                stub.write_text("#!/bin/sh\n"
+                                "case \"$1\" in\n"
+                                f"  version) printf '{{\"version\":\"{version}\"}}\\n' ;;\n"
+                                f"  search) printf '%s\\n' \"$@\" > {shlex.quote(str(calls))}; printf '[]\\n' ;;\n"
+                                "esac\nexit 0\n", encoding="utf-8")
+                stub.chmod(0o755)
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
+                p.initialize("s1", hermes_home=self.home, agent_context="primary")
+                self.assertNotIn("error", json.loads(p.handle_tool_call("memcue_search", {"query": "порт"})))
+                args = calls.read_text(encoding="utf-8").splitlines()
+                self.assertEqual("-cwd" in args, scoped, args)
+                self.assertEqual("-session" in args, scoped, args)
+                self.assertEqual(args[-2:], ["--", "порт"])
+
     def test_final_flushes_pass_min_chars(self):
         """session_end, pre_compress and shutdown are the last chance for a tail; threshold and idle wait."""
         for event, final in (("session_end", True), ("pre_compress", True), ("shutdown", True),
