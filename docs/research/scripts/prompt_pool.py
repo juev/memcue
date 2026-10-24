@@ -6,7 +6,8 @@ recall.log, deduplicated, without the prompts of a gold set, as a judgecand eval
 A prompt is a user message the person typed: not meta, not a tool result, not a command or hook wrapper (text starting
 with "<"), not a compaction summary, at least 20 characters. Texts are cut to 4000 characters as the hook cuts them. A prompt whose first 200
 characters, lowercased and with whitespace collapsed, match a gold prompt's is left out, so training never sees the
-evaluation prompts.
+evaluation prompts. A transcript prompt keeps the working directory of its message as `cwd`, so a replay can name the
+session's project (#345); a recall.log prompt has none.
 """
 import json
 import re
@@ -54,12 +55,12 @@ gold = {key(json.loads(line)["text"]) for line in open(gold_path)}
 seen, prompts = set(), []
 
 
-def add(text, source):
+def add(text, source, cwd=""):
     k = key(text)
     if k in gold or k in seen:
         return
     seen.add(k)
-    prompts.append({"id": f"n{len(prompts) + 1:05d}", "tier": "", "text": text, "source": source})
+    prompts.append({"id": f"n{len(prompts) + 1:05d}", "tier": "", "text": text, "source": source, "cwd": cwd})
 
 
 for d in dirs:
@@ -68,11 +69,12 @@ for d in dirs:
             continue
         for line in open(path, errors="replace"):
             try:
-                text = typed(json.loads(line))
+                msg = json.loads(line)
+                text = typed(msg)
             except (json.JSONDecodeError, AttributeError):
                 continue
             if text:
-                add(text, "transcript")
+                add(text, "transcript", msg.get("cwd") or "")
 if recall_log:
     for line in open(recall_log):
         text = clean(json.loads(line).get("prompt") or "")
