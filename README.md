@@ -327,6 +327,12 @@ Each retirement names the fact that covers it (`by`) and its kind: `duplicate` o
 one with the smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same
 copy and never retire both.
 
+A duplicate learnt in another project than the fact that stays makes that fact global (#346): a fact learnt twice,
+independently, in two projects holds in both, so it should not count as one project's fact in recall. memcue decides
+this from the two facts' scopes and origins, not the model. The dream prints `global <id>` and lists the fact under
+`promoted` in `dream.log`; a dry run and its plan show it too. In the author's dream log, 15 of the 21 duplicates
+retired before this change crossed projects.
+
 Before grouping, a dream asks the main model which of those facts still hold several claims, twenty facts a call: a
 fact one part of which can go stale while another stays true. Such a fact is retired and its parts take its place,
 approved, with its origin, scope, kind, source and expiry (not its keywords, which were chosen for the whole text).
