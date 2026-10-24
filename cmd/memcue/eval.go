@@ -54,6 +54,7 @@ func runEval(args []string, out io.Writer) error {
 	fl.Float64Var(&p.MinCoverage, "min-coverage", p.MinCoverage, "")
 	fl.IntVar(&p.MaxPromptTerms, "max-prompt-terms", p.MaxPromptTerms, "")
 	fl.IntVar(&p.MaxFacts, "max-facts", p.MaxFacts, "")
+	fl.Float64Var(&p.ForeignCoverage, "foreign-coverage", p.ForeignCoverage, "0 measures the recall before #345")
 	if err := fl.Parse(args); err != nil {
 		return err
 	}

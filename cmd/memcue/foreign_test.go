@@ -21,6 +21,7 @@ func TestForeignFromEnv(t *testing.T) {
 		{name: "negative", value: "-0.1", coverage: 0.25},
 		{name: "above one", value: "1.5", coverage: 0.25},
 		{name: "not a number", value: "abc", coverage: 0.25},
+		{name: "NaN parses but is no share", value: "NaN", coverage: 0.25},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
