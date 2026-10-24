@@ -1,5 +1,5 @@
 name: memcue
-version: 0.7.0
+version: 0.8.0
 description: "memcue — long-term memory as a base of atomic facts: the model searches it with memcue_search, the session card rides with the first turn, built-in memory writes are mirrored into it, facts can expire. Runs the memcue binary."
 external_dependencies:
   - name: memcue
