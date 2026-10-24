@@ -62,7 +62,7 @@ func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 1, MinCoverage: 0.1, MaxFacts: 3}
-	hits, err := Recall(s, "caddy reload path", "", p)
+	hits, err := Recall(s, "caddy reload path", nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,9 +83,17 @@ func splitKW(s string) []string {
 	return []string{s}
 }
 
+// project is the key set of a session in the repository tier, none outside one.
+func project(tier string) []string {
+	if tier == "" {
+		return nil
+	}
+	return []string{tier}
+}
+
 func recall(t *testing.T, s *store.Store, prompt, tier string) []Hit {
 	t.Helper()
-	hs, err := Recall(s, prompt, tier, Default)
+	hs, err := Recall(s, prompt, project(tier), Default)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +129,7 @@ func TestOwnRepositoryWinsTies(t *testing.T) {
 	p := Default
 	p.MinMatched = 2
 	for tier, want := range map[string]string{"loadtest": "loadtest 2026-09-10", "": "_global 2026-08-01"} {
-		got, err := Recall(s, "брокер rabbitmq", tier, p)
+		got, err := Recall(s, "брокер rabbitmq", project(tier), p)
 		if err != nil || len(got) != 2 || got[0].bm25 != got[1].bm25 {
 			t.Fatalf("want a tie of two, got %+v %v", got, err)
 		}
@@ -147,7 +155,7 @@ func TestPassingFactsAreServedInBM25Order(t *testing.T) {
 	}
 	p := Default
 	p.MinMatched, p.MinCoverage = 2, 0
-	hs, err := Recall(s, "конфиг кластера kafka zookeeper", "", p)
+	hs, err := Recall(s, "конфиг кластера kafka zookeeper", nil, p)
 	if err != nil || len(hs) != 2 {
 		t.Fatalf("got %+v %v, want two facts", hs, err)
 	}
@@ -164,7 +172,7 @@ func TestAtMostMaxFacts(t *testing.T) {
 	s := setup(t)
 	p := Default
 	p.MaxFacts, p.MinMatched, p.MinCoverage = 1, 1, 0
-	hs, err := Recall(s, "прокси mihomo caddy gradle", "", p)
+	hs, err := Recall(s, "прокси mihomo caddy gradle", nil, p)
 	if err != nil || len(hs) != 1 {
 		t.Errorf("got %d %v", len(hs), err)
 	}
@@ -178,7 +186,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 	p.MinMatched, p.MinCoverage = 1, 0
 	const prompt = "прокси mihomo caddy gradle"
 	p.MaxFacts = 100 // a cap above any candidate list: "no cap" as well
-	all, err := Recall(s, prompt, "", p)
+	all, err := Recall(s, prompt, nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +195,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 	}
 	for _, maxFacts := range []int{0, -1} {
 		p.MaxFacts = maxFacts
-		got, err := Recall(s, prompt, "", p)
+		got, err := Recall(s, prompt, nil, p)
 		if err != nil {
 			t.Fatalf("MaxFacts %d: %v", maxFacts, err)
 		}
@@ -201,7 +209,7 @@ func TestNonPositiveMaxFactsIsNoCap(t *testing.T) {
 		}
 	}
 	p.MaxFacts = 1
-	got, err := Recall(s, prompt, "", p)
+	got, err := Recall(s, prompt, nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +267,7 @@ func TestVersionedPromptIsNotATicket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hs, err := Recall(s, "Which port does postgres-16 use?", "", Default)
+	hs, err := Recall(s, "Which port does postgres-16 use?", nil, Default)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +291,7 @@ func TestCurrentHostWinsTies(t *testing.T) {
 	p := Default
 	p.Host = "mac"
 	p.MinMatched, p.MinCoverage, p.MaxFacts = 2, 0, 1
-	hs, err := Recall(s, "кэш memcached", "", p)
+	hs, err := Recall(s, "кэш memcached", nil, p)
 	if err != nil || len(hs) != 1 || hs[0].ID != a.ID {
 		t.Errorf("got %+v %v, want %s", hs, err, a.ID)
 	}
@@ -304,7 +312,7 @@ func TestOtherHostDisplacementIsMarked(t *testing.T) {
 	p := Default
 	p.Host = "mac"
 	p.MinMatched, p.MinCoverage, p.MaxFacts = 1, 0, 1
-	hs, err := Recall(s, "кэш redis", "", p)
+	hs, err := Recall(s, "кэш redis", nil, p)
 	if err != nil || len(hs) != 1 || hs[0].ID != b.ID || !hs[0].Displaced {
 		t.Errorf("got %+v %v, want displaced %s", hs, err, b.ID)
 	}
@@ -319,7 +327,7 @@ func TestExpiredFactIsNotRecalled(t *testing.T) {
 	}
 	p := Default
 	p.Today = "2026-10-19"
-	hs, err := Recall(s, "на каком порту поднимается стенд нагрузки в staging", "loadtest", p)
+	hs, err := Recall(s, "на каком порту поднимается стенд нагрузки в staging", []string{"loadtest"}, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +337,7 @@ func TestExpiredFactIsNotRecalled(t *testing.T) {
 		}
 	}
 	p.Today = "2026-10-05" // still inside its last day
-	hs, err = Recall(s, "на каком порту поднимается стенд нагрузки в staging", "loadtest", p)
+	hs, err = Recall(s, "на каком порту поднимается стенд нагрузки в staging", []string{"loadtest"}, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,5 +365,25 @@ func TestNewerOrdersByCreatedThenID(t *testing.T) {
 	same := Hit{Fact: store.Fact{ID: "01ZZZ", Created: recent}}
 	if !newer(same, byCreated) {
 		t.Fatal("equal created times must fall back to the larger id")
+	}
+}
+
+// A fact learnt under any key of the session's project wins a tie: a fork's session prefers a fact of its upstream
+// over the same text learnt elsewhere.
+func TestAnyProjectKeyWinsTies(t *testing.T) {
+	s := setup(t)
+	for _, origin := range []string{"example.com/elsewhere/z 2026-09-10", "example.com/them/upstream 2026-08-01"} {
+		if _, err := s.Add("Брокер nats слушает 4222, мониторинг на 8222.", []string{"nats"}, origin); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := Default
+	p.MinMatched = 2
+	got, err := Recall(s, "брокер nats", []string{"example.com/me/fork", "example.com/them/upstream"}, p)
+	if err != nil || len(got) != 2 || got[0].bm25 != got[1].bm25 {
+		t.Fatalf("want a tie of two, got %+v %v", got, err)
+	}
+	if got[0].Origin != "example.com/them/upstream 2026-08-01" {
+		t.Errorf("first is %q, want the upstream's fact", got[0].Origin)
 	}
 }

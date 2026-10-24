@@ -114,9 +114,7 @@ func TestSessionCardResetsSeenOnCompact(t *testing.T) {
 func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	gitRepo(t, repo)
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
@@ -131,10 +129,10 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	}
 	old := add("Правило: отвечать по-русски.", "rule", "global", "user", "")
 	add("Правило только на маке.", "rule", "host:mac", "user", "")
-	decision := add("Решение: мержить squash в shop.", "decision", "repo:shop", "user", "")
+	decision := add("Решение: мержить squash в shop.", "decision", "repo:example.com/team/shop", "user", "")
 	add("Решение чужого репозитория.", "decision", "repo:other", "user", "")
 	add("Глобальное решение.", "decision", "global", "user", "")
-	add("Ловушка в shop.", "pitfall", "repo:shop", "tool", "")
+	add("Ловушка в shop.", "pitfall", "repo:example.com/team/shop", "tool", "")
 	add("Кандидат-правило.", "rule", "global", "user", store.Candidate)
 	newest := add("Правило: не пушить в main.", "rule", "global", "user", "")
 	_ = s.Close()
@@ -143,7 +141,7 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	if !strings.Contains(ctx, "memcue add") || !strings.Contains(ctx, "rules and decisions from the base") {
 		t.Fatalf("no note or card: %q", ctx)
 	}
-	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "scope: global", "scope: repo:shop",
+	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "scope: global", "scope: repo:example.com/team/shop",
 		time.Now().UTC().Format(time.DateOnly)} {
 		if !strings.Contains(ctx, want) {
 			t.Errorf("card lacks %q: %q", want, ctx)
@@ -168,7 +166,7 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 		t.Fatalf("card.log %q: %v", b, err)
 	}
 	wantIDs := map[string]bool{newest.ID: true, old.ID: true, decision.ID: true}
-	if len(rec.Facts) != 3 || rec.Tier != "shop" || rec.Source != "startup" || rec.Session != "s1" || rec.Chars == 0 {
+	if len(rec.Facts) != 3 || rec.Tier != "example.com/team/shop" || rec.Source != "startup" || rec.Session != "s1" || rec.Chars == 0 {
 		t.Errorf("card record %+v", rec)
 	}
 	for _, id := range rec.Facts {
@@ -302,9 +300,7 @@ func TestSessionStartCardComesAgainAfterCompaction(t *testing.T) {
 func TestSessionStartCardDropsExpiredFacts(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	gitRepo(t, repo)
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
@@ -319,8 +315,8 @@ func TestSessionStartCardDropsExpiredFacts(t *testing.T) {
 	}
 	add("EXPIRED-RULE: old.", "rule", "global", "2026-01-01")
 	liveRule := add("LIVE-RULE: current.", "rule", "global", time.Now().UTC().Format(time.DateOnly))
-	add("EXPIRED-DECISION: old.", "decision", "repo:shop", "2026-01-01")
-	liveDecision := add("LIVE-DECISION: current.", "decision", "repo:shop", "")
+	add("EXPIRED-DECISION: old.", "decision", "repo:example.com/team/shop", "2026-01-01")
+	liveDecision := add("LIVE-DECISION: current.", "decision", "repo:example.com/team/shop", "")
 	_ = s.Close()
 
 	ctx := sessionStartContext(t, repo, "startup", "s1")
@@ -430,9 +426,7 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 	tr := filepath.Join(dir, "s.jsonl")
 	args := []string{"-session", "sess-1", "-transcript", tr, "-event", "PreCompact"}
 	repo := filepath.Join(dir, "app")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	gitRepo(t, repo)
 
 	transcriptLinesIn(t, tr, repo, 3) // ~1700 chars: below minNew, waits
 	if err := runExtractSession(args); err != nil {
@@ -454,7 +448,7 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 	}
 	recs := readLog(t, state)
 	if len(recs) != 3 || recs[0].Skipped == "" || recs[1].From != 0 || recs[1].To != 13 || recs[2].From != 13 ||
-		recs[2].To != 23 || recs[2].Origin != "app 2026-10-19" {
+		recs[2].To != 23 || recs[2].Origin != "example.com/team/app 2026-10-19" {
 		t.Errorf("log %+v", recs)
 	}
 	s, err := store.Open(factsPath())
@@ -466,7 +460,7 @@ func TestExtractSessionReadsOnlyNewPartAndStoresFacts(t *testing.T) {
 		t.Errorf("extracted facts are active: %+v", act)
 	}
 	fs, err := s.Candidates()
-	if err != nil || len(fs) != 2 || fs[0].Origin != "app 2026-10-19" || len(fs[0].Queries) != 1 {
+	if err != nil || len(fs) != 2 || fs[0].Origin != "example.com/team/app 2026-10-19" || len(fs[0].Queries) != 1 {
 		t.Errorf("facts %+v %v", fs, err)
 	}
 }
@@ -724,9 +718,7 @@ func TestStateDirHonoursOverride(t *testing.T) {
 func TestExtractMessagesOriginFromCwd(t *testing.T) {
 	env(t)
 	repo := filepath.Join(t.TempDir(), "demo")
-	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	gitRepo(t, repo)
 	var got string
 	old := extractFn
 	extractFn = func(origin, _ string) (extracted, error) {
@@ -738,7 +730,7 @@ func TestExtractMessagesOriginFromCwd(t *testing.T) {
 	if err := runExtractMessages([]string{"-cwd", repo, "-min-chars", "0"}, strings.NewReader(msgs)); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(got, "demo ") {
+	if !strings.HasPrefix(got, "example.com/team/demo ") {
 		t.Errorf("origin = %q, want the repository tier and a date", got)
 	}
 	if err := runExtractMessages([]string{"-cwd", repo, "-origin", "explicit 2026-10-21", "-min-chars", "0"},

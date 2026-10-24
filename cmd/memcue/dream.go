@@ -997,7 +997,7 @@ func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, err
 	for _, f := range fresh {
 		p := dreamNeighbours
 		p.Seen = map[string]bool{f.ID: true}
-		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), "", p)
+		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), nil, p)
 		if err != nil {
 			return nil, err
 		}

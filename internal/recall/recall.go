@@ -58,8 +58,9 @@ type Hit struct {
 	gated   bool    // the term or coverage gate turned the fact away
 }
 
-// Recall returns the facts to inject for prompt in a session of repository sessionTier ("" outside a repository).
-func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error) {
+// Recall returns the facts to inject for prompt in a session whose project has the keys of project (tier.Keys; none
+// outside a project).
+func Recall(s *store.Store, prompt string, project []string, p Params) ([]Hit, error) {
 	hits, _, err := recallCandidates(s, prompt, p)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 		if hits[i].bm25 != hits[j].bm25 {
 			return hits[i].bm25 < hits[j].bm25
 		}
-		if pi, pj := place(hits[i], sessionTier, p.Host), place(hits[j], sessionTier, p.Host); pi != pj {
+		if pi, pj := place(hits[i], project, p.Host), place(hits[j], project, p.Host); pi != pj {
 			return pi < pj
 		}
 		return newer(hits[i], hits[j])
@@ -108,12 +109,14 @@ func Recall(s *store.Store, prompt, sessionTier string, p Params) ([]Hit, error)
 }
 
 // place ranks a fact for a tie of equal BM25 score or judge score: this host first, then the session's repository,
-// then a global origin, then everything else. The host only orders facts; it never excludes another host's fact.
-func place(h Hit, sessionTier, host string) int {
+// then a global origin, then everything else. A fact was learnt in the session's project when its origin starts with
+// any of the project's keys: a mirror's other host or a fork's upstream counts. The host only orders facts; it never
+// excludes another host's fact.
+func place(h Hit, project []string, host string) int {
 	switch {
 	case hostScope(h.Scope, host):
 		return 0
-	case sessionTier != "" && strings.HasPrefix(h.Origin, sessionTier+" "):
+	case slices.ContainsFunc(project, func(k string) bool { return k != "" && strings.HasPrefix(h.Origin, k+" ") }):
 		return 1
 	case strings.HasPrefix(h.Origin, tier.Global+" "):
 		return 2

@@ -265,7 +265,7 @@ func recallFor(s *store.Store, prompt, cwd string, seen map[string]bool, trace *
 		}
 	}
 	p.MaxFacts = maxFactsFromEnv(p.MaxFacts)
-	return recallFacts(s, prompt, tier.Of(cwd, claudeDir()), p)
+	return recallFacts(s, prompt, tier.Keys(cwd, claudeDir()), p)
 }
 
 // maxFactsFromEnv reads MEMCUE_MAX_FACTS, how many facts one prompt may get. A value outside 1..10 is ignored and

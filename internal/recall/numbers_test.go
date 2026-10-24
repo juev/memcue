@@ -21,7 +21,7 @@ func TestVersionOnlyPromptRecallsTheFact(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, err := Recall(s, "1.27", "", Default); err != nil {
+	if got, err := Recall(s, "1.27", nil, Default); err != nil {
 		t.Fatal(err)
 	} else if len(got) != 0 {
 		t.Fatalf("version recalled %v with the flag off, want nothing", got)
@@ -31,7 +31,7 @@ func TestVersionOnlyPromptRecallsTheFact(t *testing.T) {
 	if err := s.Rebuild(); err != nil {
 		t.Fatal(err)
 	}
-	got, err := Recall(s, "1.27", "", Default)
+	got, err := Recall(s, "1.27", nil, Default)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestVersionDoesNotFilterThePool(t *testing.T) {
 	}
 	p := Default
 	p.MaxFacts = 3
-	got, err := Recall(s, "сборка стенда 1.27", "", p)
+	got, err := Recall(s, "сборка стенда 1.27", nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}

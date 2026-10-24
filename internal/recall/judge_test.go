@@ -47,11 +47,11 @@ func meaningBase(t *testing.T) (*store.Store, string) {
 func TestRecallJudgeWithoutARankerStaysLexical(t *testing.T) {
 	s, _ := meaningBase(t)
 	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK"
-	plain, err := Recall(s, prompt, "", Default)
+	plain, err := Recall(s, prompt, nil, Default)
 	if err != nil {
 		t.Fatal(err)
 	}
-	hits, err := RecallJudge(s, prompt, "", Default, nil)
+	hits, err := RecallJudge(s, prompt, nil, Default, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,12 +64,12 @@ func TestRecallJudgeFallsBackWhenTheJudgeFails(t *testing.T) {
 	s, _ := meaningBase(t)
 	// Two facts hold words of the prompt, so the judge is asked, and its failure is what sends recall to the words.
 	prompt := "Gradle требует JAVA_HOME, иначе сборка не находит JDK, а Caddy конфиг"
-	plain, err := Recall(s, prompt, "", Default)
+	plain, err := Recall(s, prompt, nil, Default)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := &fakeRanker{min: 0.5, err: errors.New("down")}
-	hits, err := RecallJudge(s, prompt, "", Default, r)
+	hits, err := RecallJudge(s, prompt, nil, Default, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestRecallJudgeKeepsTheHostTieBreak(t *testing.T) {
 	p.MaxFacts = 1
 
 	p.Host = "box"
-	hits, err := RecallJudge(s, "порог покрытия поиск фактов", "", p, r)
+	hits, err := RecallJudge(s, "порог покрытия поиск фактов", nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestRecallJudgeKeepsTheHostTieBreak(t *testing.T) {
 	}
 
 	p.Host = "other"
-	hits, err = RecallJudge(s, "порог покрытия поиск фактов", "", p, r)
+	hits, err = RecallJudge(s, "порог покрытия поиск фактов", nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestRecallJudgeMarksDisplacement(t *testing.T) {
 	p := rankedParams()
 	p.MaxFacts = 1
 	p.Host = "box"
-	hits, err := RecallJudge(s, "порог покрытия поиск фактов", "", p, r)
+	hits, err := RecallJudge(s, "порог покрытия поиск фактов", nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,14 +198,14 @@ const gatePrompt = "почему журналы nginx на loffe не ротир
 // among its candidates, and is served when the judge scores it; recall without a judge keeps the gate.
 func TestRecallJudgeReadsAFactTheGateTurnedAway(t *testing.T) {
 	s := gateBase(t, 0)
-	if plain, err := Recall(s, gatePrompt, "", Default); err != nil || len(plain) != 0 {
+	if plain, err := Recall(s, gatePrompt, nil, Default); err != nil || len(plain) != 0 {
 		t.Fatalf("the gate must turn both facts away without a judge: %v %v", ids(plain), err)
 	}
 	trace := &Trace{}
 	p := Default
 	p.Trace = trace
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"journald": 0.9}}
-	hits, err := RecallJudge(s, gatePrompt, "", p, r)
+	hits, err := RecallJudge(s, gatePrompt, nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestRecallJudgeReadsTheFirstFactsInSearchOrder(t *testing.T) {
 	p := Default
 	p.Trace = trace
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"journald": 0.9}}
-	if _, err := RecallJudge(s, gatePrompt, "", p, r); err != nil {
+	if _, err := RecallJudge(s, gatePrompt, nil, p, r); err != nil {
 		t.Fatal(err)
 	}
 	if len(trace.Lexical) <= r.Candidates() || len(r.got) != r.Candidates() {
@@ -263,7 +263,7 @@ func TestRecallJudgeMarksAPausedJudge(t *testing.T) {
 	p := Default
 	p.Trace = trace
 	r := &fakeRanker{min: 0.5, err: fmt.Errorf("%w: 40s left", judge.ErrPaused)}
-	if _, err := RecallJudge(s, prompt, "", p, r); err != nil {
+	if _, err := RecallJudge(s, prompt, nil, p, r); err != nil {
 		t.Fatal(err)
 	}
 	if !trace.Paused || !strings.HasPrefix(trace.Fallback, "judge skipped") {
@@ -273,7 +273,7 @@ func TestRecallJudgeMarksAPausedJudge(t *testing.T) {
 	trace = &Trace{}
 	p.Trace = trace
 	r.err = errors.New("decisions 500")
-	if _, err := RecallJudge(s, prompt, "", p, r); err != nil {
+	if _, err := RecallJudge(s, prompt, nil, p, r); err != nil {
 		t.Fatal(err)
 	}
 	if trace.Paused || !strings.HasPrefix(trace.Fallback, "judge failed") {
@@ -284,7 +284,7 @@ func TestRecallJudgeMarksAPausedJudge(t *testing.T) {
 // The judge path keeps the ticket exactness rule too: PROJ-1235 cannot reach PROJ-1234 through a shared keyword.
 func TestRecallJudgeKeepsTheTicketGate(t *testing.T) {
 	s, other, wanted := ticketBase(t)
-	hits, err := RecallJudge(s, "PROJ-1235 postgres port", "x", rankedParams(),
+	hits, err := RecallJudge(s, "PROJ-1235 postgres port", []string{"x"}, rankedParams(),
 		&fakeRanker{min: 0.5, scores: map[string]float64{"": 0.9}})
 	if err != nil {
 		t.Fatal(err)
@@ -304,12 +304,12 @@ func TestRecallJudgeSkipsWhatTheSessionSaw(t *testing.T) {
 	s, _ := rankedBase(t)
 	p := rankedParams()
 	r := &fakeRanker{min: 0.5, scores: map[string]float64{"JAVA_HOME": 0.93}}
-	first, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", "", p, r)
+	first, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", nil, p, r)
 	if err != nil || len(first) == 0 {
 		t.Fatalf("first = %v, %v", ids(first), err)
 	}
 	p.Seen = map[string]bool{first[0].ID: true}
-	second, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", "", p, r)
+	second, err := RecallJudge(s, "почему сборка падает и что не так с конфигом caddy", nil, p, r)
 	if err != nil {
 		t.Fatal(err)
 	}

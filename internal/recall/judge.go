@@ -26,10 +26,10 @@ const minRankCandidates = 2
 // still answer prompts (gold set of 180 prompts, 2026-10-22, #232: 20 facts in BM25 order on expanded facts served a
 // useful fact to 122-124 prompts, as many as the vector reader and the judge together). Any failure of the judge
 // leaves the lexical answer, gate included; a nil ranker means lexical only.
-func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker) ([]Hit, error) {
+func RecallJudge(s *store.Store, prompt string, project []string, p Params, r Ranker) ([]Hit, error) {
 	if r == nil {
 		p.Trace.fallback("no judge configured")
-		return Recall(s, prompt, sessionTier, p)
+		return Recall(s, prompt, project, p)
 	}
 	passed, gated, err := recallCandidates(s, prompt, p)
 	if err != nil {
@@ -56,7 +56,7 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 	}
 	if len(candidates) < minRankCandidates {
 		p.Trace.fallback("fewer than two candidates for the judge")
-		return Recall(s, prompt, sessionTier, p)
+		return Recall(s, prompt, project, p)
 	}
 	contents := make([]string, len(candidates))
 	for i := range candidates {
@@ -76,7 +76,7 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		default:
 			p.Trace.fallback("judge returned a wrong number of scores")
 		}
-		return Recall(s, prompt, sessionTier, p)
+		return Recall(s, prompt, project, p)
 	}
 	p.Trace.judge(candidates, scores, r.Min())
 	order := make([]int, len(candidates))
@@ -93,8 +93,8 @@ func RecallJudge(s *store.Store, prompt, sessionTier string, p Params, r Ranker)
 		}
 		// Equal score: the same place tie-break as the lexical pass, so enabling the judge does not silently drop
 		// the host or repository preference.
-		if pi, pj := place(candidates[order[i]], sessionTier, p.Host),
-			place(candidates[order[j]], sessionTier, p.Host); pi != pj {
+		if pi, pj := place(candidates[order[i]], project, p.Host),
+			place(candidates[order[j]], project, p.Host); pi != pj {
 			return pi < pj
 		}
 		return candidates[order[i]].ID > candidates[order[j]].ID
