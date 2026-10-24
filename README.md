@@ -209,7 +209,7 @@ opens it. Opening a version-4 base adds the column and rebuilds the index once; 
 textconv) still reads older revisions of the file, with no queries.
 
 Two things a base upgraded from 0.4 still needs. The facts stored before 0.5 have no queries; each dream now gives them
-queries, up to 500 a dream, and `memcue dream -all` does the whole base at once. And facts that describe memcue 0.4
+queries, a packet at a time, and `memcue dream -prepare -all` starts on the whole base. And facts that describe memcue 0.4
 itself (its variables, verbs and versions) stay recallable and win lexically, because they are written in memcue's own
 words: no dream or vet compares a fact with the release it is about. Find them and decide each one:
 
@@ -261,9 +261,8 @@ memcue recall -cwd . "text"          # what a prompt would get
 memcue recall -explain "text"        # every step: terms, lexical gate, final cut
 memcue recall -fact ID "text"        # where this fact dropped out for this prompt
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
-memcue dream -since 2026-10-19 -dry-run
-memcue dream -all -dry-run -plan plan.json # review the whole base, keep what the model decided
-memcue dream -apply plan.json              # carry it out later, without the model
+memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base)
+memcue dream -apply answer.json      # check and carry out the model's answer to it
 ```
 
 `memcue add` and `memcue correct` refuse text that looks like a token or a password; `-force` stores it anyway.
@@ -292,7 +291,7 @@ directory with the rule or model and its reason; the page, the `approve` command
 stay the manual way, unchanged.
 
 The review runs on the main model: `MEMCUE_API_URL` when it is set, otherwise `claude -p`, as the extraction does. The
-facts a session just stored are reviewed in the extraction process, after storing them and before the dream
+facts a session just stored are reviewed in the extraction process, after storing them
 (`MEMCUE_VET=0` turns that off; without an endpoint and without `claude` on `PATH` nothing is reviewed); that process is
 already detached from the session, so a turn never waits for the verdict. A run that finds another one busy is skipped
 rather than queued, and its failures go to `vet.log`, not to the extraction.
@@ -325,67 +324,78 @@ An expiry is the last day a fact is worth recalling: after it the fact stays in 
 skips it, so a one-off reminder does not keep coming back months later. The date is the local calendar day of the
 machine that judges it. A correction keeps the expiry unless it names a new one.
 
-Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it.
-`memcue dream` groups each fact the last dream did not see with the stored facts close to it in words and asks
-the model which to retire as a duplicate or as contradicted, and which to correct with merged text. The new text is
-built only from the facts of the group, every group keeps at least one fact, and each change goes to `dream.log`
-with its reason; a retired fact stays in the history. With `MEMCUE_DREAM=1` a dream runs after an extraction once a
-day; its first run on a machine only marks the start.
+### Dream
 
-Each retirement names the fact that covers it (`by`) and its kind: `duplicate` or `outdated`. Of two duplicates the
-one with the smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same
-copy and never retire both.
+Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it. A
+dream tidies the facts the last dream did not see. memcue starts no model for it: the model of a session does it.
+
+1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
+   the instructions, the fresh facts to split, the facts without search queries to expand, and the groups to review.
+   It keeps the packet in the state directory.
+2. The model answers in one JSON object, with the packet's id.
+3. `memcue dream -apply FILE` checks the answer against the packet and carries out what passes. It prints and logs
+   to `dream.log` what it changed and what it refused, with the reason.
+
+Who runs it:
+
+- **Claude Code.** When a dream is due, the session start says so in one line, and the agent runs the `memcue-dream`
+  skill when the user's task allows. It never interrupts a turn. A dream is due once `MEMCUE_DREAM_EVERY` (default
+  `1h`) has passed since the last one and some fact is fresh. The first check on a machine only marks the start, so
+  the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them.
+- **Hermes.** A cron job of Hermes calls the provider's dream tools on a schedule
+  ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
+
+A packet holds up to 40 fresh facts, 30 groups and 50 facts to expand. The fresh facts it leaves out are not counted
+as seen, so the next packet takes them, and the session start still says facts wait.
+
+What the answer may do:
+
+- **Split** a compound fact: one part of it can go stale while another stays true. The fact is retired and its parts
+  take its place, approved, with its origin, scope, kind, source and expiry (not its keywords, which were chosen for
+  the whole text). `vet` splits candidates the same way, so this mostly matters for facts stored before it.
+- **Expand** a fact without **search queries**: 6–10 short phrases a user would name the task with, the general name
+  of what the fact is about, and how the problem or question sounds. The index searches them next to the fact's words
+  and keywords. Extraction writes them with every fact it stores, and `add` and `correct` ask for them in one call when
+  `MEMCUE_API_URL` is set. So the dream fills the facts written without an endpoint, those of `import`, and the parts
+  of a split. Facts stored before extraction wrote queries are never fresh again, so each packet also offers the
+  newest of them: a base upgraded from 0.4 fills over a few dreams. On the gold set of 180 prompts the queries added
+  7–9 prompts that got a useful fact ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).
+- **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
+  `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
+  machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
+  fact; a retired fact stays in the history.
+- **Correct** a fact of a group with text built only from the facts of the group. A correction drops the queries of
+  the old text. With `queries` in the action the new ones are written at once; without them the next packet asks for
+  them.
 
 A duplicate learnt in another project than the fact that stays makes that fact global (#346): a fact learnt twice,
 independently, in two projects holds in both, so it should not count as one project's fact in recall. memcue decides
-this from the two facts' scopes and origins, not the model. The dream prints `global <id>` and lists the fact under
-`promoted` in `dream.log`; a dry run and its plan show it too. In the author's dream log, 15 of the 21 duplicates
-retired before this change crossed projects.
+this from the two facts' scopes and origins, not the model. `-apply` prints `global <id>` and lists the fact under
+`promoted` in `dream.log`. In the author's dream log, 15 of the 21 duplicates retired before this change crossed
+projects.
 
-Before grouping, a dream asks the main model which of those facts still hold several claims, twenty facts a call: a
-fact one part of which can go stale while another stays true. Such a fact is retired and its parts take its place,
-approved, with its origin, scope, kind, source and expiry (not its keywords, which were chosen for the whole text).
-The parts are grouped in the same dream, so a part that repeats an older fact is retired as its duplicate. A failed
-split call leaves its facts as they are and is counted in `dream.log` (`split_errors`); a split with fewer than two
-parts, or of a fact that changed while the model ran, is refused and logged. `vet` splits candidates the same way, so
-this step mostly matters for the facts stored before it: `memcue dream -all -dry-run -plan FILE` proposes the splits of
-the whole base, and `-apply FILE` writes them.
+The checks:
 
-Then every fresh fact without **search queries** gets them: 6–10 short phrases a user would name the task with, the
-general name of what the fact is about and how the problem or question sounds, which the index searches next to the
-words and keywords of the fact. Extraction writes them with every fact it stores, and `add` and `correct` ask for them
-in one call when `MEMCUE_API_URL` is set (not for a candidate; a failed call leaves the fact to the dream). A correction
-asks again whenever the text changed, in the same run: the words the fact was found by no longer describe it, and a
-dream's own corrections are expanded after it judges the groups. So the dream fills only the facts written without an
-endpoint, or of `import`, and the parts
-of a split. Facts stored
-before extraction wrote queries are never fresh again, so each dream also expands up to 500 of them, the newest first,
-without reviewing their text: a base upgraded from 0.4 fills over a few dreams, and `dream -all` does it at once,
-together with the review of the whole base. The call asks the main model, 25 facts at a time; on `api.deepseek.com` it turns reasoning off,
-since the queries were measured that way and reasoning took 97–99 % of the output of such calls. A failed call leaves its
-facts for the next dream (`expand_errors` in `dream.log`). On the gold set of 180 prompts the queries added 7–9 prompts
-that got a useful fact from the judge ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).
+- An answer to another packet is refused whole: a second `-prepare` replaced the packet it was for.
+- An answer about a fact the packet did not give for that part is refused, as is a second answer about one fact or a
+  split into fewer than two parts.
+- A group with a fact changed since the packet (a new version, or retired) is refused whole, since its actions were
+  decided on the old text; the other groups apply. Splits apply first, so a group formed around a compound fact is
+  refused as changed, and the next dream groups the parts with their neighbours. Queries apply after the splits; the
+  version they write does not count as a change of the groups.
 
 A dream keeps the facts and versions it saw in `dream.seen`, next to `dream.at`. A fact pulled from another machine
 after the last dream is new to the next one even when it was written earlier, and so is a correction made since.
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
 and writes the file.
 
-A dry run with `-plan FILE` writes the actions that passed the checks, with the version of every fact of their
-groups. `-apply FILE` carries them out without asking the model again, so the run that changes the base is the one
-that was reviewed, and it is paid for once. A group with a fact changed since the plan (a new version, or retired) is
-refused whole and logged, since its actions were decided on the old text; the other groups apply, and the dream is
-marked as of the dry run. The plan lists the splits under `splits`, each with the version the model read; edit the
-parts or delete an entry before `-apply`. Splits apply first, so a group the dry run formed around a compound fact is
-refused as changed, and the parts are left for the next dream to group with their neighbours. The queries are under
-`expansions`; they apply after the splits, and the version they write does not count as a change of the groups.
-
 The Jev triage that sorted out the groups needing no action before the model saw them is removed with the rest of the
 judge (#357); its measurements are in [docs/research/dream-triage-2026-10.md](docs/research/dream-triage-2026-10.md).
 
 ## Configuration
 
-memcue calls one model, the main chat model, for extraction, review and the dream; recall calls none. The judge and
+memcue calls one model, the main chat model, for extraction and review; recall calls none, and the dream is done by the
+model of a session ([Dream](#dream)). The judge and
 embeddings roles of [docs/models.md](docs/models.md) are removed (#250, #357). The table is the contract this release
 uses.
 
@@ -407,8 +417,8 @@ uses.
 | `MEMCUE_NUMBER_TERMS` | `1` indexes versions, dates, ports and addresses as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a prompt that names a version finds the fact naming it instead of being silenced: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)) | off |
 | `MEMCUE_MAX_FACTS` | facts one prompt may get; the cut is applied after the ranking, so a larger value adds context, not coverage: on the 68 prompts that needed memory a third fact left the number with a useful fact unchanged, 58 of 68 either way ([docs/research/max-facts-2026-10.md](docs/research/max-facts-2026-10.md)) | `2` |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
-| `MEMCUE_DREAM` | `1` runs a dream after an extraction once an hour | off |
-| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them and before the dream, on `MEMCUE_API_URL` or `claude -p` | on |
+| `MEMCUE_DREAM_EVERY` | how long after a dream the session start says the next one is due (a Go duration, at least `1m`) | `1h` |
+| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
@@ -453,9 +463,13 @@ A review is the second model call, and a much smaller one: twelve candidates wit
 no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
 `claude -p` reports one; a rules-only run (`-no-model`) costs nothing. The review uses `MEMCUE_MODEL` and
 `MEMCUE_API_URL`, or `claude -p` without it; there is no separate review model. On `api.deepseek.com` the review
-turns reasoning off: it agreed with a `claude -p` reference as often and used a quarter of the output, while split,
-dream and extraction lost quality without it and keep it
+turns reasoning off: it agreed with a `claude -p` reference as often and used a quarter of the output, while
+extraction lost quality without it and keeps it
 ([docs/research/reasoning-off-2026-10.md](docs/research/reasoning-off-2026-10.md)).
+
+A dream costs no call of its own: it is part of the session that runs it. One packet is about 20,000–36,000
+characters on the author's two bases, instructions included; a dream with no fresh fact and nothing to expand prints
+one line.
 
 ## Results
 
