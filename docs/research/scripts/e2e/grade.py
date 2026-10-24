@@ -3,13 +3,17 @@
 
     grade.py run     -> grades.json (one Opus call per prompt: the reference and every run's answer under a letter)
     grade.py report  -> per-mode scores, flags, turns, tools, cost, time; pairwise wins; rep-to-rep spread
+
+E2E_ARMS picks the modes graded together, E2E_GRADES the prefix of the grade files; the pull grading of #361 ran with
+E2E_ARMS=none,memcue,push,pull,both E2E_GRADES=grades7.
 """
 import json, os, random, re, statistics as st, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 
 E = os.path.dirname(os.path.abspath(__file__))
 PASS = int(sys.argv[2]) if len(sys.argv) > 2 else 1  # grading pass: two passes measure the grader's own noise
-ARMS = ("none", "files", "memcue", "judge", "stubs", "local")
+ARMS = tuple(os.environ.get("E2E_ARMS", "none,files,memcue,judge,stubs,local").split(","))
+GRADES = os.environ.get("E2E_GRADES", "grades")
 
 PROMPT = """Ты оцениваешь ответы агента на реплику пользователя. Агент работал в режиме планирования: только читал
 репозиторий, без сети и без записи. Дан эталон — начало реального ответа, который пользователь получил в настоящей
@@ -72,7 +76,7 @@ def grade_one(p):
 def cmd_run():
     ids = json.load(open(os.path.join(E, "ids-v2.json")))
     ps = {p["id"]: p for p in json.load(open(os.path.join(E, "prompts-all.json")))}
-    path = os.path.join(E, f"grades-{PASS}.json")
+    path = os.path.join(E, f"{GRADES}-{PASS}.json")
     done = json.load(open(path)) if os.path.exists(path) else {}
     todo = [ps[i] for i in ids if len(done.get(str(i), {})) < 2 * len(ARMS)]
     cost = 0
@@ -87,8 +91,8 @@ def cmd_run():
 
 def cmd_report():
     ids = json.load(open(os.path.join(E, "ids-v2.json")))
-    grades = json.load(open(os.path.join(E, "grades-1.json")))
-    second = json.load(open(os.path.join(E, "grades-2.json")))
+    grades = json.load(open(os.path.join(E, f"{GRADES}-1.json")))
+    second = json.load(open(os.path.join(E, f"{GRADES}-2.json")))
     rows = {a: {"score": [], "wrong": 0, "asks": 0, "past": 0, "turns": [], "tools": [], "cost": [], "sec": [],
                 "n": 0, "errors": 0, "served": []} for a in ARMS}
     per = {}  # pid -> arm -> run scores (each the mean of the two grading passes)
@@ -122,7 +126,10 @@ def cmd_report():
     print("\npairwise by prompt (mean of two reps): wins / ties / losses")
     for a, b in (("memcue", "files"), ("memcue", "none"), ("files", "none"), ("judge", "memcue"), ("judge", "files"),
                  ("judge", "none"), ("stubs", "memcue"), ("stubs", "judge"), ("stubs", "none"),
-                 ("local", "memcue"), ("local", "judge"), ("local", "none")):
+                 ("local", "memcue"), ("local", "judge"), ("local", "none"), ("pull", "push"), ("both", "push"),
+                 ("both", "pull"), ("push", "none"), ("pull", "none"), ("both", "none"), ("push", "memcue")):
+        if a not in ARMS or b not in ARMS:
+            continue
         w = t = l = 0
         for pid, d in per.items():
             if a in d and b in d:
@@ -138,6 +145,18 @@ def cmd_report():
         diff = sum(1 for d in per.values() if len(d.get(arm, [])) == 2 and d[arm][0] != d[arm][1])
         print(f"  {arm}: {diff} of {sum(1 for d in per.values() if len(d.get(arm, [])) == 2)}")
 
+    # The pull and both modes: how often the agent searched the base itself.
+    for arm in ("pull", "both"):
+        runs = searched = calls = 0
+        for pid in ids:
+            for rep in (1, 2):
+                path = os.path.join(E, "runs", str(pid), f"{arm}-{rep}.meta.json")
+                if os.path.exists(path):
+                    n = len(json.load(open(path)).get("search", []))
+                    runs += 1; searched += n > 0; calls += n
+        if runs:
+            print(f"\n{arm}: {runs} runs, searched in {searched}, {calls / runs:.1f} searches per run")
+
     # The stubs mode: how many stubs were offered and how many of them the agent read with memcue-show.
     offered = read = runs = with_read = 0
     for pid in ids:
@@ -150,7 +169,7 @@ def cmd_report():
             stubs = {i for x in meta.get("stubs", []) for i in x["stubs"]}
             got = {i for x in meta.get("show", []) for i in x} & stubs
             offered += len(stubs); read += len(got); with_read += bool(got)
-    if runs:
+    if runs and "stubs" in ARMS:
         print(f"\nstubs: {runs} runs, {offered / runs:.1f} stubs offered and {read / runs:.1f} read per run, "
               f"runs that read any {with_read}")
 

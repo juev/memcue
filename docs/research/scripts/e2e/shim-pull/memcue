@@ -1,0 +1,5 @@
+#!/bin/sh
+# memcue for the agent in the pull and both modes: only `search`, over the run's throwaway base; every call logged.
+printf '%s\n' "$*" >> "$MEMCUE_STATE_DIR/search.log"
+[ "$1" = search ] || { echo "memcue: only search is available in this run" >&2; exit 126; }
+exec "$MEMCUE_REAL" "$@"
