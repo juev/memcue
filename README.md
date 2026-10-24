@@ -302,14 +302,16 @@ the Jev pass 8–10 and 1–4, for about 420k more input tokens
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so a rule shows as used even though no search found it.
 
-The card holds about 3,500 characters, a dozen facts, and a labelled base has more rules than that. They are chosen
-in this order:
+Every rule and decision the user stated (`source` `user` or `user_confirmed`) is on the card, each cut to 400
+characters (#363): since the agent searches itself, the card is the only memory it gets unasked. On the author's
+archived base that is 9 global rules, about 1,300 characters. The other facts share a budget of about 3,500 characters,
+a dozen facts, and a labelled base has more rules than that. They are chosen in this order:
 
-1. The facts the user stated (`source` `user` or `user_confirmed`) come first, then the rest; newest first within
-   each. The date alone says little on a migrated base, where most rules share the day of the migration.
-2. The rules and decisions of the current repository may take half of the card before anything else is placed.
-3. The rest of the card is filled in the order of step 1, global rules and the repository's facts together, so a
-   repository whose stated decisions come first may take more than half.
+1. Newest first. The date alone says little on a migrated base, where most rules share the day of the migration,
+   which is why the stated facts come before the budget.
+2. The rules and decisions of the current repository may take half of the budget before anything else is placed.
+3. The rest of the budget is filled in the order of step 1, global rules and the repository's facts together, so a
+   repository whose facts come first may take more than half.
 
 Measured on the author's base (65 global rules after the labelling of #219, 129 facts for the largest repository): the
 global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
