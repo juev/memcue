@@ -71,6 +71,23 @@ and the disputed ones by hand.
 The judge's USEFUL was right about 40% of the time on the disputed pairs. The judge-labelled usefulness elsewhere in
 this file was not checked by hand, so it may be inflated the same way. Method and tables: [scope-filter-2026-10.md](research/scope-filter-2026-10.md).
 
+### Pull instead of push (October 2026)
+
+Since #361 no host injects facts with a prompt: the agent searches memcue itself, and the session card stays. On 40
+real prompts, each run twice through `claude -p` with Opus on the repository as of the prompt and graded blind in two
+passes (score 0–2):
+
+| | No memory | Push (0.7.0) | Pull | Both |
+|---|---|---|---|---|
+| Score, mean | 0.76 | 0.89 | **1.08** | 0.99 |
+| Correct answers (score 2) | 10 | 13 | **22** | 20 |
+| Wrong or empty (score 0) | 29 | 24 | **15** | 22 |
+| Cost of 80 runs | $30.19 | $31.43 | $33.75 | $31.36 |
+
+Pull against push is +0.19 per prompt, 95% interval [+0.03, +0.37]; push against no memory stays inside the noise.
+The agent searched in 62 of 80 runs, two queries in the median run. Only Opus in Claude Code was measured. Method and
+tables: [pull-2026-10.md](research/pull-2026-10.md).
+
 ## Writing: how facts get into the base
 
 ### Migration of existing notes
