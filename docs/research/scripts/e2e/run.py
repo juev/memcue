@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One e2e run: a real prompt, one memory mode, `claude -p` in plan mode on a clone of the repository as of the prompt.
 
-    run.py one  --prompt-id N --arm none|files|memcue|judge|stubs|local|push|pull|both --rep R
+    run.py one  --prompt-id N --arm none|files|memcue|judge|stubs|local|push|pull|both|pullf --rep R
     run.py all  --ids ids.json --reps 2 --jobs 4 [--arms push,pull,both]
 
 Modes differ only in memory. none: memcue hook silenced (MEMCUE_BIN=true), built-in memory off. files: built-in memory
@@ -16,6 +16,7 @@ push, pull and both (#361) run the 0.7.0 release over the snapshot base moved on
 that keeps the repository's real remotes. push: the release as it runs live. pull: the card only, with the note's line
 about facts arriving with prompts replaced by a line telling the agent to run `memcue search` itself (pull_hook.py);
 the agent may run `memcue search` and nothing else of memcue (shim-pull). both: push plus that line and that search.
+pullf: pull whose search leaves out the facts of other projects and the facts the card carried (shim-pullf).
 """
 import argparse, json, os, random, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
@@ -32,8 +33,8 @@ DENY = ["Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(glab *)", "Bash(gh 
         "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)"]
 ARCHIVE = os.path.expanduser("~/.claude/archive/memory-2026-10-19")
 CLAUDE = os.path.expanduser("~/.claude")
-ARMS = ("none", "files", "memcue", "judge", "stubs", "local", "push", "pull", "both")
-V7 = ("push", "pull", "both")  # 0.7.0: base migrated onto repo keys, clone keeps the real remotes
+ARMS = ("none", "files", "memcue", "judge", "stubs", "local", "push", "pull", "both", "pullf")
+V7 = ("push", "pull", "both", "pullf")  # 0.7.0: base migrated onto repo keys, clone keeps the real remotes
 JUDGE_ENV = ("MEMCUE_JUDGE_URL", "MEMCUE_JUDGE_MODEL", "MEMCUE_JUDGE_KEY")
 
 
@@ -148,10 +149,11 @@ def run_one(pid, arm, rep):
     if arm == "push":  # the release as it runs live: words, card, recall on every prompt
         senv.pop("MEMCUE_RERANK")
         senv["MEMCUE_BIN"] = MEMCUE
-    if arm in ("pull", "both"):  # the card tells the agent to search; pull drops the per-prompt recall
+    if arm in ("pull", "both", "pullf"):  # the card tells the agent to search; pull drops the per-prompt recall
         senv.pop("MEMCUE_RERANK")
-        senv.update(MEMCUE_BIN=os.path.join(E, "pull_hook.py"), MEMCUE_REAL=MEMCUE, PULL_MODE=arm,
-                    PATH=os.path.join(E, "shim-pull") + ":" + senv["PATH"])
+        shim = "shim-pullf" if arm == "pullf" else "shim-pull"  # pullf: search without other projects and the card
+        senv.update(MEMCUE_BIN=os.path.join(E, "pull_hook.py"), MEMCUE_REAL=MEMCUE,
+                    PULL_MODE="pull" if arm == "pullf" else arm, PATH=os.path.join(E, shim) + ":" + senv["PATH"])
     if arm == "local":  # the same hook with the tree reader built into memcue
         local = os.environ.get("MEMCUE_LOCAL_BIN")
         if not local:
@@ -183,7 +185,7 @@ def run_one(pid, arm, rep):
     with open(out + ".tmp", "w") as f:
         r = subprocess.run([CLAUDE_BIN, "-p", "--model", "opus", "--permission-mode", "plan", "--settings", sfile,
                             "--tools", TOOLS, "--strict-mcp-config", "--disallowedTools",
-                            *[d for d in DENY if not (arm in ("pull", "both") and d == "Bash(memcue *)")],
+                            *[d for d in DENY if not (arm in ("pull", "both", "pullf") and d == "Bash(memcue *)")],
                             "--output-format", "stream-json", "--verbose", "--max-turns", "40"],
                            input=p["prompt"], stdout=f, stderr=subprocess.PIPE, text=True, cwd=cwd, env=env,
                            timeout=1200)
@@ -191,7 +193,7 @@ def run_one(pid, arm, rep):
             "commit": commit, "cwd": cwd, "seconds": round(time.time() - start, 1)}
     rl = os.path.join(state, "recall.log")
     meta["recall"] = [json.loads(l) for l in open(rl)] if os.path.exists(rl) else []
-    for name in ("stubs", "show", "search"):  # stubs: what was offered and read; pull and both: what was searched
+    for name in ("stubs", "show", "search", "pullf"):  # stubs: offered and read; pull*: searched; pullf: dropped
         lp = os.path.join(state, f"{name}.log")
         if os.path.exists(lp):
             meta[name] = [l.rstrip("\n") if name == "search" else json.loads(l) for l in open(lp)]

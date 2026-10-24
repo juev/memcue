@@ -85,8 +85,9 @@ passes (score 0–2):
 | Cost of 80 runs | $30.19 | $31.43 | $33.75 | $31.36 |
 
 Pull against push is +0.19 per prompt, 95% interval [+0.03, +0.37]; push against no memory stays inside the noise.
-The agent searched in 62 of 80 runs, two queries in the median run. Only Opus in Claude Code was measured. Method and
-tables: [pull-2026-10.md](research/pull-2026-10.md).
+The agent searched in 62 of 80 runs, two queries in the median run. A search that leaves out the facts of other
+projects and of the card scored below the plain search, inside the noise (−0.09 [−0.23, +0.05]), so search keeps every
+project. Only Opus in Claude Code was measured. Method and tables: [pull-2026-10.md](research/pull-2026-10.md).
 
 ## Writing: how facts get into the base
 

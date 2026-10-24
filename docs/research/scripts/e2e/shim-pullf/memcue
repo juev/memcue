@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""memcue for the agent in the pullf mode (#361 follow-up): only `search`, over the run's throwaway base, with the
+facts of other projects (repo:/dir: scopes that are not the session's) and the facts the session card carried left
+out. The session's project and the card's ids come from card.log in the run's state directory. Every call is logged."""
+import json, os, sqlite3, subprocess, sys
+state = os.environ["MEMCUE_STATE_DIR"]
+with open(os.path.join(state, "search.log"), "a") as f:
+    f.write(" ".join(sys.argv[1:]) + "\n")
+args = sys.argv[1:]
+if args[:1] != ["search"]:
+    print("memcue: only search is available in this run", file=sys.stderr)
+    sys.exit(126)
+n, as_json, rest, i = 10, False, [], 1
+while i < len(args):
+    a = args[i]
+    if a in ("-n", "--n") and i + 1 < len(args):
+        n = int(args[i + 1]); i += 2; continue
+    if a.startswith("-n="):
+        n = int(a[3:]); i += 1; continue
+    if a in ("-json", "--json"):
+        as_json = True; i += 1; continue
+    if a == "--":
+        rest += args[i + 1:]; break
+    rest.append(a); i += 1
+tier, card = "", set()
+try:
+    with open(os.path.join(state, "card.log")) as f:
+        last = [json.loads(l) for l in f if l.strip()][-1]
+    tier, card = last.get("tier", ""), set(last.get("facts") or [])
+except (OSError, IndexError, ValueError):
+    pass
+# As recall's ownScopes: only a repository key has other projects; the config directory, dir: and none do not.
+own = {("repo:" + tier).lower()} if tier and tier != "_global" and not tier.startswith("dir:") else set()
+r = subprocess.run([os.environ["MEMCUE_REAL"], "search", "-json", "-n", str(max(n, 1) * 4), "--", " ".join(rest)],
+                   capture_output=True, text=True)
+if r.returncode:
+    sys.stderr.write(r.stderr); sys.exit(r.returncode)
+hits = json.loads(r.stdout or "[]")
+db = sqlite3.connect(f"file:{os.environ['MEMCUE_FACTS']}?mode=ro", uri=True)
+def scope(i):
+    row = db.execute("select scope from facts where id = ? order by version desc limit 1", (i,)).fetchone()
+    return (row[0] if row else "") or ""
+kept, dropped = [], []
+for h in hits:
+    if len(kept) == n:
+        break
+    sc = scope(h["id"]).lower()
+    if h["id"] in card:
+        dropped.append({"id": h["id"], "why": "card"})
+    elif own and (sc.startswith("repo:") or sc.startswith("dir:")) and sc not in own:
+        dropped.append({"id": h["id"], "why": "foreign", "scope": sc})
+    else:
+        kept.append(h)
+with open(os.path.join(state, "pullf.log"), "a") as f:
+    f.write(json.dumps({"query": " ".join(rest), "tier": tier, "kept": [h["id"] for h in kept], "dropped": dropped},
+                       ensure_ascii=False) + "\n")
+if as_json:
+    print(json.dumps(kept, ensure_ascii=False))
+else:
+    for h in kept:
+        print(" ".join((h["id"] + " " + (h.get("origin") or "") + " | " + h["content"]).split()))
