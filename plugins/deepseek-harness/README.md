@@ -3,13 +3,12 @@
 Long-term memory for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) on top of a memcue
 fact base:
 
-- **Before each step** the prompt goes to `memcue hook`; at most two matching facts come back and are appended as a
-  user-role message with source `memcue` and form `recall`. memcue itself keeps a fact to one delivery per session.
-  A failed recall is reported once per session and the step still runs; a failed session card is not treated as
-  delivered, so the next step retries it (with one report per session).
+- **No facts come with a prompt** (#361). The system-prompt section tells the model to search the base with
+  `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
+  system's name and both languages if the first try finds nothing.
 - **At the first prompt and after every compaction** `memcue session-card` supplies the card of global rules and
-  repository decisions as a user-role notice. The card is a view of the base, not a copy; after a compaction it also
-  resets the session's delivered facts, so a fact dropped with the old context may come again.
+  repository decisions as a user-role notice. The card is a view of the base, not a copy. A failed card is not
+  treated as delivered, so the next step retries it (with one report per session), and the step still runs.
 - **When a turn ends** the messages it added go to `memcue extract-messages` in the background, once
   `minNewChars` of new text has gathered. The checkpoint per session lives in `<stateDir>/<session>.json`: it holds
   fingerprints of messages already extracted and a pending batch, written atomically before the model call. A failed
@@ -22,12 +21,13 @@ fact base:
   listener awaits the remaining tail even if it is below `minNewChars`; that call lowers memcue's own 2000-character
   transcript minimum, so a short final tail can still produce candidates, and a batch left behind by a crash is
   retried when the plugin loads.
-- **A system-prompt section** says the memory is memcue and names the fact tools; the built-in memory files are not
-  written.
+- **A system-prompt section** says the memory is memcue, when to search it and which tools fix it; the built-in memory
+  files are not written.
 - **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact),
   `memcue_correct` (a new version of a stored fact, with optional `keywords` and `expires`) and `memcue_retire` (stop
-  recalling a fact; the history keeps it). Search is lexical, like `memcue search`: the host and repository preference
-  is part of recall, not of the tool.
+  finding a fact; the history keeps it). `memcue_search` runs `memcue search` with the session's working directory
+  and id, so facts of this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the
+  session.
 
 The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
 the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and
@@ -35,7 +35,7 @@ Hermes.
 
 ## Review and vet
 
-Session extraction writes **candidates**, not active facts: `memcue extract-messages` stores them, recall ignores
+Session extraction writes **candidates**, not active facts: `memcue extract-messages` stores them, search ignores
 them, and `memcue vet` or `memcue approve ID...` decides. A fact written by `memcue_add` is active at
 once; `memcue_correct` of an approved fact is a deliberate correction, not a candidate. The shared rules are in
 [Review and vet](../../README.md#review-and-vet).
@@ -46,7 +46,7 @@ The plugin asks `memcue version -json` when it loads. Without a configured `bina
 or one older than the plugin's release is replaced by that release, installed into
 `$XDG_DATA_HOME/memcue/<version>/` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base
 the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the session card
-and extraction off with one warning (recall keeps working). A build from source reports a suffixed version and counts
+and extraction off with one warning (search keeps working). A build from source reports a suffixed version and counts
 as the current tree.
 
 Tested with `dsh 0.2.0-rc.2`. Both the repository bundle and the standalone package declare
@@ -177,8 +177,8 @@ granular token without the 2FA bypass cannot run `npm publish`: use `npm stage p
 
 - Hermes' `MEMORY.md` mirror has no counterpart here: dsh has no built-in memory files, so there is nothing to
   mirror. The write path is `memcue_add`, `memcue_correct` and `memcue_retire`.
-- Recall arrives as a durable message in the session log rather than a `<memory-context>` block, so it replays with
-  the session and survives a harness restart.
-- The Claude Code hooks bridge in dsh cannot do this: it runs `SessionStart` and `UserPromptSubmit`, but it ignores
+- The session card arrives as a durable message in the session log, so it replays with the session and survives a
+  harness restart.
+- The Claude Code hooks bridge in dsh cannot do this: it runs `SessionStart`, but it ignores
   `PreCompact`/`SessionEnd` and always sends an empty `transcript_path`, so extraction never starts and the base
   never grows.

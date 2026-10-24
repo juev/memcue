@@ -259,9 +259,8 @@ quality with local signals only.
 
 ## Repeating the measurements
 
-`memcue eval -set FILE` runs a labelled set against the base and prints how many questions found their fact and,
-from the labels, how many injected facts were useful, related or noise; `-unlabeled FILE` writes the recalled
-(prompt, fact) pairs that still need a label, and `-min-matched`, `-min-coverage`, `-max-facts` try other
-thresholds. The set format is
-the `evalSet` type in `cmd/memcue/eval.go`. `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a session would
-add, with tokens or cost, without storing it.
+`memcue eval` ran a labelled set against the injection of facts with a prompt; it went with that injection in #361,
+and the measurements above that used it stay as history (the set format is the `evalSet` type in `cmd/memcue/eval.go`
+before #361). The agent's own searches are judged end to end (`docs/research/scripts/e2e`) and by `search.log`
+(`MEMCUE_SEARCH_LOG=1`). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a session would add, with tokens or
+cost, without storing it.
