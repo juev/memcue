@@ -13,9 +13,10 @@ memcue fact base:
   rebuild and is reported to the log at most every ten minutes.
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's
   `cwd`), named by its remote as in Claude Code: it names the origin of the facts a session learns, the `repo`
-  scope, the card's decisions and the search tie-break. A chat with no working directory and a session in one of
-  Hermes's own directories outside git (`/opt/data`, `/opt/hermes`) have no project: their facts keep an empty
-  origin and a `repo` scope is dropped (#347).
+  scope, the card's decisions and the search tie-break. A session Hermes gives no `cwd` (a one-shot `hermes -z` or a
+  cron run) takes the directory Hermes itself falls back to: `resolve_agent_cwd()`, that is `TERMINAL_CWD` or the
+  process directory (#354). A session whose directory is one of Hermes's own outside git (`/opt/data`,
+  `/opt/hermes`) has no project: its facts keep an empty origin and a `repo` scope is dropped (#347).
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.

@@ -200,6 +200,25 @@ def _project_dir(cwd: str) -> str:
     return ""
 
 
+def _session_cwd(cwd: str) -> str:
+    """The session's working directory: the cwd Hermes passed, or for a session without one (a one-shot or cron run)
+    the directory Hermes itself falls back to (#354): ``resolve_agent_cwd()`` when this Hermes has it, else
+    TERMINAL_CWD when it is a directory, else the process directory."""
+    if cwd:
+        return cwd
+    try:
+        from agent.runtime_cwd import resolve_agent_cwd
+        return str(resolve_agent_cwd())
+    except Exception:  # an older or a stub Hermes: the same chain by hand
+        raw = os.environ.get("TERMINAL_CWD", "").strip()
+        if raw and os.path.isdir(os.path.expanduser(raw)):
+            return os.path.expanduser(raw)
+        try:
+            return os.getcwd()
+        except OSError:  # the process directory was removed: no project rather than a failed start
+            return ""
+
+
 def _on(v: Any) -> bool:
     """A config switch: true, or a string a YAML file or a person would mean as true."""
     return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
@@ -402,7 +421,7 @@ class MemcueMemoryProvider(MemoryProvider):
         Path(self._state).mkdir(parents=True, exist_ok=True)
         self._install_in_background()
         # agent_workspace is the constant "hermes", not a directory; cwd is the session's working directory.
-        self._workspace = _project_dir(str(kwargs.get("cwd") or ""))
+        self._workspace = _project_dir(_session_cwd(str(kwargs.get("cwd") or "")))
         self._session_id = session_id
         self._writes = kwargs.get("agent_context", "primary") == "primary"
         self._context = str(kwargs.get("agent_context") or "primary")
