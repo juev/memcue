@@ -142,6 +142,8 @@ comes from where the session works, read from the files and never by running git
   `[include] path` is followed, `includeIf` is not. The directory's own name plays no part.
 - **A repository without a remote** is `dir:<path of its main worktree>`.
 - **Outside git** the project is the `module` of the nearest `go.mod`, or else `dir:<working directory>`.
+- **No working directory** is no project: a host passes an empty `cwd` for such a session (`-cwd ""` to `add` and
+  `extract-messages`). The Hermes plugin does so for a chat and for a session outside git (#347).
 - **The Claude config directory** is the global tier; **a temporary directory** names nothing.
 
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
@@ -156,6 +158,13 @@ the share; `0` leaves such facts out of the search entirely, which cut 37% of th
 about 20 of those prompts.
 
 ## Upgrade
+
+### Hermes sessions (#347)
+
+The Hermes plugin used to pass the constant `hermes` as the working directory, so its facts had the origin
+`hermes <date>`, and on the author's base an empty one from 2026-10-23. Now a session in a git repository names its facts by
+that repository, and every other session leaves the origin empty. Facts already stored keep their origin; nothing
+needs to be moved.
 
 ### Facts of other projects (#345)
 
