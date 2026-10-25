@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.11.1`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.12.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.12.0 | 5 | 0.12.0 | 0.12.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.12.0 (`hermes-agent` 0.15.2) |
 | 0.11.1 | 5 | 0.11.1 | 0.11.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.1 (`hermes-agent` 0.15.2) |
 | 0.11.0 | 5 | 0.11.0 | 0.11.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.0 (`hermes-agent` 0.15.2) |
 | 0.10.0 | 5 | 0.10.0 | 0.10.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.10.0 (`hermes-agent` 0.15.2) |
@@ -163,6 +164,27 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.12.0: a question in either language, and a base that brings itself up to date (#390, #391, #395, #396)
+
+- **Translation.** Every fact keeps its whole text in the other language, Russian or English, as one search query
+  that starts with `= ` (#395). Before, an English question found a Russian fact 22 times out of 30, and every other
+  combination 29–30. With the translation it is 30 out of 30, 23 of them at rank one instead of 12, measured on a
+  copy of a live base of 2,855 facts ([language-2026-10](docs/research/language-2026-10.md)). The session
+  extraction writes the translation with each new fact, for about 4% more per session. Facts stored before get theirs
+  from the regular dream, 40 a dream (#396). A base of 2,855 facts therefore takes about 72 dreams, three days at
+  the hourly default. Search output and the card do not change, and the base grows by one version per fact.
+- **Opening the base.** Each index row is stamped with the version of the number terms it was built with (#390).
+  An open restems only older rows, including rows written by an older memcue on another machine of the same base.
+  The index check trusts its last count when nothing changed (#396). On the copy above, search took 57 ms on 0.8.0,
+  90 ms on 0.11.1 and 10 ms here, and the translation does not change that. The first open restamps every row once,
+  in about 0.6 s.
+- **Numbers after `:` and `/`.** An image tag (`image:v1.106.1`) and a versioned path (`gradle/9.8.1/`) give a
+  term (#391). On the copy above, 15 of 15 version-only prompts now find their fact, against 13 before.
+- **The card names what this machine still owes.** That is a missing merge driver (`memcue install`) or old
+  repository names in the facts (`memcue migrate -repos`). The line reaches Hermes and DSH too (#396).
+- No schema change and no new flag. `reindex` is a diagnostic again, and nothing has to be run by hand after the
+  upgrade.
 
 ### 0.11.1: the index repair asks a cheaper question
 
