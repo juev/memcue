@@ -86,6 +86,8 @@ _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared here
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
+_BELOW_FLOOR_SERVED = 2  # an empty answer hands over this many facts from below the floor (#439)
+
 _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
 _DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
 _SEARCH_CONTROLS = "0.14.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
@@ -658,7 +660,7 @@ class MemcueMemoryProvider(MemoryProvider):
             self._warned_card[session] = now
             logger.warning("memcue session card failed (session %s): %s", session or "-", reason)
 
-    def _floor_hint(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> str:
+    def _below_floor(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> tuple[list[Any], str]:
         """Whether the score floor is what made an answer thin. A single fact is the case where a floor hides the
         rest (#407): the same search with the floor off costs one more call and says how many facts sit below it.
         Runs only for an answer of one fact or none, so the ordinary answer pays nothing.
@@ -677,19 +679,19 @@ class MemcueMemoryProvider(MemoryProvider):
             wide += ["-min-score", "0"]
         ok, out = self._run(wide_cmd + wide + ["--", query], timeout=_RECALL_TIMEOUT)
         if not ok:
-            return ""
+            return [], ""
         try:
             more = json.loads(out)
         except ValueError:
-            return ""
+            return [], ""
         if not isinstance(more, list):
-            return ""
+            return [], ""
         known = {f.get("id") for f in facts if isinstance(f, dict)}
         held = [f for f in more if isinstance(f, dict) and f.get("id") not in known]
         if not held:
-            return ""
-        return (f"{len(held)} more facts hold the words but sit below the score floor; run the same search with "
-                f"min_score 0 to read them (limit still caps the answer).")
+            return [], ""
+        return held, (f"{len(held)} more facts hold the words but sit below the score floor; run the same search with "
+                      f"min_score 0 to read them (limit still caps the answer).")
 
     def _remember_found(self, session: str, facts: list[Any]) -> None:
         """Keep the identifiers of the facts a search returned, so the reply of this turn can be judged by them. Only
@@ -1261,9 +1263,18 @@ class MemcueMemoryProvider(MemoryProvider):
                     result = {"facts": facts}
                     hints = [_CJK_HINT] if _CJK.search(arg("query")) else []
                     if controls_ok and isinstance(facts, list) and len(facts) <= 1 and arg("min_score") not in ("0", "0.0"):
-                        floor_hint = self._floor_hint(cmd, controls, facts, arg("query"))
+                        held, floor_hint = self._below_floor(cmd, controls, facts, arg("query"))
                         if floor_hint:
                             hints.append(floor_hint)
+                        # An empty answer that has facts below the floor hands over the first of them, marked: a
+                        # count alone leaves the model nothing to read, and the second call is paid anyway (#439).
+                        if not facts and held:
+                            served = [dict(f, below_floor=True) for f in held[:_BELOW_FLOOR_SERVED]]
+                            facts = served
+                            result["facts"] = served
+                            self._remember_found(self._session_id, served)
+                            hints[-1] = (f"{len(held)} facts hold the words but sit below the score floor; the first "
+                                         f"{len(served)} come with below_floor: true, and min_score 0 reads the rest.")
                     if hints:
                         result["hint"] = " ".join(hints)
                     return json.dumps(result, ensure_ascii=False)
