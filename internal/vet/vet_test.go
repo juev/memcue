@@ -125,3 +125,56 @@ func TestRulesTreatEqualTextAsDuplicate(t *testing.T) {
 		t.Errorf("decided %+v, rest %+v", decided, rest)
 	}
 }
+
+func kinded(id, kind, content string) store.Fact {
+	f := fact(id, content, "hermes 2026-10-25", "tool")
+	f.Kind = kind
+	return f
+}
+
+// Installation state is read by a command, and a stored copy is stale after the next release (#426). Only the kinds
+// that can be mere state are dropped: a pitfall or a rule that names a version or a default is knowledge.
+func TestRulesDropInstallationState(t *testing.T) {
+	cands := []store.Fact{
+		kinded("01wrapper", "environment", "На хосте loffe обёртка /opt/data/bin/tool версии 1.2.3 экспортирует TOOL_FACTS=1."),
+		kinded("01path", "", "Бинарь memcue лежит в /usr/local/bin/memcue на хосте loffe."),
+		kinded("01default", "other", "В Hermes ключ memory.memcue.search_facts по умолчанию включён."),
+		kinded("01size", "environment", "База memcue на loffe держит 396 живых фактов и занимает 12 МБ."),
+		kinded("01pitfall", "pitfall", "memcue 0.40.1 падает на пустом запросе, обход — передавать хотя бы одно слово."),
+		kinded("01rule", "rule", "Ключ memory.memcue.search_facts по умолчанию не трогать: его включает только пользователь."),
+		kinded("01plain", "environment", "Grafana на хосте ams слушает порт 3000 за nginx."),
+		kinded("01address", "environment", "Сервис установлен на 10.0.0.5, вход по ключу deploy."),
+		kinded("01file", "environment", "Hermes читает config.yaml из /opt/data по умолчанию."),
+		kinded("01branch", "environment", "Ветка по умолчанию репозитория juev/skills на git.example.org — main."),
+	}
+	decided, rest := Rules(cands, nil, "", false)
+	got := map[string]Decision{}
+	for _, d := range decided {
+		got[d.Fact.ID] = d
+	}
+	for id, part := range map[string]string{"01wrapper": "version", "01path": "path", "01default": "config default", "01size": "size"} {
+		want := "installation state: the command that reads " + part + " is the answer"
+		if d := got[id]; d.Verdict != Drop || d.By != "rule" || d.Reason != want {
+			t.Errorf("%s: %+v, want a drop with %q", id, d, want)
+		}
+	}
+	left := map[string]bool{}
+	for _, f := range rest {
+		left[f.ID] = true
+	}
+	for _, id := range []string{"01pitfall", "01rule", "01plain", "01address", "01file", "01branch"} {
+		if !left[id] {
+			t.Errorf("%s was decided instead of left for the model: %+v", id, got[id])
+		}
+	}
+}
+
+// A mirror of the built-in notes is decided by the mirror rule first, even when its text looks like installation state.
+func TestRulesMirrorBeforeInstallationState(t *testing.T) {
+	text := "На хосте loffe обёртка /opt/data/bin/tool версии 1.2.3 экспортирует TOOL_FACTS=1."
+	cands := []store.Fact{fact("01m", text, "hermes-memory 2026-10-20", "memory")}
+	decided, rest := Rules(cands, nil, text, true)
+	if len(rest) != 0 || len(decided) != 1 || decided[0].Verdict != Keep || !strings.Contains(decided[0].Reason, "mirror") {
+		t.Errorf("decided %+v, rest %+v", decided, rest)
+	}
+}

@@ -11,12 +11,42 @@ package vet
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
 )
+
+// The signals of installation state (#426). Each one fires only together with a word near it, so a fact that merely
+// names a version or a path is left alone. The text is lower-cased before matching.
+var (
+	// semVer is a release number such as 1.2.3 or v0.40.1; an address such as 10.0.0.1 is filtered out by the caller.
+	semVer = regexp.MustCompile(`v?\d+\.\d+\.\d+`)
+	// installWord says the number is the version of something installed, not a value of some other kind.
+	installWord = regexp.MustCompile(`верси|version|установлен|installed|бинар|binary|обёртк|обертк|wrapper|релиз|release|тег|tag|сборк|build`)
+	// installPath is a place binaries, wrappers and plugins are installed to: the part of a base that carries the
+	// tool itself. A service's directory or a data path is knowledge a command does not give, so it is not here.
+	installPath = regexp.MustCompile(`/(?:bin|plugins)/`)
+	// placeWord says the path is where something lies, not an argument of a command.
+	placeWord = regexp.MustCompile(`лежит|лежат|находится|хранится|пут[ьи]|path|stored`)
+	// defaultWord marks a config default.
+	defaultWord = regexp.MustCompile(`по умолчанию|by default|default`)
+	// configKey is a dotted key such as memory.memcue.search_facts; a file name such as config.yaml is filtered out by
+	// the caller.
+	configKey = regexp.MustCompile(`[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)+`)
+	// fileExt is the last part of a dotted name that makes it a file, not a config key.
+	fileExt = regexp.MustCompile(`^(?:ya?ml|json|toml|ini|conf|env|log|md|txt|go|py|sh|js|ts|db|sqlite)$`)
+	// hostExt is the last part of a dotted name that makes it a host name (a private forge, a site), not a key.
+	hostExt = regexp.MustCompile(`^(?:com|org|net|io|ru|de|me|co|ai|app|cloud|dev|local|internal|online|site|tech|xyz|info)$`)
+	// baseSize is the size of a base or the count of its facts.
+	baseSize = regexp.MustCompile(`живых фактов|фактов в базе|live facts|facts in the base|размер базы|занимает \d+(?:[.,]\d+)? ?(?:кб|мб|гб|kb|mb|gb)`)
+)
+
+// nearRunes is how far, in characters either side, a signal looks for the word that confirms it.
+const nearRunes = 60
 
 // Verdict is what vet decided about a candidate.
 type Verdict string
@@ -51,10 +81,18 @@ type Decision struct {
 // An origin whose tier is exactly "test" is a test run that wrote to a live base: it never belongs there. Origins are
 // "<tier> <date>", so a repository called test-utils or testing must not be mistaken for one.
 //
+// An environment fact (or one of no kind) that only records installation state is dropped: a command reads it, and
+// the stored copy is stale after the next release (#426). A rule, a decision, a pitfall or a procedure that names a
+// version is knowledge, not state, and is left alone.
+//
 // A candidate whose words are all in an approved fact says nothing new and would only take room in a prompt.
 func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decided []Decision, rest []store.Fact) {
 	notes := norm(memory)
 	for _, c := range cands {
+		state := ""
+		if stateKind(c.Kind) {
+			state = installationState(c)
+		}
 		switch {
 		case c.Source == "memory" && haveMemory:
 			// Word boundaries: a one-word mirror such as "Go" must not match "Django" or "Golang".
@@ -68,6 +106,9 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 		case isTestOrigin(c.Origin):
 			decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
 				Reason: "origin=test: a test run wrote it"})
+		case state != "":
+			decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
+				Reason: fmt.Sprintf("installation state: the command that reads %s is the answer", state)})
 		default:
 			if cover, ok := covers(c, approved); ok {
 				decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
@@ -78,6 +119,97 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 		}
 	}
 	return decided, rest
+}
+
+// stateKind reports whether a fact of this kind can be mere installation state: knowledge kinds never are.
+func stateKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "", "environment", "other":
+		return true
+	}
+	return false
+}
+
+// installationState reports whether a fact only records the state of an installation: the version of something
+// installed, the path of a binary or a wrapper, the variables a wrapper exports, a config default, or the size and
+// the fact count of a base. A command reads each of these (#426), and the stored copy is stale after the next
+// release; a rule, a decision or a pitfall that merely names a version is not this.
+//
+// It names the part found — version, path, config default or size — or returns "" when there is none. When in doubt
+// it returns "": a wrong drop loses knowledge, an undecided candidate only costs a line in a report.
+func installationState(c store.Fact) string {
+	s := strings.ToLower(c.Content)
+	switch {
+	case near(s, semVer, installWord, isVersion):
+		return "version"
+	case near(s, installPath, placeWord, nil) || near(s, installPath, installWord, nil):
+		return "path"
+	case near(s, configKey, defaultWord, isConfigKey):
+		return "config default"
+	case baseSize.MatchString(s):
+		return "size"
+	}
+	return ""
+}
+
+// near reports whether a match of sig, accepted by ok when ok is set, has a match of word within nearRunes
+// characters either side of it.
+func near(s string, sig, word *regexp.Regexp, ok func(s string, at []int) bool) bool {
+	for _, at := range sig.FindAllStringIndex(s, -1) {
+		if ok != nil && !ok(s, at) {
+			continue
+		}
+		if word.MatchString(s[back(s, at[0], nearRunes):ahead(s, at[1], nearRunes)]) {
+			return true
+		}
+	}
+	return false
+}
+
+// isVersion rejects a number that is part of a longer dotted one or of a word: 10.0.0.1 is an address, not 10.0.0.
+func isVersion(s string, at []int) bool {
+	if at[0] > 0 {
+		if r, _ := utf8.DecodeLastRuneInString(s[:at[0]]); r == '.' || isWord(r) {
+			return false
+		}
+	}
+	if at[1] < len(s) {
+		r, _ := utf8.DecodeRuneInString(s[at[1]:])
+		if isWord(r) || r == '.' && at[1]+1 < len(s) && s[at[1]+1] >= '0' && s[at[1]+1] <= '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// isConfigKey rejects a dotted name that is a file (config.yaml) or a part of a path or a longer word.
+func isConfigKey(s string, at []int) bool {
+	if at[0] > 0 {
+		if r, _ := utf8.DecodeLastRuneInString(s[:at[0]]); r == '/' || r == '.' || r == '-' || isWord(r) {
+			return false
+		}
+	}
+	key := s[at[0]:at[1]]
+	ext := key[strings.LastIndexByte(key, '.')+1:]
+	return !fileExt.MatchString(ext) && !hostExt.MatchString(ext)
+}
+
+// back returns the byte offset n characters before i in s, or 0.
+func back(s string, i, n int) int {
+	for ; n > 0 && i > 0; n-- {
+		_, size := utf8.DecodeLastRuneInString(s[:i])
+		i -= size
+	}
+	return i
+}
+
+// ahead returns the byte offset n characters after i in s, or len(s).
+func ahead(s string, i, n int) int {
+	for ; n > 0 && i < len(s); n-- {
+		_, size := utf8.DecodeRuneInString(s[i:])
+		i += size
+	}
+	return i
 }
 
 // isTestOrigin reports whether origin is a test run's: its tier, the first word of "<tier> <date>", has to be exactly
