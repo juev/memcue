@@ -84,13 +84,13 @@ Top-k sweeps over the same 20 prompts; every k is a prefix of the same top-10, s
 The five-fact default is the right point on this base. Against the 0.8.0 run at the same k, coverage is one prompt
 lower (13 against 14), the useful share one point higher (23% against 22%), the noise share **16 points lower**
 (32% against 48%) and the characters 3% lower — a base that grew more precise as vet and dream swept it, not a
-search that changed. Half of what the ten-fact default adds is noise — 32 of the 100 facts above the fifth are
-useful, 52 are noise — for nine more useful facts and 19 448 more characters.
+search that changed. Of the 100 facts the ten-fact default adds (ranks six to ten), 9 are useful, 52 are noise and
+39 are related: nine useful facts for 19 448 more characters.
 
 Composition is the caveat. Five prompts have no useful fact in the top ten, and four of them are ordinary
 operational questions — disk space, token rotation, how numbers are tokenized, where an origin comes from — answered
-with host lore and memory changelog. On the three prompts that are not about memory at all, coverage is 2 of 3, and the useful share
-at k=5 is **13%** against 24% on the memory ones.
+with host lore and memory changelog. On the three prompts that are not about memory at all, coverage is 2 of 3, and
+the useful share at k=5 is **13%** against 24% on the memory ones.
 
 ## Push and pull, the same installation, side by side
 
