@@ -61,11 +61,12 @@ shares its vocabulary. With that, a lower floor buys useful facts and unrelated 
 useful for four more unrelated. The floor is now where that trade is best on this corpus; the remaining noise needs a
 signal BM25 does not have, which is a ranker, not a floor.
 
-One measurement of the same family, not acted on here: the index of a fact carries the extraction's `queries` field,
-a list of phrasings written for it, so a fact with a long list matches more of a message's common words. The best fact
-of the NAS question is the size of an old memory file, and its ten-point lead comes from its list
-(«размер старой базы, сколько килобайт, вес базы»), not from its text. That bias deserves its own issue: it inflates
-exactly the kind of fact the floor then fails to separate.
+One observation of the same family, measured and **not** turned into an issue: the index of a fact carries the
+extraction's `queries` field, a list of phrasings written for it, so a fact matches words its text does not hold — the
+best fact of the NAS question is the size of an old memory file, and it matches «сколько», «занимает» and «база» only
+through its list («размер старой базы, сколько килобайт, вес базы»). That alone is not a bias, though: 388 of the 391
+live facts carry such a list, and the top fact of the twenty prompts carries 6.5 phrasings against 6.1 in the base, so
+the finding needs a corpus where the lists differ in length before it can be called one.
 
 ## Tests
 
