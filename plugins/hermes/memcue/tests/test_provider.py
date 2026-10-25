@@ -499,6 +499,37 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(nothing["facts"], [])  # nothing below the floor to name
         self.assertNotIn("hint", nothing)
 
+    def test_floor_hint_counts_the_tail_with_its_own_limit(self):
+        """The wide call asks for min(4 * limit, 20) facts while the answer keeps the caller's -n, and the hint counts
+        the facts the wide call returned beyond the served ones, not limit - served (#423)."""
+        served = '{"id":"a","content":"x"}'
+        tail = ",".join(f'{{"id":"t{i}","content":"x"}}' for i in range(6))
+        for limit, wide_n in (("2", "8"), (None, "20"), ("10", "20")):
+            with self.subTest(limit=limit):
+                calls = Path(self.home) / f"floor-args-{limit}"
+                count = Path(self.home) / f"floor-count-{limit}"
+                stub = Path(self.home) / f"floor-memcue-{limit}"
+                stub.write_text("#!/bin/sh\n"
+                                "case \"$1\" in\n"
+                                "  version) printf '{\"version\":\"dev\"}\\n' ;;\n"
+                                f"  search) printf '%s\\n' \"$@\" --- >> {shlex.quote(str(calls))}\n"
+                                f"    echo x >> {shlex.quote(str(count))}\n"
+                                f"    if [ \"$(wc -l < {shlex.quote(str(count))})\" -eq 1 ]; then printf '[{served}]\\n'\n"
+                                f"    else printf '[{served},{tail}]\\n'; fi ;;\n"
+                                "esac\nexit 0\n", encoding="utf-8")
+                stub.chmod(0o755)
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
+                p.initialize("s1", hermes_home=self.home, agent_context="primary")
+                args = {"query": "caddy"} if limit is None else {"query": "caddy", "limit": limit}
+                found = json.loads(p.handle_tool_call("memcue_search", args))
+                self.assertEqual([f["id"] for f in found["facts"]], ["a"])
+                self.assertTrue(found["hint"].startswith("6 more facts hold the words"), found["hint"])
+                first, second = [c.strip("\n").split("\n") for c in
+                                 calls.read_text(encoding="utf-8").split("---\n") if c.strip()]
+                self.assertEqual(first[first.index("-n") + 1], limit or str(memcue_provider._SEARCH_FACTS))
+                self.assertEqual(second[second.index("-n") + 1], wide_n)
+                self.assertEqual(second[second.index("-min-score") + 1], "0")
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):

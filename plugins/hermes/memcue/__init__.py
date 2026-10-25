@@ -582,13 +582,21 @@ class MemcueMemoryProvider(MemoryProvider):
     def _floor_hint(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> str:
         """Whether the score floor is what made an answer thin. A single fact is the case where a floor hides the
         rest (#407): the same search with the floor off costs one more call and says how many facts sit below it.
-        Runs only for an answer of one fact or none, so the ordinary answer pays nothing."""
+        Runs only for an answer of one fact or none, so the ordinary answer pays nothing.
+
+        The wide call has its own -n, min(4 * limit, 20): with the caller's limit it could only ever count
+        limit - served, so the number tracked the limit instead of the tail (#423). With the wider arm the number is
+        the facts the floor hid, up to 4 x limit; the answer itself stays capped by the caller's limit."""
+        wide_cmd = list(cmd)
+        if "-n" in wide_cmd:
+            i = len(wide_cmd) - wide_cmd[::-1].index("-n")  # the last -n: the plugin appends it after -session
+            wide_cmd[i] = str(min(4 * int(wide_cmd[i]), 20))
         wide = list(controls)
         if "-min-score" in wide:
             wide[wide.index("-min-score") + 1] = "0"
         else:
             wide += ["-min-score", "0"]
-        ok, out = self._run(cmd + wide + ["--", query], timeout=_RECALL_TIMEOUT)
+        ok, out = self._run(wide_cmd + wide + ["--", query], timeout=_RECALL_TIMEOUT)
         if not ok:
             return ""
         try:
