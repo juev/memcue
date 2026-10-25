@@ -103,6 +103,25 @@ The four agent queries without a useful fact are all the same shape: the base ha
   say what the default is.
 - "plugin scope" — every fact about the scope was delivered; none of them states the default the model asked about.
 
+### Correction: the useful bucket is half installation state
+
+Re-read against the rule that the installation's version, paths and defaults are **read from the machine and never from
+memory** — a version fact rots with the next release, and the command that answers it is one call — the grades above
+overstate the base's usefulness:
+
+| among the 54 useful deliveries | deliveries | distinct facts |
+|---|---|---|
+| installation state (version, wrapper and its variables, `search_facts`, this release's flags and expiry, suite path) | **24** | 13 |
+| repository documentation (release workflow, the dsh plugin, the search stand) | 5 | 3 |
+| belongs in memory: rules, decisions, pitfalls, procedures | **25** | 17 |
+| all useful deliveries | 54 | 33 |
+
+So the base delivered **25 useful facts out of 187 (13 %) that belong in memory**, and 1.6 copies of each distinct fact.
+The re-grade also reverses the conclusion drawn from it: the defect is not that stale state ranks first, it is that
+installation state is stored at all — a fresh copy of "the version is 0.14.0" is the wrong channel just as much as an
+old one. The measurement itself stands (the search returns what the words match); the judgement of what it returned
+does not.
+
 ## The thin-answer hint (#421)
 
 - It fires on **8 of 30** agent queries and **3 of 20** user prompts, and it fires exactly where the floor is the
@@ -160,9 +179,10 @@ repository itself, `in=project` returned 1 of 3.
 5. **No call ever used a control** (`in`, `kind`, `since`, `min_score`): the schema carries them, the habit does not.
 6. **The card repeats the memory tool**: 4 of 15 rules, one rule twice, ~230 of 900 tokens.
 7. **A bad `min_score` leaks the binary's usage text** as the tool error; the other arguments are validated.
-8. **Stale facts take the top slots.** Asking which version or which plugin is installed returns, beside the right
-   fact, facts about mechanisms removed in 0.8.0, a "no `recalled` files in 0.9.0" fact and a plugin sha that no longer
-   matches the installation. They are a large part of the 17 % unrelated share.
+8. **The base stores what a command should answer.** 13 distinct facts of the useful bucket describe the installation
+   — the version, the wrapper and its variables, `search_facts`, this release's flags and expiry — and 49 live facts
+   name a version number. Freshness is a symptom, not the defect: even a correct copy is the wrong channel, and these
+   are the facts that take the top slots on the most frequent question of the week.
 
 ## Recommendations, by payoff
 
@@ -178,15 +198,26 @@ repository itself, `in=project` returned 1 of 3.
    depend on earlier sessions"; it does not name the classes that actually recur — host paths, installed versions,
    service configuration, past decisions — and adoption outside audits is 30 %. One sentence with those four classes
    is cheaper than any mechanism.
-5. **Base hygiene, not code.** Retire the facts about removed mechanisms and the plugin sha; they answer the most
-   frequent question of the last week with history, and they are most of the unrelated share. The search itself
-   already has the lever — `-since`, `-kind` — that nobody uses.
+5. **Base hygiene, not code — and it is a rule, not a clean-up.** Retire the installation-state facts (version, sha,
+   wrapper variables, config defaults, release behaviour) and keep the extractor from storing them: 13 distinct facts
+   in the useful bucket, 49 live facts naming a version. What stays is what a command cannot answer — rules, decisions,
+   pitfalls, procedures — and the search already has the lever (`-since`, `-kind`) that nobody uses.
+
+## Filed from this note
+
+- **#423** — the hint reports `limit − served`, not the tail: 4, 9 and 19 for the same one-fact answer at limits 5, 10
+  and 20.
+- **#424** — the card repeats 4 of the 15 rules of the memory tool block, one rule twice, ~230 of 900 tokens.
+- **#425** — the default `limit`: 29 of 57 calls pass 10, +40 % tokens per call, no control ever used. The issue asks
+  for a decision, because the measurement alone does not say which default is right.
+- **#426** — installation state is stored as facts (13 distinct in the useful bucket, 49 live facts naming a version);
+  the fix belongs in the extraction prompts and the vet policy, not in the search.
 
 ## Deliberately not filed
 
-- **No issues.** #417 (the floor on long queries) and #418 (a wrong `-in repo:KEY`) are the open issues this note
-  prices; the hint, the card and the default are decisions to settle in a PR, not defects to report. The numbers above
-  are the input to that decision.
+- The adoption trigger: "search before answering, and name the classes that recur" is a wording experiment, not a
+  defect; it goes to a PR with a before/after count if the decision is taken.
+- #417 (the floor on long queries) and #418 (a wrong `-in repo:KEY`) stay open and are untouched here.
 
 ## Reproduction
 
