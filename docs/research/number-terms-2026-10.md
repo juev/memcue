@@ -1,6 +1,6 @@
 # Versions as exact terms: what a numeric anchor buys, October 2026
 
-Status: **measured 2026-10-24; shipped behind `MEMCUE_NUMBER_TERMS=1`, off by default ([#328](https://github.com/juev/memcue/issues/328)).** The lexer drops bare
+Status: **measured 2026-10-24; shipped behind `MEMCUE_NUMBER_TERMS=1` ([#328](https://github.com/juev/memcue/issues/328)), on by default since [#376](https://github.com/juev/memcue/issues/376) with `MEMCUE_NUMBER_TERMS=0` as the opt-out.** The lexer drops bare
 numbers, versions, ports and addresses on purpose: matching `Go 1.27` against notes about other versions is a
 false-positive source. The cost had not been measured. A prompt that names only a version recalls nothing at all,
 and a prompt that names a version next to a topic loses the one term that told the versions apart. Keeping the
@@ -96,3 +96,21 @@ reusing the prompt session ids made the `off` arm return the *next* facts, so it
 - One base, Russian and English mixed; a base of code-heavy notes would put more numbers in the prompt path.
 - Two arms on one binary, one pass each; judge noise is ±1–2 prompts, so differences smaller than that are not
   effects. The ordinary-question arm was repeated against itself to size that noise.
+
+## Default-on pass, 2026-10-25 (#376)
+
+The mode shipped opt-in because the measurement above only proved it did no harm; the default it left behind costs
+silently on every host without a wrapper, since a fresh install and the plugin path keep dropping numbers. Flipping
+the default was checked on a copy of the live base (380 indexed rows, schema 5) before the change was merged:
+
+- six version prompts built from the base itself (`topic version`), top-5 facts carrying the queried version:
+  1 of 30 with `MEMCUE_NUMBER_TERMS=0`, 10 of 30 with the variable unset. Five of the six prompts move a fact
+  naming the version into top-5; in the sixth the version was already found under the opt-out, so it stays at 1.
+- ten ordinary questions (blog publishing, backups, mail, certificates, host names, deploys, disks, Claude Code):
+  the same top-5 ids in 10 of 10 prompts, so nothing moves where the words decide.
+- a base left word-only by the old default: the first `search` with the variable unset rebuilds the index once
+  (0 of 380 rows with an `nm` term before, 60 after), and the same `memcue 0.5` prompt then returns 5 of 5 top-5
+  facts naming the version, against 0 of 5 on the word-only index. A second open rebuilds nothing.
+
+`MEMCUE_NUMBER_TERMS=0` (or `false`, `off`, `no`) keeps the word-only index, and a base opened with it is not
+rebuilt.

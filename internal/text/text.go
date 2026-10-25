@@ -1,10 +1,10 @@
 // Package text turns notes and prompts into the stems memcue indexes and matches.
 //
 // FTS5 has no Russian stemmer, so stems are computed here and stored pre-tokenized. Bare numbers, versions, ports
-// and addresses are dropped: matching "Go 1.27" against notes recalls notes about other versions. An uppercase
-// ticket key such as PROJ-1234, #123 or !45 is kept as one exact term, because a ticket is a precise anchor and
-// losing its number loses the fact. A versioned name such as PostgreSQL-16 is not a ticket: its word stays in the
-// index and only the number is dropped.
+// and addresses become one exact term each, so "Go 1.27" never matches notes about other versions; with
+// MEMCUE_NUMBER_TERMS=0 they are dropped instead. An uppercase ticket key such as PROJ-1234, #123 or !45 is kept as
+// one exact term, because a ticket is a precise anchor and losing its number loses the fact. A versioned name such as
+// PostgreSQL-16 is not a ticket: its word stays an ordinary word next to the number.
 package text
 
 import (
@@ -93,10 +93,16 @@ func Query(term string) string {
 func isCyrillic(r rune) bool { return r >= 'а' && r <= 'я' }
 
 // NumbersEnabled reports whether bare numbers, versions, ports and addresses are indexed as one exact term
-// instead of being dropped. Off by default: the word-only index is the shipped behaviour. With
-// MEMCUE_NUMBER_TERMS=1 the term is exact ("nm1x27" never matches "nm1x20"), so it can only add candidates and
-// rank the prompt's own version above the others.
-func NumbersEnabled() bool { return os.Getenv("MEMCUE_NUMBER_TERMS") == "1" }
+// instead of being dropped. On by default: the term is exact ("nm1x27" never matches "nm1x20"), so it can only add
+// candidates and rank the prompt's own version above the others. MEMCUE_NUMBER_TERMS=0 (or false, off, no) keeps
+// the word-only index of the releases before it.
+func NumbersEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MEMCUE_NUMBER_TERMS"))) {
+	case "0", "false", "off", "no":
+		return false
+	}
+	return true
+}
 
 // words splits s into words, taking ticket keys out first so their number survives. Tickets are recognized on the
 // original text: only an uppercase key is one, so a versioned name such as PostgreSQL-16 stays an ordinary word and

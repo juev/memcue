@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// With MEMCUE_NUMBER_TERMS=1 a version, a date or a versioned address is one exact term instead of a dropped
-// number: the prompt's own version has to reach the index, and "1.27" must never match "1.20".
-func TestNumberTermsWhenEnabled(t *testing.T) {
-	t.Setenv("MEMCUE_NUMBER_TERMS", "1")
+// By default a version, a date or a versioned address is one exact term instead of a dropped number: the prompt's
+// own version has to reach the index, and "1.27" must never match "1.20".
+func TestNumberTermsByDefault(t *testing.T) {
+	t.Setenv("MEMCUE_NUMBER_TERMS", "")
 	cases := []struct{ in, want string }{
 		{"Go 1.27", "nm1x27"},
 		{"v0.22.2", "nmv0x22x2"},
@@ -21,6 +21,9 @@ func TestNumberTermsWhenEnabled(t *testing.T) {
 			t.Errorf("Stems(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
+	if got := Terms("0.17.4"); !slices.Equal(got, []string{"nm0x17x4"}) {
+		t.Errorf("Terms(0.17.4) = %q, want the version alone", got)
+	}
 	if got := Terms("v0.22.2"); !slices.Equal(got, []string{"nmv0x22x2"}) {
 		t.Errorf("Terms(v0.22.2) = %q, want the version alone", got)
 	}
@@ -30,13 +33,18 @@ func TestNumberTermsWhenEnabled(t *testing.T) {
 	}
 }
 
-// Off by default: the shipped index holds no numbers, so an ordinary prompt about a version finds nothing by it.
-func TestNumberTermsOffByDefault(t *testing.T) {
-	if got := Terms("Go 1.27"); slices.ContainsFunc(got, IsNumberTerm) {
-		t.Errorf("number term appeared with the flag off: %q", got)
-	}
-	if got := Terms("0.17.4"); len(got) != 0 {
-		t.Errorf("Terms(0.17.4) = %q, want nothing", got)
+// MEMCUE_NUMBER_TERMS=0 keeps the word-only lexer: the same inputs yield no number at all.
+func TestNumberTermsOptOut(t *testing.T) {
+	for _, off := range []string{"0", "false", "OFF", "No"} {
+		t.Run(off, func(t *testing.T) {
+			t.Setenv("MEMCUE_NUMBER_TERMS", off)
+			if got := Terms("Go 1.27"); !slices.Equal(got, []string{"go"}) {
+				t.Errorf("Terms(Go 1.27) = %q, want the word alone", got)
+			}
+			if got := Terms("0.17.4"); len(got) != 0 {
+				t.Errorf("Terms(0.17.4) = %q, want nothing", got)
+			}
+		})
 	}
 }
 
