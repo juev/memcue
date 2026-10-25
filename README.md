@@ -274,7 +274,7 @@ came from). See [Projects](#projects) for how a project is named. A fact of `kin
 says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash
-memcue search -json postgres port    # find facts and their IDs, best first (a JSON array with -json; -n N, default 10)
+memcue search -json postgres port    # find facts and their IDs, best first (a JSON array with -json; -n N, default 5)
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
 memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
@@ -287,6 +287,8 @@ memcue vet                           # decide it: approve what belongs in the ba
 memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
 memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
+memcue reindex -dry-run              # index rows against the live facts, and how many lack their number term
+memcue reindex                       # rebuild the index from the live facts (-json for one JSON object)
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
 memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base)
 memcue dream -apply answer.json      # check and carry out the model's answer to it

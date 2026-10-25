@@ -15,6 +15,7 @@ func TestNumberTermsByDefault(t *testing.T) {
 		{"2026-10-19", "nm2026x10x19"},
 		{"(v1.2.3)", "nmv1x2x3"},
 		{"memcue 0.17.4 вышел", "nm0x17x4"},
+		{"проверять `dig @1.1.1.1`", "nm1x1x1x1"},
 	}
 	for _, c := range cases {
 		if got := Stems(c.in); !slices.Contains(got, c.want) {
@@ -26,6 +27,16 @@ func TestNumberTermsByDefault(t *testing.T) {
 	}
 	if got := Terms("v0.22.2"); !slices.Equal(got, []string{"nmv0x22x2"}) {
 		t.Errorf("Terms(v0.22.2) = %q, want the version alone", got)
+	}
+	// An address after @ is its own exact term: the prompt naming it finds the fact, a neighbour address does not.
+	if got := Terms("dig @1.1.1.1"); !slices.Equal(got, []string{"dig", "nm1x1x1x1"}) {
+		t.Errorf("Terms(dig @1.1.1.1) = %q", got)
+	}
+	if got := Terms("1.1.1.1"); !slices.Equal(got, []string{"nm1x1x1x1"}) {
+		t.Errorf("Terms(1.1.1.1) = %q, want the address alone", got)
+	}
+	if got := Stems("dig @1.1.1.10"); slices.Contains(got, "nm1x1x1x1") {
+		t.Errorf("Stems(dig @1.1.1.10) = %q holds the term of 1.1.1.1", got)
 	}
 	// The word next to the version still stems as usual.
 	if got := Terms("Go 1.27"); !slices.Equal(got, []string{"go", "nm1x27"}) {
@@ -54,6 +65,7 @@ func TestNumberTermShape(t *testing.T) {
 		"\tv0.22.2":   "nmv0x22x2",
 		"(1.27":       "nm1x27",
 		"'0.5.2":      "nm0x5x2",
+		"@1.1.1.1":    "nm1x1x1x1",
 	}
 	for in, want := range cases {
 		if got := numberTerm(in); got != want {

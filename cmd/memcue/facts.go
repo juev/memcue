@@ -434,11 +434,81 @@ func runFacts(out io.Writer) error {
 	})
 }
 
+// reindexReport is what reindex prints: the index against the live facts before and, unless -dry-run, after the
+// rebuild. Unnumbered is how many live facts whose text gives a numeric term have an index row without one, the
+// rows a rebuild would fix (#383).
+type reindexReport struct {
+	DryRun           bool `json:"dry_run"`
+	Live             int  `json:"live"`
+	RowsBefore       int  `json:"rows_before"`
+	RowsAfter        *int `json:"rows_after,omitempty"`
+	NumberedBefore   int  `json:"numbered_before"`
+	NumberedAfter    *int `json:"numbered_after,omitempty"`
+	UnnumberedBefore int  `json:"unnumbered_before"`
+	UnnumberedAfter  *int `json:"unnumbered_after,omitempty"`
+}
+
+// runReindex rebuilds the index from the live facts and says what changed. The counts before are read without
+// Open, which repairs an index it finds incomplete: through it the report would show the repaired index, and
+// -dry-run would rebuild.
+func runReindex(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("reindex", flag.ContinueOnError)
+	dryRun := fs.Bool("dry-run", false, "print the counts and what a rebuild would fix, rebuilding nothing")
+	asJSON := fs.Bool("json", false, "print one JSON object instead of lines")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	ro, err := store.OpenReadOnly(factsPath())
+	if err != nil {
+		return err
+	}
+	before, err := ro.IndexStats()
+	if cerr := ro.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err
+	}
+	r := reindexReport{DryRun: *dryRun, Live: before.Live, RowsBefore: before.Rows, NumberedBefore: before.Numbered,
+		UnnumberedBefore: before.Unnumbered}
+	if !*dryRun {
+		err := withStore(func(s *store.Store) error {
+			if err := s.Rebuild(); err != nil {
+				return err
+			}
+			after, err := s.IndexStats()
+			if err != nil {
+				return err
+			}
+			r.Live, r.RowsAfter, r.NumberedAfter, r.UnnumberedAfter = after.Live, &after.Rows, &after.Numbered,
+				&after.Unnumbered
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if *asJSON {
+		return json.NewEncoder(out).Encode(r)
+	}
+	if *dryRun {
+		_, err = fmt.Fprintf(out, "live facts: %d\nindex rows: %d\nrows with a number term: %d\n"+
+			"live facts with a number but no number term: %d\n", r.Live, r.RowsBefore, r.NumberedBefore,
+			r.UnnumberedBefore)
+		return err
+	}
+	_, err = fmt.Fprintf(out, "live facts: %d\nindex rows: %d -> %d\nrows with a number term: %d -> %d\n",
+		r.Live, r.RowsBefore, *r.RowsAfter, r.NumberedBefore, *r.NumberedAfter)
+	return err
+}
+
 // runSearch lists the facts holding any word of the text, best first, with their IDs: how the agent reads its memory
 // (#361), and the way to find the fact to correct or retire. It has no threshold: the agent reads what it asked for.
 func runSearch(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
-	n := fs.Int("n", 10, "how many facts")
+	// Five is the measured point (#372, confirmed on a live base): ten facts halve the useful share and double the
+	// noise. Every surface hands over five unless the caller asks for more (#384).
+	n := fs.Int("n", 5, "how many facts")
 	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
 	cwd := fs.String("cwd", ".", "session working directory: facts of its repository win ties")
 	session := fs.String("session", "", "session id for the search log")

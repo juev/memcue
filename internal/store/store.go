@@ -383,7 +383,7 @@ func (s *Store) ensureIndex() error {
 			return err
 		}
 		if missing == 0 && stale == 0 {
-			numbers, err := s.numbersMissing()
+			numbers, err := s.numbersIncomplete()
 			if err != nil {
 				return err
 			}
@@ -395,29 +395,87 @@ func (s *Store) ensureIndex() error {
 	return s.Rebuild()
 }
 
-// numbersMissing reports whether the index has no numeric terms while the base holds versions and dates and
-// number terms are on (the default). Such an index was built before the terms existed, or with
-// MEMCUE_NUMBER_TERMS=0, and a prompt naming a version would be answered with nothing until Rebuild puts them in:
-// the counts match, so nothing else would notice.
-func (s *Store) numbersMissing() (bool, error) {
+// numbersIncomplete reports whether a live fact whose text gives a numeric term has an index row without one, with
+// number terms on (the default). Such a row was written before the terms existed, or with MEMCUE_NUMBER_TERMS=0, and
+// a prompt naming its version is answered with nothing until Rebuild puts the term in. The row counts match, so
+// ensureIndex sees nothing else wrong; and one numbered row proves nothing about the others, since a base indexed
+// before 0.10.0 gets its first term from the next fact it stores (#383).
+func (s *Store) numbersIncomplete() (bool, error) {
 	if !text.NumbersEnabled() {
 		return false, nil
 	}
-	var indexed int
-	if err := s.db.QueryRow(`SELECT count(*) FROM fact_index WHERE instr(stems, ' nm') > 0`).Scan(&indexed); err != nil {
-		return false, err
-	}
-	if indexed > 0 {
-		return false, nil
-	}
-	var numbered int
-	err := s.db.QueryRow(`SELECT count(*) FROM facts f
+	n, err := s.unnumbered()
+	return n > 0, err
+}
+
+// unnumbered counts the live facts whose text gives a numeric term while their index row, if any, has none. Only
+// a fact whose text has a digit, a separator and a digit can give one, so SQL cuts the set to those before the
+// lexer runs: opening a base does not stem every fact.
+func (s *Store) unnumbered() (int, error) {
+	kw, q, review := s.col("f", "keywords"), s.col("f", "queries"), s.col("f", "review")
+	rows, err := s.db.Query(`SELECT f.content, `+kw+`, `+q+`, coalesce(i.stems, '') FROM facts f
+		LEFT JOIN fact_index i ON i.id = f.id
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
-			AND f.review IN ('', 'provisional') AND f.content GLOB '*[0-9].[0-9]*'`, Active).Scan(&numbered)
+			AND `+review+` IN ('', 'provisional')
+			AND (f.content || char(10) || `+kw+` || char(10) || `+q+`) GLOB '*[0-9][-.:/][0-9]*'`, Active)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	return numbered > 0, nil
+	defer func() { _ = rows.Close() }()
+	n := 0
+	for rows.Next() {
+		var content, keywords, queries, stems string
+		if err := rows.Scan(&content, &keywords, &queries, &stems); err != nil {
+			return 0, err
+		}
+		if hasNumberTerm(text.Stems(content+"\n"+keywords+"\n"+queries)) && !hasNumberTerm(strings.Fields(stems)) {
+			n++
+		}
+	}
+	return n, rows.Err()
+}
+
+func hasNumberTerm(terms []string) bool {
+	return slices.ContainsFunc(terms, text.IsNumberTerm)
+}
+
+// IndexStats is the state of the index against the live facts: what `memcue reindex` reports.
+type IndexStats struct {
+	Live       int // live facts: active and approved or provisional, the ones Search reads
+	Rows       int // rows of fact_index
+	Numbered   int // rows carrying a numeric term
+	Unnumbered int // live facts whose text gives a numeric term while their row has none
+}
+
+// IndexStats counts the index against the live facts. It reads every index row, so it is for an explicit command,
+// not for Open.
+func (s *Store) IndexStats() (IndexStats, error) {
+	var st IndexStats
+	if err := s.db.QueryRow(`SELECT count(*) FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
+			AND `+s.col("f", "review")+` IN ('', 'provisional')`, Active).Scan(&st.Live); err != nil {
+		return st, err
+	}
+	rows, err := s.db.Query(`SELECT stems FROM fact_index`)
+	if err != nil {
+		return st, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var stems string
+		if err := rows.Scan(&stems); err != nil {
+			return st, err
+		}
+		st.Rows++
+		if hasNumberTerm(strings.Fields(stems)) {
+			st.Numbered++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return st, err
+	}
+	st.Unnumbered, err = s.unnumbered()
+	return st, err
 }
 
 // Close closes the base.
@@ -1028,6 +1086,14 @@ func (s *Store) cols(alias string) string {
 		}
 	}
 	return strings.Join(out, ", ")
+}
+
+// col is one column of facts under alias, or its default when the base lacks it.
+func (s *Store) col(alias, c string) string {
+	if def, missing := s.absent[c]; missing {
+		return def
+	}
+	return alias + "." + c
 }
 
 func (s *Store) query(q string, args ...any) ([]Fact, error) {

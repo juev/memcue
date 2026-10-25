@@ -17,6 +17,11 @@ func env(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "facts.db"))
+	// The gateway's own environment carries these; a test that asks whether a log is off by default must not
+	// inherit the flag of the shell that runs it (the same reason the suite is run with env -u MEMCUE_*).
+	t.Setenv("MEMCUE_SEARCH_LOG", "")
+	t.Setenv("MEMCUE_USAGE_LOG", "")
+	t.Setenv("MEMCUE_NUMBER_TERMS", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	// The tests pin the historical layout; the per-base subdirectory has its own test.
