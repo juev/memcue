@@ -96,6 +96,30 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 		rec.Error = err.Error()
 		return nil, rec
 	}
+	var lines []vetLine
+	// A mirror of the built-in memory is approved when it is written (#440), so nothing would ever retire it once its
+	// note is gone unless this pass does: the note is the source of truth, and a copy that outlives it is wrong.
+	live := approved[:0:0]
+	memory, haveMemory := memoryNotes(o.memory)
+	stale := 0
+	for _, f := range approved {
+		if f.Source != "memory" || !haveMemory || vet.HoldsNote(memory, f.Content) {
+			live = append(live, f)
+			continue
+		}
+		stale++
+		if !o.dry {
+			if _, err := s.Retire(f.ID); err != nil {
+				rec.Error = err.Error()
+				continue
+			}
+		}
+		lines = append(lines, vetLine{Time: rec.Time, ID: f.ID, Decision: "retired", Verdict: string(vet.Drop),
+			By: "rule", Reason: "stale mirror: the built-in memory no longer holds it", Source: f.Source,
+			Content: clip(f.Content, 200)})
+	}
+	rec.SuspectsRetired += stale
+	approved = live
 	k := knownSelf()
 	var todo []vet.Suspect
 	for _, sp := range vet.Suspects(approved, k, now) {
@@ -104,7 +128,6 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 		}
 	}
 	rec.Suspects = len(todo)
-	var lines []vetLine
 	line := func(sp vet.Suspect, decision, verdict, by, reason string) vetLine {
 		return vetLine{Time: rec.Time, ID: sp.Fact.ID, Decision: decision, Verdict: verdict, By: by,
 			Reason: "suspect: " + strings.Join(sp.Evidence, "; ") + reason, Source: sp.Fact.Source,
