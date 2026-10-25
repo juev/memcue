@@ -46,3 +46,42 @@ func TestSearchHandsOverWhatFits(t *testing.T) {
 		t.Errorf("a query nothing fits printed %q", out.String())
 	}
 }
+
+// The flags of #409 reach the search: -kind and -in narrow it, -all-words requires each word, and a wrong value
+// fails before the base is opened.
+func TestSearchFlags(t *testing.T) {
+	env(t)
+	rule := addFactForTest(t, "-origin", "x 2026-10-25", "-kind", "rule", "-scope", "global", "nats держим на 4222.")
+	pit := addFactForTest(t, "-origin", "x 2026-10-25", "-kind", "pitfall", "-scope", "repo:example.com/them/lib",
+		"nats на db1 падает без памяти.")
+	ids := func(args ...string) []string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runSearch(append([]string{"-json"}, args...), &out); err != nil {
+			t.Fatal(err)
+		}
+		var facts []struct{ ID string }
+		if err := json.Unmarshal(out.Bytes(), &facts); err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for _, f := range facts {
+			ids = append(ids, f.ID)
+		}
+		return ids
+	}
+	if got := ids("-min-score", "0", "nats"); len(got) != 1 || got[0] != rule {
+		t.Errorf("default: %q, want the rule alone: the pitfall belongs to another repository", got)
+	}
+	if got := ids("-min-score", "0", "-in", "all", "-kind", "pitfall", "nats"); len(got) != 1 || got[0] != pit {
+		t.Errorf("-in all -kind pitfall: %q, want the pitfall", got)
+	}
+	if got := ids("-in", "all", "-all-words", "nats db1"); len(got) != 1 || got[0] != pit {
+		t.Errorf("-all-words: %q, want the fact with both words", got)
+	}
+	for _, bad := range [][]string{{"-in", "everywhere"}, {"-kind", "wish"}, {"-since", "yesterday"}} {
+		if err := runSearch(append(bad, "nats"), &bytes.Buffer{}); err == nil {
+			t.Errorf("%q: want an error", bad)
+		}
+	}
+}

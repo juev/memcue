@@ -1231,8 +1231,76 @@ type Hit struct {
 	BM25  float64
 }
 
+// Filter narrows Search (#409). Its zero value keeps every active fact that holds any of the terms.
+type Filter struct {
+	AllTerms bool     // a fact must hold every term, not any of them
+	Kinds    []string // only facts of these kinds
+	Since    string   // only facts created at or after this UTC instant, "2006-01-02T15:04:05"
+	Today    string   // leaves out facts that expired before this day; empty keeps them
+	// Scopes and Origins keep a fact whose scope is one of Scopes (case aside) or whose origin starts with one of
+	// Origins and a space; both empty keep every fact.
+	Scopes  []string
+	Origins []string
+	// OtherRepos, when set, leaves out a fact bound to a repository (scope "repo:KEY") whose KEY is not in Repos.
+	OtherRepos bool
+	Repos      []string
+}
+
+// where returns the SQL conditions of f over facts under alias, with their arguments.
+func (s *Store) where(alias string, f Filter) (string, []any) {
+	var conds []string
+	var args []any
+	if len(f.Kinds) > 0 {
+		conds = append(conds, s.col(alias, "kind")+" IN ("+marks(len(f.Kinds))+")")
+		for _, k := range f.Kinds {
+			args = append(args, k)
+		}
+	}
+	if f.Since != "" {
+		conds = append(conds, "substr("+alias+".created, 1, 19) >= ?")
+		args = append(args, f.Since)
+	}
+	if f.Today != "" {
+		conds = append(conds, "("+s.col(alias, "expires")+" = '' OR "+s.col(alias, "expires")+" >= ?)")
+		args = append(args, f.Today)
+	}
+	scope := "lower(" + s.col(alias, "scope") + ")"
+	if len(f.Scopes)+len(f.Origins) > 0 {
+		var or []string
+		for _, sc := range f.Scopes {
+			or = append(or, scope+" = ?")
+			args = append(args, strings.ToLower(sc))
+		}
+		for _, o := range f.Origins {
+			or = append(or, "substr("+alias+".origin, 1, ?) = ?")
+			args = append(args, len(o)+1, o+" ")
+		}
+		conds = append(conds, "("+strings.Join(or, " OR ")+")")
+	}
+	if f.OtherRepos {
+		cond := scope + " NOT LIKE 'repo:%'"
+		for _, r := range f.Repos {
+			cond += " OR " + scope + " = ?"
+			args = append(args, strings.ToLower("repo:"+r))
+		}
+		conds = append(conds, "("+cond+")")
+	}
+	if len(conds) == 0 {
+		return "", nil
+	}
+	return " AND " + strings.Join(conds, " AND "), args
+}
+
+func marks(n int) string { return strings.TrimSuffix(strings.Repeat("?, ", n), ", ") }
+
 // Search returns up to limit active facts holding any of the terms, best BM25 first.
 func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
+	return s.SearchFiltered(terms, limit, Filter{})
+}
+
+// SearchFiltered is Search narrowed by f. The filter runs in the database, before the limit, so a narrow search
+// still gets limit facts when the base holds them.
+func (s *Store) SearchFiltered(terms []string, limit int, f Filter) ([]Hit, error) {
 	if len(terms) == 0 {
 		return nil, nil
 	}
@@ -1240,10 +1308,16 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 	for i, t := range terms {
 		q[i] = text.Query(t)
 	}
+	join := " OR "
+	if f.AllTerms {
+		join = " AND "
+	}
+	cond, args := s.where("f", f)
 	rows, err := s.db.Query(`SELECT i.stems, bm25(fact_fts), `+s.cols("f")+`
 		FROM fact_fts JOIN fact_index i ON i.rid = fact_fts.rowid
 		JOIN facts f ON f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = i.id)
-		WHERE fact_fts MATCH ? ORDER BY bm25(fact_fts) LIMIT ?`, strings.Join(q, " OR "), limit)
+		WHERE fact_fts MATCH ?`+cond+` ORDER BY bm25(fact_fts) LIMIT ?`,
+		append(append([]any{strings.Join(q, join)}, args...), limit)...)
 	if err != nil {
 		return nil, err
 	}

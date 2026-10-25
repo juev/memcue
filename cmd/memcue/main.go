@@ -94,7 +94,7 @@ commands:
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-cwd DIR] [-session ID] [-event E] [-min-chars N]
-  search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-json] [-cwd DIR] [-session ID] TEXT
+  search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S] -- TEXT
   candidates list the facts that wait for approval: memcue candidates [-json]
   vet       decide the candidates without asking: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]

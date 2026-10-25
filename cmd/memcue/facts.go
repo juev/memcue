@@ -512,19 +512,31 @@ func runSearch(args []string, out io.Writer) error {
 	n := fs.Int("n", 5, "the most facts to return; fewer come when the rest do not fit")
 	minScore := fs.Float64("min-score", recall.MinScore,
 		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
+	in := fs.String("in", "", "where to look, comma-separated: project (this repository), global, host (this machine), "+
+		"all, or a scope such as repo:KEY, host:NAME, service:NAME (default: all but facts of other repositories)")
+	kind := fs.String("kind", "", "only facts of these kinds, comma-separated: "+strings.Join(recall.Kinds, ", "))
+	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
+	expired := fs.Bool("expired", false, "include facts whose expiry has passed")
+	allWords := fs.Bool("all-words", false, "a fact must hold every word of the query, not any of them")
 	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
-	cwd := fs.String("cwd", ".", "session working directory: facts of its repository win ties")
+	cwd := fs.String("cwd", ".", "session working directory: its repository is the project, and its facts win ties")
 	session := fs.String("session", "", "session id for the search log")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	query := strings.Join(fs.Args(), " ")
+	q := recall.Query{Text: strings.Join(fs.Args(), " "), N: *n, MinScore: *minScore,
+		Project: tier.Keys(*cwd, claudeDir()), Host: currentHost(), In: splitKeywords(*in), Kinds: splitKeywords(*kind), Since: *since,
+		Expired: *expired, AllWords: *allWords}
+	if _, err := q.Filter(); err != nil {
+		return err
+	}
 	return withStore(func(s *store.Store) error {
 		start := time.Now()
-		hits, err := recall.Search(s, query, tier.Keys(*cwd, claudeDir()), currentHost(), *n, *minScore)
+		hits, err := recall.Search(s, q)
 		if err != nil {
 			return err
 		}
+		query := q.Text
 		logSearch(*session, *cwd, query, hits, time.Since(start))
 		if *asJSON {
 			return json.NewEncoder(out).Encode(searchJSON(hits))
