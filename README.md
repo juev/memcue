@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.13.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.14.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.14.0 | 5 | 0.14.0 | 0.14.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.14.0 (`hermes-agent` 0.15.2) |
 | 0.13.0 | 5 | 0.13.0 | 0.13.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.13.0 (`hermes-agent` 0.15.2) |
 | 0.12.0 | 5 | 0.12.0 | 0.12.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.12.0 (`hermes-agent` 0.15.2) |
 | 0.11.1 | 5 | 0.11.1 | 0.11.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.1 (`hermes-agent` 0.15.2) |
@@ -167,6 +168,20 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.14.0: a dream over the whole base, and search hands over only what fits (#405, #407)
+
+- `memcue dream -run -all` answers packet after packet until the base has no work left, so the translations of
+  0.12.0 need not wait for three days of hourly dreams. It uses the endpoint when `MEMCUE_API_URL` is set and
+  `claude -p` on `MEMCUE_MODEL` (default Opus) otherwise. It stops when the work is done, after three passes that
+  change nothing, or after 200 passes, and `dream.log` records each pass with its cost (#405).
+- `memcue search -n` is now a maximum, five by default. A fact whose BM25 score is under 0.6 of the best fact's is
+  left out; `-min-score` sets another share, `-min-score 0` turns the floor off. On 35 queries that agents wrote,
+  the floor removed a third of the unrelated facts, kept a useful fact for every query that had one and cut the
+  characters per search by 17% ([search-floor-2026-10](docs/research/search-floor-2026-10.md), #407). A search that
+  finds nothing prints "No stored facts match." The session note and the search tools of the Hermes and DSH plugins
+  say so.
+- No schema change.
 
 ### 0.13.0: Hermes runs the dream itself (#401)
 
