@@ -827,6 +827,28 @@ test('memcue_search passes the session cwd and id for the tie order and the sear
 	assert.ok(text.includes(`arg: search -json -n 5 -cwd /repo/demo -session ${memcueSessionId('session:7')} -- harness base`), text)
 })
 
+test('memcue_search passes the search controls (#409)', async () => {
+	const log = join(dir, 'search-015.log')
+	const binary = join(dir, 'memcue-015.sh')
+	await writeFile(binary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"0.15.0"}\\n' ;;
+  search) printf '%s\\n' "$*" >> "${log}"; printf '[]\\n' ;;
+esac
+exit 0
+`)
+	await chmod(binary, 0o755)
+	const { tools } = mount({ binary })
+	await tools.get('memcue_search').execute({ query: 'harness base', in: 'project,host', kind: 'rule,decision', since: '2026-10-01', expired: true, words: 'all', min_score: 0 }, {})
+	assert.equal((await readFile(log, 'utf8')).trim(), `search -json -n 5 -cwd ${process.cwd()} -in project,host -kind rule,decision -since 2026-10-01 -min-score 0 -expired -all-words -- harness base`)
+	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', words: 'some' }, {}), /words must be all or any/)
+})
+
+test('memcue_search refuses the controls on a binary older than 0.15.0', async () => {
+	const { tools } = mount()
+	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', kind: 'rule' }, {}), /need memcue 0\.15\.0/)
+})
+
 test('memcue_search gives a binary older than 0.8.0 only the flags it knows (#368)', async () => {
 	const oldLog = join(dir, 'search-070.log')
 	const oldBinary = join(dir, 'memcue-070.sh')
