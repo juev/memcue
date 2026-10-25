@@ -32,7 +32,7 @@ func TestSearchOrdersTiesByHostProjectGlobal(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := Search(s, "nats", []string{"example.com/me/app"}, "mac", 10)
+	got, err := Search(s, "nats", []string{"example.com/me/app"}, "mac", 10, MinScore)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestSearchAnyProjectKeyWinsTies(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := Search(s, "брокер nats", []string{"example.com/me/fork", "example.com/them/upstream"}, "", 10)
+	got, err := Search(s, "брокер nats", []string{"example.com/me/fork", "example.com/them/upstream"}, "", 10, MinScore)
 	if err != nil || len(got) != 2 || got[0].BM25 != got[1].BM25 {
 		t.Fatalf("want a tie of two, got %+v %v", got, err)
 	}
@@ -75,7 +75,7 @@ func TestSearchCutKeepsTheTieWinner(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := Search(s, "nats", nil, "mac", 1)
+	got, err := Search(s, "nats", nil, "mac", 1, MinScore)
 	if err != nil || len(got) != 1 || got[0].Scope != "host:mac" {
 		t.Fatalf("got %+v %v, want the host's fact", got, err)
 	}
@@ -84,7 +84,7 @@ func TestSearchCutKeepsTheTieWinner(t *testing.T) {
 // A query of one word finds its fact: the agent wrote it, and the term floors of Recall would silence it.
 func TestSearchHasNoGates(t *testing.T) {
 	s := setup(t)
-	got, err := Search(s, "gradle", nil, "", 10)
+	got, err := Search(s, "gradle", nil, "", 10, MinScore)
 	if err != nil || len(got) == 0 {
 		t.Fatalf("got %+v %v, want the gradle fact", got, err)
 	}
@@ -92,7 +92,36 @@ func TestSearchHasNoGates(t *testing.T) {
 
 func TestSearchNoRoomFindsNothing(t *testing.T) {
 	s := setup(t)
-	if got, err := Search(s, "gradle", nil, "", 0); err != nil || got != nil {
+	if got, err := Search(s, "gradle", nil, "", 0, MinScore); err != nil || got != nil {
 		t.Fatalf("got %+v %v", got, err)
+	}
+}
+
+// n is a maximum (#407): a fact far below the best one does not fit the query and is left out, so a query that one
+// fact answers gets that fact alone, while minScore 0 hands over every fact up to n as before.
+func TestSearchLeavesOutWhatDoesNotFit(t *testing.T) {
+	s := emptyBase(t)
+	if _, err := s.Add("Брокер nats на db1 слушает порт 4222, мониторинг nats на 8222, кластер nats из трёх узлов.",
+		[]string{"nats", "брокер"}, "x 2026-09-10"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []string{"Порт postgres на db1 — 5432.", "На db1 стоит node_exporter.", "db1 перезагружали в среду."} {
+		if _, err := s.Add(c, nil, "x 2026-09-10"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Search(s, "брокер nats db1", nil, "", 5, MinScore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Keywords[0] != "nats" {
+		t.Fatalf("got %d facts %+v, want the nats fact alone", len(got), got)
+	}
+	all, err := Search(s, "брокер nats db1", nil, "", 5, 0)
+	if err != nil || len(all) != 4 {
+		t.Fatalf("minScore 0: got %d facts %v, want all four", len(all), err)
+	}
+	if few, err := Search(s, "брокер nats db1", nil, "", 2, 0); err != nil || len(few) != 2 {
+		t.Fatalf("n 2: got %d facts %v, want two", len(few), err)
 	}
 }

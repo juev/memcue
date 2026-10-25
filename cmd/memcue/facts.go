@@ -502,13 +502,16 @@ func runReindex(args []string, out io.Writer) error {
 	return err
 }
 
-// runSearch lists the facts holding any word of the text, best first, with their IDs: how the agent reads its memory
-// (#361), and the way to find the fact to correct or retire. It has no threshold: the agent reads what it asked for.
+// runSearch lists the facts that fit the text, best first, with their IDs: how the agent reads its memory (#361), and
+// the way to find the fact to correct or retire. -n is the most it returns; a fact far below the best one does not fit
+// and is left out (#407), so one fitting fact comes alone and none says so.
 func runSearch(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	// Five is the measured point (#372, confirmed on a live base): ten facts halve the useful share and double the
 	// noise. Every surface hands over five unless the caller asks for more (#384).
-	n := fs.Int("n", 5, "how many facts")
+	n := fs.Int("n", 5, "the most facts to return; fewer come when the rest do not fit")
+	minScore := fs.Float64("min-score", recall.MinScore,
+		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
 	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
 	cwd := fs.String("cwd", ".", "session working directory: facts of its repository win ties")
 	session := fs.String("session", "", "session id for the search log")
@@ -518,13 +521,17 @@ func runSearch(args []string, out io.Writer) error {
 	query := strings.Join(fs.Args(), " ")
 	return withStore(func(s *store.Store) error {
 		start := time.Now()
-		hits, err := recall.Search(s, query, tier.Keys(*cwd, claudeDir()), currentHost(), *n)
+		hits, err := recall.Search(s, query, tier.Keys(*cwd, claudeDir()), currentHost(), *n, *minScore)
 		if err != nil {
 			return err
 		}
 		logSearch(*session, *cwd, query, hits, time.Since(start))
 		if *asJSON {
 			return json.NewEncoder(out).Encode(searchJSON(hits))
+		}
+		if len(hits) == 0 {
+			_, err := fmt.Fprintln(out, "No stored facts match.")
+			return err
 		}
 		for _, h := range hits {
 			if _, err := fmt.Fprintln(out, strings.Join(strings.Fields(h.ID+" "+h.Origin+" | "+h.Content), " ")); err != nil {

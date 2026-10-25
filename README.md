@@ -9,7 +9,9 @@ through hooks:
   agent would not think to search for still reaches it.
 - **When the agent needs something from earlier sessions** it runs `memcue search` itself, with its own words:
   synonyms, the system's name, both languages. Nothing is injected with a prompt (#361): the agent's own queries
-  answered more questions right than facts matched to the prompt's words (see [Results](#results)).
+  answered more questions right than facts matched to the prompt's words (see [Results](#results)). A search returns
+  at most five facts, and only those that fit: a fact whose BM25 is below 0.6 of the best one's is left out, so a
+  query one fact answers gets that fact alone (#407, [search-floor](docs/research/search-floor-2026-10.md)).
 - **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
   will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
   added; nothing is compared or overwritten.
@@ -338,7 +340,8 @@ came from). See [Projects](#projects) for how a project is named. A fact of `kin
 says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash
-memcue search -json postgres port    # find facts and their IDs, best first (a JSON array with -json; -n N, default 5)
+memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
+memcue search -min-score 0 postgres  # every fact up to -n, the floor off
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
 memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
