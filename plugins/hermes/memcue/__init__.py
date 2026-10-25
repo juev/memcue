@@ -24,6 +24,9 @@ Config, all optional (``memory.memcue`` in config.yaml):
           applies to a RESULT block; 0 turns tool output off). Tool output is kept because a fact whose source is a
           tool can only quote its evidence from a RESULT block, and memcue's write policy drops it without one
   extract_max_message_chars: cut a message to this many characters before extraction (default 4000)
+  shelf: the shelf an extracted fact goes to when its evidence is quoted from a tool that reads the outside world
+          (web_extract, a browser, a PDF): stored as shelf:<name>, left out of ordinary search (default research;
+          an empty value turns it off)
   host: name of this machine for fact scope and the search tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   session_card: put the session card (global rules and repository decisions) in the system prompt (default true)
@@ -86,6 +89,8 @@ _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an ol
 _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
 _DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
 _SEARCH_CONTROLS = "0.14.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
+_SHELF = "0.16.0"  # extract-messages -shelf and add -shelf appeared here (#433)
+_DEFAULT_SHELF = "research"  # the one shelf a fact read from a page or a PDF goes to (#433)
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
@@ -280,14 +285,15 @@ SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
-    "the whole base — a chat is not about one repository — and leaves out expired facts; the optional parameters "
-    "narrow or widen that.",
+    "the whole base — a chat is not about one repository — except the shelf, and leaves out expired facts; the "
+    "optional parameters narrow or widen that.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
               "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
               "got is thinner than the question needs.",
      "in": "Optional where to look, comma-separated: all (the default), project (the session's repository only), "
-           "global, host (this machine), or a scope such as repo:KEY, host:NAME, service:NAME.",
+           "global, host (this machine), shelf (facts read from web pages and documents, which no other place "
+           "returns, all included), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:research.",
      "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. "
              "E.g. rule,decision for what was decided.",
      "since": "Optional YYYY-MM-DD: only facts learnt on or after that day.",
@@ -302,7 +308,9 @@ ADD_SCHEMA = _schema(
      "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
                 "omit for a fact that stays true.",
      "kind": "Optional: rule, decision, pitfall or environment. A rule the user stated belongs on the session card.",
-     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project."},
+     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project.",
+     "shelf": "Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with "
+              "in shelf:<name>. For what was read from outside sources; omit scope when you pass it."},
     ["content"])
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",
@@ -347,6 +355,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
         self._tick = _TICK
         self._host = str(self._config.get("host") or "")
+        shelf = self._config.get("shelf", _DEFAULT_SHELF)
+        self._shelf = "" if shelf is None else str(shelf).strip()  # empty turns shelving off
         self._usage_log = _on(self._config.get("usage_log"))
         self._state_dir = _expand_path(str(self._config.get("state_dir") or ""))
         self._tool_result_chars = int(self._config.get("extract_tool_result_chars", _TOOL_RESULT))
@@ -715,6 +725,9 @@ class MemcueMemoryProvider(MemoryProvider):
                "-cwd", self._workspace]
         if event in _FINAL_EVENTS:
             cmd += ["-min-chars", "1"]
+        if self._shelf and _version_at_least(self._version, _SHELF):
+            # A fact quoted from a page or a document goes on the shelf; an older binary would refuse the flag.
+            cmd += ["-shelf", self._shelf]
         return cmd
 
     def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "",
@@ -1295,6 +1308,8 @@ class MemcueMemoryProvider(MemoryProvider):
                 cmd += ["-kind", arg("kind")]
             if arg("scope"):
                 cmd += ["-scope", arg("scope")]
+            if arg("shelf"):
+                cmd += ["-shelf", arg("shelf")]
             ok, out = self._run(cmd + ["--", arg("content")])
         elif tool_name == "memcue_correct":
             if not arg("id") or not arg("content"):

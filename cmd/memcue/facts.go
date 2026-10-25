@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -62,10 +63,23 @@ func splitKeywords(s string) []string {
 var (
 	// kinds are the fact kinds the base understands; the card uses rule and decision.
 	kinds = map[string]bool{"rule": true, "decision": true, "pitfall": true, "environment": true}
-	// reScope is where a fact holds: global, a named host, repository or service, a directory, or bare repo for the
-	// project of the working directory.
-	reScope = regexp.MustCompile(`^(global|repo|host:[^ ]+|repo:[^ ]+|service:[^ ]+|dir:/.+)$`)
+	// reScope is where a fact holds: global, a named host, repository or service, a directory, a shelf, or bare repo
+	// for the project of the working directory.
+	reScope = regexp.MustCompile(`^(global|repo|host:[^ ]+|repo:[^ ]+|service:[^ ]+|dir:/.+|shelf:` + shelfSlug + `)$`)
+	// reShelf is the name of a shelf (#433), the same shape for every one, so a shelf split later needs no new code.
+	reShelf = regexp.MustCompile(`^` + shelfSlug + `$`)
 )
+
+// shelfSlug is the shape of a shelf's name, the part after "shelf:".
+const shelfSlug = `[a-z0-9][a-z0-9-]{0,63}`
+
+// validShelf checks the name of a shelf a caller passes with -shelf.
+func validShelf(cmd, slug string) error {
+	if !reShelf.MatchString(slug) {
+		return fmt.Errorf("%s: -shelf %q must match %s", cmd, slug, reShelf)
+	}
+	return nil
+}
 
 // validKindScope checks the values a caller may pass to add. An empty value means "not stated" and is allowed.
 func validKindScope(kind, scope string) error {
@@ -73,7 +87,11 @@ func validKindScope(kind, scope string) error {
 		return fmt.Errorf("add: unknown -kind %q; use rule, decision, pitfall or environment", kind)
 	}
 	if scope != "" && !reScope.MatchString(scope) {
-		return fmt.Errorf("add: -scope %q must be global, repo, host:<name>, repo:<key>, service:<name> or dir:<path>", scope)
+		if recall.IsShelf(scope) {
+			return fmt.Errorf("add: -scope %q: a shelf is shelf:<slug>, the slug matching %s", scope, reShelf)
+		}
+		return fmt.Errorf("add: -scope %q must be global, repo, host:<name>, repo:<key>, service:<name>, dir:<path> "+
+			"or shelf:<slug>", scope)
 	}
 	return nil
 }
@@ -102,13 +120,23 @@ func runAdd(args []string, out io.Writer) error {
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
 	kind := fs.String("kind", "", "rule, decision, pitfall or environment")
-	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>")
+	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>, shelf:<slug> (read only by a search that names it)")
+	shelf := fs.String("shelf", "", "put it on this shelf: the same as -scope shelf:<slug>")
 	force := fs.Bool("force", false, "store it even when it looks like a secret")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if !sources[*source] {
 		return fmt.Errorf("add: unknown -source %q", *source)
+	}
+	if *shelf != "" {
+		if *scope != "" {
+			return errors.New("add: -shelf and -scope both name where the fact holds; pass one of them")
+		}
+		if err := validShelf("add", *shelf); err != nil {
+			return err
+		}
+		*scope = recall.ShelfPrefix + *shelf
 	}
 	if err := validKindScope(*kind, *scope); err != nil {
 		return err
@@ -514,7 +542,8 @@ func runSearch(args []string, out io.Writer) error {
 	minScore := fs.Float64("min-score", recall.MinScore,
 		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
 	in := fs.String("in", "", "where to look, comma-separated: project (this repository), global, host (this machine), "+
-		"all, or a scope such as repo:KEY, host:NAME, service:NAME (default: project, host and global in a repository, all elsewhere)")
+		"all (every fact off the shelves), shelf (every shelf), or a scope such as repo:KEY, host:NAME, service:NAME, "+
+		"shelf:SLUG (default: project, host and global in a repository, all elsewhere)")
 	kind := fs.String("kind", "", "only facts of these kinds, comma-separated: "+strings.Join(recall.Kinds, ", "))
 	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
 	expired := fs.Bool("expired", false, "include facts whose expiry has passed")
@@ -528,7 +557,8 @@ func runSearch(args []string, out io.Writer) error {
 	q := recall.Query{Text: strings.Join(fs.Args(), " "), N: *n, MinScore: *minScore,
 		Project: tier.Keys(*cwd, claudeDir()), Host: currentHost(), In: splitKeywords(*in), Kinds: splitKeywords(*kind), Since: *since,
 		Expired: *expired, AllWords: *allWords}
-	if _, err := q.Filter(); err != nil {
+	f, err := q.Filter()
+	if err != nil {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
@@ -557,6 +587,11 @@ func runSearch(args []string, out io.Writer) error {
 			if _, err := fmt.Fprintln(out, msg); err != nil {
 				return err
 			}
+			if len(f.ExcludePrefixes) > 0 {
+				if err := shelfHint(out, s, q); err != nil {
+					return err
+				}
+			}
 		}
 		for _, h := range hits {
 			if _, err := fmt.Fprintln(out, strings.Join(strings.Fields(h.ID+" "+h.Origin+" | "+h.Content), " ")); err != nil {
@@ -570,6 +605,34 @@ func runSearch(args []string, out io.Writer) error {
 		}
 		return nil
 	})
+}
+
+// shelfHints is the most shelved facts the hint of an empty search counts, and shelfNames the most shelves it names.
+const (
+	shelfHints = 10
+	shelfNames = 3
+)
+
+// shelfHint follows an empty search that did not read the shelves: when the same words find facts on a shelf, it says
+// how many and which -in reads them (#433), so a fact put away is not a fact lost. Nothing when the shelves hold none.
+func shelfHint(out io.Writer, s *store.Store, q recall.Query) error {
+	q.In, q.N = []string{"shelf"}, shelfHints
+	hits, err := recall.Search(s, q)
+	if err != nil || len(hits) == 0 {
+		return err
+	}
+	var names []string
+	for _, h := range hits {
+		if name := strings.ToLower(h.Scope); !slices.Contains(names, name) && len(names) < shelfNames {
+			names = append(names, name)
+		}
+	}
+	verb := "facts on the shelf match"
+	if len(hits) == 1 {
+		verb = "fact on the shelf matches"
+	}
+	_, err = fmt.Fprintf(out, "%d %s: -in %s\n", len(hits), verb, strings.Join(names, ","))
+	return err
 }
 
 // cjkHint follows the answer to a query in Chinese, Japanese or Korean: the facts are in Russian and English, and a
@@ -615,6 +678,7 @@ type searchFact struct {
 	Content  string   `json:"content"`
 	Keywords []string `json:"keywords,omitempty"`
 	Origin   string   `json:"origin,omitempty"`
+	Scope    string   `json:"scope,omitempty"`
 	Created  string   `json:"created"`
 	Expires  string   `json:"expires,omitempty"`
 }
@@ -622,7 +686,7 @@ type searchFact struct {
 func searchJSON(hits []store.Hit) []searchFact {
 	out := make([]searchFact, 0, len(hits))
 	for _, h := range hits {
-		out = append(out, searchFact{ID: h.ID, Content: h.Content, Keywords: h.Keywords, Origin: h.Origin,
+		out = append(out, searchFact{ID: h.ID, Content: h.Content, Keywords: h.Keywords, Origin: h.Origin, Scope: h.Scope,
 			Created: h.Created.UTC().Format(time.RFC3339), Expires: h.Expires})
 	}
 	return out

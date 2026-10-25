@@ -449,6 +449,37 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("kind=rule", line)
         self.assertIn("scope=global", line)
 
+    def test_add_passes_shelf(self):
+        """memcue_add puts a fact on the shelf: no search reads it but one that names the shelf (#433)."""
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Example API разрешает 60 запросов в минуту на ключ.", "keywords": "example, лимит",
+            "kind": "environment", "shelf": "research"}))
+        fact_id = added["result"].split()[0]
+        line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
+        self.assertIn("scope=shelf:research", line)
+        self.assertEqual(json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит"}))["facts"], [])
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит", "in": "shelf:research"}))
+        self.assertEqual([(f["id"], f.get("scope")) for f in found["facts"]], [(fact_id, "shelf:research")])
+
+    def test_extract_command_carries_the_shelf(self):
+        """Extraction always names the shelf, research by default; an empty value and an older binary drop it."""
+        cmd = self.p._extract_command("memcue", "threshold", "s1")
+        self.assertEqual(cmd[cmd.index("-shelf") + 1], "research")
+        named = memcue_provider.MemcueMemoryProvider({"binary": BIN, "shelf": "papers"})
+        cmd = named._extract_command("memcue", "threshold", "s1")
+        self.assertEqual(cmd[cmd.index("-shelf") + 1], "papers")
+        off = memcue_provider.MemcueMemoryProvider({"binary": BIN, "shelf": ""})
+        self.assertNotIn("-shelf", off._extract_command("memcue", "session_end", "s1"))
+        old = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        old._version = "0.15.0"
+        self.assertNotIn("-shelf", old._extract_command("memcue", "threshold", "s1"))
+
+    def test_search_documents_the_shelf(self):
+        schema = next(s for s in self.p.get_tool_schemas() if s["name"] == "memcue_search")
+        self.assertIn("shelf:research", schema["parameters"]["properties"]["in"]["description"])
+        add = next(s for s in self.p.get_tool_schemas() if s["name"] == "memcue_add")
+        self.assertIn("shelf", add["parameters"]["properties"])
+
     def test_search_returns_facts_with_ids(self):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера.",

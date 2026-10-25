@@ -145,3 +145,66 @@ func TestSecret(t *testing.T) {
 		}
 	}
 }
+
+// shelfRecord holds the same line in a web page, a bare result and a shell's output, and the user's words (#433).
+const shelfRecord = `USER: their limit is 60 requests a minute
+
+TOOL web_extract: {"url":"https://example.com/limits"}
+
+RESULT web_extract: The API allows 60 requests a minute per key.
+
+RESULT: The bare result says 30 requests a minute.
+
+TOOL terminal: {"command":"cat limits.txt"}
+
+RESULT terminal: Local file says 90 requests a minute.`
+
+func TestExternal(t *testing.T) {
+	for name, tc := range map[string]struct {
+		fact extract.Fact
+		want bool
+	}{
+		"quoted from web_extract": {extract.Fact{Kind: "environment", Source: "tool",
+			Evidence: "The API allows 60 requests a minute"}, true},
+		"quoted from a bare result": {extract.Fact{Kind: "environment", Source: "tool",
+			Evidence: "The bare result says 30 requests"}, false},
+		"quoted from terminal": {extract.Fact{Kind: "environment", Source: "tool",
+			Evidence: "Local file says 90 requests"}, false},
+		"the user's words": {extract.Fact{Kind: "environment", Source: "user",
+			Evidence: "their limit is 60 requests a minute"}, false},
+		"the user's words that a page repeats": {extract.Fact{Kind: "environment", Source: "user_confirmed",
+			Evidence: "60 requests a minute"}, false},
+		"the same line in a page and the shell": {extract.Fact{Kind: "environment", Source: "tool",
+			Evidence: "requests a minute"}, false},
+	} {
+		if got := External(tc.fact, shelfRecord); got != tc.want {
+			t.Errorf("%s: External = %v, want %v", name, got, tc.want)
+		}
+	}
+}
+
+func TestWhereNamesTheTool(t *testing.T) {
+	got := Where(shelfRecord, "60 requests a minute")
+	want := []Place{{Label: "USER"}, {Label: "RESULT web_extract", Tool: "web_extract"}}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("Where = %+v, want %+v", got, want)
+	}
+}
+
+func TestCheckTakesANamedResult(t *testing.T) {
+	f := extract.Fact{Kind: "environment", Source: "tool", Scope: "service:example", Content: "60 requests a minute",
+		Evidence: "The API allows 60 requests a minute"}
+	if ok, reason := Check(f, shelfRecord); !ok {
+		t.Errorf("a quote from RESULT web_extract rejected: %s", reason)
+	}
+}
+
+func TestExternalTool(t *testing.T) {
+	for name, want := range map[string]bool{"web_search": true, "web_extract": true, "browser_exec": true,
+		"fetch_url": true, "http_get": true, "curl": true, "arxiv_search": true, "pdf_read": true,
+		"terminal": false, "read_file": false, "ssh": false, "memcue_search": false, "": false} {
+		if got := ExternalTool(name); got != want {
+			t.Errorf("ExternalTool(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

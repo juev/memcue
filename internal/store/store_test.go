@@ -1649,3 +1649,49 @@ func TestRepoScopes(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestSearchFilteredShelf(t *testing.T) {
+	s, _ := open(t)
+	shelved, err := s.AddWith("the api allows sixty requests", nil, "", "", Meta{Kind: "environment", Scope: "shelf:research"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := s.AddWith("our proxy allows sixty requests", nil, "", "", Meta{Kind: "environment", Scope: "host:mac"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := func(f Filter) []string {
+		t.Helper()
+		hs, err := s.SearchFiltered(text.Terms("sixty requests"), 10, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, h := range hs {
+			out = append(out, h.ID)
+		}
+		slices.Sort(out)
+		return out
+	}
+	both := []string{shelved.ID, plain.ID}
+	slices.Sort(both)
+	for _, c := range []struct {
+		name string
+		f    Filter
+		want []string
+	}{
+		{"no filter", Filter{}, both},
+		{"shelves left out", Filter{ExcludePrefixes: []string{"shelf:"}}, []string{plain.ID}},
+		{"shelves left out, any case", Filter{ExcludePrefixes: []string{"SHELF:"}}, []string{plain.ID}},
+		{"the shelf named", Filter{Scopes: []string{"shelf:research"}}, []string{shelved.ID}},
+		{"every shelf", Filter{ScopePrefixes: []string{"shelf:"}}, []string{shelved.ID}},
+		{"named and left out", Filter{Scopes: []string{"shelf:research", "host:mac"}, ExcludePrefixes: []string{"shelf:"}},
+			[]string{plain.ID}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if g := got(c.f); !slices.Equal(g, c.want) {
+				t.Errorf("got %q, want %q", g, c.want)
+			}
+		})
+	}
+}

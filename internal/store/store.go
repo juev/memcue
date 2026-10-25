@@ -1267,10 +1267,14 @@ type Filter struct {
 	Kinds    []string // only facts of these kinds
 	Since    string   // only facts created at or after this UTC instant, "2006-01-02T15:04:05"
 	Today    string   // leaves out facts that expired before this day; empty keeps them
-	// Scopes and Origins keep a fact whose scope is one of Scopes (case aside) or whose origin starts with one of
-	// Origins and a space; both empty keep every fact.
-	Scopes  []string
-	Origins []string
+	// Scopes, ScopePrefixes and Origins keep a fact whose scope is one of Scopes or starts with one of ScopePrefixes
+	// (case aside), or whose origin starts with one of Origins and a space; all empty keep every fact.
+	Scopes        []string
+	ScopePrefixes []string
+	Origins       []string
+	// ExcludePrefixes leaves out a fact whose scope starts with one of these (case aside), whatever the rest keeps:
+	// the shelves, which a search reads only when it names them (#433).
+	ExcludePrefixes []string
 }
 
 // where returns the SQL conditions of f over facts under alias, with their arguments.
@@ -1292,17 +1296,25 @@ func (s *Store) where(alias string, f Filter) (string, []any) {
 		args = append(args, f.Today)
 	}
 	scope := "lower(" + s.col(alias, "scope") + ")"
-	if len(f.Scopes)+len(f.Origins) > 0 {
+	if len(f.Scopes)+len(f.ScopePrefixes)+len(f.Origins) > 0 {
 		var or []string
 		for _, sc := range f.Scopes {
 			or = append(or, scope+" = ?")
 			args = append(args, strings.ToLower(sc))
+		}
+		for _, p := range f.ScopePrefixes {
+			or = append(or, "substr("+scope+", 1, ?) = ?")
+			args = append(args, utf8.RuneCountInString(p), strings.ToLower(p))
 		}
 		for _, o := range f.Origins {
 			or = append(or, "substr("+alias+".origin, 1, ?) = ?")
 			args = append(args, utf8.RuneCountInString(o)+1, o+" ")
 		}
 		conds = append(conds, "("+strings.Join(or, " OR ")+")")
+	}
+	for _, p := range f.ExcludePrefixes {
+		conds = append(conds, "substr("+scope+", 1, ?) <> ?")
+		args = append(args, utf8.RuneCountInString(p), strings.ToLower(p))
 	}
 	if len(conds) == 0 {
 		return "", nil

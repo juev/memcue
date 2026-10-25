@@ -179,6 +179,22 @@ reason it is wider. An agent that finds nothing here searches again with `-in al
 learnt in the session's project comes before a global one and the rest.
 `search -cwd DIR` names the session's directory; the default is the working directory.
 
+**The shelf** holds what a session read from the outside world: another system's limits, versions and terms, wanted
+only when the same subject comes up again (#433). Such a fact is stored in the same base under the scope
+`shelf:<slug>`, and in practice there is one shelf, `shelf:research`. What goes there is decided by where the fact's
+evidence sits, not by a model: `extract-messages -shelf research` (the Hermes plugin passes it, the `shelf` option;
+empty turns it off) puts a fact on the shelf when its quote is in the result of a tool that reads the outside world —
+a name starting with `web_`, `browser`, `fetch`, `http`, `curl`, `arxiv` or `pdf` — and in no other tool's result. A
+fact quoted from `terminal`, `read_file` or `ssh` keeps its scope, and a fact in the user's words is never shelved:
+the user already chose to say it. Without `-shelf`, as in Claude Code sessions, nothing is shelved. By hand,
+`memcue add -shelf research` is `-scope shelf:research`; a slug is `[a-z0-9][a-z0-9-]{0,63}`.
+
+A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf` for every shelf. Every other place
+leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
+that still read the shelf would hide nothing. A search that finds nothing, while its words fit a shelved fact, says
+where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json` carries each fact's `scope`, so a
+fact from the shelf can be told from the rest.
+
 ## Upgrade
 
 ### 0.15.0: search listens to a message, the card stops repeating the memory, and installation state stops being a fact (#417, #418, #421, #423, #424, #425, #426)
@@ -419,6 +435,7 @@ says otherwise: what happened in one run is not the knowledge a later session ne
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
 memcue search -in all postgres       # every repository; the default in a repository is its own, this host's and the global facts
+memcue search -in shelf:research rate limit  # facts read from pages and documents, which no other place returns
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
