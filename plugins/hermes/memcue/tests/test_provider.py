@@ -441,6 +441,21 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(len(found["facts"]), 2)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": "x"})))
 
+    def test_search_defaults_to_the_configured_number(self):
+        """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
+        for i in range(7):
+            json.loads(self.p.handle_tool_call("memcue_add", {
+                "content": f"Сервер server{i}: Caddy перечитывает Caddyfile после пересоздания контейнера.",
+                "keywords": "caddy"}))
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
+        self.assertEqual(len(found["facts"]), memcue_provider._SEARCH_FACTS)
+        self.assertEqual(memcue_provider._SEARCH_FACTS, 5)
+        few = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": self.p._facts, "search_facts": "2"})
+        found = json.loads(few.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
+        self.assertEqual(len(found["facts"]), 2)
+        self.assertEqual(memcue_provider.MemcueMemoryProvider({"binary": BIN, "search_facts": "many"})._search_facts, 5)
+        self.assertEqual(memcue_provider.MemcueMemoryProvider({"binary": BIN, "search_facts": "99"})._search_facts, 50)
+
     def test_correct_sets_keywords_and_expiry(self):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера.",

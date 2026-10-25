@@ -76,6 +76,7 @@ _FINAL_EVENTS = frozenset({"session_end", "pre_compress", "shutdown"})  # a tail
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared here
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
+_SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
@@ -220,6 +221,15 @@ def _session_cwd(cwd: str) -> str:
             return ""
 
 
+def _bounded_int(value: Any, default: int, low: int, high: int) -> int:
+    """A config number that came from YAML or a chat edit: anything unusable falls back to the default."""
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return min(high, max(low, number))
+
+
 def _on(v: Any) -> bool:
     """A config switch: true, or a string a YAML file or a person would mean as true."""
     return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
@@ -250,7 +260,8 @@ SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it.",
-    {"query": "Words of the fact.", "limit": "Optional maximum number of facts (default 10)."}, ["query"])
+    {"query": "Words of the fact.",
+     "limit": f"Optional maximum number of facts (default {_SEARCH_FACTS}, the provider's search_facts)."}, ["query"])
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory: one self-contained statement in one to three sentences, "
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
@@ -294,6 +305,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._dreams = True
         self._generation = 0  # grows with every compression: the facts of an earlier context may come again
         self._session_card = _on(self._config.get("session_card", True))
+        self._search_facts = _bounded_int(self._config.get("search_facts"), _SEARCH_FACTS, 1, 50)
         self._lock = threading.Lock()
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
@@ -1042,6 +1054,7 @@ class MemcueMemoryProvider(MemoryProvider):
             self._binary_ok()  # asks the version once
             if _version_at_least(self._version, _SCOPED_SEARCH):
                 cmd += ["-cwd", self._workspace or ".", "-session", self._session_id]
+            limit = self._search_facts  # the key of #372: ten facts were noise on a live base
             if arg("limit"):
                 try:
                     limit = int(arg("limit"))
@@ -1049,7 +1062,7 @@ class MemcueMemoryProvider(MemoryProvider):
                     return tool_error("limit must be a positive integer")
                 if limit <= 0:
                     return tool_error("limit must be a positive integer")
-                cmd += ["-n", str(limit)]
+            cmd += ["-n", str(limit)]
             ok, out = self._run(cmd + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
                 try:
