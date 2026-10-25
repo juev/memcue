@@ -810,6 +810,16 @@ test('memcue_search passes a limit and a leading dash safely', async () => {
 	assert.match(text, new RegExp(`arg: search -json -n 3 -cwd ${process.cwd()} -- -dash query`))
 })
 
+test('memcue_search hints on a Chinese query (#410)', async () => {
+	const { tools } = mount()
+	const search = tools.get('memcue_search')
+	const result = await search.execute({ query: '如何 harness base' }, {})
+	assert.match(result.hint, /Russian and English/)
+	assert.equal((await search.execute({ query: 'harness base' }, {})).hint, undefined)
+	const [part] = search.output.render({}, result)
+	assert.match(part.text, /Russian and English/)
+})
+
 test('memcue_search passes a leading dash as a query', async () => {
 	await resetLog()
 	const { tools } = mount()

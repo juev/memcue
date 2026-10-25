@@ -176,7 +176,7 @@ under a host or service scope learnt elsewhere; an agent that finds nothing in t
 
 ## Upgrade
 
-### 0.14.0: a dream over the whole base, and search hands over only what fits and where the agent asks (#405, #407, #409)
+### 0.14.0: a dream over the whole base, and search hands over only what fits and where the agent asks (#405, #407, #409, #414)
 
 - `memcue dream -run -all` answers packet after packet until the base has no work left, so the translations of
   0.12.0 need not wait for three days of hourly dreams. It uses the endpoint when `MEMCUE_API_URL` is set and
@@ -194,6 +194,11 @@ under a host or service scope learnt elsewhere; an agent that finds nothing in t
   facts by default**, and a text answer that finds nothing there says that `-in all` searches every repository.
   Outside a repository, and in the Hermes tool, the default stays the whole base. Expired facts leave the default
   result. See [Projects](#projects) for what the narrow default costs on measured queries.
+- A query in Chinese, Japanese or Korean finds facts only through the Latin names in it: the facts are in Russian and
+  English. The session note and the search tools now say to write the query in one of them, and `search` adds that
+  hint to the answer of a CJK query, found or not (`hint` in the Hermes and DSH tools). A Chinese question translated
+  first finds its fact 54–60 times in 60, against 0–50 as it is ([chinese-2026-10](docs/research/chinese-2026-10.md),
+  #410, #414).
 - No schema change. The plugins pass the new parameters only to a 0.14.0 binary.
 
 ### 0.13.0: Hermes runs the dream itself (#401)

@@ -469,6 +469,16 @@ class ProviderTest(unittest.TestCase):
         narrow = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
         self.assertEqual(narrow["facts"], [])
 
+    def test_search_hints_on_cjk(self):
+        """A Chinese query gets the hint to search in the facts' languages, found or not; a Russian one does not (#410)."""
+        json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Caddy на server1 перечитывает Caddyfile после пересоздания.", "keywords": "caddy"}))
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启 caddy"}))
+        self.assertEqual(len(found["facts"]), 1)
+        self.assertIn("Russian and English", found["hint"])
+        self.assertIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启"})))
+        self.assertNotIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})))
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):
