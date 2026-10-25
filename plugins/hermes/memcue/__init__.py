@@ -82,6 +82,7 @@ _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared h
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
 _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
 _DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
+_SEARCH_CONTROLS = "0.15.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
@@ -265,10 +266,21 @@ SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. Only the facts that fit the words come back: one fact means one fits, none means the base has "
-    "nothing on them, so try other words or the other language rather than a larger limit.",
+    "nothing on them, so try other words or the other language rather than a larger limit. By default it leaves "
+    "out facts bound to other repositories and expired facts; the optional parameters narrow or widen that.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); fewer come "
-              "when the rest do not fit."}, ["query"])
+              "when the rest do not fit.",
+     "in": "Optional where to look, comma-separated: project (this repository only), global, host (this machine), "
+           "all (every repository: all that is known about a tool), or a scope such as repo:KEY, host:NAME, "
+           "service:NAME.",
+     "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. "
+             "E.g. rule,decision for what was decided.",
+     "since": "Optional YYYY-MM-DD: only facts learnt on or after that day.",
+     "expired": "Optional true to include facts whose expiry has passed.",
+     "words": "Optional all: a fact must hold every word, for a precise match; any (default) holds one or more.",
+     "min_score": "Optional 0-1, how close to the best fact a fact must score (default 0.6): 0 is a wide net up to "
+                  "limit, 0.9 only the best match."}, ["query"])
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory: one self-contained statement in one to three sentences, "
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
@@ -1098,7 +1110,20 @@ class MemcueMemoryProvider(MemoryProvider):
                 if limit <= 0:
                     return tool_error("limit must be a positive integer")
             cmd += ["-n", str(limit)]
-            ok, out = self._run(cmd + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
+            controls = []
+            for name, flag in (("in", "-in"), ("kind", "-kind"), ("since", "-since"), ("min_score", "-min-score")):
+                if arg(name):
+                    controls += [flag, arg(name)]
+            if _on(arg("expired")):
+                controls.append("-expired")
+            if arg("words") not in ("", "any", "all"):
+                return tool_error("words must be all or any")
+            if arg("words") == "all":
+                controls.append("-all-words")
+            if controls and not _version_at_least(self._version, _SEARCH_CONTROLS):
+                return tool_error(f"in, kind, since, expired, words and min_score need memcue {_SEARCH_CONTROLS} "
+                                  f"or later; this one is {self._version or 'unknown'}")
+            ok, out = self._run(cmd + controls + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
                 try:
                     facts = json.loads(out)

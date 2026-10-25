@@ -441,6 +441,23 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(len(found["facts"]), 2)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": "x"})))
 
+    def test_search_passes_the_controls(self):
+        """in, kind, words and expired reach memcue search (#409); a wrong value comes back as an error."""
+        rule = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Caddy на server1 перечитывает Caddyfile после пересоздания.", "keywords": "caddy",
+            "kind": "rule", "scope": "global"}))["result"].split()[0]
+        json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Caddy на server2 падает без конфига.", "keywords": "caddy", "kind": "pitfall"}))
+        def ids(**kw):
+            found = json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy server1", **kw)))
+            return [f["id"] for f in found["facts"]]
+        self.assertEqual(ids(kind="rule", min_score="0"), [rule])
+        self.assertEqual(ids(words="all"), [rule])
+        self.assertEqual(ids(**{"in": "global"}, min_score="0"), [rule])
+        self.assertEqual(len(ids(**{"in": "all"}, expired="true", min_score="0")), 2)
+        for bad in ({"kind": "wish"}, {"in": "everywhere"}, {"words": "some"}):
+            self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy", **bad))))
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):

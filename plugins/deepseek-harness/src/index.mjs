@@ -53,6 +53,7 @@ const MIN_BINARY = '0.4.0'
 
 /** The oldest binary with `search -cwd` and `-session` (#361); an older one searches without them (#368). */
 const SCOPED_SEARCH = '0.8.0'
+const SEARCH_CONTROLS = '0.15.0' // search -in, -kind, -since, -expired, -all-words (#409)
 
 /** Defaults used when the bundle patch supplies no config. */
 const DEFAULTS = Object.freeze({
@@ -509,6 +510,7 @@ export function apply(ctx, config) {
 	let extraction = settings.extract
 	let compatible = true // cleared when the binary is older than MIN_BINARY
 	let scopedSearch = true // cleared when the binary is older than SCOPED_SEARCH
+	let searchControls = true // cleared when the binary is older than SEARCH_CONTROLS
 	const busy = new Set()
 	const cardSources = new Map() // session id -> "startup" | "compact" | "done"
 	const warnedCard = new Set()
@@ -553,6 +555,7 @@ export function apply(ctx, config) {
 			}
 		}
 		scopedSearch = !found || versionAtLeast(reported, SCOPED_SEARCH)
+		searchControls = !found || versionAtLeast(reported, SEARCH_CONTROLS)
 		if (!found || versionAtLeast(reported, MIN_BINARY)) return
 		compatible = false
 		extraction = false
@@ -756,10 +759,16 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. By default it leaves out facts bound to other repositories and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Words to look for, in any language the fact may be written in.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
+			in: { type: 'string', description: 'Where to look, comma-separated: project (this repository only), global, host (this machine), all (every repository: all that is known about a tool), or a scope such as repo:KEY, host:NAME, service:NAME.' },
+			kind: { type: 'string', description: 'Kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. E.g. rule,decision for what was decided.' },
+			since: { type: 'string', description: 'YYYY-MM-DD: only facts learnt on or after that day.' },
+			expired: { type: 'boolean', description: 'Include facts whose expiry has passed.' },
+			words: { type: 'string', description: 'all: a fact must hold every word, for a precise match; any (default): one or more.' },
+			min_score: { type: 'number', description: 'How close to the best fact a fact must score, 0-1 (default 0.6): 0 is a wide net up to limit, 0.9 only the best match.' },
 		},
 		output: {
 			schema: {
@@ -798,7 +807,15 @@ export function apply(ctx, config) {
 				flags.push('-cwd', sessionCwd(exec))
 				if (session) flags.push('-session', memcueSessionId(session))
 			}
-			const { code, out, err } = await runMemcue(settings, [...flags, '--', String(args.query)], { timeoutMs: 15_000 })
+			const controls = []
+			for (const [name, flag] of [['in', '-in'], ['kind', '-kind'], ['since', '-since'], ['min_score', '-min-score']]) {
+				if (args[name] !== undefined && args[name] !== null && String(args[name]).trim() !== '') controls.push(flag, String(args[name]).trim())
+			}
+			if (args.expired === true || args.expired === 'true') controls.push('-expired')
+			if (args.words !== undefined && !['', 'any', 'all'].includes(String(args.words))) throw new Error('words must be all or any')
+			if (args.words === 'all') controls.push('-all-words')
+			if (controls.length > 0 && !searchControls) throw new Error(`in, kind, since, expired, words and min_score need memcue ${SEARCH_CONTROLS} or later`)
+			const { code, out, err } = await runMemcue(settings, [...flags, ...controls, '--', String(args.query)], { timeoutMs: 15_000 })
 			if (code !== 0) throw new Error(`memcue search exited ${code}: ${err.trim().slice(0, 500)}`)
 			return { facts: factsOf(out) }
 		},
