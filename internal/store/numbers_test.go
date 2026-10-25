@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -309,4 +310,54 @@ func rids(t *testing.T, s *Store) string {
 		t.Fatal(err)
 	}
 	return strings.Join(out, " ")
+}
+
+// A lexer change reaches the rows a base already has through the stamp: a row stemmed by the previous version of
+// the number terms, here without the term of a version after ":", gets it on the next open (#391).
+func TestOlderNumberTermsAreRestemmedOnOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "facts.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.Add("Правила проверять образом victoriametrics/vmalert:v1.106.1 с -dryRun.", nil, "notes 2026-10-25")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The row as version 1 of the number terms left it: no term for the tag, stamped 1.
+	var rowid int64
+	var stems string
+	if err := s.db.QueryRow(`SELECT rid, stems FROM fact_index WHERE id = ?`, f.ID).Scan(&rowid, &stems); err != nil {
+		t.Fatal(err)
+	}
+	old := strings.Join(slices.DeleteFunc(strings.Fields(stems), text.IsNumberTerm), " ")
+	for _, q := range []string{
+		`INSERT INTO fact_fts(fact_fts, rowid, stems) SELECT 'delete', rid, stems FROM fact_index WHERE rid = ?`,
+		`UPDATE fact_index SET stems = ?2, numbers = 1 WHERE rid = ?1`,
+		`INSERT INTO fact_fts(rowid, stems) VALUES (?1, ?2)`,
+	} {
+		if _, err := s.db.Exec(q, rowid, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if hits, err := s.Search(text.Terms("v1.106.1"), 10); err != nil || len(hits) != 0 {
+		t.Fatalf("before reopening Search(v1.106.1) = %+v, %v; want nothing", hits, err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	hits, err := reopened.Search(text.Terms("v1.106.1"), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].ID != f.ID {
+		t.Fatalf("Search(v1.106.1) = %+v, want the vmalert fact", hits)
+	}
+	rids(t, reopened) // every row stamped with the current version
 }
