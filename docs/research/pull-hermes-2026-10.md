@@ -72,8 +72,12 @@ weeks of `search.log`, and it is the number the whole pull design rests on.
 
 ## What follows
 
+Two tasks are filed from this run: #372 for the ten-fact default (five keeps the prompt coverage and halves the
+characters; whether the agent reads five better than ten is not measured here, only what it is handed) and #373 for the
+missing floor, where two unrelated prompts returned the same ten facts.
+
 - The ten-fact default is worth a measured change, not a guess: five facts keep the prompt coverage and halve the
-  characters. Whether the agent reads five better than ten is not measured here — only what it is handed.
+  characters.
 - The facts about the removed machinery are candidates for retirement, and the facts of the release are missing
   outright; the dream is the tool for the first part, nothing does the second automatically.
 - The weekly review needs to move to `search.log` and `usage.log`: searches per session, empty searches, delivered
