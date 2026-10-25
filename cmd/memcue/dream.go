@@ -95,7 +95,9 @@ type dreamRecord struct {
 	// grouped in a run without the model.
 	Grouped []dreamGroupRecord `json:"grouped,omitempty"`
 	Packet  string             `json:"packet,omitempty"` // the packet -prepare wrote, or -apply applied
-	Error   string             `json:"error,omitempty"`
+	// Tokens is what the endpoint call of dream -run took (#401); a dream answered by the session's model has none.
+	Tokens *extract.Tokens `json:"tokens,omitempty"`
+	Error  string          `json:"error,omitempty"`
 }
 
 // dreamGroupRecord is one group of a dream in dream.log. Outcome is "acted" when an action on it was applied,
@@ -154,8 +156,15 @@ func runDream(args []string, out io.Writer) error {
 	prep := fs.Bool("prepare", false, "print the work of the dream for the session's model and keep it for -apply")
 	list := fs.Bool("list", false, "print the groups and stop")
 	applyFile := fs.String("apply", "", "check and carry out the model's answer to the packet -prepare printed")
+	run := fs.Bool("run", false, "when a dream is due, send its packet to MEMCUE_API_URL and apply the answer (#401)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *run {
+		if *applyFile != "" || *since != "" || *all || *prep || *list {
+			return errors.New("-run takes no other flag")
+		}
+		return runDreamOnce(out)
 	}
 	if *applyFile != "" && (*since != "" || *all || *prep || *list) {
 		return errors.New("-apply takes no other flag")
