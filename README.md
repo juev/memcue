@@ -169,11 +169,14 @@ The project narrows and orders `memcue search`. In a session that works in a rep
 repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default
 (#418). Outside a repository, and in the Hermes tool, the default is the whole base. `-in all` searches every
 repository, `-in project` searches this repository only, and `-in host`, `-in global` or a scope such as
-`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`. The narrow default
-is a choice, not a measured gain: on 35 queries agents wrote from repositories and the Claude config directory, it
-left 22 queries with a useful fact against 32 for the whole base, because what a repository session needs often lives
-under a host or service scope learnt elsewhere; an agent that finds nothing in the project searches again with
-`-in all`. Of facts with equal scores, one learnt in the session's project comes before a global one and the rest.
+`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`. The default was
+measured, not assumed: the project's facts alone answered a question about the host with 1 fact where the whole base
+gave 5, three of them the host facts that answered it, and 255 of the 391 live facts of that base carry the host scope
+([scope-418-2026-10](docs/research/scope-418-2026-10.md)) — so the host and the global facts are in the default, and a
+fact of another repository still needs `-in all`. What the wider default costs in precision on a query corpus is not
+measured; the 35 queries of #409, where the project alone left 22 useful facts against 32 for the whole base, are the
+reason it is wider. An agent that finds nothing here searches again with `-in all`. Of facts with equal scores, one
+learnt in the session's project comes before a global one and the rest.
 `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
