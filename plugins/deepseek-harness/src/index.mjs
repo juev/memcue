@@ -761,7 +761,7 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches only the facts of that repository by default, elsewhere the whole base, and leaves out expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Words to look for, in Russian or English, the languages of the facts: translate a question asked in another language.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },

@@ -28,7 +28,7 @@ type Query struct {
 	Host     string
 	// In names where to look: "project" (facts of the session's repository, by any of its keys), "global", "host"
 	// (this machine), "all", or a scope such as "repo:KEY", "host:NAME" or "service:NAME". Several are a union. Empty
-	// is "project" in a session that works in a repository and "all" outside one.
+	// is "project", "host" and "global" in a session that works in a repository (#418) and "all" outside one.
 	In       []string
 	Kinds    []string // only facts of these kinds (rule, decision, pitfall, ...)
 	Since    string   // only facts learnt on or after this day, "YYYY-MM-DD"
@@ -64,11 +64,12 @@ func (q Query) Filter() (store.Filter, error) {
 	}
 	in := q.In
 	if len(in) == 0 {
-		// The user's choice (#409): a session in a repository searches that repository; outside one a question is as
-		// likely about anything, so it searches the whole base.
+		// A session in a repository searches that repository, this host and the global facts (#418): on a
+		// host-centric base most facts carry the host's scope, and the repository alone (#409) hid them. Outside a
+		// repository a question is as likely about anything, so it searches the whole base.
 		in = []string{"all"}
 		if inRepo(q.Project) {
-			in = []string{"project"}
+			in = []string{"project", "host", "global"}
 		}
 	}
 	for _, in := range in {
@@ -102,9 +103,67 @@ func (q Query) Filter() (store.Filter, error) {
 	return f, nil
 }
 
-// ProjectOnly reports whether q searches only the session's repository because it named no place: the default in a
-// repository, which an agent widens with "all" when the repository has nothing.
-func (q Query) ProjectOnly() bool { return len(q.In) == 0 && inRepo(q.Project) }
+// NarrowByDefault reports whether q searches only the session's repository, this host and the global facts because
+// it named no place: the default inside a repository (#418), which an agent widens with "all" when none of the three
+// has the answer.
+func (q Query) NarrowByDefault() bool { return len(q.In) == 0 && inRepo(q.Project) }
+
+// maxKnownKeys is how many stored repository keys an error of ResolveRepos names before it counts the rest.
+const maxKnownKeys = 12
+
+// ResolveRepos turns a repository key in In that is not stored into the stored one it ends with: "-in repo:memcue"
+// means "repo:github.com/me/memcue" when exactly one stored key ends that way (#418). A key that matches nothing, or
+// more than one stored key, is an error that names the stored keys, so a typo cannot be read as an empty base. The
+// other places in In are untouched, and an empty known list leaves In as it is.
+func (q Query) ResolveRepos(known []string) (Query, error) {
+	if len(known) == 0 {
+		return q, nil
+	}
+	var keys []string
+	for _, sc := range known {
+		if len(sc) > len("repo:") && strings.EqualFold(sc[:len("repo:")], "repo:") {
+			keys = append(keys, sc[len("repo:"):])
+		}
+	}
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+	in := slices.Clone(q.In)
+	for i, place := range in {
+		place = strings.TrimSpace(place)
+		if len(place) <= len("repo:") || !strings.EqualFold(place[:len("repo:")], "repo:") {
+			continue
+		}
+		key := place[len("repo:"):]
+		var ends []string
+		stored := false
+		for _, k := range keys {
+			switch lk, lkey := strings.ToLower(k), strings.ToLower(key); {
+			case lk == lkey || "repo:"+lk == lkey:
+				stored = true
+			case strings.HasSuffix(lk, "/"+lkey):
+				ends = append(ends, k)
+			}
+		}
+		switch {
+		case stored:
+		case len(ends) == 1:
+			in[i] = "repo:" + ends[0]
+		case len(ends) == 0:
+			list := keys
+			more := ""
+			if len(list) > maxKnownKeys {
+				list, more = list[:maxKnownKeys], fmt.Sprintf(", and %d more", len(keys)-maxKnownKeys)
+			}
+			return q, fmt.Errorf("-in repo:%s: no stored repository key ends with %q; known keys: %s%s", key, key,
+				strings.Join(list, ", "), more)
+		default:
+			return q, fmt.Errorf("-in repo:%s: %d stored repository keys end with %q: %s", key, len(ends), key,
+				strings.Join(ends, ", "))
+		}
+	}
+	q.In = in
+	return q, nil
+}
 
 // inRepo reports whether a session with these project keys works in a repository: a key other than a directory
 // (dir:<path>) names one, the global tier of the Claude config directory included.

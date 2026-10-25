@@ -29,7 +29,8 @@ memcue add -keywords "word1, word2, синоним" -origin "<repository> <YYYY-
 ## Correct or forget
 
 Find the fact first; `search` prints IDs, best match first. `-in all` looks in every repository: by default search
-leaves out facts bound to other repositories, and `-expired` adds facts whose expiry has passed:
+looks at this repository, this host and the global facts and leaves out facts bound to other repositories, and
+`-expired` adds facts whose expiry has passed:
 
 ```bash
 memcue search -in all "<words of the fact>"

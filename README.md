@@ -164,10 +164,11 @@ comes from where the session works, read from the files and never by running git
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
 writes the key. `memcue add -scope repo` does the same for the working directory.
 
-The project narrows and orders `memcue search`. In a session that works in a repository, search looks only at that
-repository's facts by default: those learnt in it or scoped to it (`repo:<key>`). Outside a repository, and in the
-Hermes tool, the default is the whole base. `-in all` searches every repository, `-in project` asks for the narrow
-place explicitly, and `-in host`, `-in global` or a scope such as `-in repo:KEY` name another (#409). The narrow default
+The project narrows and orders `memcue search`. In a session that works in a repository, search looks at that
+repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default
+(#418). Outside a repository, and in the Hermes tool, the default is the whole base. `-in all` searches every
+repository, `-in project` searches this repository only, and `-in host`, `-in global` or a scope such as
+`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`. The narrow default
 is a choice, not a measured gain: on 35 queries agents wrote from repositories and the Claude config directory, it
 left 22 queries with a useful fact against 32 for the whole base, because what a repository session needs often lives
 under a host or service scope learnt elsewhere; an agent that finds nothing in the project searches again with
@@ -384,7 +385,7 @@ says otherwise: what happened in one run is not the knowledge a later session ne
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
-memcue search -in all postgres       # every repository; the default in a repository is its own facts (-in project)
+memcue search -in all postgres       # every repository; the default in a repository is its own, this host's and the global facts
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."

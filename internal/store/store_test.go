@@ -1587,3 +1587,39 @@ func TestCardFactsTakeEveryScopeOfTheProject(t *testing.T) {
 		t.Errorf("card %v: want both hosts of the mirror and not the other project", ids)
 	}
 }
+
+// RepoScopes names the repository scopes of the live facts, sorted and once each: a retired fact, a candidate and a
+// scope of another kind are not among them, and a provisional fact is.
+func TestRepoScopes(t *testing.T) {
+	s, _ := open(t)
+	add := func(scope, review string) Fact {
+		t.Helper()
+		f, err := s.AddWith("fact under "+scope, nil, "x 2026-10-26", "", Meta{Scope: scope, Review: review})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	add("repo:github.com/me/memcue", "")
+	add("repo:github.com/me/memcue", "")
+	add("repo:example.com/a/zeta", "")
+	add("host:loffe", "")
+	add("global", "")
+	add("repo:example.com/a/candidate", Candidate)
+	retired := add("repo:example.com/a/retired", "")
+	if _, err := s.Retire(retired.ID); err != nil {
+		t.Fatal(err)
+	}
+	prov := add("repo:example.com/a/provisional", Candidate)
+	if _, err := s.ApproveProvisional(prov.ID, time.Now().AddDate(0, 0, 7).Format(time.DateOnly)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.RepoScopes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"repo:example.com/a/provisional", "repo:example.com/a/zeta", "repo:github.com/me/memcue"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
