@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.14.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.15.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.15.0 | 5 | 0.15.0 | 0.15.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.15.0 (`hermes-agent` 0.15.2) |
 | 0.14.0 | 5 | 0.14.0 | 0.14.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.14.0 (`hermes-agent` 0.15.2) |
 | 0.13.0 | 5 | 0.13.0 | 0.13.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.13.0 (`hermes-agent` 0.15.2) |
 | 0.12.0 | 5 | 0.12.0 | 0.12.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.12.0 (`hermes-agent` 0.15.2) |
@@ -177,7 +178,7 @@ under a host or service scope learnt elsewhere; an agent that finds nothing in t
 
 ## Upgrade
 
-### Unreleased
+### 0.15.0: search listens to a message, the card stops repeating the memory, and installation state stops being a fact (#417, #418, #421, #423, #424, #425, #426)
 
 - A thin answer says what it left out. When one fact is all the score floor allows, the Hermes `memcue_search` adds a
   hint naming the lever (`min_score 0`) and how many facts hold the same words below the floor; the tool description
@@ -185,6 +186,35 @@ under a host or service scope learnt elsewhere; an agent that finds nothing in t
   more search on those answers only (p50 8.9 ms, ~150 characters). Measured on 9 thin queries with one model: 7 of 9
   reached an answer inside three turns against 3 of 9 without it, and tokens per answered question fell 44 %
   ([thin-answer-hint-2026-10](docs/research/thin-answer-hint-2026-10.md)). The DSH tool is unchanged.
+- **A message is searched as a message** (#417). A query of more than eight words is a user's message, not a search: its
+  floor is 0.45 of the best fact instead of 0.6, and a fact has to hold two of the message's terms, because one shared
+  word with a message of dozens usually means something else. On the same twenty user prompts the answer keeps 17
+  useful facts instead of 11 and loses 2 instead of 8; the eight agent queries return exactly what they did before.
+  The unrelated facts of a message rise, 23 to 27 of the delivered set — the BM25 tail of a message is flat, and the
+  write-up says why a floor cannot separate it
+  ([message-floor-417-2026-10](docs/research/message-floor-417-2026-10.md)).
+- **`-in repo:KEY` accepts the end of the stored key, and the default of a repository takes the host and the global
+  facts** (#418). `-in repo:memcue` finds `repo:github.com/…/memcue`; a key that matches nothing fails with the stored
+  keys named instead of answering an empty result. Inside a repository the default is now that repository, this host
+  and the global facts: on the measured base the project alone was 1 of 391 facts while the host scope held 255, and a
+  question about the host went answered by the project or not at all
+  ([scope-418-2026-10](docs/research/scope-418-2026-10.md)).
+- **The thin-answer hint counts the tail** (#423): its wide call asks for `min(4 × limit, 20)` facts, so the number it
+  prints is the size of the tail and no longer `limit − served` — 19 more on the query that used to say 4
+  ([thin-hint-tail-423-2026-10](docs/research/thin-hint-tail-423-2026-10.md)).
+- **The session card leaves out what the memory block already says** (#424): a mirror of a built-in memory note, a
+  line whose opening repeats one already on the card, and a line the memory notes state are dropped; `card.log` gains
+  `excluded`. On the live card 16 lines and 3 181 characters became 11 and 1 995, at every session start and after
+  every compaction ([card-memory-copies-424-2026-10](docs/research/card-memory-copies-424-2026-10.md)).
+- **Five facts stay the search default** (#425): the higher limit adds the tail — 40 facts on twenty prompts, one of
+  them useful — for 62 % more characters, so the schema says when to raise it instead
+  ([limit-default-425-2026-10](docs/research/limit-default-425-2026-10.md)).
+- **Installation state is not a fact** (#426): the extraction prompt and the review prompt no longer invite the version
+  of something installed, the path of a binary or a wrapper, a config default or the size of a base, and `vet` drops
+  such a candidate before the duplicate check. 13 of 386 approved facts of the live base match the rule and are
+  retired in a separate pass ([installation-state-426-2026-10](docs/research/installation-state-426-2026-10.md)).
+- No schema change: 5, as in 0.14.0. The scope default and the message floor are search-side; the plugins pass the
+  same flags as before.
 
 ### 0.14.0: a dream over the whole base, and search hands over only what fits and where the agent asks (#405, #407, #409, #414)
 
