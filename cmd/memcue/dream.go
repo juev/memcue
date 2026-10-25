@@ -39,6 +39,16 @@ var dreamNeighbours = recall.Params{
 	MaxFacts:       3,
 }
 
+// groupNeighbours is the search a dream groups by: dreamNeighbours, and also the facts whose own terms the fact holds
+// nearly all of. A restatement in other words is grouped with the fact it restates whichever of the two is the
+// fresh one; coverage alone groups a short copy only when the short one is fresh (#377). It stays a share of the
+// short fact's terms, so two facts that each add their own detail to one topic do not pass by it.
+var groupNeighbours = func() recall.Params {
+	p := dreamNeighbours
+	p.MinContained = 0.8
+	return p
+}()
+
 const (
 	maxGroup   = 6         // facts in one group: a chain of neighbours longer than that is cut
 	dreamEvery = time.Hour // default of MEMCUE_DREAM_EVERY
@@ -53,6 +63,14 @@ var (
 	packetExpand = 50
 )
 
+// The merge sweep groups facts the dream has already seen, so a duplicate pair that predates the last dream is
+// reviewed too (#377): each dream takes up to mergeSweep of them after the cursor in dream.merge, and adds at most
+// mergeGroups groups of its own, so a large base costs a few groups a dream and is walked over many.
+var (
+	mergeSweep  = 50
+	mergeGroups = 20
+)
+
 // dreamRecord is one line of dream.log: what a dream changed and why, the record its decisions are checked by.
 type dreamRecord struct {
 	Time    string           `json:"time"`
@@ -65,9 +83,24 @@ type dreamRecord struct {
 	// Promoted are the facts that became global: a duplicate of them was learnt in another project (#346).
 	Promoted []string `json:"promoted,omitempty"`
 	// Expanded counts the facts that got search queries.
-	Expanded int    `json:"expanded,omitempty"`
-	Packet   string `json:"packet,omitempty"` // the packet -prepare wrote, or -apply applied
-	Error    string `json:"error,omitempty"`
+	Expanded int `json:"expanded,omitempty"`
+	// Swept counts the facts seen before that the merge sweep grouped with their neighbours.
+	Swept int `json:"swept,omitempty"`
+	// Grouped is what the dream grouped and what came of each group, by id only: it answers whether two facts were
+	// grouped in a run without the model.
+	Grouped []dreamGroupRecord `json:"grouped,omitempty"`
+	Packet  string             `json:"packet,omitempty"` // the packet -prepare wrote, or -apply applied
+	Error   string             `json:"error,omitempty"`
+}
+
+// dreamGroupRecord is one group of a dream in dream.log. Outcome is "acted" when an action on it was applied,
+// "refused" when the model proposed actions and none was applied, "kept" when the model proposed none, and
+// "deferred" when the packet bounds left the group for a later dream.
+type dreamGroupRecord struct {
+	Facts   []string `json:"facts"`
+	Fresh   []string `json:"fresh,omitempty"` // the facts of the group the dream reviewed as new, not swept
+	Outcome string   `json:"outcome"`
+	Acted   []string `json:"acted,omitempty"` // the facts retired or corrected
 }
 
 // dreamPlan is a checked answer: the actions of each group with the versions of the facts they were decided on, and
@@ -79,6 +112,7 @@ type dreamPlan struct {
 	// Expansions are the search queries for facts that had none, with the version the model read.
 	Expansions []dreamPlanExpansion `json:"expansions,omitempty"`
 	Groups     []dreamPlanGroup     `json:"groups"`
+	Merge      string               `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
 }
 
 type dreamPlanExpansion struct {
@@ -241,6 +275,10 @@ type dreamPacket struct {
 	Split  map[string]int   `json:"split"`
 	Expand map[string]int   `json:"expand"`
 	Groups []map[string]int `json:"groups"`
+	// Deferred are the groups the packet bounds left out, kept for the record only.
+	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
+	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
+	Swept    int                `json:"swept,omitempty"`
 }
 
 // dreamAnswer is what the model gives back for a packet.
@@ -278,36 +316,74 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	if len(batch) > packetFresh {
 		batch = batch[:packetFresh]
 	}
-	groups, err := groupFacts(s, active, batch)
+	isFresh := freshSet(fresh)
+	gr := newGrouper(active)
+	for _, f := range batch {
+		if err := gr.add(s, f); err != nil {
+			return rec, err
+		}
+	}
+	// The sweep takes the room the fresh groups leave in the packet, so it never pushes a fresh fact to the next one.
+	room := min(mergeGroups, packetGroups-len(gr.groups()))
+	cursor, err := readMergeCursor(dir)
 	if err != nil {
 		return rec, err
 	}
+	swept := 0
+	isBatch := freshSet(batch)
+	for _, f := range sweepFacts(active, isFresh, cursor) {
+		if swept == mergeSweep || gr.groupsWithout(isBatch) >= room {
+			break
+		}
+		if err := gr.add(s, f); err != nil {
+			return rec, err
+		}
+		cursor = f.ID
+		swept++
+	}
+	rec.Swept = swept
+	// Groups with a fresh fact come first, so the packet bound below leaves out sweep groups before them.
+	var groups, sweepGroups [][]store.Fact
+	for _, g := range gr.groups() {
+		if slices.ContainsFunc(g, func(f store.Fact) bool { return isBatch[f.ID] }) {
+			groups = append(groups, g)
+		} else {
+			sweepGroups = append(sweepGroups, g)
+		}
+	}
+	groups = append(groups, sweepGroups...)
+	var deferred []dreamGroupRecord
 	if len(groups) > packetGroups {
 		// A fresh fact of a group left out waits for the next packet with the rest of its group.
 		left := map[string]bool{}
 		for _, g := range groups[packetGroups:] {
+			r := dreamGroupRecord{Outcome: "deferred"}
 			for _, f := range g {
 				left[f.ID] = true
+				r.Facts = append(r.Facts, f.ID)
+				if isBatch[f.ID] {
+					r.Fresh = append(r.Fresh, f.ID)
+				}
 			}
+			deferred = append(deferred, r)
 		}
 		groups = groups[:packetGroups]
 		batch = slices.DeleteFunc(slices.Clone(batch), func(f store.Fact) bool { return left[f.ID] })
+		isBatch = freshSet(batch)
 	}
 	rec.Groups = len(groups)
 	if list {
-		_, err := io.WriteString(out, renderGroups(groups, freshSet(batch)))
+		_, err := io.WriteString(out, renderGroups(groups, isBatch))
 		return rec, err
 	}
 	// Every fact without search queries gets them, the fresh ones first, then the facts the dream has seen and will
 	// not see again, the newest first: an old base is expanded over a few dreams (#276).
-	isBatch := freshSet(batch)
 	var bare []store.Fact
 	for _, f := range batch {
 		if len(f.Queries) == 0 {
 			bare = append(bare, f)
 		}
 	}
-	isFresh := freshSet(fresh)
 	for i := len(active) - 1; i >= 0 && len(bare) < packetExpand; i-- {
 		if f := active[i]; !isFresh[f.ID] && len(f.Queries) == 0 {
 			bare = append(bare, f)
@@ -317,7 +393,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 		bare = bare[:packetExpand]
 	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
-		Split: versions(batch), Expand: versions(bare)}
+		Split: versions(batch), Expand: versions(bare), Deferred: deferred, Merge: cursor, Swept: swept}
 	for _, f := range fresh {
 		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
@@ -330,10 +406,10 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	for _, g := range groups {
 		p.Groups = append(p.Groups, versions(g))
 	}
-	if len(batch) == 0 && len(bare) == 0 {
+	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
-		return rec, errors.Join(err, writeDreamSeen(dir, p.Seen), markDream(dir, start))
+		return rec, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
 	}
 	if err := writeJSONFile(filepath.Join(dir, packetFile), p); err != nil {
 		return rec, err
@@ -397,7 +473,8 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	if a.Packet != p.ID {
 		return rec, fmt.Errorf("answer %s is for packet %q, the current one is %q: run -prepare again", path, a.Packet, p.ID)
 	}
-	plan := dreamPlan{Start: p.Start, Seen: p.Seen}
+	plan := dreamPlan{Start: p.Start, Seen: p.Seen, Merge: p.Merge}
+	rec.Swept = p.Swept
 	done := map[string]bool{}
 	for _, sp := range a.Splits {
 		var parts []string
@@ -447,6 +524,7 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	rec.Fresh = len(p.Split)
 	applied, err := applyPlan(dir, plan, rec, out)
 	applied.Groups = len(p.Groups) // the groups the model reviewed, not only those it acted on
+	applied.Grouped = groupRecords(p, a.Actions, applied.Actions)
 	if err == nil {
 		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d retired or corrected, %d promoted, %d refused\n",
 			len(applied.Splits), applied.Expanded, len(applied.Actions), len(applied.Promoted), len(applied.Refused))
@@ -455,6 +533,31 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 		err = os.Remove(filepath.Join(dir, packetFile))
 	}
 	return applied, err
+}
+
+// groupRecords says what came of each group of the packet: the ids of its facts, which of them were fresh, and what the
+// answer and the checks did with it.
+func groupRecords(p dreamPacket, proposed, applied []extract.Action) []dreamGroupRecord {
+	out := make([]dreamGroupRecord, 0, len(p.Groups)+len(p.Deferred))
+	for _, g := range p.Groups {
+		r := dreamGroupRecord{Facts: slices.Sorted(maps.Keys(g)), Outcome: "kept"}
+		for _, id := range r.Facts {
+			if _, ok := p.Split[id]; ok {
+				r.Fresh = append(r.Fresh, id)
+			}
+		}
+		if slices.ContainsFunc(proposed, func(a extract.Action) bool { _, ok := g[a.ID]; return ok }) {
+			r.Outcome = "refused"
+		}
+		for _, a := range applied {
+			if _, ok := g[a.ID]; ok {
+				r.Acted = append(r.Acted, a.ID)
+				r.Outcome = "acted"
+			}
+		}
+		out = append(out, r)
+	}
+	return append(out, p.Deferred...)
 }
 
 // planGroups pairs the checked actions of a batch with their groups; a group without an action needs no entry.
@@ -595,7 +698,7 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 			return rec, err
 		}
 	}
-	return rec, errors.Join(writeDreamSeen(dir, saw), markDream(dir, plan.Start))
+	return rec, errors.Join(writeDreamSeen(dir, saw), writeMergeCursor(dir, plan.Merge), markDream(dir, plan.Start))
 }
 
 // onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,
@@ -739,64 +842,137 @@ func freshSet(fresh []store.Fact) map[string]bool {
 // groupFacts joins each fresh fact with its neighbours; groups that share a fact become one. A group is cut at
 // maxGroup facts, and a fact with no neighbour makes no group.
 func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, error) {
-	byID := map[string]store.Fact{}
-	for _, f := range active {
-		byID[f.ID] = f
-	}
-	parent := map[string]string{}
-	size := map[string]int{}
-	var find func(string) string
-	find = func(id string) string {
-		if _, ok := parent[id]; !ok {
-			parent[id], size[id] = id, 1
-		}
-		if parent[id] != id {
-			parent[id] = find(parent[id])
-		}
-		return parent[id]
-	}
-	union := func(a, b string) {
-		ra, rb := find(a), find(b)
-		if ra == rb || size[ra]+size[rb] > maxGroup {
-			return
-		}
-		parent[rb] = ra
-		size[ra] += size[rb]
-	}
+	gr := newGrouper(active)
 	for _, f := range fresh {
-		p := dreamNeighbours
-		p.Seen = map[string]bool{f.ID: true}
-		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), p)
-		if err != nil {
+		if err := gr.add(s, f); err != nil {
 			return nil, err
 		}
-		for _, h := range hits {
-			// Recall returns provisional facts too: they are indexed and active, but store.Active leaves them out.
-			// Take the hit's own fact, so a provisional neighbour is a real group member rather than a zero fact.
-			if _, ok := byID[h.ID]; !ok {
-				if h.Review != store.Provisional {
-					continue
-				}
-				byID[h.ID] = h.Fact
+	}
+	return gr.groups(), nil
+}
+
+// grouper joins facts with their neighbours one fact at a time, so the sweep can stop once it has made enough groups.
+type grouper struct {
+	byID   map[string]store.Fact
+	parent map[string]string
+	size   map[string]int
+}
+
+func newGrouper(active []store.Fact) *grouper {
+	g := &grouper{byID: map[string]store.Fact{}, parent: map[string]string{}, size: map[string]int{}}
+	for _, f := range active {
+		g.byID[f.ID] = f
+	}
+	return g
+}
+
+func (g *grouper) find(id string) string {
+	if _, ok := g.parent[id]; !ok {
+		g.parent[id], g.size[id] = id, 1
+	}
+	if g.parent[id] != id {
+		g.parent[id] = g.find(g.parent[id])
+	}
+	return g.parent[id]
+}
+
+func (g *grouper) union(a, b string) {
+	ra, rb := g.find(a), g.find(b)
+	if ra == rb || g.size[ra]+g.size[rb] > maxGroup {
+		return
+	}
+	g.parent[rb] = ra
+	g.size[ra] += g.size[rb]
+}
+
+// add joins f with its neighbours.
+func (g *grouper) add(s *store.Store, f store.Fact) error {
+	p := groupNeighbours
+	p.Seen = map[string]bool{f.ID: true}
+	hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), p)
+	if err != nil {
+		return err
+	}
+	for _, h := range hits {
+		// Recall returns provisional facts too: they are indexed and active, but store.Active leaves them out.
+		// Take the hit's own fact, so a provisional neighbour is a real group member rather than a zero fact.
+		if _, ok := g.byID[h.ID]; !ok {
+			if h.Review != store.Provisional {
+				continue
 			}
-			union(f.ID, h.ID)
+			g.byID[h.ID] = h.Fact
+		}
+		g.union(f.ID, h.ID)
+	}
+	return nil
+}
+
+// groupsWithout counts the groups with no fact of these.
+func (g *grouper) groupsWithout(these map[string]bool) int {
+	n := 0
+	for _, m := range g.members() {
+		if len(m) > 1 && !slices.ContainsFunc(m, func(f store.Fact) bool { return these[f.ID] }) {
+			n++
 		}
 	}
+	return n
+}
+
+func (g *grouper) members() map[string][]store.Fact {
 	members := map[string][]store.Fact{}
-	for id := range parent {
-		r := find(id)
-		members[r] = append(members[r], byID[id])
+	for id := range g.parent {
+		r := g.find(id)
+		members[r] = append(members[r], g.byID[id])
 	}
+	return members
+}
+
+// groups are the groups of two facts or more, each in id order, ordered by their first fact.
+func (g *grouper) groups() [][]store.Fact {
 	var groups [][]store.Fact
-	for _, g := range members {
-		if len(g) < 2 {
+	for _, m := range g.members() {
+		if len(m) < 2 {
 			continue
 		}
-		slices.SortFunc(g, func(a, b store.Fact) int { return strings.Compare(a.ID, b.ID) })
-		groups = append(groups, g)
+		slices.SortFunc(m, func(a, b store.Fact) int { return strings.Compare(a.ID, b.ID) })
+		groups = append(groups, m)
 	}
 	slices.SortFunc(groups, func(a, b []store.Fact) int { return strings.Compare(a[0].ID, b[0].ID) })
-	return groups, nil
+	return groups
+}
+
+// sweepFacts are the facts the merge sweep takes next: the active facts that are not fresh, in id order from the
+// first one after cursor, then from the oldest again. store.Active returns them in id order, oldest first.
+func sweepFacts(active []store.Fact, fresh map[string]bool, cursor string) []store.Fact {
+	var old []store.Fact
+	for _, f := range active {
+		if !fresh[f.ID] {
+			old = append(old, f)
+		}
+	}
+	i, _ := slices.BinarySearchFunc(old, cursor, func(f store.Fact, id string) int {
+		if f.ID <= id {
+			return -1
+		}
+		return 1
+	})
+	return append(old[i:len(old):len(old)], old[:i]...)
+}
+
+// readMergeCursor reads the id of the last fact the merge sweep took; no file is the start of the base.
+func readMergeCursor(dir string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "dream.merge"))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	return strings.TrimSpace(string(b)), err
+}
+
+func writeMergeCursor(dir, id string) error {
+	if id == "" {
+		return nil
+	}
+	return os.WriteFile(filepath.Join(dir, "dream.merge"), []byte(id+"\n"), 0o600)
 }
 
 func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {

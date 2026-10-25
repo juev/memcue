@@ -170,6 +170,7 @@ func TestDreamExpandsTheBacklog(t *testing.T) {
 	oldExpand := packetExpand
 	packetExpand = 2
 	t.Cleanup(func() { packetExpand = oldExpand })
+	noSweep(t) // the merge sweep reviews old facts by design; this test is about their queries
 	sent := fakeExpand(t, nil)
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
 	nothingFresh := []string{"-since", time.Now().Add(time.Hour).Format(time.RFC3339)}

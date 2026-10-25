@@ -7,6 +7,7 @@
 package recall
 
 import (
+	"cmp"
 	"math"
 	"slices"
 	"sort"
@@ -25,8 +26,12 @@ type Params struct {
 	MinCoverage    float64 // IDF-weighted share of the prompt's terms a fact must hold
 	MaxPromptTerms int     // a longer prompt keeps its rarest terms only
 	MaxFacts       int
-	Seen           map[string]bool // facts left out, such as the fact whose neighbours are sought
-	Today          string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
+	// MinContained lets a fact pass below MinCoverage when the text holds nearly all of the fact's own terms: the
+	// IDF-weighted share of them it covers. Coverage alone is one-sided: a long restatement of a short fact covers
+	// all of it, while the short fact holds only a part of the long one's terms. Zero leaves it off.
+	MinContained float64
+	Seen         map[string]bool // facts left out, such as the fact whose neighbours are sought
+	Today        string          // local "YYYY-MM-DD" the expired facts are judged by; empty means store.Today()
 }
 
 // Hit is a fact close to the text.
@@ -103,6 +108,7 @@ func capFacts(maxFacts, available int) int {
 // recallCandidates applies the lexical gates and returns the facts that pass, in Search order and without the
 // MaxFacts cap. Recall adds the tie order and the cap.
 func recallCandidates(s *store.Store, prompt string, p Params) (hits []Hit, err error) {
+	var short []Hit // below MinCoverage, for the containment check
 	terms := text.Terms(prompt)
 	var tickets, numbers []string
 	for _, t := range terms {
@@ -187,13 +193,72 @@ func recallCandidates(s *store.Store, prompt string, p Params) (hits []Hit, err 
 			}
 		}
 		cov := got / sum
-		if matched < minMatched || cov < p.MinCoverage {
+		if matched < minMatched {
+			continue
+		}
+		if cov < p.MinCoverage {
+			if p.MinContained > 0 {
+				short = append(short, Hit{Fact: f.Fact, Coverage: cov, Matched: matched,
+					Provisional: f.Review == store.Provisional, bm25: f.BM25})
+			}
 			continue
 		}
 		hits = append(hits, Hit{Fact: f.Fact, Coverage: cov, Matched: matched,
 			Provisional: f.Review == store.Provisional, bm25: f.BM25})
 	}
-	return hits, nil
+	if len(short) == 0 {
+		return hits, nil
+	}
+	contained, err := containedIn(s, prompt, short, weight, total, p.MinContained)
+	if err != nil {
+		return nil, err
+	}
+	// Search order is BM25 order, and the facts kept by containment take their place in it.
+	return slices.SortedStableFunc(slices.Values(append(hits, contained...)), func(a, b Hit) int {
+		return cmp.Compare(a.bm25, b.bm25)
+	}), nil
+}
+
+// containedIn keeps the candidates whose own terms, those of their text and keywords, the prompt covers for at least
+// minShare of their IDF weight. weight holds the IDF of the prompt's terms and grows by the candidates' others.
+func containedIn(s *store.Store, prompt string, candidates []Hit, weight map[string]float64, total int,
+	minShare float64) ([]Hit, error) {
+	stems := text.Stems(prompt)
+	own := make([][]string, len(candidates))
+	var unknown []string
+	for i, h := range candidates {
+		own[i] = text.Terms(h.Content + " " + strings.Join(h.Keywords, " "))
+		for _, t := range own[i] {
+			if _, ok := weight[t]; !ok && !slices.Contains(unknown, t) {
+				unknown = append(unknown, t)
+			}
+		}
+	}
+	if len(unknown) > 0 {
+		df, _, err := s.DocFreq(unknown)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range unknown {
+			if df[t] > 0 {
+				weight[t] = math.Log(1 + float64(total)/float64(df[t]))
+			}
+		}
+	}
+	var out []Hit
+	for i, h := range candidates {
+		var got, sum float64
+		for _, t := range own[i] {
+			sum += weight[t]
+			if slices.ContainsFunc(stems, func(st string) bool { return text.Covers(t, st) }) {
+				got += weight[t]
+			}
+		}
+		if sum > 0 && got/sum >= minShare {
+			out = append(out, h)
+		}
+	}
+	return out, nil
 }
 
 // hostScope reports whether scope names this host.

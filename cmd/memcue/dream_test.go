@@ -279,6 +279,7 @@ func TestDreamDuplicateKeepsSmallerID(t *testing.T) {
 func TestDreamSinceLastRunOnly(t *testing.T) {
 	dir := env(t)
 	dreamBase(t)
+	noSweep(t) // the sweep reviews old facts on purpose; this test is about which facts are fresh
 	calls := fakeDream(t, func(string) []extract.Action { return nil })
 	if err := dreamModel(nil, &bytes.Buffer{}); err == nil {
 		t.Error("first dream without -since or -all must ask for one")
@@ -429,6 +430,14 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	if len(*calls) != 1 || !strings.Contains((*calls)[0], other) || !strings.Contains((*calls)[0], b+" (origin: x 2026-10-19; записан 2026-") {
 		t.Fatalf("new fact and new version not reviewed: %q", *calls)
 	}
+}
+
+// noSweep turns the merge sweep off for a test about the fresh facts alone.
+func noSweep(t *testing.T) {
+	t.Helper()
+	old := mergeSweep
+	mergeSweep = 0
+	t.Cleanup(func() { mergeSweep = old })
 }
 
 // mergeAnswer retires a and folds it into b, the answer for the nightly-sync group of dreamBase.
