@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.8.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.9.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.9.0 | 5 | 0.9.0 | 0.9.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.9.0 (`hermes-agent` 0.15.2) |
 | 0.8.0 | 5 | 0.8.0 | 0.8.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.8.0 (`hermes-agent` 0.15.2) |
 | 0.7.0 | 5 | 0.7.0 | 0.7.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.7.0 (`hermes-agent` 0.15.2) |
 | 0.6.0 | 5 | 0.6.0 | 0.6.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.6.0 (`hermes-agent` 0.15.2) |
@@ -157,6 +158,13 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.9.0: five facts per search by default (#372)
+
+- `memcue_search` hands over five facts unless the call asks for another number. On a live base ten facts doubled
+  the characters of a search and reached no prompt five did not, with the useful share falling from 22% to 12%.
+- The number is the provider option `search_facts` (default 5, 1–50); an installation that wants ten sets it back in
+  its own config, no release needed.
 
 ### 0.8.0: the agent searches itself (#361)
 
