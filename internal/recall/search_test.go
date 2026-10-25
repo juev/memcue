@@ -1,6 +1,7 @@
 package recall
 
 import (
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -174,8 +175,9 @@ func TestSearchControls(t *testing.T) {
 		q    Query
 		want []string
 	}{
-		// By default a session in a repository gets that repository's facts, and none that has expired.
-		{"default", Query{}, []string{"learnt here", "own repo"}},
+		// By default a session in a repository gets that repository's facts, this host's and the global ones (#418),
+		// and none that has expired.
+		{"default", Query{}, []string{"global rule", "learnt here", "other host", "own repo", "this host"}},
 		{"project", Query{In: []string{"project"}}, []string{"learnt here", "own repo"}},
 		{"global", Query{In: []string{"global"}}, []string{"global rule", "other host"}},
 		{"host", Query{In: []string{"host"}}, []string{"this host"}},
@@ -198,7 +200,7 @@ func TestSearchControls(t *testing.T) {
 	}
 }
 
-func TestSearchProjectOnly(t *testing.T) {
+func TestSearchNarrowByDefault(t *testing.T) {
 	repo := []string{"example.com/me/app"}
 	for _, c := range []struct {
 		q    Query
@@ -209,9 +211,98 @@ func TestSearchProjectOnly(t *testing.T) {
 		{Query{Project: []string{"dir:/home/me"}}, false},
 		{Query{}, false},
 	} {
-		if got := c.q.ProjectOnly(); got != c.want {
+		if got := c.q.NarrowByDefault(); got != c.want {
 			t.Errorf("%+v: %v, want %v", c.q, got, c.want)
 		}
+	}
+}
+
+// In a repository the default finds a fact of the repository, one of this host and a global one, and none of another
+// repository or host (#418).
+func TestSearchDefaultInARepository(t *testing.T) {
+	s := emptyBase(t)
+	for _, f := range []struct{ content, origin, scope string }{
+		{"project fact nats", "example.com/me/app 2026-10-26", "repo:example.com/me/app"},
+		{"host fact nats", "example.com/them/lib 2026-10-26", "host:mac"},
+		{"global fact nats", "example.com/them/lib 2026-10-26", "global"},
+		{"another repo nats", "example.com/them/lib 2026-10-26", "repo:example.com/them/lib"},
+		{"another host nats", "example.com/them/lib 2026-10-26", "host:loft"},
+	} {
+		if _, err := s.AddWith(f.content, []string{"nats"}, f.origin, "", store.Meta{Scope: f.scope}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hits, err := Search(s, Query{Text: "nats", N: 20, Project: []string{"example.com/me/app"}, Host: "mac"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, h := range hits {
+		got = append(got, strings.TrimSuffix(h.Content, " nats"))
+	}
+	slices.Sort(got)
+	if want := []string{"global fact", "host fact", "project fact"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestResolveRepos(t *testing.T) {
+	known := []string{"repo:github.com/me/memcue", "repo:example.com/a/app", "repo:example.com/b/app", "repo:Example.com/c/Tool"}
+	for _, c := range []struct {
+		name    string
+		in      []string
+		known   []string
+		want    []string
+		wantErr []string // parts the error must hold; nil is no error
+	}{
+		{"exact key keeps its spelling", []string{"REPO:github.com/me/MEMCUE"}, known,
+			[]string{"REPO:github.com/me/MEMCUE"}, nil},
+		{"unique suffix", []string{"repo:memcue"}, known, []string{"repo:github.com/me/memcue"}, nil},
+		{"suffix of several parts, case aside", []string{"repo:c/tool"}, known, []string{"repo:Example.com/c/Tool"}, nil},
+		{"other places untouched", []string{"host", "global", "service:x", "repo:memcue"}, known,
+			[]string{"host", "global", "service:x", "repo:github.com/me/memcue"}, nil},
+		{"empty known list", []string{"repo:nothing"}, nil, []string{"repo:nothing"}, nil},
+		{"no match", []string{"repo:memcu"}, known, nil,
+			[]string{`-in repo:memcu: no stored repository key ends with "memcu"; known keys: `, "github.com/me/memcue"}},
+		{"two matches", []string{"repo:app"}, known, nil,
+			[]string{`-in repo:app: 2 stored repository keys end with "app": example.com/a/app, example.com/b/app`}},
+		{"a part of a name is no suffix", []string{"repo:cue"}, known, nil, []string{"no stored repository key"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			q, err := Query{In: c.in}.ResolveRepos(c.known)
+			if c.wantErr != nil {
+				if err == nil {
+					t.Fatalf("got %q, want an error", q.In)
+				}
+				for _, part := range c.wantErr {
+					if !strings.Contains(err.Error(), part) {
+						t.Errorf("error %q lacks %q", err, part)
+					}
+				}
+				return
+			}
+			if err != nil || !slices.Equal(q.In, c.want) {
+				t.Errorf("got %q %v, want %q", q.In, err, c.want)
+			}
+		})
+	}
+}
+
+// Past twelve stored keys the error names the first twelve and counts the rest.
+func TestResolveReposCountsTheRest(t *testing.T) {
+	var known []string
+	for i := range 15 {
+		known = append(known, fmt.Sprintf("repo:example.com/a/r%02d", i))
+	}
+	_, err := Query{In: []string{"repo:nope"}}.ResolveRepos(known)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	want := `-in repo:nope: no stored repository key ends with "nope"; known keys: example.com/a/r00, example.com/a/r01, ` +
+		`example.com/a/r02, example.com/a/r03, example.com/a/r04, example.com/a/r05, example.com/a/r06, ` +
+		`example.com/a/r07, example.com/a/r08, example.com/a/r09, example.com/a/r10, example.com/a/r11, and 3 more`
+	if err.Error() != want {
+		t.Errorf("got  %q\nwant %q", err, want)
 	}
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -113,5 +114,57 @@ func TestSearchHintsOnCJK(t *testing.T) {
 	}
 	if got := run("headscale обновить"); strings.Contains(got, cjkHint) {
 		t.Errorf("a Russian query got the hint: %q", got)
+	}
+}
+
+// In a repository, search finds the repository's, this host's and the global facts without -in, and an answer with
+// none of them names -in all (#418).
+func TestSearchDefaultInARepository(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	key := gitRepo(t, repo)
+	t.Chdir(repo)
+	own := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:"+key, "nats магазина слушает 4222.")
+	host := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "host:"+currentHost(), "nats на этом хосте в docker.")
+	global := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "global", "nats держим на 4222 везде.")
+	addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
+	var out bytes.Buffer
+	if err := runSearch([]string{"-min-score", "0", "nats"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{own, host, global} {
+		if !strings.Contains(out.String(), id) {
+			t.Errorf("default search lacks %s: %q", id, out.String())
+		}
+	}
+	if strings.Contains(out.String(), "библиотеки") {
+		t.Errorf("default search found another repository's fact: %q", out.String())
+	}
+	out.Reset()
+	if err := runSearch([]string{"4223"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	want := "No facts of this repository, this host or global match; -in all searches every repository."
+	if strings.TrimSpace(out.String()) != want {
+		t.Errorf("an empty default answer printed %q, want %q", out.String(), want)
+	}
+}
+
+// -in repo:KEY takes the end of a stored key, and a key nothing ends with fails with the stored keys named (#418).
+func TestSearchResolvesARepositorySuffix(t *testing.T) {
+	env(t)
+	lib := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
+	addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/app", "nats приложения на 4224.")
+	var out bytes.Buffer
+	if err := runSearch([]string{"-in", "repo:lib", "nats"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), lib) || strings.Contains(out.String(), "приложения") {
+		t.Errorf("-in repo:lib printed %q, want the library's fact alone", out.String())
+	}
+	err := runSearch([]string{"-in", "repo:libs", "nats"}, &bytes.Buffer{})
+	want := `-in repo:libs: no stored repository key ends with "libs"; known keys: example.com/them/app, example.com/them/lib`
+	if err == nil || err.Error() != want {
+		t.Errorf("got %v, want %q", err, want)
 	}
 }

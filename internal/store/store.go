@@ -1184,6 +1184,29 @@ func (s *Store) Active() ([]Fact, error) {
 		ORDER BY f.id`, Active)
 }
 
+// RepoScopes returns the repository scopes the live facts carry — "repo:<key>" of the latest version of every fact
+// that is active and not a candidate — sorted and without duplicates. It is how a caller names a repository key it
+// does not know exactly.
+func (s *Store) RepoScopes() ([]string, error) {
+	scope, review := s.col("f", "scope"), s.col("f", "review")
+	rows, err := s.db.Query(`SELECT DISTINCT `+scope+` FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
+		AND `+review+` IN ('', ?) AND lower(`+scope+`) LIKE 'repo:%' ORDER BY 1`, Active, Provisional)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var sc string
+		if err := rows.Scan(&sc); err != nil {
+			return nil, err
+		}
+		out = append(out, sc)
+	}
+	return out, rows.Err()
+}
+
 // cols is the column list of a SELECT from facts, under alias when it is not empty; a column the base lacks reads as
 // its default.
 func (s *Store) cols(alias string) string {
