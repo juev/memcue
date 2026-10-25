@@ -562,7 +562,7 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	for _, tr := range a.Translations {
 		v, ok := p.Translate[tr.ID]
 		t := strings.TrimSpace(tr.Translation)
-		if !ok || translated[tr.ID] || t == "" {
+		if !ok || translated[tr.ID] || len(extract.WithTranslation(nil, t)) == 0 {
 			continue // a fact the packet did not give to translate, a second answer, or nothing to write
 		}
 		translated[tr.ID] = true
