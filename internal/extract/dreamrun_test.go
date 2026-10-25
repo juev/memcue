@@ -11,8 +11,8 @@ import (
 	"testing"
 )
 
-// The packet goes to the endpoint whole as the user message, without reasoning and at temperature 0; the answer comes
-// back without its fence, with the tokens it took (#401).
+// The packet goes to the endpoint whole as the user message, and the model may reason over it: the request carries no
+// thinking switch and no temperature. The answer comes back without its fence, with the tokens it took (#401).
 func TestDreamAnswerSendsThePacket(t *testing.T) {
 	const packet = "# memcue dream\n\n## Форма ответа\n\n`packet` — ровно `p1`."
 	content, _ := json.Marshal("```json\n{\"packet\":\"p1\",\"translations\":[]}\n```")
@@ -24,7 +24,7 @@ func TestDreamAnswerSendsThePacket(t *testing.T) {
 			Thinking    map[string]string `json:"thinking"`
 		}
 		if err := json.Unmarshal(b, &req); err != nil || len(req.Messages) != 2 || req.Messages[1].Content != packet ||
-			!strings.Contains(req.Messages[0].Content, "memcue dream") || req.Temperature == nil || *req.Temperature != 0 {
+			!strings.Contains(req.Messages[0].Content, "memcue dream") || req.Temperature != nil || req.Thinking != nil {
 			t.Errorf("request %s", b)
 		}
 		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":`+string(content)+`},"finish_reason":"stop"}],
