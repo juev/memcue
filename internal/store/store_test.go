@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oklog/ulid/v2"
+
 	"github.com/juev/memcue/internal/text"
 )
 
@@ -857,6 +859,106 @@ func TestActiveSurvivesLostIndexRow(t *testing.T) {
 	defer func() { _ = s.Close() }()
 	if _, ok := ids(t, s, "vaultwarden vault")[f.ID]; !ok {
 		t.Error("reopening did not repair the index")
+	}
+}
+
+func reopen(t *testing.T, s *Store, path string) *Store {
+	t.Helper()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+// An open that finds the counts of the last check trusts the index (#396); one whose index lost a row since does
+// not, though the facts did not change.
+func TestStampedBaseStillRepairsALostIndexRow(t *testing.T) {
+	s, path := open(t)
+	facts, err := s.AddBatch([]FactInput{{Content: "Vaultwarden обслуживает vault.example.org"},
+		{Content: "Gitea слушает порт 3000"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = reopen(t, s, path) // the open that saves the stamp
+	tx, err := s.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO fact_fts(fact_fts, rowid, stems) SELECT 'delete', rid, stems FROM fact_index
+		WHERE id = ?`, facts[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`DELETE FROM fact_index WHERE id = ?`, facts[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	s = reopen(t, s, path)
+	if _, ok := ids(t, s, "vaultwarden")[facts[0].ID]; !ok {
+		t.Error("a stamped base kept a lost index row lost")
+	}
+}
+
+// A version written without its index row, as by an older memcue or a merge that left the index behind, changes the
+// count of facts: the stamp no longer matches and the open indexes the version.
+func TestStampedBaseIndexesAVersionWrittenWithoutTheIndex(t *testing.T) {
+	s, path := open(t)
+	if _, err := s.Add("Vaultwarden обслуживает vault.example.org", nil, "x 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	s = reopen(t, s, path)
+	tx, err := s.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := Fact{ID: ulid.Make().String(), Version: 1, Content: "Gitea слушает порт 3000", Created: time.Now().UTC(),
+		Status: Active}
+	if err := insert(tx, f); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	s = reopen(t, s, path)
+	if _, ok := ids(t, s, "gitea")[f.ID]; !ok {
+		t.Error("a version written without the index is not found after the open")
+	}
+}
+
+// Merge rebuilds the index, and the rebuild leaves the stamp the next open trusts.
+func TestMergeLeavesACurrentStamp(t *testing.T) {
+	s, path := open(t)
+	if _, err := s.Add("Vaultwarden обслуживает vault.example.org", nil, "x 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	other, otherPath := open(t)
+	f, err := other.Add("Gitea слушает порт 3000", nil, "y 2026-10-21")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := other.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Merge(otherPath); err != nil {
+		t.Fatal(err)
+	}
+	want, err := indexStamp(s.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved string
+	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = 'index'`).Scan(&saved); err != nil || saved != want {
+		t.Errorf("stamp after merge %q, want %q (%v)", saved, want, err)
+	}
+	s = reopen(t, s, path)
+	if _, ok := ids(t, s, "gitea")[f.ID]; !ok {
+		t.Error("the merged fact is not found after the open")
 	}
 }
 
