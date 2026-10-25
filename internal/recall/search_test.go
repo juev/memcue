@@ -198,6 +198,23 @@ func TestSearchControls(t *testing.T) {
 	}
 }
 
+func TestSearchProjectOnly(t *testing.T) {
+	repo := []string{"example.com/me/app"}
+	for _, c := range []struct {
+		q    Query
+		want bool
+	}{
+		{Query{Project: repo}, true},
+		{Query{Project: repo, In: []string{"project"}}, false},
+		{Query{Project: []string{"dir:/home/me"}}, false},
+		{Query{}, false},
+	} {
+		if got := c.q.ProjectOnly(); got != c.want {
+			t.Errorf("%+v: %v, want %v", c.q, got, c.want)
+		}
+	}
+}
+
 // Outside a repository the default is the whole base.
 func TestSearchDefaultOutsideARepository(t *testing.T) {
 	s := controlBase(t)

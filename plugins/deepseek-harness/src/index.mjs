@@ -53,7 +53,7 @@ const MIN_BINARY = '0.4.0'
 
 /** The oldest binary with `search -cwd` and `-session` (#361); an older one searches without them (#368). */
 const SCOPED_SEARCH = '0.8.0'
-const SEARCH_CONTROLS = '0.15.0' // search -in, -kind, -since, -expired, -all-words (#409)
+const SEARCH_CONTROLS = '0.14.0' // search -in, -kind, -since, -expired, -all-words (#409)
 
 /** Defaults used when the bundle patch supplies no config. */
 const DEFAULTS = Object.freeze({

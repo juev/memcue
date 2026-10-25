@@ -828,11 +828,11 @@ test('memcue_search passes the session cwd and id for the tie order and the sear
 })
 
 test('memcue_search passes the search controls (#409)', async () => {
-	const log = join(dir, 'search-015.log')
-	const binary = join(dir, 'memcue-015.sh')
+	const log = join(dir, 'search-014.log')
+	const binary = join(dir, 'memcue-014.sh')
 	await writeFile(binary, `#!/bin/sh
 case "$1" in
-  version) printf '{"version":"0.15.0"}\\n' ;;
+  version) printf '{"version":"0.14.0"}\\n' ;;
   search) printf '%s\\n' "$*" >> "${log}"; printf '[]\\n' ;;
 esac
 exit 0
@@ -844,9 +844,9 @@ exit 0
 	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', words: 'some' }, {}), /words must be all or any/)
 })
 
-test('memcue_search refuses the controls on a binary older than 0.15.0', async () => {
+test('memcue_search refuses the controls on a binary older than 0.14.0', async () => {
 	const { tools } = mount()
-	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', kind: 'rule' }, {}), /need memcue 0\.15\.0/)
+	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', kind: 'rule' }, {}), /need memcue 0\.14\.0/)
 })
 
 test('memcue_search gives a binary older than 0.8.0 only the flags it knows (#368)', async () => {

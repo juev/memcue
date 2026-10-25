@@ -164,17 +164,19 @@ comes from where the session works, read from the files and never by running git
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
 writes the key. `memcue add -scope repo` does the same for the working directory.
 
-The project narrows and orders `memcue search`. By default it leaves out facts bound to another repository (scope
-`repo:<other key>`); `-in project` keeps only the project's facts, those learnt in it or scoped to it, and `-in all`
-keeps every repository's. On 35 queries agents wrote, the default kept 116 of the 129 useful facts and dropped 37 of
-the 63 unrelated ones, while the project alone kept 41 useful facts: what a repository session needs often lives under
-a host or service scope learnt elsewhere (#409). Of facts with equal scores, one learnt in the session's project comes
-before a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working
-directory.
+The project narrows and orders `memcue search`. In a session that works in a repository, search looks only at that
+repository's facts by default: those learnt in it or scoped to it (`repo:<key>`). Outside a repository, and in the
+Hermes tool, the default is the whole base. `-in all` searches every repository, `-in project` asks for the narrow
+place explicitly, and `-in host`, `-in global` or a scope such as `-in repo:KEY` name another (#409). The narrow default
+is a choice, not a measured gain: on 35 queries agents wrote from repositories and the Claude config directory, it
+left 22 queries with a useful fact against 32 for the whole base, because what a repository session needs often lives
+under a host or service scope learnt elsewhere; an agent that finds nothing in the project searches again with
+`-in all`. Of facts with equal scores, one learnt in the session's project comes before a global one and the rest.
+`search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
 
-### 0.14.0: a dream over the whole base, and search hands over only what fits (#405, #407)
+### 0.14.0: a dream over the whole base, and search hands over only what fits and where the agent asks (#405, #407, #409)
 
 - `memcue dream -run -all` answers packet after packet until the base has no work left, so the translations of
   0.12.0 need not wait for three days of hourly dreams. It uses the endpoint when `MEMCUE_API_URL` is set and
@@ -186,7 +188,13 @@ directory.
   characters per search by 17% ([search-floor-2026-10](docs/research/search-floor-2026-10.md), #407). A search that
   finds nothing prints "No stored facts match." The session note and the search tools of the Hermes and DSH plugins
   say so.
-- No schema change.
+- The agent steers search (#409): `-in` where to look (`project`, `all`, `global`, `host`, or a scope such as
+  `repo:KEY`), `-kind`, `-since`, `-expired` and `-all-words`; the Hermes and DSH search tools take the same as `in`,
+  `kind`, `since`, `expired`, `words` and `min_score`. **In a repository search now looks only at that repository's
+  facts by default**, and a text answer that finds nothing there says that `-in all` searches every repository.
+  Outside a repository, and in the Hermes tool, the default stays the whole base. Expired facts leave the default
+  result. See [Projects](#projects) for what the narrow default costs on measured queries.
+- No schema change. The plugins pass the new parameters only to a 0.14.0 binary.
 
 ### 0.13.0: Hermes runs the dream itself (#401)
 
@@ -362,7 +370,7 @@ says otherwise: what happened in one run is not the knowledge a later session ne
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
-memcue search -in project postgres   # only this repository's facts; -in all: every repository, -in host, -in global
+memcue search -in all postgres       # every repository; the default in a repository is its own facts (-in project)
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
