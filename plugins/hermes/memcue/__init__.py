@@ -82,7 +82,7 @@ _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared h
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
 _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
 _DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
-_SEARCH_CONTROLS = "0.15.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
+_SEARCH_CONTROLS = "0.14.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:

@@ -102,6 +102,10 @@ func (q Query) Filter() (store.Filter, error) {
 	return f, nil
 }
 
+// ProjectOnly reports whether q searches only the session's repository because it named no place: the default in a
+// repository, which an agent widens with "all" when the repository has nothing.
+func (q Query) ProjectOnly() bool { return len(q.In) == 0 && inRepo(q.Project) }
+
 // inRepo reports whether a session with these project keys works in a repository: a key other than a directory
 // (dir:<path>) names one, the global tier of the Claude config directory included.
 func inRepo(project []string) bool {

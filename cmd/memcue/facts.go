@@ -542,7 +542,11 @@ func runSearch(args []string, out io.Writer) error {
 			return json.NewEncoder(out).Encode(searchJSON(hits))
 		}
 		if len(hits) == 0 {
-			_, err := fmt.Fprintln(out, "No stored facts match.")
+			msg := "No stored facts match."
+			if q.ProjectOnly() {
+				msg = "No facts of this repository match; -in all searches every repository."
+			}
+			_, err := fmt.Fprintln(out, msg)
 			return err
 		}
 		for _, h := range hits {
