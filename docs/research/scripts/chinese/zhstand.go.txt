@@ -1,0 +1,86 @@
+// Command zhstand is the stand of #410 (experiment, not part of memcue).
+//
+//	zhstand rebuild DB MODE            rebuild the FTS index with lexer MODE ("", bigram, gse)
+//	zhstand search DB PROMPTS MODE REP run every prompt: floor top 5 and no-floor top 10, mean latency over REP runs
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/juev/memcue/internal/recall"
+	"github.com/juev/memcue/internal/store"
+	"github.com/juev/memcue/internal/text"
+	"github.com/juev/memcue/internal/tier"
+)
+
+type prompt struct {
+	ID  string `json:"id"`
+	Q   string `json:"q"`
+	CWD string `json:"cwd"`
+}
+
+type row struct {
+	ID      string    `json:"id"`
+	Terms   []string  `json:"terms"`
+	Top5    []string  `json:"top5"`    // recall.Search with recall.MinScore, n=5
+	Top10   []string  `json:"top10"`   // no floor, n=10
+	BM25    []float64 `json:"bm25"`    // of Top10
+	Latency float64   `json:"lat_us"`  // mean microseconds of the floor search
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	switch os.Args[1] {
+	case "rebuild":
+		text.SetCJK(os.Args[3])
+		s, err := store.Open(os.Args[2])
+		must(err)
+		t := time.Now()
+		must(s.Rebuild())
+		fmt.Fprintf(os.Stderr, "rebuild %s mode=%q %v\n", os.Args[2], os.Args[3], time.Since(t))
+		must(s.Close())
+	case "search":
+		text.SetCJK(os.Args[4])
+		rep, _ := strconv.Atoi(os.Args[5])
+		s, err := store.OpenReadOnly(os.Args[2])
+		must(err)
+		var ps []prompt
+		b, err := os.ReadFile(os.Args[3])
+		must(err)
+		must(json.Unmarshal(b, &ps))
+		enc := json.NewEncoder(os.Stdout)
+		for _, p := range ps {
+			keys := tier.Keys(p.CWD, "")
+			r := row{ID: p.ID, Terms: text.Terms(p.Q)}
+			hs, err := recall.Search(s, p.Q, keys, "", 5, recall.MinScore)
+			must(err)
+			for _, h := range hs {
+				r.Top5 = append(r.Top5, h.ID)
+			}
+			hs, err = recall.Search(s, p.Q, keys, "", 10, 0)
+			must(err)
+			for _, h := range hs {
+				r.Top10 = append(r.Top10, h.ID)
+				r.BM25 = append(r.BM25, h.BM25)
+			}
+			t := time.Now()
+			for range rep {
+				_, err := recall.Search(s, p.Q, keys, "", 5, recall.MinScore)
+				must(err)
+			}
+			if rep > 0 {
+				r.Latency = float64(time.Since(t).Microseconds()) / float64(rep)
+			}
+			must(enc.Encode(r))
+		}
+	}
+}

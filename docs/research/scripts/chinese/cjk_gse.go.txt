@@ -1,0 +1,13 @@
+//go:build gse
+
+package text
+
+import "github.com/go-ego/gse"
+
+func init() {
+	seg, err := gse.NewEmbed("zh_s")
+	if err != nil {
+		panic(err)
+	}
+	gseCut = func(s string) []string { return seg.CutSearch(s, true) }
+}

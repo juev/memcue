@@ -1,0 +1,80 @@
+package text
+
+// Experiment for #410, not part of memcue: MEMCUE_CJK=bigram splits every run of Han or kana into overlapping
+// bigrams (a lone character stays a unigram), the CJK approach of FTS engines without a dictionary.
+// MEMCUE_CJK=gse uses the gse dictionary segmenter instead (see cjk_gse.go). Empty keeps the lexer as shipped.
+
+import (
+	"os"
+	"unicode"
+)
+
+var cjk = os.Getenv("MEMCUE_CJK")
+
+func cjkMode() string { return cjk }
+
+// SetCJK switches the mode inside one process, for the stand.
+func SetCJK(m string) { cjk = m }
+
+func isCJK(r rune) bool {
+	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r)
+}
+
+func isCJKWord(w string) bool {
+	for _, r := range w {
+		if !isCJK(r) {
+			return false
+		}
+	}
+	return w != ""
+}
+
+// splitCJK cuts each word at script boundaries and replaces each CJK run by its segments.
+func splitCJK(ws []string) []string {
+	var out []string
+	for _, w := range ws {
+		rs := []rune(w)
+		start := 0
+		for i := 1; i <= len(rs); i++ {
+			if i < len(rs) && isCJK(rs[i]) == isCJK(rs[start]) {
+				continue
+			}
+			seg := rs[start:i]
+			if isCJK(seg[0]) {
+				out = append(out, segmentCJK(seg)...)
+			} else {
+				out = append(out, string(seg))
+			}
+			start = i
+		}
+	}
+	return out
+}
+
+func segmentCJK(rs []rune) []string {
+	if cjk == "gse" && gseCut != nil {
+		var out []string
+		for _, t := range gseCut(string(rs)) {
+			if isCJKWord(t) && !zhStop[t] {
+				out = append(out, t)
+			}
+		}
+		return out
+	}
+	if len(rs) == 1 {
+		return []string{string(rs)}
+	}
+	out := make([]string, 0, len(rs)-1)
+	for i := 0; i+1 < len(rs); i++ {
+		out = append(out, string(rs[i:i+2]))
+	}
+	return out
+}
+
+// gseCut is set by cjk_gse.go when built with that segmenter.
+var gseCut func(string) []string
+
+// zhStop: function words a dictionary segmenter leaves as single tokens.
+var zhStop = map[string]bool{"的": true, "了": true, "是": true, "在": true, "和": true, "吗": true, "呢": true,
+	"什么": true, "哪": true, "哪些": true, "怎么": true, "如何": true, "我们": true, "这": true, "那": true, "有": true,
+	"就": true, "也": true, "都": true, "把": true, "被": true, "从": true, "里": true, "对": true, "还": true, "吧": true}
