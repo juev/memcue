@@ -5,8 +5,9 @@ description: Tidy long-term memory (memcue dream). Use when the session start sa
 
 # memcue: the dream
 
-A dream splits compound facts, gives facts without search queries their queries, and retires or corrects
-duplicates and outdated facts. You do it; memcue prepares the work and checks your answer.
+A dream splits compound facts, gives facts without search queries their queries, translates facts into the other
+language, and retires or corrects duplicates and outdated facts. You do it; memcue prepares the work and checks your
+answer.
 
 Never interrupt the user's work for it: finish or pause at a natural point first.
 
@@ -16,7 +17,7 @@ Never interrupt the user's work for it: finish or pause at a natural point first
    memcue dream -prepare
    ```
 
-   It prints the instructions, the three tasks with their rules and the data. "nothing for the dream" means you are
+   It prints the instructions, the four tasks with their rules and the data. "nothing for the dream" means you are
    done.
 2. Follow the instructions: write one JSON answer to a temporary file (`mktemp`), with `packet` exactly as printed.
 3. Apply it:
@@ -31,3 +32,14 @@ Never interrupt the user's work for it: finish or pause at a natural point first
    corrected.
 
 A packet is bounded; when the session start still says facts wait, the next packet takes the rest.
+
+A base far behind (hundreds of facts waiting, or a translation owed for most of them) takes dozens of packets, about
+25,000 tokens of context each. Do not answer them in the session: when the user wants the whole base done, run it in
+the background on `claude -p` and report the result.
+
+```bash
+env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all
+```
+
+It answers packet after packet until the base has no work left, and logs each pass with its cost in `dream.log`.
+Without `env -u` it uses the extraction's endpoint when `MEMCUE_API_URL` is set.

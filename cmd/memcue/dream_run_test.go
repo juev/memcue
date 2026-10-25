@@ -17,18 +17,18 @@ func fakeDreamRun(t *testing.T, fail error) *int {
 	t.Helper()
 	calls := 0
 	old := dreamRunFn
-	dreamRunFn = func(packet string) ([]byte, extract.Tokens, error) {
+	dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
 		calls++
 		tokens := extract.Tokens{Input: len(packet) / 4, Output: 100}
 		if fail != nil {
-			return nil, tokens, fail
+			return nil, 0, tokens, fail
 		}
 		a, err := answerPacket(packet)
 		if err != nil {
-			return nil, tokens, err
+			return nil, 0, tokens, err
 		}
 		b, err := json.Marshal(a)
-		return b, tokens, err
+		return b, 0.5, tokens, err
 	}
 	t.Cleanup(func() { dreamRunFn = old })
 	return &calls
@@ -77,8 +77,8 @@ func TestDreamRunNeedsAnEndpoint(t *testing.T) {
 	if !errors.Is(err, extract.ErrNoEndpoint) || *calls != 0 {
 		t.Fatalf("err %v after %d calls, want ErrNoEndpoint and none", err, *calls)
 	}
-	if err := runDream([]string{"-run", "-all"}, &bytes.Buffer{}); err == nil {
-		t.Error("-run -all was accepted")
+	if err := runDream([]string{"-run", "-since", "2026-10-01"}, &bytes.Buffer{}); err == nil {
+		t.Error("-run -since was accepted")
 	}
 }
 
@@ -156,7 +156,7 @@ func TestDreamRunLogsAFailedCall(t *testing.T) {
 		t.Error("a failed call wrote a translation")
 	}
 	recs := readDreamLog(t, dir)
-	if last := recs[len(recs)-1]; !strings.HasPrefix(last.Error, "endpoint: ") || last.Tokens == nil {
+	if last := recs[len(recs)-1]; !strings.HasPrefix(last.Error, "model: ") || last.Tokens == nil {
 		t.Errorf("record %+v", last)
 	}
 	translateAll(t)
@@ -166,5 +166,124 @@ func TestDreamRunLogsAFailedCall(t *testing.T) {
 	}
 	if _, ok := extract.Translation(vetStatus(t, old).Queries); !ok || *calls != 1 {
 		t.Errorf("the run after a failure did not translate (failed calls %d)", *calls)
+	}
+}
+
+// fewPerPacket makes a packet take one fact to translate and two to expand, so a small base needs several passes.
+func fewPerPacket(t *testing.T) {
+	t.Helper()
+	oldT, oldE := packetTranslate, packetExpand
+	packetTranslate, packetExpand = 1, 2
+	t.Cleanup(func() { packetTranslate, packetExpand = oldT, oldE })
+}
+
+// dream -run -all finishes the base (#405): packets one after another, with no interval, until a packet has nothing
+// to split, expand or translate; that one is answered too and the loop stops. Without MEMCUE_API_URL it runs, on
+// claude -p; a plain -run still refuses there.
+func TestDreamRunAllFinishesTheBase(t *testing.T) {
+	dir := env(t)
+	ids := []string{}
+	old, a, b, other := dreamBase(t)
+	ids = append(ids, old, a, b, other)
+	fewPerPacket(t)
+	noSweep(t) // the sweep would group the duplicate pair on every pass of a base this small; see the next test
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	calls := fakeDreamRun(t, nil)
+
+	var out bytes.Buffer
+	if err := runDream([]string{"-run", "-all"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if *calls < 4 || !strings.Contains(out.String(), "dream -all: done after ") {
+		t.Fatalf("%d calls, out %q", *calls, out.String())
+	}
+	for _, id := range ids {
+		f := vetStatus(t, id)
+		if _, ok := extract.Translation(f.Queries); !ok || len(extract.SearchQueries(f.Queries)) == 0 {
+			t.Errorf("fact %s left with queries %q", id, f.Queries)
+		}
+	}
+	priced := 0
+	for _, r := range readDreamLog(t, dir) {
+		if r.Error != "" {
+			t.Errorf("record %+v", r)
+		}
+		if r.CostUSD == 0.5 {
+			priced++
+		}
+	}
+	if priced != *calls {
+		t.Errorf("%d records carry the cost of %d calls", priced, *calls)
+	}
+	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, extract.ErrNoEndpoint) {
+		t.Errorf("plain -run without an endpoint: err %v, want ErrNoEndpoint", err)
+	}
+}
+
+// A failed pass stops dream -run -all with its error; the passes before it stay applied.
+func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
+	env(t)
+	dreamBase(t)
+	fewPerPacket(t)
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	ok := fakeDreamRun(t, nil)
+	good := dreamRunFn
+	n := 0
+	dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
+		if n++; n == 2 {
+			return nil, 0, extract.Tokens{}, errModel
+		}
+		return good(packet)
+	}
+	err := runDream([]string{"-run", "-all"}, &bytes.Buffer{})
+	if !errors.Is(err, errModel) || !strings.Contains(err.Error(), "pass 2") || *ok != 1 {
+		t.Errorf("err %v after %d good passes", err, *ok)
+	}
+}
+
+// The bound of passes stops a run that still has work and says so; the next run continues.
+func TestDreamRunAllStopsAtTheBound(t *testing.T) {
+	env(t)
+	dreamBase(t)
+	fewPerPacket(t)
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	calls := fakeDreamRun(t, nil)
+	old := dreamAllPasses
+	dreamAllPasses = 1
+	t.Cleanup(func() { dreamAllPasses = old })
+	err := runDream([]string{"-run", "-all"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "stopped after 1 passes") || *calls != 1 {
+		t.Fatalf("err %v after %d calls", err, *calls)
+	}
+	dreamAllPasses = old
+	if err := runDream([]string{"-run", "-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A fact a group of every packet holds waits for its translation (#396). In a base this small the merge sweep groups
+// the duplicate pair on every pass, so after dreamAllStalls passes that change nothing the loop stops and says how
+// many facts are left, instead of running to the bound.
+func TestDreamRunAllStopsWhenNothingMoves(t *testing.T) {
+	env(t)
+	dreamBase(t)
+	fewPerPacket(t)
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	calls := fakeDreamRun(t, nil)
+	var out bytes.Buffer
+	if err := runDream([]string{"-run", "-all"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "stopped after 3 passes that changed nothing; 2 facts still lack a translation") ||
+		*calls >= dreamAllPasses {
+		t.Errorf("%d calls, out %q", *calls, out.String())
 	}
 }

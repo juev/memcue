@@ -446,6 +446,12 @@ Who runs it:
   facts, and when a dream is due sends the packet to the extraction's endpoint (`MEMCUE_API_URL`) and applies the
   answer; with nothing due it makes no call. Without `MEMCUE_API_URL`, `-run` refuses, so Claude Code keeps the
   session's model ([plugins/hermes/README.md](plugins/hermes/README.md#dream), #401).
+- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
+  interval, and the merge sweep, which never runs out of groups, does not keep it going. It uses the endpoint when
+  `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks) otherwise. It stops on
+  the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. On a
+  Claude Code machine that extracts through an endpoint, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all`
+  runs it on Opus (#405).
 
 A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand and 40 to translate. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.

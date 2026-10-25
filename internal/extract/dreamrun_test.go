@@ -3,7 +3,6 @@ package extract
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +31,7 @@ func TestDreamAnswerSendsThePacket(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	useEndpoint(t, srv.URL)
-	answer, tokens, err := DreamAnswer(context.Background(), packet)
+	answer, _, tokens, err := DreamAnswer(context.Background(), packet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,10 +40,23 @@ func TestDreamAnswerSendsThePacket(t *testing.T) {
 	}
 }
 
-// Without an endpoint there is nobody to send the packet to: the session's model runs the dream instead.
-func TestDreamAnswerNeedsAnEndpoint(t *testing.T) {
-	useEndpoint(t, "")
-	if _, _, err := DreamAnswer(context.Background(), "packet"); !errors.Is(err, ErrNoEndpoint) {
-		t.Errorf("err %v, want ErrNoEndpoint", err)
+// The schema `claude -p` holds a dream answer to is the answer -apply reads: every part, and the fields an action and a
+// split need.
+func TestDreamSchemaIsTheAnswer(t *testing.T) {
+	var schema struct {
+		Required   []string                   `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal([]byte(dreamSchema), &schema); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"packet", "splits", "expansions", "actions", "translations"}
+	if strings.Join(schema.Required, ",") != strings.Join(want, ",") || len(schema.Properties) != len(want) {
+		t.Errorf("schema requires %q with %d properties, want %q", schema.Required, len(schema.Properties), want)
+	}
+	for _, field := range []string{`"by"`, `"kind"`, `"parts"`, `"translation"`, `"queries"`} {
+		if !strings.Contains(dreamSchema, field) {
+			t.Errorf("schema lacks %s", field)
+		}
 	}
 }
