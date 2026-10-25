@@ -539,6 +539,10 @@ class ProviderTest(unittest.TestCase):
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
         self.assertEqual(len(found["facts"]), memcue_provider._SEARCH_FACTS)
         self.assertEqual(memcue_provider._SEARCH_FACTS, 5)
+        # Raising the limit adds the tail, not better facts (#425): the schema names the default and that cost.
+        limit = memcue_provider.SEARCH_SCHEMA["parameters"]["properties"]["limit"]["description"]
+        self.assertIn("default 5", limit)
+        self.assertIn("adds the tail", limit)
         few = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": self.p._facts, "search_facts": "2"})
         found = json.loads(few.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
         self.assertEqual(len(found["facts"]), 2)

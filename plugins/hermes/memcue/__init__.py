@@ -271,8 +271,9 @@ SEARCH_SCHEMA = _schema(
     "or retiring it. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
     "the whole base and leaves out expired facts; the optional parameters narrow or widen that.",
     {"query": "Words of the fact.",
-     "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); fewer come "
-              "when the rest do not fit.",
+     "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
+              "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
+              "got is thinner than the question needs.",
      "in": "Optional where to look, comma-separated: all (the default), project (the session's repository only), "
            "global, host (this machine), or a scope such as repo:KEY, host:NAME, service:NAME.",
      "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. "
