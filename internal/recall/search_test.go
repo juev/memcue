@@ -289,3 +289,15 @@ func TestSearchRefusesUnknownControls(t *testing.T) {
 		}
 	}
 }
+
+// An origin key outside ASCII still names its facts: the database counts characters, not bytes.
+func TestSearchProjectKeyOutsideASCII(t *testing.T) {
+	s := emptyBase(t)
+	if _, err := s.Add("nats на стенде", nil, "dir:/дом/проект 2026-10-25"); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := Search(s, Query{Text: "nats", N: 5, Project: []string{"dir:/дом/проект"}, In: []string{"project"}})
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("got %d facts %v, want the project's fact", len(hits), err)
+	}
+}
