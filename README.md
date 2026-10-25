@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.9.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.10.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.10.0 | 5 | 0.10.0 | 0.10.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.10.0 (`hermes-agent` 0.15.2) |
 | 0.9.0 | 5 | 0.9.0 | 0.9.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.9.0 (`hermes-agent` 0.15.2) |
 | 0.8.0 | 5 | 0.8.0 | 0.8.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.8.0 (`hermes-agent` 0.15.2) |
 | 0.7.0 | 5 | 0.7.0 | 0.7.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.7.0 (`hermes-agent` 0.15.2) |
@@ -158,6 +159,21 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.10.0: versions are terms by default, and the dream sweeps old facts (#376, #377)
+
+- `MEMCUE_NUMBER_TERMS` is on unless it is `0` (`false`, `off`, `no`): versions, dates, ports and addresses are one
+  exact term, so a prompt naming a version finds the fact naming it. A base indexed word-only by the previous
+  release is rebuilt once on the first search, with no `reindex`. On a copy of a live base the share of top-5 facts
+  carrying the queried version went from 1 of 30 to 10 of 30; 10 of 10 ordinary questions returned the same facts
+  ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)).
+- A dream also sweeps up to 50 facts it has already seen, after a cursor in `dream.merge`, and adds at most 20
+  groups of its own inside the packet bound: a duplicate pair whose copies both predate the last dream is reviewed
+  at last. `dream.log` lists every group by id under `grouped`, with its fresh facts and its outcome, so the log
+  says whether two facts were grouped in a run
+  ([docs/research/dream-merge-2026-10.md](docs/research/dream-merge-2026-10.md)).
+- Grouping passes a candidate whose own terms the text nearly all holds, below the search's coverage gate; search
+  itself is unchanged.
 
 ### 0.9.0: five facts per search by default (#372)
 
