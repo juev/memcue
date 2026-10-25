@@ -74,6 +74,30 @@ func TestDreamExpandsFactsWithoutQueries(t *testing.T) {
 	}
 }
 
+// A fact whose only query is its translation (#395) has no search queries yet: the dream expands it, and the
+// translation stays next to the queries it writes.
+func TestDreamExpandsATranslatedFactAndKeepsTheTranslation(t *testing.T) {
+	env(t)
+	_, a, _, _ := dreamBase(t)
+	s, _ := store.Open(factsPath())
+	tr := extract.TranslationPrefix + "the fact in English"
+	if _, err := s.SetQueries(a, 1, []string{tr}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	sent := fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(*sent, a) {
+		t.Fatalf("sent %q, want the translated fact among them", *sent)
+	}
+	if f := vetStatus(t, a); !slices.Equal(f.Queries, []string{"запрос " + a, tr}) {
+		t.Errorf("queries %q, want the new query and the translation", f.Queries)
+	}
+}
+
 // The parts of a split have no queries yet, and are new to the next dream, so it expands them. The compound fact
 // itself is not expanded: its split goes first.
 func TestDreamExpandsTheParts(t *testing.T) {

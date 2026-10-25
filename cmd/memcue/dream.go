@@ -378,14 +378,15 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	}
 	// Every fact without search queries gets them, the fresh ones first, then the facts the dream has seen and will
 	// not see again, the newest first: an old base is expanded over a few dreams (#276).
+	// A translation alone (#395) is not search queries: a fact that has only it still gets them.
 	var bare []store.Fact
 	for _, f := range batch {
-		if len(f.Queries) == 0 {
+		if len(extract.SearchQueries(f.Queries)) == 0 {
 			bare = append(bare, f)
 		}
 	}
 	for i := len(active) - 1; i >= 0 && len(bare) < packetExpand; i-- {
-		if f := active[i]; !isFresh[f.ID] && len(f.Queries) == 0 {
+		if f := active[i]; !isFresh[f.ID] && len(extract.SearchQueries(f.Queries)) == 0 {
 			bare = append(bare, f)
 		}
 	}
@@ -626,7 +627,13 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 	// unchanged at that version; any other change refuses its group.
 	expandedFrom := map[string]int{}
 	for _, e := range plan.Expansions {
-		f, err := s.SetQueries(e.ID, e.Version, extract.CleanQueries(e.Queries))
+		q := extract.CleanQueries(e.Queries)
+		if cur, err := s.Get(e.ID); err == nil && cur.Version == e.Version {
+			// The queries are written whole: the translation the fact already has stays with them.
+			tr, _ := extract.Translation(cur.Queries)
+			q = extract.WithTranslation(q, tr)
+		}
+		f, err := s.SetQueries(e.ID, e.Version, q)
 		switch {
 		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound):
 			rec.Refused = append(rec.Refused, "expand "+e.ID+": "+err.Error())
