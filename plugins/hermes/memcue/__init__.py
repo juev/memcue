@@ -280,7 +280,8 @@ SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
-    "the whole base and leaves out expired facts; the optional parameters narrow or widen that.",
+    "the whole base — a chat is not about one repository — and leaves out expired facts; the optional parameters "
+    "narrow or widen that.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
               "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
@@ -1217,8 +1218,11 @@ class MemcueMemoryProvider(MemoryProvider):
                 return tool_error(f"in, kind, since, expired, words and min_score need memcue {_SEARCH_CONTROLS} "
                                   f"or later; this one is {self._version or 'unknown'}")
             if controls_ok and not arg("in"):
-                # A Hermes chat is not about one repository: the whole base, where memcue would take the workspace's
-                # repository alone (#409).
+                # A Hermes chat is not about one repository: the whole base, where memcue would take the places of
+                # the working directory (#409). Kept after the default itself was widened (#418), because measured it
+                # is still the better arm: on 20 user prompts the repository default (project, host, global) delivered
+                # 10 useful facts and lost 7 where the whole base delivered 16 and lost 1, and on 8 agent queries 9
+                # and 7 against 15 and 1 (#438, docs/research/scope-default-vs-all-438-2026-10.md).
                 controls += ["-in", "all"]
             ok, out = self._run(cmd + controls + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
