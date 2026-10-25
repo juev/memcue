@@ -479,6 +479,26 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启"})))
         self.assertNotIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})))
 
+    def test_search_hints_when_the_floor_holds_facts_back(self):
+        """A single fact may be all the score floor allows: the answer says so and names the lever (#407)."""
+        strong = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера.",
+            "keywords": "caddy"}))["result"].split()[0]
+        for i in range(4):
+            json.loads(self.p.handle_tool_call("memcue_add", {
+                "content": f"Заметка {i} о Caddy: сертификаты обновляются через ACME на стенде.",
+                "keywords": "caddy"}))
+        query = "caddy пересоздание контейнера server1"
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": query}))
+        self.assertEqual([f["id"] for f in found["facts"]], [strong])
+        self.assertIn("min_score 0", found["hint"])
+        wide = json.loads(self.p.handle_tool_call("memcue_search", {"query": query, "min_score": "0"}))
+        self.assertGreater(len(wide["facts"]), 1)  # the hint named what the floor held back
+        self.assertNotIn("hint", wide)  # a search that already asks wide needs no hint
+        nothing = json.loads(self.p.handle_tool_call("memcue_search", {"query": "квазар антигравитация"}))
+        self.assertEqual(nothing["facts"], [])  # nothing below the floor to name
+        self.assertNotIn("hint", nothing)
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):

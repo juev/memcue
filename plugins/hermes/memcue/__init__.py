@@ -268,8 +268,7 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
-    "or retiring it. The facts are in Russian and English: write the query in one of them. Only the facts that fit the words come back: one fact means one fits, none means the base has "
-    "nothing on them, so try other words or the other language rather than a larger limit. By default it searches "
+    "or retiring it. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
     "the whole base and leaves out expired facts; the optional parameters narrow or widen that.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); fewer come "
@@ -579,6 +578,31 @@ class MemcueMemoryProvider(MemoryProvider):
         if now - self._warned_card.get(session, 0.0) >= _WARN_EVERY:
             self._warned_card[session] = now
             logger.warning("memcue session card failed (session %s): %s", session or "-", reason)
+
+    def _floor_hint(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> str:
+        """Whether the score floor is what made an answer thin. A single fact is the case where a floor hides the
+        rest (#407): the same search with the floor off costs one more call and says how many facts sit below it.
+        Runs only for an answer of one fact or none, so the ordinary answer pays nothing."""
+        wide = list(controls)
+        if "-min-score" in wide:
+            wide[wide.index("-min-score") + 1] = "0"
+        else:
+            wide += ["-min-score", "0"]
+        ok, out = self._run(cmd + wide + ["--", query], timeout=_RECALL_TIMEOUT)
+        if not ok:
+            return ""
+        try:
+            more = json.loads(out)
+        except ValueError:
+            return ""
+        if not isinstance(more, list):
+            return ""
+        known = {f.get("id") for f in facts if isinstance(f, dict)}
+        held = [f for f in more if isinstance(f, dict) and f.get("id") not in known]
+        if not held:
+            return ""
+        return (f"{len(held)} more facts hold the words but sit below the score floor; run the same search with "
+                f"min_score 0 to read them (limit still caps the answer).")
 
     def _remember_found(self, session: str, facts: list[Any]) -> None:
         """Keep the identifiers of the facts a search returned, so the reply of this turn can be judged by them. Only
@@ -1138,8 +1162,13 @@ class MemcueMemoryProvider(MemoryProvider):
                     facts = json.loads(out)
                     self._remember_found(self._session_id, facts if isinstance(facts, list) else [])
                     result = {"facts": facts}
-                    if _CJK.search(arg("query")):
-                        result["hint"] = _CJK_HINT
+                    hints = [_CJK_HINT] if _CJK.search(arg("query")) else []
+                    if controls_ok and isinstance(facts, list) and len(facts) <= 1 and arg("min_score") not in ("0", "0.0"):
+                        floor_hint = self._floor_hint(cmd, controls, facts, arg("query"))
+                        if floor_hint:
+                            hints.append(floor_hint)
+                    if hints:
+                        result["hint"] = " ".join(hints)
                     return json.dumps(result, ensure_ascii=False)
                 except ValueError:  # an older binary without -json prints text
                     return json.dumps({"result": out or "No stored facts match."}, ensure_ascii=False)

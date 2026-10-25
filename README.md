@@ -176,6 +176,15 @@ under a host or service scope learnt elsewhere; an agent that finds nothing in t
 
 ## Upgrade
 
+### Unreleased
+
+- A thin answer says what it left out. When one fact is all the score floor allows, the Hermes `memcue_search` adds a
+  hint naming the lever (`min_score 0`) and how many facts hold the same words below the floor; the tool description
+  now says that fewer facts than `limit` means the floor or the scope, not that the words are wrong. The hint costs one
+  more search on those answers only (p50 8.9 ms, ~150 characters). Measured on 9 thin queries with one model: 7 of 9
+  reached an answer inside three turns against 3 of 9 without it, and tokens per answered question fell 44 %
+  ([thin-answer-hint-2026-10](docs/research/thin-answer-hint-2026-10.md)). The DSH tool is unchanged.
+
 ### 0.14.0: a dream over the whole base, and search hands over only what fits and where the agent asks (#405, #407, #409, #414)
 
 - `memcue dream -run -all` answers packet after packet until the base has no work left, so the translations of
