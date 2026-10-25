@@ -173,3 +173,14 @@ func TestTermsKeepTopicWords(t *testing.T) {
 		}
 	}
 }
+
+func TestHasCJK(t *testing.T) {
+	for s, want := range map[string]bool{
+		"如何更新 headscale": true, "ヘッドスケール": true, "헤드스케일": true,
+		"как обновить headscale": false, "how to update headscale": false, "": false,
+	} {
+		if got := HasCJK(s); got != want {
+			t.Errorf("HasCJK(%q) = %v, want %v", s, got, want)
+		}
+	}
+}

@@ -91,3 +91,27 @@ func TestSearchFlags(t *testing.T) {
 		}
 	}
 }
+
+// A query in Chinese, Japanese or Korean gets the hint to search in the facts' languages, with facts or without
+// (#410); a Russian or English query does not.
+func TestSearchHintsOnCJK(t *testing.T) {
+	env(t)
+	addFactForTest(t, "-origin", "x 2026-10-25", "Headscale на сервере обновляют через docker compose pull.")
+	run := func(query string) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runSearch([]string{query}, &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	if got := run("如何更新 headscale"); !strings.Contains(got, "Headscale на сервере") || !strings.Contains(got, cjkHint) {
+		t.Errorf("CJK query with a hit: %q", got)
+	}
+	if got := run("如何更新"); !strings.Contains(got, "No stored facts match.") || !strings.Contains(got, cjkHint) {
+		t.Errorf("CJK query without a hit: %q", got)
+	}
+	if got := run("headscale обновить"); strings.Contains(got, cjkHint) {
+		t.Errorf("a Russian query got the hint: %q", got)
+	}
+}

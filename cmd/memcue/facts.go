@@ -19,6 +19,7 @@ import (
 	"github.com/juev/memcue/internal/policy"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
+	"github.com/juev/memcue/internal/text"
 	"github.com/juev/memcue/internal/tier"
 )
 
@@ -546,17 +547,27 @@ func runSearch(args []string, out io.Writer) error {
 			if q.ProjectOnly() {
 				msg = "No facts of this repository match; -in all searches every repository."
 			}
-			_, err := fmt.Fprintln(out, msg)
-			return err
+			if _, err := fmt.Fprintln(out, msg); err != nil {
+				return err
+			}
 		}
 		for _, h := range hits {
 			if _, err := fmt.Fprintln(out, strings.Join(strings.Fields(h.ID+" "+h.Origin+" | "+h.Content), " ")); err != nil {
 				return err
 			}
 		}
+		if text.HasCJK(q.Text) {
+			// Found or not: a CJK query that finds facts matched only on its Latin names (#410).
+			_, err := fmt.Fprintln(out, cjkHint)
+			return err
+		}
 		return nil
 	})
 }
+
+// cjkHint follows the answer to a query in Chinese, Japanese or Korean: the facts are in Russian and English, and a
+// question translated into either finds its fact 54-60 times in 60, against 0-50 asked as it is (#410).
+const cjkHint = "The facts are in Russian and English: search again with the query translated into one of them."
 
 // searchRecord is one line of search.log: a query the agent wrote and the facts it got, the record the read side is
 // judged by since the agent searches itself (#361).

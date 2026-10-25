@@ -190,6 +190,17 @@ func ticketTerm(s string) string {
 // minimum-term gate alone, but never matches a different ticket number.
 func IsTicket(term string) bool { return reTicketTerm.MatchString(term) }
 
+// HasCJK reports whether s holds Chinese, Japanese or Korean script. The lexer keeps a run of it as one word that no
+// fact holds, so such text finds facts only through the Latin names beside it (#410).
+func HasCJK(s string) bool {
+	for _, r := range s {
+		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsNumberTerm reports whether term is a normalized version, date, port or address ("nm1x27"). Such a term is
 // exact, so a prompt made of one is answered instead of silenced; it never filters, only adds and ranks.
 func IsNumberTerm(term string) bool { return strings.HasPrefix(term, "nm") && isNumberWord(term[2:]) }
