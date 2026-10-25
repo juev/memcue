@@ -793,15 +793,17 @@ func (s *Store) Candidates() ([]Fact, error) {
 // CardFacts returns the facts a session-start card carries: global rules and the rules and decisions whose scope is
 // one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
 // goes first because the date says little on a migrated base, where most rules share the day of the migration (#229).
-// It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. today
-// is a local "YYYY-MM-DD" date; empty means today.
-func (s *Store) CardFacts(scopes []string, today string) ([]Fact, error) {
+// It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. A fact
+// whose source is memory is left out and counted in mirrors: it mirrors a note of the host's built-in memory, which
+// the memory tool already puts in the prompt and prunes itself, so on the card it would be a second copy of a block
+// the card cannot take out of the prompt (#424). today is a local "YYYY-MM-DD" date; empty means today.
+func (s *Store) CardFacts(scopes []string, today string) (facts []Fact, mirrors int, err error) {
 	if today == "" {
 		today = Today()
 	}
 	active, err := s.Active()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var out []Fact
 	for _, f := range active {
@@ -816,6 +818,10 @@ func (s *Store) CardFacts(scopes []string, today string) ([]Fact, error) {
 		default:
 			continue
 		}
+		if f.Source == "memory" {
+			mirrors++
+			continue
+		}
 		out = append(out, f)
 	}
 	stated := func(f Fact) bool { return f.Source == "user" || f.Source == "user_confirmed" }
@@ -828,7 +834,7 @@ func (s *Store) CardFacts(scopes []string, today string) ([]Fact, error) {
 		}
 		return out[i].ID > out[j].ID
 	})
-	return out, nil
+	return out, mirrors, nil
 }
 
 // Relabel adds a version of an active fact with the given kind, scope and expiry; the content and everything else
