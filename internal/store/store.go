@@ -73,14 +73,20 @@ CREATE TABLE IF NOT EXISTS fact_vectors (
 	vec       BLOB NOT NULL,
 	PRIMARY KEY (id, tag)
 ) WITHOUT ROWID;
+` + stampsDDL
+
+// stampsDDL holds what a check of the base saw when it last passed, by name (see ensureIndex). An older memcue
+// ignores the table, so it needs no schema version; migrate creates it before its Rebuild writes the first stamp.
+const stampsDDL = `
+CREATE TABLE IF NOT EXISTS stamps (name TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
 `
 
-// indexDDL holds the add-only indexes. Open runs it on every base, not only when the schema version changes, so a
-// base created by an older memcue gets an index added without a version bump and without a full Rebuild.
+// indexDDL holds the add-only indexes and tables. Open runs it on every base, not only when the schema version
+// changes, so a base created by an older memcue gets them without a version bump and without a full Rebuild.
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS facts_created ON facts(created);
 CREATE INDEX IF NOT EXISTS fact_index_numbers ON fact_index(numbers);
-`
+` + stampsDDL
 
 // Status of a fact version.
 const (
@@ -372,7 +378,24 @@ func (s *Store) ensureIndexes() error {
 
 // ensureIndex repairs an index that no longer matches the active facts. The index is derived and the only thing
 // Search reads, so a base whose index row was lost must get it back before a prompt is answered.
+//
+// The full check costs about 45 ms on a base of 10 000 rows, on every open (#396), so a base that passed it keeps
+// the row counts it passed with, and an open that finds the same counts trusts the index. Rows of facts are never
+// deleted (Merge renumbers by adding), so any write since, by this memcue, an older one or a merge, changes the
+// count and brings the full check back once.
 func (s *Store) ensureIndex() error {
+	stamp, err := indexStamp(s.db)
+	if err != nil {
+		return err
+	}
+	var saved string
+	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = 'index'`).Scan(&saved); err != nil &&
+		!errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if saved == stamp {
+		return s.restamp()
+	}
 	const active = `SELECT count(*) FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
 			AND f.review IN ('', 'provisional') `
@@ -397,10 +420,38 @@ func (s *Store) ensureIndex() error {
 			return err
 		}
 		if missing == 0 && stale == 0 {
+			if err := saveStamp(s.db, "index", stamp); err != nil {
+				return err
+			}
 			return s.restamp()
 		}
 	}
 	return s.Rebuild()
+}
+
+// querier is a *sql.DB or a *sql.Tx.
+type querier interface {
+	Exec(query string, args ...any) (sql.Result, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+// indexStamp is what ensureIndex compares: the rows of the facts, the index and its FTS table.
+func indexStamp(q querier) (string, error) {
+	var facts, indexed, fts int
+	for _, c := range []struct {
+		table string
+		n     *int
+	}{{"facts", &facts}, {"fact_index", &indexed}, {"fact_fts", &fts}} {
+		if err := q.QueryRow(`SELECT count(*) FROM ` + c.table).Scan(c.n); err != nil {
+			return "", err
+		}
+	}
+	return fmt.Sprintf("facts=%d index=%d fts=%d", facts, indexed, fts), nil
+}
+
+func saveStamp(q querier, name, value string) error {
+	_, err := q.Exec(`INSERT OR REPLACE INTO stamps(name, value) VALUES (?, ?)`, name, value)
+	return err
 }
 
 // restamp stems again the index rows stamped with an older version of the number terms than this memcue writes,
@@ -1063,6 +1114,13 @@ func (s *Store) Rebuild() error {
 		if err := reindex(tx, id); err != nil {
 			return err
 		}
+	}
+	stamp, err := indexStamp(tx)
+	if err != nil {
+		return err
+	}
+	if err := saveStamp(tx, "index", stamp); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
