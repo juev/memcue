@@ -263,5 +263,7 @@ quality with local signals only.
 `memcue eval` ran a labelled set against the injection of facts with a prompt; it went with that injection in #361,
 and the measurements above that used it stay as history (the set format is the `evalSet` type in `cmd/memcue/eval.go`
 before #361). The agent's own searches are judged end to end (`docs/research/scripts/e2e`) and by `search.log`
-(`MEMCUE_SEARCH_LOG=1`). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a session would add, with tokens or
-cost, without storing it.
+(`MEMCUE_SEARCH_LOG=1`). A cheaper middle ground — one run of `search` over prompts with known answers, minutes not
+dollars — is [search_stand.py](research/scripts/search_stand.py), with a first run on a live base in
+[pull-hermes-2026-10.md](research/pull-hermes-2026-10.md). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a
+session would add, with tokens or cost, without storing it.
