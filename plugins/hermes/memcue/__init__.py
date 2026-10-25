@@ -556,9 +556,21 @@ class MemcueMemoryProvider(MemoryProvider):
                 dropped += 1
                 continue
             kept.append(line)
+        # A heading stays only while a fact line follows it: the card groups its lines by scope, and a group whose
+        # facts were all copies must not leave an empty heading behind (#437).
+        body = kept[1:]
+        trimmed = []
+        for i, line in enumerate(body):
+            if line.startswith("- "):
+                trimmed.append(line)
+                continue
+            if i + 1 < len(body) and body[i + 1].startswith("- "):
+                trimmed.append(line)
         if dropped:
             logger.info("memcue card: %d of %d lines left out as copies of the memory notes", dropped, len(lines) - 1)
-        return "\n".join(kept) if len(kept) > 1 else ""
+        if not any(line.startswith("- ") for line in trimmed):
+            return ""
+        return "\n".join([kept[0]] + trimmed)
 
     @staticmethod
     def _tokens(text: str) -> set:
