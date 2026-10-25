@@ -164,8 +164,13 @@ comes from where the session works, read from the files and never by running git
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
 writes the key. `memcue add -scope repo` does the same for the working directory.
 
-The project only orders `memcue search`: of facts with equal scores, one learnt in the session's project comes before
-a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
+The project narrows and orders `memcue search`. By default it leaves out facts bound to another repository (scope
+`repo:<other key>`); `-in project` keeps only the project's facts, those learnt in it or scoped to it, and `-in all`
+keeps every repository's. On 35 queries agents wrote, the default kept 116 of the 129 useful facts and dropped 37 of
+the 63 unrelated ones, while the project alone kept 41 useful facts: what a repository session needs often lives under
+a host or service scope learnt elsewhere (#409). Of facts with equal scores, one learnt in the session's project comes
+before a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working
+directory.
 
 ## Upgrade
 
@@ -357,6 +362,9 @@ says otherwise: what happened in one run is not the knowledge a later session ne
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
+memcue search -in project postgres   # only this repository's facts; -in all: every repository, -in host, -in global
+memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
+memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
 memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
