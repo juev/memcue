@@ -19,7 +19,7 @@ func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	recalled := func() bool {
 		t.Helper()
 		var r bytes.Buffer
-		if err := runSearch([]string{prompt}, &r); err != nil {
+		if err := runSearch([]string{"-in", "all", prompt}, &r); err != nil {
 			t.Fatal(err)
 		}
 		return strings.Contains(r.String(), "openjdk@21")
