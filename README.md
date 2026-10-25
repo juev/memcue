@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.15.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.16.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.16.0 | 5 | 0.16.0 | 0.16.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.16.0 (`hermes-agent` 0.15.2) |
 | 0.15.0 | 5 | 0.15.0 | 0.15.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.15.0 (`hermes-agent` 0.15.2) |
 | 0.14.0 | 5 | 0.14.0 | 0.14.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.14.0 (`hermes-agent` 0.15.2) |
 | 0.13.0 | 5 | 0.13.0 | 0.13.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.13.0 (`hermes-agent` 0.15.2) |
@@ -196,6 +197,26 @@ where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json`
 fact from the shelf can be told from the rest.
 
 ## Upgrade
+
+### 0.16.0: a shelf for what a session read outside, a card that says the scope once, a mirror searchable at the write (#433, #437, #440)
+
+- **Facts read from outside sources are kept on a shelf.** A fact whose evidence is quoted from the result of a tool
+  that reads the world outside — a name starting with `web_`, `browser`, `fetch`, `http`, `curl`, `arxiv` or `pdf` —
+  is stored under the scope `shelf:<slug>` and read only by a search that names it: `-in shelf` for every shelf,
+  `-in shelf:research` for one. Every other place leaves the shelves out, `-in all` included, because an `all` that
+  still read the shelf would hide nothing. A search that finds nothing while its words fit a shelved fact says where
+  to look (`1 fact on the shelf matches: -in shelf:research`), and `search -json` now carries each fact's `scope`. The
+  decision is provenance, not a model: `extract-messages -shelf research` shelves a fact only when its quote is in an
+  outside tool's result and in no other tool's result; a fact in the user's words is never shelved; without the flag
+  (the Claude Code path) nothing changes. The Hermes plugin passes `-shelf research` by default (`shelf` in its
+  config, empty turns it off) and `memcue_add` takes `shelf`. By hand, `add -shelf research` is `-scope
+  shelf:research`.
+- **The session card says the scope and the dates once per group**, not on every line: a card of twelve lines gave 324
+  of its 2 338 characters to the same suffix. The facts are unchanged; only the heading carries what the lines shared.
+- **A memory note is searchable when it is written.** Every write of the built-in memory tool was mirrored as a
+  candidate, and a candidate has no index row: between the write and the next vet run the user's latest memory was
+  invisible, and an older approved fact answered in its place. A mirror is now approved at the write, and a stale one
+  is retired by rule, without a model call.
 
 ### 0.15.0: search listens to a message, the card stops repeating the memory, and installation state stops being a fact (#417, #418, #421, #423, #424, #425, #426)
 
