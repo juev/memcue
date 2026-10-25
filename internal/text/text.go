@@ -19,7 +19,7 @@ import (
 
 var (
 	// v0.21.6, 1.27, 2026-10-19: never a match.
-	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'@])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
+	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'@:/])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
 	// PROJ-1234, JIRA-12, #123, !45: one exact term. Only an uppercase project key is a ticket; a versioned name
 	// such as PostgreSQL-16 keeps its word and its number is dropped.
 	reTicket = regexp.MustCompile(`\b[A-Z][A-Z0-9]*-\d+\b|#\d+|!\d+`)
@@ -28,7 +28,7 @@ var (
 	// reNumberWord is the part of reNumeric that becomes a numeric term: a version, a date, a port or an address
 	// after a boundary. A ticket (#123) leaves the text before reNumeric runs and never gives one, so it is not
 	// here; neither is a number inside a word (PostgreSQL-16, gpt-6.1-sol), which has no boundary before it.
-	reNumberWord = regexp.MustCompile(`(?:^|[\s(\[{"'@])[vV]?\d+(?:[.\-:/]\d+)+\b`)
+	reNumberWord = regexp.MustCompile(`(?:^|[\s(\[{"'@:/])[vV]?\d+(?:[.\-:/]\d+)+\b`)
 )
 
 // HasNumberTerm reports whether s holds a word Stems would turn into a numeric term. It answers the same question
@@ -108,7 +108,8 @@ func isCyrillic(r rune) bool { return r >= 'а' && r <= 'я' }
 
 // NumberTermsVersion is the version of the number terms an index row is stamped with when they are on. Bump it when
 // the lexer starts giving a term to a number it dropped before: the next open of a base stems its older rows again.
-const NumberTermsVersion = 1
+// Version 2 gives a term to a number after ":" or "/": an image tag (vmalert:v1.106.1), a path (gradle/9.8.1/).
+const NumberTermsVersion = 2
 
 // NumbersEnabled reports whether bare numbers, versions, ports and addresses are indexed as one exact term
 // instead of being dropped. On by default: the term is exact ("nm1x27" never matches "nm1x20"), so it can only add
@@ -149,7 +150,7 @@ func words(s string) []string {
 // an ordinary word or a ticket, and every separator becomes "x", so the unicode61 tokenizer cannot split it. The
 // boundary character the regexp swallowed (space, paren, quote, the @ of dig @1.1.1.1) is dropped first.
 func numberTerm(s string) string {
-	s = strings.TrimLeft(s, " 	\n([{\"'@")
+	s = strings.TrimLeft(s, " 	\n([{\"'@:/")
 	s = strings.ToLower(s)
 	var b strings.Builder
 	b.WriteString("nm")

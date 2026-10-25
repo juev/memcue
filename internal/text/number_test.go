@@ -16,6 +16,9 @@ func TestNumberTermsByDefault(t *testing.T) {
 		{"(v1.2.3)", "nmv1x2x3"},
 		{"memcue 0.17.4 вышел", "nm0x17x4"},
 		{"проверять `dig @1.1.1.1`", "nm1x1x1x1"},
+		{"образ victoriametrics/vmalert:v1.106.1 -dryRun", "nmv1x106x1"},
+		{"/opt/homebrew/Cellar/gradle/9.8.1/libexec", "nm9x8x1"},
+		{"логи в /var/log/2026/10/25/", "nm2026x10x25"},
 	}
 	for _, c := range cases {
 		if got := Stems(c.in); !slices.Contains(got, c.want) {
@@ -37,6 +40,19 @@ func TestNumberTermsByDefault(t *testing.T) {
 	}
 	if got := Stems("dig @1.1.1.10"); slices.Contains(got, "nm1x1x1x1") {
 		t.Errorf("Stems(dig @1.1.1.10) = %q holds the term of 1.1.1.1", got)
+	}
+	// A number after ":" or "/" is found by the version alone, and the tool next to it by its name.
+	if got := Terms("vmalert:v1.106.1"); !slices.Equal(got, []string{"vmalert", "nmv1x106x1"}) {
+		t.Errorf("Terms(vmalert:v1.106.1) = %q", got)
+	}
+	// The forms the boundary had before keep their term: a time, an address with its port, a bare port.
+	for in, want := range map[string]string{"в 16:00": "nm16x00", "127.0.0.1:8080": "nm127x0x0x1x8080"} {
+		if got := Stems(in); !slices.Contains(got, want) {
+			t.Errorf("Stems(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := Stems("localhost:8080"); slices.ContainsFunc(got, IsNumberTerm) {
+		t.Errorf("Stems(localhost:8080) = %q, a bare port gives no term", got)
 	}
 	// The word next to the version still stems as usual.
 	if got := Terms("Go 1.27"); !slices.Equal(got, []string{"go", "nm1x27"}) {
@@ -66,6 +82,8 @@ func TestNumberTermShape(t *testing.T) {
 		"(1.27":       "nm1x27",
 		"'0.5.2":      "nm0x5x2",
 		"@1.1.1.1":    "nm1x1x1x1",
+		":v1.106.1":   "nmv1x106x1",
+		"/9.8.1":      "nm9x8x1",
 	}
 	for in, want := range cases {
 		if got := numberTerm(in); got != want {
@@ -98,7 +116,8 @@ func TestHasNumberTermAgreesWithStems(t *testing.T) {
 		"Стенд собран под Go 1.27 и только под него.", "версия v0.22.2 вышла", "2026-10-19 из конфига",
 		"проверять `dig @1.1.1.1`", "порт 55432 слушает", "PostgreSQL-16 и gpt-6.1-sol", "тикет PROJ-1234 открыт",
 		"#123 закрыт", "без чисел вовсе", "s3 и k8s", "(1.27", "'0.5.2", "206.253.89.87 отвечает",
-		"модель gpt-6.1-sol, 27.0 часа", "ни 1.2, ни 3.4",
+		"модель gpt-6.1-sol, 27.0 часа", "ни 1.2, ни 3.4", "vmalert:v1.106.1", "Cellar/gradle/9.8.1/libexec",
+		"localhost:8080", "в 16:00",
 	}
 	for _, in := range cases {
 		want := slices.ContainsFunc(Stems(in), IsNumberTerm)
