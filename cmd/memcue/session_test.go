@@ -127,7 +127,8 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	if !strings.Contains(ctx, "memcue add") || !strings.Contains(ctx, "rules and decisions from the base") {
 		t.Fatalf("no note or card: %q", ctx)
 	}
-	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "scope: global", "scope: repo:example.com/team/shop",
+	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "Global rules (learnt",
+		"Rules and decisions of repo:example.com/team/shop (learnt",
 		time.Now().UTC().Format(time.DateOnly)} {
 		if !strings.Contains(ctx, want) {
 			t.Errorf("card lacks %q: %q", want, ctx)
