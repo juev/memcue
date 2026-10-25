@@ -18,6 +18,20 @@ import (
 // 4.2; a query whose best fact stands far above the rest gets that fact alone.
 const MinScore = 0.6
 
+// MessageFloor is the floor of a query that reads as a message rather than as a search (#417). A user's message holds
+// dozens of words, several of them common in the base, so the best fact's BM25 is inflated by the words it shares
+// with the message, and the 0.6 of it cuts facts that answer one part of it: on twenty prompts the same base lost 8
+// of the 19 useful facts it had in the top five.
+const MessageFloor = 0.45
+
+// messageWords is the number of words from which a query reads as a message: a search names what it asks for in a
+// few words, a message is a sentence.
+const messageWords = 8
+
+// messageTerms is the number of the query's terms a fact has to hold to fit a message. A fact sharing one word with a
+// message of dozens is usually related to something else; the fact that answers one part of the message shares several.
+const messageTerms = 2
+
 // Query is what the agent asks Search for (#409): the words, how many facts and how close to the best, and where and
 // what to look in. Its zero value is no search; Defaults gives the measured defaults.
 type Query struct {
@@ -171,6 +185,32 @@ func inRepo(project []string) bool {
 	return slices.ContainsFunc(project, func(k string) bool { return k != "" && !strings.HasPrefix(k, "dir:") })
 }
 
+// IsMessage reports whether the query reads as a message rather than as a search: more than messageWords words.
+func IsMessage(q Query) bool { return len(strings.Fields(q.Text)) > messageWords }
+
+// floor is the share of the best fact's score a fact must reach: MinScore, or MessageFloor when the query is a
+// message and the caller asked for the default. An explicit -min-score is the caller's own choice and is kept as it is.
+func (q Query) floor() float64 {
+	if q.MinScore == MinScore && IsMessage(q) {
+		return MessageFloor
+	}
+	return q.MinScore
+}
+
+// holds counts how many of the query's terms a fact holds, by the same prefix rule the index matches with.
+func holds(terms, stems []string) int {
+	n := 0
+	for _, t := range terms {
+		for _, st := range stems {
+			if text.Covers(t, st) {
+				n++
+				break
+			}
+		}
+	}
+	return n
+}
+
 // Search finds the facts for a query the agent wrote itself (#361): FTS5 over the query's terms in BM25 order, with
 // none of the gates of Recall, because the agent reads what it asked for. It returns at most q.N facts and leaves out
 // those whose BM25 is below q.MinScore of the best one (#407); the filter of q runs before either (#409). Ties of
@@ -184,8 +224,9 @@ func Search(s *store.Store, q Query) ([]store.Hit, error) {
 	if err != nil {
 		return nil, err
 	}
+	terms := text.Terms(q.Text)
 	// Twice the room: the database cuts a run of equal scores in its own order, before the tie order could see it.
-	hits, err := s.SearchFiltered(text.Terms(q.Text), 2*q.N, f)
+	hits, err := s.SearchFiltered(terms, 2*q.N, f)
 	if err != nil {
 		return nil, err
 	}
@@ -198,13 +239,24 @@ func Search(s *store.Store, q Query) ([]store.Hit, error) {
 		}
 		return newer(hits[i].Fact, hits[j].Fact)
 	})
+	// A message holds many common words, so a fact that shares only one of them with it is about something else
+	// (#417). The wide net of -min-score 0 keeps every fact the words fit, as before.
+	if floor := q.floor(); floor > 0 && IsMessage(q) && !q.AllWords {
+		kept := hits[:0]
+		for _, h := range hits {
+			if holds(terms, h.Stems) >= messageTerms {
+				kept = append(kept, h)
+			}
+		}
+		hits = kept
+	}
 	// BM25 of FTS5 is negative, the best fact the lowest: a fact keeps its place while its score is at least
-	// MinScore of the best one.
-	if q.MinScore > 0 && len(hits) > 0 && hits[0].BM25 < 0 {
+	// the floor of the best one.
+	if floor := q.floor(); floor > 0 && len(hits) > 0 && hits[0].BM25 < 0 {
 		best := hits[0].BM25
 		kept := hits[:0]
 		for _, h := range hits {
-			if h.BM25/best >= q.MinScore {
+			if h.BM25/best >= floor {
 				kept = append(kept, h)
 			}
 		}

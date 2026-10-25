@@ -392,3 +392,73 @@ func TestSearchProjectKeyOutsideASCII(t *testing.T) {
 		t.Fatalf("got %d facts %v, want the project's fact", len(hits), err)
 	}
 }
+
+// A query of more than messageWords words reads as a message: its floor is MessageFloor, not MinScore. An explicit
+// -min-score is the caller's choice, and 0 keeps every fact the words fit (#417).
+func TestQueryFloor(t *testing.T) {
+	long := "Давай посмотрим сколько у нас свободно на диске на nas? Что больше всего занимает и сколько весят бекапы с loffe?"
+	short := "навык skill структура действия инструкции"
+	for _, c := range []struct {
+		name string
+		q    Query
+		want float64
+	}{
+		{"a search", Query{Text: short, MinScore: MinScore}, MinScore},
+		{"a message", Query{Text: long, MinScore: MinScore}, MessageFloor},
+		{"a message at 0.3", Query{Text: long, MinScore: 0.3}, 0.3},
+		{"a message wide", Query{Text: long, MinScore: 0}, 0},
+		{"no floor asked", Query{Text: long}, 0},
+	} {
+		if got := c.q.floor(); got != c.want {
+			t.Errorf("%s: floor %v, want %v", c.name, got, c.want)
+		}
+	}
+	if !IsMessage(Query{Text: long}) || IsMessage(Query{Text: short}) {
+		t.Errorf("IsMessage: %q is a message, %q is not", long, short)
+	}
+}
+
+// A message holds many common words: a fact that shares one of them with it is about something else, while the fact
+// that answers one part of the message shares several. -min-score 0 stays the wide net (#417).
+func TestSearchMessageLeavesOutAFactOfOneTerm(t *testing.T) {
+	s := emptyBase(t)
+	if _, err := s.Add("NAS на хосте loffe держит restic-репозиторий в каталоге /volume1/backup.", nil,
+		"example.org/me/app 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Add("Файл /opt/data/memory_store.db занимает 260 КБ.", nil, "example.org/me/app 2026-10-20"); err != nil {
+		t.Fatal(err)
+	}
+	msg := "Давай посмотрим сколько у нас свободно на диске на nas? Что больше всего занимает и сколько весят бекапы с loffe?"
+	got, err := Search(s, Query{Text: msg, N: 5, MinScore: MinScore, In: []string{"all"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var about, other bool
+	for _, h := range got {
+		switch {
+		case strings.Contains(h.Content, "restic"):
+			about = true
+		case strings.Contains(h.Content, "memory_store"):
+			other = true
+		}
+	}
+	if !about || other {
+		t.Errorf("message: restic fact %v, one-term fact %v, want the first and not the second: %v", about, other, hits(got))
+	}
+	wide, err := Search(s, Query{Text: msg, N: 5, MinScore: 0, In: []string{"all"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wide) != 2 {
+		t.Errorf("wide net: %d facts, want both: %v", len(wide), hits(wide))
+	}
+}
+
+func hits(h []store.Hit) []string {
+	out := make([]string, len(h))
+	for i, x := range h {
+		out[i] = x.Content
+	}
+	return out
+}
