@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.12.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.13.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.13.0 | 5 | 0.13.0 | 0.13.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.13.0 (`hermes-agent` 0.15.2) |
 | 0.12.0 | 5 | 0.12.0 | 0.12.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.12.0 (`hermes-agent` 0.15.2) |
 | 0.11.1 | 5 | 0.11.1 | 0.11.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.1 (`hermes-agent` 0.15.2) |
 | 0.11.0 | 5 | 0.11.0 | 0.11.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.0 (`hermes-agent` 0.15.2) |
@@ -164,6 +165,19 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.13.0: Hermes runs the dream itself (#401)
+
+- `memcue dream -run` runs a whole dream through the extraction's endpoint (`MEMCUE_API_URL`). It checks what the
+  Claude Code session start checks, `MEMCUE_DREAM_EVERY` and fresh or untranslated facts, and makes no model call when
+  no dream is due. The answer goes through the same checks as `-apply`, and `dream.log` records the tokens. Without
+  `MEMCUE_API_URL` it refuses: on Claude Code the dream stays with the session's model.
+- The Hermes plugin starts `dream -run` after each extraction, so a Hermes base gets its dream, and the translations of
+  0.12.0, without a cron job. `dream: false` in `memory.memcue` turns it off.
+- The endpoint model reasons over the packet. Without reasoning, deepseek-flash retired a fact it should have kept,
+  and on a large packet its answer was cut at the token limit; with reasoning a dream takes 1.5–2.5 minutes and
+  22,000–29,000 output tokens in the background ([dream-run-2026-10](docs/research/dream-run-2026-10.md)).
+- No schema change. Upgrade the binary and the plugin together: the plugin starts `-run` only with a 0.13.0 binary.
 
 ### 0.12.0: a question in either language, and a base that brings itself up to date (#390, #391, #395, #396)
 
