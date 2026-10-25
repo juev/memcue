@@ -428,8 +428,10 @@ Who runs it:
   skill when the user's task allows. It never interrupts a turn. A dream is due once `MEMCUE_DREAM_EVERY` (default
   `1h`) has passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks the start, so
   the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them.
-- **Hermes.** A cron job of Hermes calls the provider's dream tools on a schedule
-  ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
+- **Hermes.** The provider starts `memcue dream -run` after an extraction. memcue checks the same interval and
+  facts, and when a dream is due sends the packet to the extraction's endpoint (`MEMCUE_API_URL`) and applies the
+  answer; with nothing due it makes no call. Without `MEMCUE_API_URL`, `-run` refuses, so Claude Code keeps the
+  session's model ([plugins/hermes/README.md](plugins/hermes/README.md#dream), #401).
 
 A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand and 40 to translate. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
