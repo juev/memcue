@@ -46,3 +46,23 @@ tokens and up to 2.5 minutes, in a background process started at most once an ho
 
 Not measured: more than one run per cell, the token limit with reasoning on a packet larger than these, and the cost
 in money.
+
+## The whole Claude Code base with `-run -all` (#405)
+
+One run of `memcue dream -run -all` on a live Claude Code base of 2,861 facts, through `claude -p` on Opus (no
+endpoint), 2026-10-25.
+
+- **Time and money.** 106 passes in 3 h 11 min, 108 s a pass on average; $63.16 in all, $0.22–1.97 a pass, $0.60 for
+  most. At the hourly default the same work takes 72 or more dreams, three days and more.
+- **Work done.** 4,024 translations; 612 compound facts split into 1,483 parts; 1,414 facts given search queries;
+  164 retired and 88 corrected as duplicates or outdated. The base grew to 3,584 live facts, each indexed.
+- **Why it took longer than the translation debt suggests.** The debt was 2,771 facts, about 70 passes at 40 a pass,
+  and a pass did translate 40 facts in 100 of 106. But every split part is a new fact that needs its own translation
+  and its first dream: in the first 67 passes the dream split 488 facts, and for an hour the debt fell by about 15 a
+  pass. Once the compound facts were gone it fell by 40.
+- **End.** The last pass found no work and the run stopped on its own ("done after 106 passes"), not on the stall or
+  pass limit. 3,577 of 3,584 facts carry a translation; the other 7 are provisional facts waiting for review, which
+  the dream does not take.
+
+Not measured: the quality of these answers fact by fact; the earlier sections read three packets by hand, this run was
+read only through its counts.
