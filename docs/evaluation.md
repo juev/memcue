@@ -265,5 +265,6 @@ and the measurements above that used it stay as history (the set format is the `
 before #361). The agent's own searches are judged end to end (`docs/research/scripts/e2e`) and by `search.log`
 (`MEMCUE_SEARCH_LOG=1`). A cheaper middle ground — one run of `search` over prompts with known answers, minutes not
 dollars — is [search_stand.py](research/scripts/search_stand.py), with a first run on a live base in
-[pull-hermes-2026-10.md](research/pull-hermes-2026-10.md). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a
+[pull-hermes-2026-10.md](research/pull-hermes-2026-10.md) and the run at 0.10.0 a day later in
+[pull-hermes-010-2026-10.md](research/pull-hermes-010-2026-10.md). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a
 session would add, with tokens or cost, without storing it.
