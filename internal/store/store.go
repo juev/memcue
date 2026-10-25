@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS facts (
 	queries  TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fact_index (rid INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, stems TEXT NOT NULL,
+	numbers INTEGER NOT NULL DEFAULT 0);
 CREATE VIRTUAL TABLE IF NOT EXISTS fact_fts USING fts5(stems, content='fact_index', content_rowid='rid',
 	tokenize='unicode61 remove_diacritics 0');
 CREATE TABLE IF NOT EXISTS fact_vectors (
@@ -78,6 +79,7 @@ CREATE TABLE IF NOT EXISTS fact_vectors (
 // base created by an older memcue gets an index added without a version bump and without a full Rebuild.
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS facts_created ON facts(created);
+CREATE INDEX IF NOT EXISTS fact_index_numbers ON fact_index(numbers);
 `
 
 // Status of a fact version.
@@ -346,6 +348,18 @@ func (s *Store) ensureColumns() error {
 			}
 		}
 	}
+	// numbers stamps an index row with the version of the number terms it was stemmed with. An older memcue names
+	// the columns it inserts, so its rows read 0 and the next open stems them again (see restamp).
+	var numbers int
+	if err := s.db.QueryRow(`SELECT count(*) FROM pragma_table_info('fact_index') WHERE name = 'numbers'`).
+		Scan(&numbers); err != nil {
+		return err
+	}
+	if numbers == 0 {
+		if _, err := s.db.Exec(`ALTER TABLE fact_index ADD COLUMN numbers INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -383,29 +397,51 @@ func (s *Store) ensureIndex() error {
 			return err
 		}
 		if missing == 0 && stale == 0 {
-			numbers, err := s.numbersIncomplete()
-			if err != nil {
-				return err
-			}
-			if !numbers {
-				return nil
-			}
+			return s.restamp()
 		}
 	}
 	return s.Rebuild()
 }
 
-// numbersIncomplete reports whether a live fact whose text gives a numeric term has an index row without one, with
-// number terms on (the default). Such a row was written before the terms existed, or with MEMCUE_NUMBER_TERMS=0, and
-// a prompt naming its version is answered with nothing until Rebuild puts the term in. The row counts match, so
-// ensureIndex sees nothing else wrong; and one numbered row proves nothing about the others, since a base indexed
-// before 0.10.0 gets its first term from the next fact it stores (#383).
-func (s *Store) numbersIncomplete() (bool, error) {
+// restamp stems again the index rows stamped with an older version of the number terms than this memcue writes,
+// with number terms on (the default). Such a row was written before the terms existed, by an older memcue on another
+// machine of the same base, or with MEMCUE_NUMBER_TERMS=0, and a prompt naming its version is answered with nothing
+// until the row carries the term (#383). The row counts match, so nothing else in ensureIndex notices it. The stamp
+// is read instead of stemming the facts, so a repaired base pays one indexed lookup per open (#390).
+func (s *Store) restamp() error {
 	if !text.NumbersEnabled() {
-		return false, nil
+		return nil
 	}
-	n, err := s.unnumbered()
-	return n > 0, err
+	rows, err := s.db.Query(`SELECT id FROM fact_index WHERE numbers < ?`, text.NumberTermsVersion)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, id := range ids {
+		if err := reindex(tx, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // unnumbered counts the live facts whose text gives a numeric term while their index row, if any, has none. Only
@@ -413,8 +449,7 @@ func (s *Store) numbersIncomplete() (bool, error) {
 // lexer runs: opening a base does not stem every fact.
 func (s *Store) unnumbered() (int, error) {
 	kw, q, review := s.col("f", "keywords"), s.col("f", "queries"), s.col("f", "review")
-	// The latest version per id is a grouped join, not a correlated max(): the same rows in half the time, and this
-	// query runs on every open of the base.
+	// The latest version per id is a grouped join, not a correlated max(): the same rows in half the time.
 	rows, err := s.db.Query(`SELECT f.content, `+kw+`, `+q+`, coalesce(i.stems, '') FROM facts f
 		JOIN (SELECT id, max(version) mv FROM facts GROUP BY id) m ON f.id = m.id AND f.version = m.mv
 		LEFT JOIN fact_index i ON i.id = f.id
@@ -979,7 +1014,11 @@ func reindex(tx *sql.Tx, id string) error {
 		return err
 	}
 	stems := strings.Join(text.Stems(content+"\n"+keywords+"\n"+queries), " ")
-	res, err := tx.Exec(`INSERT INTO fact_index(id, stems) VALUES (?, ?)`, id, stems)
+	numbers := 0
+	if text.NumbersEnabled() {
+		numbers = text.NumberTermsVersion
+	}
+	res, err := tx.Exec(`INSERT INTO fact_index(id, stems, numbers) VALUES (?, ?, ?)`, id, stems, numbers)
 	if err != nil {
 		return err
 	}

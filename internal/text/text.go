@@ -106,6 +106,10 @@ func Query(term string) string {
 
 func isCyrillic(r rune) bool { return r >= 'а' && r <= 'я' }
 
+// NumberTermsVersion is the version of the number terms an index row is stamped with when they are on. Bump it when
+// the lexer starts giving a term to a number it dropped before: the next open of a base stems its older rows again.
+const NumberTermsVersion = 1
+
 // NumbersEnabled reports whether bare numbers, versions, ports and addresses are indexed as one exact term
 // instead of being dropped. On by default: the term is exact ("nm1x27" never matches "nm1x20"), so it can only add
 // candidates and rank the prompt's own version above the others. MEMCUE_NUMBER_TERMS=0 (or false, off, no) keeps
