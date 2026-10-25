@@ -61,6 +61,9 @@ var (
 	packetFresh  = 40
 	packetGroups = 30
 	packetExpand = 50
+	// packetTranslate is the facts a dream translates (#396): 40 kept every answer in one call when #395 measured
+	// a whole base, and a base of 3 000 facts is done in about 75 dreams.
+	packetTranslate = 40
 )
 
 // The merge sweep groups facts the dream has already seen, so a duplicate pair that predates the last dream is
@@ -84,6 +87,8 @@ type dreamRecord struct {
 	Promoted []string `json:"promoted,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
+	// Translated counts the facts that got their translation (#396).
+	Translated int `json:"translated,omitempty"`
 	// Swept counts the facts seen before that the merge sweep grouped with their neighbours.
 	Swept int `json:"swept,omitempty"`
 	// Grouped is what the dream grouped and what came of each group, by id only: it answers whether two facts were
@@ -111,14 +116,22 @@ type dreamPlan struct {
 	Splits []dreamPlanSplit `json:"splits,omitempty"`
 	// Expansions are the search queries for facts that had none, with the version the model read.
 	Expansions []dreamPlanExpansion `json:"expansions,omitempty"`
-	Groups     []dreamPlanGroup     `json:"groups"`
-	Merge      string               `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
+	// Translations are the facts' text in the other language, with the version the model read (#396).
+	Translations []dreamPlanTranslation `json:"translations,omitempty"`
+	Groups       []dreamPlanGroup       `json:"groups"`
+	Merge        string                 `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
 }
 
 type dreamPlanExpansion struct {
 	ID      string   `json:"id"`
 	Version int      `json:"version"`
 	Queries []string `json:"queries"`
+}
+
+type dreamPlanTranslation struct {
+	ID          string `json:"id"`
+	Version     int    `json:"version"`
+	Translation string `json:"translation"`
 }
 
 // dreamPlanSplit is a compound fact to split, with the version the model read.
@@ -230,51 +243,65 @@ func freshFacts(s *store.Store, active []store.Fact, from time.Time, seen map[st
 	return fresh, nil
 }
 
-// dreamDue says how many facts wait for the dream when one is due: the interval since the last one has passed and some
-// fact is fresh. The first call on a machine only marks the base, so the facts it already had are not swept by
-// surprise (memcue dream -prepare -all does that).
-func dreamDue(dir string, every time.Duration) (int, time.Time, error) {
+// dreamDue says, when a dream is due, how many facts are fresh and how many are owed a translation (#396): the
+// interval since the last one has passed and some fact is either. The first call on a machine only marks the base, so
+// the facts it already had are not swept by surprise (memcue dream -prepare -all does that).
+func dreamDue(dir string, every time.Duration) (fresh, owed int, last time.Time, err error) {
 	last, ok := lastDream(dir)
 	if !ok {
 		unlock, err := lockDream(dir)
 		if err != nil {
-			return 0, time.Time{}, nil // a dream is running: it marks the base itself
+			return 0, 0, time.Time{}, nil // a dream is running: it marks the base itself
 		}
 		defer unlock()
 		if _, ok := lastDream(dir); ok {
-			return 0, time.Time{}, nil
+			return 0, 0, time.Time{}, nil
 		}
-		return 0, time.Time{}, markBase(dir)
+		return 0, 0, time.Time{}, markBase(dir)
 	}
 	if time.Since(last) < every {
-		return 0, last, nil
+		return 0, 0, last, nil
 	}
 	seen, err := readDreamSeen(dir)
 	if err != nil {
-		return 0, last, err
+		return 0, 0, last, err
 	}
 	s, err := store.Open(factsPath())
 	if err != nil {
-		return 0, last, err
+		return 0, 0, last, err
 	}
 	defer func() { _ = s.Close() }()
 	active, err := s.Active()
 	if err != nil {
-		return 0, last, err
+		return 0, 0, last, err
 	}
-	fresh, err := freshFacts(s, active, last, seen)
-	return len(fresh), last, err
+	for _, f := range active {
+		if owesTranslation(f) {
+			owed++
+		}
+	}
+	fr, err := freshFacts(s, active, last, seen)
+	return len(fr), owed, last, err
+}
+
+// owesTranslation reports whether a fact has no translation among its queries yet: stored before #395, or corrected
+// since, which drops the queries of the old text. The dream gives it one, packetTranslate a dream.
+func owesTranslation(f store.Fact) bool {
+	_, ok := extract.Translation(f.Queries)
+	return !ok
 }
 
 // dreamPacket is what -prepare handed to the model, kept in the state directory for -apply: the facts and versions
 // each part of the work was read at, and what the dream counts as seen once the answer is applied.
 type dreamPacket struct {
-	ID     string           `json:"id"`
-	Start  time.Time        `json:"start"`
-	Seen   map[string]int   `json:"seen"`
-	Split  map[string]int   `json:"split"`
-	Expand map[string]int   `json:"expand"`
-	Groups []map[string]int `json:"groups"`
+	ID     string         `json:"id"`
+	Start  time.Time      `json:"start"`
+	Seen   map[string]int `json:"seen"`
+	Split  map[string]int `json:"split"`
+	Expand map[string]int `json:"expand"`
+	// Translate are the facts owed a translation (#396), which no other part of the packet changes.
+	Translate map[string]int   `json:"translate,omitempty"`
+	Groups    []map[string]int `json:"groups"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
 	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
 	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
@@ -283,10 +310,11 @@ type dreamPacket struct {
 
 // dreamAnswer is what the model gives back for a packet.
 type dreamAnswer struct {
-	Packet     string              `json:"packet"`
-	Splits     []extract.Split     `json:"splits"`
-	Expansions []extract.Expansion `json:"expansions"`
-	Actions    []extract.Action    `json:"actions"`
+	Packet       string               `json:"packet"`
+	Splits       []extract.Split      `json:"splits"`
+	Expansions   []extract.Expansion  `json:"expansions"`
+	Actions      []extract.Action     `json:"actions"`
+	Translations []extract.Translated `json:"translations"`
 }
 
 const packetFile = "dream.packet.json"
@@ -393,8 +421,25 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	if len(bare) > packetExpand {
 		bare = bare[:packetExpand]
 	}
+	// Facts owed a translation get it a packet at a time, the newest first (#396). A fact another part of the packet
+	// may change waits: a split retires it, and an expansion or a group action writes a version the translation would
+	// race. A fresh fact the packet leaves for later is translated now: a base whose dream fell behind would otherwise
+	// translate nothing until it caught up.
+	busy := freshSet(bare)
+	for _, g := range groups {
+		for _, f := range g {
+			busy[f.ID] = true
+		}
+	}
+	var owed []store.Fact
+	for i := len(active) - 1; i >= 0 && len(owed) < packetTranslate; i-- {
+		if f := active[i]; !isBatch[f.ID] && !busy[f.ID] && owesTranslation(f) {
+			owed = append(owed, f)
+		}
+	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
-		Split: versions(batch), Expand: versions(bare), Deferred: deferred, Merge: cursor, Swept: swept}
+		Split: versions(batch), Expand: versions(bare), Translate: versions(owed), Deferred: deferred, Merge: cursor,
+		Swept: swept}
 	for _, f := range fresh {
 		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
@@ -407,7 +452,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	for _, g := range groups {
 		p.Groups = append(p.Groups, versions(g))
 	}
-	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 {
+	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
 		return rec, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
@@ -416,7 +461,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 		return rec, err
 	}
 	rec.Packet = p.ID
-	text, err := renderPacket(p.ID, batch, bare, groups, isBatch)
+	text, err := renderPacket(p.ID, batch, bare, owed, groups, isBatch)
 	if err != nil {
 		return rec, err
 	}
@@ -424,8 +469,8 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	return rec, err
 }
 
-// renderPacket is the text the model reads: the instructions, the groups, and the facts to split and expand.
-func renderPacket(id string, split, expand []store.Fact, groups [][]store.Fact, fresh map[string]bool) (string, error) {
+// renderPacket is the text the model reads: the instructions, the groups, and the facts to split, expand and translate.
+func renderPacket(id string, split, expand, translate []store.Fact, groups [][]store.Fact, fresh map[string]bool) (string, error) {
 	splitIn, err := renderSplitInput(split)
 	if err != nil {
 		return "", err
@@ -434,10 +479,15 @@ func renderPacket(id string, split, expand []store.Fact, groups [][]store.Fact, 
 	if err != nil {
 		return "", err
 	}
+	translateIn, err := renderSplitInput(translate)
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
 	b.WriteString(extract.DreamInstructions(id))
 	b.WriteString("\n## Данные: разделение\n\n```json\n" + splitIn + "\n```\n")
 	b.WriteString("\n## Данные: поисковые запросы\n\n```json\n" + expandIn + "\n```\n")
+	b.WriteString("\n## Данные: перевод\n\n```json\n" + translateIn + "\n```\n")
 	b.WriteString("\n## Данные: группы\n\n")
 	if len(groups) == 0 {
 		b.WriteString("Групп нет.\n")
@@ -508,6 +558,16 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 		expanded[e.ID] = true
 		plan.Expansions = append(plan.Expansions, dreamPlanExpansion{ID: e.ID, Version: v, Queries: q})
 	}
+	translated := map[string]bool{}
+	for _, tr := range a.Translations {
+		v, ok := p.Translate[tr.ID]
+		t := strings.TrimSpace(tr.Translation)
+		if !ok || translated[tr.ID] || t == "" {
+			continue // a fact the packet did not give to translate, a second answer, or nothing to write
+		}
+		translated[tr.ID] = true
+		plan.Translations = append(plan.Translations, dreamPlanTranslation{ID: tr.ID, Version: v, Translation: t})
+	}
 	groups := make([][]store.Fact, len(p.Groups))
 	for i, g := range p.Groups {
 		for _, id := range slices.Sorted(maps.Keys(g)) {
@@ -527,8 +587,9 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	applied.Groups = len(p.Groups) // the groups the model reviewed, not only those it acted on
 	applied.Grouped = groupRecords(p, a.Actions, applied.Actions)
 	if err == nil {
-		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d retired or corrected, %d promoted, %d refused\n",
-			len(applied.Splits), applied.Expanded, len(applied.Actions), len(applied.Promoted), len(applied.Refused))
+		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d translated, %d retired or corrected, %d promoted, "+
+			"%d refused\n", len(applied.Splits), applied.Expanded, applied.Translated, len(applied.Actions),
+			len(applied.Promoted), len(applied.Refused))
 	}
 	if err == nil {
 		err = os.Remove(filepath.Join(dir, packetFile))
@@ -647,6 +708,38 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 	}
 	if rec.Expanded > 0 {
 		if _, err := fmt.Fprintf(out, "expanded %d facts\n", rec.Expanded); err != nil {
+			return rec, err
+		}
+	}
+	// Translations write only the translation query; the rest of the queries stay. The packet gives them facts no
+	// other part touches, so a changed fact here was changed since the packet, and its translation may describe the
+	// old text.
+	for _, tr := range plan.Translations {
+		cur, err := s.Get(tr.ID)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			rec.Refused = append(rec.Refused, "translate "+tr.ID+": "+err.Error())
+			continue
+		case err != nil:
+			return rec, err
+		}
+		f, err := s.SetQueries(tr.ID, tr.Version, extract.WithTranslation(cur.Queries, tr.Translation))
+		switch {
+		case errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired):
+			rec.Refused = append(rec.Refused, "translate "+tr.ID+": "+err.Error())
+			continue
+		case err != nil:
+			return rec, err
+		}
+		// A fact the dream counts as seen stays seen at its new version; a fresh one the packet left for later stays
+		// fresh, so the next packet still reviews it.
+		if saw[tr.ID] == tr.Version {
+			saw[tr.ID] = f.Version
+		}
+		rec.Translated++
+	}
+	if rec.Translated > 0 {
+		if _, err := fmt.Fprintf(out, "translated %d facts\n", rec.Translated); err != nil {
 			return rec, err
 		}
 	}

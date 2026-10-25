@@ -34,7 +34,7 @@ memcue fact base:
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
   tools below.
 - **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
-  instructions and the facts to split, give search queries and review in groups (`since: all` for the first dream
+  instructions and the facts to split, give search queries, translate and review in groups (`since: all` for the first dream
   on a base), the second takes the JSON answer and reports what memcue applied and refused. See [Dream](#dream).
 - **Session extraction** (optional): `MEMCUE_EXTRACT=0` in the gateway's environment turns it off and wins over
   `extract_url`; otherwise the new messages of a session go to `memcue extract-messages` in the

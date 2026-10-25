@@ -191,7 +191,8 @@ func TestDreamWithNothingToMergeIsRecorded(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.SetQueries(f.ID, f.Version, []string{"query"}); err != nil {
+		// queries and a translation: nothing is owed to the dream either (#396)
+		if _, err := s.SetQueries(f.ID, f.Version, []string{"query", extract.TranslationPrefix + "translation"}); err != nil {
 			t.Fatal(err)
 		}
 	}
