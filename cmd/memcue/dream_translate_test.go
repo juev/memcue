@@ -19,17 +19,17 @@ func fakeTranslate(t *testing.T) *[]string {
 	t.Helper()
 	var sent []string
 	old := translateFn
-	translateFn = func(input string) (extract.TranslateResult, error) {
+	translateFn = func(input string) ([]extract.Translated, error) {
 		var req struct {
 			Facts []struct{ ID, Text string } `json:"facts"`
 		}
 		if err := json.Unmarshal([]byte(input), &req); err != nil {
-			return extract.TranslateResult{}, err
+			return nil, err
 		}
-		var r extract.TranslateResult
+		var r []extract.Translated
 		for _, f := range req.Facts {
 			sent = append(sent, f.ID)
-			r.Facts = append(r.Facts, extract.Translated{ID: f.ID, Translation: "translated " + f.ID})
+			r = append(r, extract.Translated{ID: f.ID, Translation: "translated " + f.ID})
 		}
 		return r, nil
 	}
