@@ -3,8 +3,9 @@
 Status: **interim measurement, 2026-10-25.** Pull has been the mode of this installation for about fifteen hours and
 0.10.0 for about five: the samples are small and the numbers below are a direction, not a rate. What they already
 show: the release is sound (the plugin suite and the unit tests pass, the search answers in milliseconds, the five-fact
-default costs half the characters of ten), and two defects in the base are measurable — a partly numbered index and
-facts that the search cannot reach at all.
+default costs half the characters of ten), and one defect in the base is measurable — a partly numbered index. A
+second defect claimed here, four live facts missing from the index, was my own counting mistake and is corrected at
+the end of the note.
 
 [pull-hermes-2026-10](pull-hermes-2026-10.md) measured the first hours of pull at 0.8.0 on this same installation;
 [pull-2026-10](pull-2026-10.md) measured pull against push end to end on another harness. This note is the third
@@ -17,8 +18,11 @@ counted from the logs that are still on disk.
   hand over five facts by default instead of ten (#374); **0.10.0** put versions, dates, ports and addresses into the
   index as exact terms with `MEMCUE_NUMBER_TERMS=0` as the opt-out (#378), and made the dream sweep what the previous
   dream saw (#379).
-- The base: **385 live facts by id**, 837 ids with their versions, 2 288 version rows, schema 5, 452 retired ids,
-  4 candidates, 0 duplicate groups, average fact 178 characters. Kinds: environment 166, pitfall 124, decision 22,
+- The base: **383 live facts by id** under the store's own definition (`status = 'active'` and
+  `review IN ('', 'provisional')`; a candidate waiting for approval is stored but deliberately not indexed), 385 if
+  candidates are counted — the audit query of this run counted them, and that is the first of the two corrections at
+  the end. 837 ids with their versions, 2 288 version rows, schema 5, 452 retired ids, 4 candidates, 0 duplicate
+  groups, average fact 178 characters. Kinds: environment 166, pitfall 124, decision 22,
   rule 21, event 15, repo 15, procedure 7, other 2, untyped 13. Scopes: host 253, repo 59, service 35, global 25,
   unset 13.
 - **20 real prompts** of the user: the newest from the session store, distinct, over 60 characters, no cron and no
@@ -117,18 +121,20 @@ quarter of what was pushed) is nonetheless the interesting part: the model asked
 
 ## What does not work yet
 
-1. **Four live facts are not in the index.** `fact_index` holds 381 ids against 385 live facts, and all four missing
-   works are ones mirrored from the `memory` tool: written to `facts`, visible in `memcue facts`, absent from
-   `memcue search`. One of them is the fact that names the installed version — `memcue 0.10.0`, binary and plugin —
-   so the base can answer "what is installed" only through the other copy of the same statement. Reproduce: list
-   live ids and `fact_index` ids, diff, then search for the exact words of a missing fact. Nine facts came from
-   `memory` in total, five of them are indexed: the mirror path does not always write the index, or the index is
-   built on a path the mirror skips.
-2. **The index is only partly numbered.** 72 live facts carry a version or a date; 53 of them have an `nm` term in
-   `fact_index` and 19 do not, because the index is computed when a fact is written and the base predates the
-   release. A version-only prompt returns a fact naming that version in **10 of 10** cases where the term exists and
-   in **0 of 4** where it does not, so those 19 facts are invisible to exactly the query the release was built for. There is no
-   `reindex` verb and `ensureIndex` compares counts, not tokenizers, so nothing fixes this on its own.
+1. **Nothing is missing from the index.** This item claimed four live facts absent from `fact_index`. They were four
+   candidates waiting for approval: `internal/store/store.go` defines a live fact as `status = 'active'` with
+   `review IN ('', 'provisional')`, and a candidate is stored but deliberately not indexed. At the time of the run
+   `ensureIndex` required 381 live facts and `fact_index` held 381 rows — a match, not a gap. The four were counted as
+   live by an audit query that filtered on `status` alone (381 + 4 = 385, the number in the table above); the same
+   query on the same base a few hours later gives 383 live facts, 383 index rows, 0 missing, 0 stale, in both
+   directions. The lesson is in the correction at the end of the note.
+2. **The index is only partly numbered.** 47 live facts carry a version or a date; 43 of them have an `nm` term in
+   `fact_index` and 4 do not. Three of the four were indexed before 0.10.0 — the index is computed when a fact is
+   written, and the release cannot go back — and the fourth names an address after an `@`, which the lexer's
+   boundary class does not accept. A version-only prompt returns a fact naming that version in **10 of 10** cases
+   where the term exists and in **0 of 4** where it does not, so those 4 facts are invisible to exactly the query the
+   release was built for. There is no `reindex` verb, and `numbersMissing` only notices an index with no numeric
+   terms at all, so a partial one is repaired only by hand.
 3. **Precision still falls with k, and five is where it stops.** 32% noise at five facts, 42% at ten; nothing below
    the fifth fact earns its characters. The default is right; the ten-fact callers are not, and the tool's own
    description invites a caller to raise the limit.
@@ -143,11 +149,33 @@ quarter of what was pushed) is nonetheless the interesting part: the model asked
 
 ## What follows
 
-Three of these are worth a task each, in this order: the missing index entries (a fact the search cannot return is
-worse than a fact that is missing, because the base says it is there), the numbering gap (a rebuild path, not a
-migration), and the ten-fact temptation in the tool description. The adoption number needs weeks and cannot be filed.
+Two of these are worth a task each: the numbering gap — a rebuild path and a repair that notices a partial index
+(#383) — and the ten-fact default of the CLI, which disagrees with the five the plugins use (#384). The counting
+mistake of item 1 is closed as invalid (#382) and its cause is fixed in the audit scripts. The adoption number needs
+weeks and cannot be filed.
 
 - The five-fact default is confirmed on live data: 13 of 20 prompts against 14 at ten facts, for half the characters.
 - Number terms are worth their default: 10 of 10 against 2 of 10 on version-only prompts.
 - Pull costs nothing on turns that do not search and 20.9 ms on the ones that do, against 386 ms a turn and a paid
   call in push.
+
+## Correction, same day
+
+The note above first reported four live facts missing from `fact_index` and filed #382 for it. That was wrong, and
+the way it went wrong is worth keeping: the counts were taken with `status = 'active'` and the newest version per id,
+but the store's own definition of a live fact also requires `review IN ('', 'provisional')`. A candidate — a fact the
+extraction stored and the vet has not yet approved — is written to `facts` and deliberately kept out of `fact_index`.
+The four facts were the four candidates, and `ensureIndex` was right all along.
+
+Recount on the same base: 387 ids with `status = 'active'` at their newest version, 4 of them candidates, **383 live
+facts by the store's definition, 383 rows in `fact_index`, none missing, none stale**. #382 is closed as invalid.
+
+What the correction changes here: the base line of the setup said 385 live facts where the store counts 383, and item
+2 of "what does not work yet" said 19 of 72 numbered facts without an `nm` term where the correct figure is 4 of 47 —
+the earlier count mixed candidates and history rows into the denominator as well. The top-k table is untouched: it
+comes from labelled prompts, not from the base count.
+
+The defect of item 2 survives the correction, and it is the reason #383 stays open: a base indexed before 0.10.0
+keeps word-only stems for the facts it already had, `numbersMissing` only notices an index with *no* numeric terms at
+all, and a version-only prompt on such a fact returns nothing. The audit scripts that produced the wrong count are
+fixed in the same pass, because the mistake was theirs and not the base's.
