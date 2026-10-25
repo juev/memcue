@@ -111,7 +111,9 @@ plugin and the binary from the same release.
    It registers the driver in the repository's git config and adds `memory/facts.db merge=memcue diff=memcue` to
    `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
-   Without a repository memcue works the same; the base is just not synced. A merge carries no vectors.
+   Without a repository memcue works the same; the base is just not synced. A merge carries no vectors. A machine
+   whose base is in git without the driver hears it on the session card, Hermes and DSH included, until
+   `memcue install` runs there.
 
 ### Binary from the plugin
 
@@ -254,7 +256,8 @@ The map comes from this machine's clones: the working directories of the Claude 
 under each `-root`. `repo:<owner>/<name>` scopes map by their suffix. A name with no clone here, or with two clones
 that now have different keys, stays as it is and is listed. So is every key that facts hold and no clone here has: a
 repository of another machine, or one whose remote changed, with the clones' keys it may have become. A changed key
-moves only by an explicit pair: `memcue migrate -repos -apply OLD=NEW`. `-apply` first copies the base to
+moves only by an explicit pair: `memcue migrate -repos -apply OLD=NEW`. A session in a repository whose old name
+facts still carry gets that pair on its card (#396). `-apply` first copies the base to
 `backup/facts.db.pre-repos-<time>` in the state directory, and writes each change as a new version that keeps the
 fact's date, so a base merged from another machine sees it.
 
