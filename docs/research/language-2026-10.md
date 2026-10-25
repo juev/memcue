@@ -92,6 +92,23 @@ installation: 20 English, 14 Russian, 7 mixed. In the search log of another inst
 are common. The weak cell of part 2 is therefore a real case: the user writes in Russian, and the agent searches
 in English.
 
+## 4. A question in Chinese
+
+The agent of the second installation runs on a Chinese model (DeepSeek), and none of its 37 queries was in
+Chinese: the query follows the language of the conversation and of the facts it reads, not the origin of the model.
+Still, the case was measured. The labeller wrote the 60 questions of part 2 once more in Simplified Chinese, with
+technical names kept (`question_prompt.md`, the language line changed). Results on the whole base:
+
+| fact | question | in top 5 | first |
+|---|---|---|---|
+| Russian | Chinese | 20 / 30 | 13 |
+| English | Chinese | 29 / 30 | 23 |
+
+The lexer splits on spaces and punctuation, so a Chinese phrase becomes one long word that matches nothing. The
+search runs only on the Latin names, paths and versions inside the question, and those are enough for most
+targets. A Chinese question with no such name returns nothing (`如何在服务器上更新反向代理配置`: no result), and a
+translation into English or Russian in the index would not change that.
+
 ## Options
 
 - **A (now).** Search loses a quarter of the Russian facts when the agent searches in English
