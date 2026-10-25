@@ -132,3 +132,37 @@ translation into English or Russian in the index would not change that.
   here.
 - Another base, or a user with a different mix of languages. 60 targets from one base, and questions written by
   a model that saw the fact, which flatters lexical search in every variant alike.
+
+## 5. Variant E on the whole base, after #395
+
+#395 shipped variant E: the session extraction writes the translation into `queries` under `= `, and
+`TranslateFacts` translates stored facts. The pass over a base is left to the regular dream (#396), so this run used
+the pass from the #395 branch before it was dropped (batches of 40, 4 calls at once, Opus through `claude -p`).
+The base is a copy of the live one with 2 855 facts, and the questions are the 60 targets of part 2, in three
+languages.
+
+| fact | question | before: top 5 (first) | after: top 5 (first) |
+|---|---|---|---|
+| Russian | Russian | 29 (27) | 29 (27) |
+| Russian | English | **22 (12)** | **30 (23)** |
+| Russian | Chinese | 20 (13) | 21 (13) |
+| English | Russian | 30 (29) | 30 (30) |
+| English | English | 30 (26) | 30 (28) |
+| English | Chinese | 29 (23) | 29 (23) |
+
+- **The pass.** 2 855 facts in 72 calls, $19.92, 20 minutes, none failed. DeepSeek flash through `MEMCUE_API_URL`
+  did 80 facts in 15 seconds.
+- **The base.** 17 MB grew to 29 MB, version rows from 10 749 to 13 604, index stems from 962 554 to 1 496 047
+  characters.
+- **Other prompts.** Version-only prompts gave 15 of 15 before and after. The 25 real prompts of
+  [pull-hermes-010](pull-hermes-010-2026-10.md)'s stand returned 29 774 and 30 282 characters: search output does not
+  carry the queries.
+- **Latency.** Search p50 went from 56 to 84 ms on the 0.11.1 code, because the per-open index check grows with the
+  version rows. With the stamp of #396 (e20adcc) it is 9.7 ms before and 10.0 ms after on the same two copies.
+- **Extraction cost.** Three sessions that had given facts before, one run each through `claude -p` and Opus, cost
+  $2.39 on `main` and $2.48 with the translation (+4%). All 33 facts of the second run carried a translation. The
+  fact counts differ between runs (26 and 33); with one run per session that is the model's spread and not an
+  effect of the change.
+
+The questions were written by a model that saw the fact, as in part 2. The Chinese column moves by one, which is
+inside the noise: a translation into Russian or English gives a Chinese question nothing new.
