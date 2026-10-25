@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.10.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.11.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.11.0 | 5 | 0.11.0 | 0.11.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.0 (`hermes-agent` 0.15.2) |
 | 0.10.0 | 5 | 0.10.0 | 0.10.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.10.0 (`hermes-agent` 0.15.2) |
 | 0.9.0 | 5 | 0.9.0 | 0.9.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.9.0 (`hermes-agent` 0.15.2) |
 | 0.8.0 | 5 | 0.8.0 | 0.8.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.8.0 (`hermes-agent` 0.15.2) |
@@ -159,6 +160,20 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.11.0: a partly numbered index is repaired, and `reindex` (#383, #384)
+
+- The index is rebuilt on the first open when a live fact whose text carries a version, date, port or address has no
+  number term in its row. 0.10.0 only noticed an index with *no* term at all, so a base indexed by an earlier release
+  kept word-only rows for the facts it already had: on a live base two facts were unreachable by the version alone
+  and reachable as `topic + version`. The check stems only the facts whose text carries a number, so opening a base
+  still costs what it cost.
+- `memcue reindex [-dry-run] [-json]` reports live facts, index rows and rows carrying a number term, then rebuilds.
+  `-dry-run` reads through a read-only open, so it does not repair what it measures.
+- An address after an `@` (`dig @1.1.1.1`) is one exact term, as versions and dates already were; it never matches a
+  neighbour address.
+- `memcue search` hands over five facts by default, as both plugins do, instead of ten (#384). `-n N` still overrides.
+- No schema change: bases stay at schema 5, and the repair writes only `fact_index`/`fact_fts`.
 
 ### 0.10.0: versions are terms by default, and the dream sweeps old facts (#376, #377)
 
