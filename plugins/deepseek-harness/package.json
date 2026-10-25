@@ -1,6 +1,6 @@
 {
   "name": "memcue-dsh",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "memcue long-term memory for DeepSeek Harness (dsh): facts recalled before a step, extracted when a turn ends",
   "type": "module",
   "license": "MIT",
