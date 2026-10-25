@@ -28,7 +28,9 @@ memcue fact base:
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   `memcue_search` takes an optional `limit` and runs `memcue search` with the session's workspace and id, so facts of
   this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the session; `memcue_correct`
-  can set `keywords` and an `expires` date, as the CLI does.
+  can set `keywords` and an `expires` date, as the CLI does. The call hands over **five** facts unless `limit` says
+  otherwise — on a live base ten doubled the characters and reached no prompt five did not — and `search_facts`
+  (default 5, 1–50) sets that number.
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
   tools below.
 - **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
