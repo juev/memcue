@@ -264,9 +264,11 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
-    "or retiring it.",
+    "or retiring it. Only the facts that fit the words come back: one fact means one fits, none means the base has "
+    "nothing on them, so try other words or the other language rather than a larger limit.",
     {"query": "Words of the fact.",
-     "limit": f"Optional maximum number of facts (default {_SEARCH_FACTS}, the provider's search_facts)."}, ["query"])
+     "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); fewer come "
+              "when the rest do not fit."}, ["query"])
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory: one self-contained statement in one to three sentences, "
     "naming the system or project, with exact values. Only what the user said or a tool confirmed.",
