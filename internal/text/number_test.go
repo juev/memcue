@@ -88,3 +88,26 @@ func TestIsNumberTerm(t *testing.T) {
 		}
 	}
 }
+
+// HasNumberTerm stands in for "Stems holds a numeric term" on the index repair's hot path, so the two must agree:
+// a number inside a word has no boundary and gives no term, a ticket gives another kind of term, and a bare port
+// number is not a term at all.
+func TestHasNumberTermAgreesWithStems(t *testing.T) {
+	t.Setenv("MEMCUE_NUMBER_TERMS", "")
+	cases := []string{
+		"Стенд собран под Go 1.27 и только под него.", "версия v0.22.2 вышла", "2026-10-19 из конфига",
+		"проверять `dig @1.1.1.1`", "порт 55432 слушает", "PostgreSQL-16 и gpt-6.1-sol", "тикет PROJ-1234 открыт",
+		"#123 закрыт", "без чисел вовсе", "s3 и k8s", "(1.27", "'0.5.2", "206.253.89.87 отвечает",
+		"модель gpt-6.1-sol, 27.0 часа", "ни 1.2, ни 3.4",
+	}
+	for _, in := range cases {
+		want := slices.ContainsFunc(Stems(in), IsNumberTerm)
+		if got := HasNumberTerm(in); got != want {
+			t.Errorf("HasNumberTerm(%q) = %v, the stems say %v", in, got, want)
+		}
+	}
+	t.Setenv("MEMCUE_NUMBER_TERMS", "0")
+	if HasNumberTerm("Go 1.27") {
+		t.Error("HasNumberTerm(Go 1.27) = true with the opt-out")
+	}
+}

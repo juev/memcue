@@ -25,7 +25,21 @@ var (
 	reTicket = regexp.MustCompile(`\b[A-Z][A-Z0-9]*-\d+\b|#\d+|!\d+`)
 	// Ticket terms carry a tk prefix and always end in a digit; ordinary identifiers such as s3 and k8s do not.
 	reTicketTerm = regexp.MustCompile(`^tk(?:h|b)?[a-z0-9]*\d+$`)
+	// reNumberWord is the part of reNumeric that becomes a numeric term: a version, a date, a port or an address
+	// after a boundary. A ticket (#123) leaves the text before reNumeric runs and never gives one, so it is not
+	// here; neither is a number inside a word (PostgreSQL-16, gpt-6.1-sol), which has no boundary before it.
+	reNumberWord = regexp.MustCompile(`(?:^|[\s(\[{"'@])[vV]?\d+(?:[.\-:/]\d+)+\b`)
 )
+
+// HasNumberTerm reports whether s holds a word Stems would turn into a numeric term. It answers the same question
+// as scanning Stems for IsNumberTerm at a fraction of the price, which matters where every fact carrying a digit is
+// asked on every open: the index repair does exactly that.
+func HasNumberTerm(s string) bool {
+	if !NumbersEnabled() {
+		return false
+	}
+	return reNumberWord.MatchString(s)
+}
 
 // Stems returns the stems of every word of s in order, stop words and numbers left out. Notes are indexed with it.
 func Stems(s string) []string {
