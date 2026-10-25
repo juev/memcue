@@ -513,7 +513,7 @@ func runSearch(args []string, out io.Writer) error {
 	minScore := fs.Float64("min-score", recall.MinScore,
 		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
 	in := fs.String("in", "", "where to look, comma-separated: project (this repository), global, host (this machine), "+
-		"all, or a scope such as repo:KEY, host:NAME, service:NAME (default: all but facts of other repositories)")
+		"all, or a scope such as repo:KEY, host:NAME, service:NAME (default: project in a repository, all elsewhere)")
 	kind := fs.String("kind", "", "only facts of these kinds, comma-separated: "+strings.Join(recall.Kinds, ", "))
 	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
 	expired := fs.Bool("expired", false, "include facts whose expiry has passed")

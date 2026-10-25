@@ -34,7 +34,7 @@ func TestSearchOrdersTiesByHostProjectGlobal(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := Search(s, Query{Text: "nats", Project: []string{"example.com/me/app"}, Host: "mac", N: 10, MinScore: MinScore})
+	got, err := Search(s, Query{Text: "nats", Project: []string{"example.com/me/app"}, Host: "mac", N: 10, MinScore: MinScore, In: []string{"all"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestSearchAnyProjectKeyWinsTies(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	got, err := Search(s, Query{Text: "брокер nats", Project: []string{"example.com/me/fork", "example.com/them/upstream"}, Host: "", N: 10, MinScore: MinScore})
+	got, err := Search(s, Query{Text: "брокер nats", Project: []string{"example.com/me/fork", "example.com/them/upstream"}, Host: "", N: 10, MinScore: MinScore, In: []string{"all"}})
 	if err != nil || len(got) != 2 || got[0].BM25 != got[1].BM25 {
 		t.Fatalf("want a tie of two, got %+v %v", got, err)
 	}
@@ -174,8 +174,8 @@ func TestSearchControls(t *testing.T) {
 		q    Query
 		want []string
 	}{
-		// By default every fact but those bound to another repository, and none that has expired.
-		{"default", Query{}, []string{"global rule", "learnt here", "other host", "own repo", "service", "this host"}},
+		// By default a session in a repository gets that repository's facts, and none that has expired.
+		{"default", Query{}, []string{"learnt here", "own repo"}},
 		{"project", Query{In: []string{"project"}}, []string{"learnt here", "own repo"}},
 		{"global", Query{In: []string{"global"}}, []string{"global rule", "other host"}},
 		{"host", Query{In: []string{"host"}}, []string{"this host"}},
@@ -186,7 +186,7 @@ func TestSearchControls(t *testing.T) {
 		{"union", Query{In: []string{"project", "host"}}, []string{"learnt here", "own repo", "this host"}},
 		{"all", Query{In: []string{"all"}},
 			[]string{"global rule", "learnt here", "other host", "other repo", "own repo", "service", "this host"}},
-		{"kind", Query{Kinds: []string{"decision", "rule"}}, []string{"global rule", "own repo"}},
+		{"kind", Query{In: []string{"all"}, Kinds: []string{"decision", "rule"}}, []string{"global rule", "other repo", "own repo"}},
 		{"expired kept", Query{In: []string{"project"}, Expired: true}, []string{"expired", "learnt here", "own repo"}},
 		{"since tomorrow", Query{In: []string{"all"}, Since: "2999-01-01"}, nil},
 	} {
@@ -195,6 +195,17 @@ func TestSearchControls(t *testing.T) {
 				t.Errorf("got %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// Outside a repository the default is the whole base.
+func TestSearchDefaultOutsideARepository(t *testing.T) {
+	s := controlBase(t)
+	for _, project := range [][]string{nil, {"dir:/home/me"}} {
+		hits, err := Search(s, Query{Text: "nats", N: 20, Project: project, Today: "2026-10-25"})
+		if err != nil || len(hits) != 7 {
+			t.Errorf("project %q: got %d facts %v, want every live fact", project, len(hits), err)
+		}
 	}
 }
 

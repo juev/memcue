@@ -4,7 +4,7 @@
 // (#407): the BM25 score and its share of the best one, the IDF-weighted share of the prompt's terms the fact holds,
 // and how many of the prompt's rare terms it holds. A floor is then chosen offline over these numbers.
 //
-//	go run -tags research ./docs/research/scripts/searchfloor FACTS.db PROMPTS.json N > hits.jsonl
+//	go run -tags research ./docs/research/scripts/searchfloor FACTS.db PROMPTS.json N [default] > hits.jsonl
 //
 // PROMPTS.json is a list of {"id": "...", "q": "...", "cwd": "..."}. Experiment only, not part of memcue.
 package main
@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 
@@ -62,6 +63,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	claudeDir := filepath.Join(os.Getenv("HOME"), ".claude")
 	enc := json.NewEncoder(os.Stdout)
 	for _, p := range prompts {
 		terms := text.Terms(p.Q)
@@ -79,7 +81,12 @@ func main() {
 				sum += weight[t]
 			}
 		}
-		hits, err := recall.Search(s, p.Q, tier.Keys(p.CWD, ""), "", n, 0)
+		// The whole base, as 0.14.0 searched it; "default" as the fourth argument applies the default filter of #409.
+		q := recall.Query{Text: p.Q, Project: tier.Keys(p.CWD, claudeDir), N: n, In: []string{"all"}, Expired: true}
+		if len(os.Args) > 4 && os.Args[4] == "default" {
+			q.In, q.Expired = nil, false
+		}
+		hits, err := recall.Search(s, q)
 		if err != nil {
 			panic(err)
 		}

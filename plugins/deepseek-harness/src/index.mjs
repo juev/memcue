@@ -759,11 +759,11 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. By default it leaves out facts bound to other repositories and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches only the facts of that repository by default, elsewhere the whole base, and leaves out expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Words to look for, in any language the fact may be written in.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
-			in: { type: 'string', description: 'Where to look, comma-separated: project (this repository only), global, host (this machine), all (every repository: all that is known about a tool), or a scope such as repo:KEY, host:NAME, service:NAME.' },
+			in: { type: 'string', description: 'Where to look, comma-separated: all (every repository: a host, a tool, another project, or when this repository has nothing), project (this repository only), global, host (this machine), or a scope such as repo:KEY, host:NAME, service:NAME.' },
 			kind: { type: 'string', description: 'Kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. E.g. rule,decision for what was decided.' },
 			since: { type: 'string', description: 'YYYY-MM-DD: only facts learnt on or after that day.' },
 			expired: { type: 'boolean', description: 'Include facts whose expiry has passed.' },

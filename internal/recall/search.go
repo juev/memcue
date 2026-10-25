@@ -28,8 +28,7 @@ type Query struct {
 	Host     string
 	// In names where to look: "project" (facts of the session's repository, by any of its keys), "global", "host"
 	// (this machine), "all", or a scope such as "repo:KEY", "host:NAME" or "service:NAME". Several are a union. Empty
-	// is everything but facts bound to another repository: on agents' queries that kept 116 of 129 useful facts
-	// and dropped 37 of 63 unrelated ones, where the session's project alone kept 41 useful facts.
+	// is "project" in a session that works in a repository and "all" outside one.
 	In       []string
 	Kinds    []string // only facts of these kinds (rule, decision, pitfall, ...)
 	Since    string   // only facts learnt on or after this day, "YYYY-MM-DD"
@@ -63,11 +62,16 @@ func (q Query) Filter() (store.Filter, error) {
 			f.Today = store.Today()
 		}
 	}
-	if len(q.In) == 0 {
-		f.OtherRepos, f.Repos = true, q.Project
-		return f, nil
+	in := q.In
+	if len(in) == 0 {
+		// The user's choice (#409): a session in a repository searches that repository; outside one a question is as
+		// likely about anything, so it searches the whole base.
+		in = []string{"all"}
+		if inRepo(q.Project) {
+			in = []string{"project"}
+		}
 	}
-	for _, in := range q.In {
+	for _, in := range in {
 		switch in = strings.TrimSpace(in); {
 		case in == "all":
 			f.Scopes, f.Origins = nil, nil
@@ -96,6 +100,12 @@ func (q Query) Filter() (store.Filter, error) {
 		}
 	}
 	return f, nil
+}
+
+// inRepo reports whether a session with these project keys works in a repository: a key other than a directory
+// (dir:<path>) names one, the global tier of the Claude config directory included.
+func inRepo(project []string) bool {
+	return slices.ContainsFunc(project, func(k string) bool { return k != "" && !strings.HasPrefix(k, "dir:") })
 }
 
 // Search finds the facts for a query the agent wrote itself (#361): FTS5 over the query's terms in BM25 order, with
