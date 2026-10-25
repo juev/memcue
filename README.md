@@ -329,7 +329,7 @@ through git.
 A fact is found by a question in either language. The session extraction stores, next to the search queries, the
 whole fact in the other language, Russian or English, as one query that starts with `= `: search reads it, while the
 card and the search output show the fact as it was written (#392, #395). Facts stored before, and those a correction
-left without one, get it through a later pass (#396).
+left without one, get it from the regular dream, 40 a dream (#396).
 
 `memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
 decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
@@ -393,7 +393,8 @@ Extraction never sees the base, so two sessions can store the same fact, or a fa
 dream tidies the facts the last dream did not see. memcue starts no model for it: the model of a session does it.
 
 1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
-   the instructions, the fresh facts to split, the facts without search queries to expand, and the groups to review.
+   the instructions, the fresh facts to split, the facts without search queries to expand, the facts without a
+   translation to translate, and the groups to review.
    It keeps the packet in the state directory.
 2. The model answers in one JSON object, with the packet's id.
 3. `memcue dream -apply FILE` checks the answer against the packet and carries out what passes. It prints and logs
@@ -403,12 +404,12 @@ Who runs it:
 
 - **Claude Code.** When a dream is due, the session start says so in one line, and the agent runs the `memcue-dream`
   skill when the user's task allows. It never interrupts a turn. A dream is due once `MEMCUE_DREAM_EVERY` (default
-  `1h`) has passed since the last one and some fact is fresh. The first check on a machine only marks the start, so
+  `1h`) has passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks the start, so
   the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them.
 - **Hermes.** A cron job of Hermes calls the provider's dream tools on a schedule
   ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
 
-A packet holds up to 40 fresh facts, 30 groups and 50 facts to expand. The fresh facts it leaves out are not counted
+A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand and 40 to translate. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
 
 What the answer may do:
@@ -423,6 +424,12 @@ What the answer may do:
   of a split. Facts stored before extraction wrote queries are never fresh again, so each packet also offers the
   newest of them: a base upgraded from 0.4 fills over a few dreams. On the gold set of 180 prompts the queries added
   7–9 prompts that got a useful fact ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).
+- **Translate** a fact that has no translation among its queries: the whole text in the other language, Russian or
+  English, kept as the query that starts with `= ` (#395). Extraction writes it with every fact; the dream gives it
+  to the facts stored before #395 and to those a correction left without one, the newest first, so an old base is
+  translated over a few dozen dreams without a command of its own (#396). A fact another part of the packet may
+  change — fresh, without queries, or in a group — waits for a later packet, and a fact changed since the packet is
+  refused, since its translation would describe the old text.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
@@ -536,7 +543,8 @@ extraction lost quality without it and keeps it
 
 A dream costs no call of its own: it is part of the session that runs it. One packet is about 20,000–36,000
 characters on the author's two bases, instructions included; a dream with no fresh fact and nothing to expand prints
-one line.
+one line. While facts are owed a translation, its 40 facts add about 10,000 characters (64,583 against 54,000 on a
+copy of the author's base with 2,831 fresh facts waiting).
 
 ## Results
 

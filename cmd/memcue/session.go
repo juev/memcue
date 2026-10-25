@@ -92,12 +92,19 @@ func dreamHint() string {
 	if err != nil {
 		return ""
 	}
-	n, last, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
-	if err != nil || n == 0 {
+	n, owed, last, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
+	if err != nil || n == 0 && owed == 0 {
 		return ""
 	}
-	return fmt.Sprintf("memcue: %d facts wait for the dream (last dream %s). When the user's task allows, run the "+
-		"memcue-dream skill to tidy the memory; never interrupt the user's work for it.", n,
+	var what []string
+	if n > 0 {
+		what = append(what, fmt.Sprintf("%d facts wait for the dream", n))
+	}
+	if owed > 0 {
+		what = append(what, fmt.Sprintf("%d facts lack a translation", owed))
+	}
+	return fmt.Sprintf("memcue: %s (last dream %s). When the user's task allows, run the memcue-dream skill to tidy "+
+		"the memory; never interrupt the user's work for it.", strings.Join(what, ", "),
 		last.Local().Format("2006-01-02 15:04"))
 }
 

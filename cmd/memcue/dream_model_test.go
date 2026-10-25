@@ -12,7 +12,7 @@ import (
 	"github.com/juev/memcue/internal/extract"
 )
 
-// The session's model in the tests: the three functions answer the parts of a packet the way the model would, and
+// The session's model in the tests: the four functions answer the parts of a packet the way the model would, and
 // dreamModel plays the session that runs the memcue-dream skill: -prepare, the answers, -apply.
 
 // dreamReply is the model's answer to the groups of a packet.
@@ -25,6 +25,8 @@ var (
 	dreamFn  = func(string) (dreamReply, error) { return dreamReply{}, nil }
 	splitFn  = func(string) (splitReply, error) { return splitReply{}, nil }
 	expandFn = func(string) (extract.ExpandResult, error) { return extract.ExpandResult{}, nil }
+	// translateFn answers the facts a packet gives to translate (#396); by default the model writes none.
+	translateFn = func(string) (extract.TranslateResult, error) { return extract.TranslateResult{}, nil }
 )
 
 // dreamModel prepares a packet with args, answers it with the functions above and applies the answer; out gets what
@@ -62,7 +64,7 @@ func prepareAnswer(args []string, out io.Writer) (string, error) {
 	return path, writeJSONFile(path, answer)
 }
 
-// answerPacket reads the parts of a printed packet and asks the three functions about them.
+// answerPacket reads the parts of a printed packet and asks the four functions about them.
 func answerPacket(text string) (dreamAnswer, error) {
 	var a dreamAnswer
 	dir, err := stateDir()
@@ -91,6 +93,13 @@ func answerPacket(text string) (dreamAnswer, error) {
 			return a, err
 		}
 		a.Expansions = r.Facts
+	}
+	if in := packetBlock(text, "## Данные: перевод"); hasFacts(in) {
+		r, err := translateFn(in)
+		if err != nil {
+			return a, err
+		}
+		a.Translations = r.Facts
 	}
 	if i := strings.Index(text, "## Данные: группы\n\n"); i >= 0 {
 		groups := text[i+len("## Данные: группы\n\n"):]

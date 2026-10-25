@@ -27,6 +27,7 @@ Never interrupt the user's work for it: finish or pause at a natural point first
 
    It prints what it changed and what it refused, with the reason. An answer to an older packet is refused whole:
    run `-prepare` again.
-4. Tell the user in one or two lines what changed: facts split, given queries, retired, corrected.
+4. Tell the user in one or two lines what changed: facts split, given queries, translated, retired,
+   corrected.
 
 A packet is bounded; when the session start still says facts wait, the next packet takes the rest.

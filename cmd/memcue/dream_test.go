@@ -65,7 +65,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	if len(*calls) != 1 {
 		t.Fatalf("calls %d", len(*calls))
 	}
-	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 1 retired or corrected, 0 promoted, 0 refused") {
+	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 0 translated, 1 retired or corrected, 0 promoted, 0 refused") {
 		t.Errorf("summary missing: %q", out.String())
 	}
 	sent := (*calls)[0]
@@ -304,7 +304,7 @@ func TestDreamDueOnlyAfterTheIntervalWithAFreshFact(t *testing.T) {
 		t.Fatal(err)
 	}
 	dreamBase(t)
-	if n, _, err := dreamDue(state, time.Hour); err != nil || n != 0 {
+	if n, _, _, err := dreamDue(state, time.Hour); err != nil || n != 0 {
 		t.Fatalf("first check: %d %v", n, err)
 	}
 	if _, ok := lastDream(state); !ok {
@@ -314,7 +314,7 @@ func TestDreamDueOnlyAfterTheIntervalWithAFreshFact(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the first check saw the whole base, so a due dream has nothing new
-	if n, _, _ := dreamDue(state, time.Hour); n != 0 {
+	if n, _, _, _ := dreamDue(state, time.Hour); n != 0 {
 		t.Errorf("facts the mark saw are due: %d", n)
 	}
 	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",
@@ -322,13 +322,13 @@ func TestDreamDueOnlyAfterTheIntervalWithAFreshFact(t *testing.T) {
 	if err := markDream(state, time.Now().Add(-59*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if n, _, _ := dreamDue(state, time.Hour); n != 0 {
+	if n, _, _, _ := dreamDue(state, time.Hour); n != 0 {
 		t.Errorf("due within the hour: %d", n)
 	}
 	if hint := dreamHint(); hint != "" {
 		t.Errorf("hint within the hour: %q", hint)
 	}
-	if n, _, _ := dreamDue(state, 30*time.Minute); n != 1 {
+	if n, _, _, _ := dreamDue(state, 30*time.Minute); n != 1 {
 		t.Errorf("due after a shorter interval: %d", n)
 	}
 	t.Setenv("MEMCUE_DREAM_EVERY", "30m")
