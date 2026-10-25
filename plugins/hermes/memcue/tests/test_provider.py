@@ -452,6 +452,7 @@ class ProviderTest(unittest.TestCase):
             found = json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy server1", **kw)))
             return [f["id"] for f in found["facts"]]
         self.assertEqual(ids(kind="rule", min_score="0"), [rule])
+        self.assertEqual(len(ids(**{"in": "all"}, min_score=0)), 2)  # a number 0 widens too
         self.assertEqual(ids(words="all"), [rule])
         self.assertEqual(ids(**{"in": "global"}, min_score="0"), [rule])
         self.assertEqual(len(ids(**{"in": "all"}, expired="true", min_score="0")), 2)

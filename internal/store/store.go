@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/oklog/ulid/v2"
 
@@ -1270,7 +1271,7 @@ func (s *Store) where(alias string, f Filter) (string, []any) {
 		}
 		for _, o := range f.Origins {
 			or = append(or, "substr("+alias+".origin, 1, ?) = ?")
-			args = append(args, len(o)+1, o+" ")
+			args = append(args, utf8.RuneCountInString(o)+1, o+" ")
 		}
 		conds = append(conds, "("+strings.Join(or, " OR ")+")")
 	}

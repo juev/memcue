@@ -1111,8 +1111,9 @@ class MemcueMemoryProvider(MemoryProvider):
             cmd += ["-n", str(limit)]
             controls = []
             for name, flag in (("in", "-in"), ("kind", "-kind"), ("since", "-since"), ("min_score", "-min-score")):
-                if arg(name):
-                    controls += [flag, arg(name)]
+                value = args.get(name)
+                if value is not None and str(value).strip() != "":  # a min_score of 0 is a value, not an absence
+                    controls += [flag, str(value).strip()]
             if _on(arg("expired")):
                 controls.append("-expired")
             if arg("words") not in ("", "any", "all"):
