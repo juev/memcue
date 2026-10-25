@@ -47,7 +47,10 @@ memcue fact base:
   start. Each message is sent once; fingerprints of the sent ones are kept in `$HERMES_HOME/memcue/sessions/`, which
   also survives compression rewriting the message list. Tool output goes too, cut to
   `extract_tool_result_chars` (1500 characters, the same cut memcue applies to a `RESULT` block): a fact sourced from
-  a tool can quote its evidence only from tool output, and the write policy drops such a fact without the quote. Each
+  a tool can quote its evidence only from tool output, and the write policy drops such a fact without the quote. A fact
+  quoted from a tool that reads the outside world (`web_extract`, a browser, a PDF) goes to `shelf:research`, which
+  only a search naming it reads; the `shelf` option names another shelf and an empty value turns it off (see
+  [Projects](../../README.md#projects)). Each
   run is a line in memcue's `extract.log`, in the binary's state directory: `$XDG_STATE_HOME/memcue/<hash>` for the
   Hermes base (a non-default base gets its own subdirectory), or `MEMCUE_STATE_DIR` when set.
 

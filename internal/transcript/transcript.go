@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 )
 
 // Limits on what one entry contributes; a session's knowledge is in what was said and found, not in full outputs.
@@ -42,17 +44,20 @@ type entry struct {
 }
 
 type block struct {
-	Type    string          `json:"type"`
-	Text    string          `json:"text"`
-	Name    string          `json:"name"`
-	Input   json.RawMessage `json:"input"`
-	Content json.RawMessage `json:"content"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	Content   json.RawMessage `json:"content"`
+	ToolUseID string          `json:"tool_use_id"`
 }
 
 // Read renders the transcript from line `from` (0-based) on.
 func Read(r io.Reader, from int) (Session, error) {
 	var s Session
 	var b strings.Builder
+	var open calls
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 1<<20), maxLine)
 	for sc.Scan() {
@@ -70,13 +75,13 @@ func Read(r io.Reader, from int) (Session, error) {
 		if s.Start == "" && len(e.Timestamp) >= 10 {
 			s.Start = e.Timestamp[:10]
 		}
-		render(&b, e)
+		render(&b, e, &open)
 	}
 	s.Text = b.String()
 	return s, sc.Err()
 }
 
-func render(b *strings.Builder, e entry) {
+func render(b *strings.Builder, e entry, open *calls) {
 	var str string
 	if json.Unmarshal(e.Message.Content, &str) == nil {
 		if e.Type == "user" {
@@ -99,11 +104,50 @@ func render(b *strings.Builder, e entry) {
 				say(b, "ASSISTANT", bl.Text)
 			}
 		case "tool_use":
+			open.add(bl.ID, bl.Name)
 			say(b, "TOOL "+bl.Name, toolInput(bl.Name, bl.Input))
 		case "tool_result":
-			say(b, "RESULT", cut(resultText(bl.Content), maxToolResult))
+			say(b, resultLabel(open.take(bl.ToolUseID)), cut(resultText(bl.Content), maxToolResult))
 		}
 	}
+}
+
+// calls are the tool calls of the turn whose results have not come yet, in the order they were made.
+type calls []call
+
+type call struct{ id, name string }
+
+func (c *calls) add(id, name string) { *c = append(*c, call{id, name}) }
+
+// take returns the name of the call a result answers: the one with its id, or the oldest open one when the result
+// names none or an unknown one. A result with no open call has no known tool.
+func (c *calls) take(id string) string {
+	i := slices.IndexFunc(*c, func(x call) bool { return id != "" && x.id == id })
+	if i < 0 {
+		if len(*c) == 0 {
+			return ""
+		}
+		i = 0
+	}
+	name := (*c)[i].name
+	*c = slices.Delete(*c, i, i+1)
+	return name
+}
+
+// resultLabel is the block label of a tool result: RESULT and the name of the tool that produced it, so the record
+// says where a quote came from (#433); the bare RESULT when the tool is not known. Signs that would end the label
+// early or break its line are left out of the name.
+func resultLabel(tool string) string {
+	tool = strings.Map(func(r rune) rune {
+		if r == ':' || unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, tool)
+	if tool == "" {
+		return "RESULT"
+	}
+	return "RESULT " + tool
 }
 
 // toolInput is what a tool call shows: the file alone for an edit, whose content is in the repository and teaches
@@ -152,7 +196,7 @@ func say(b *strings.Builder, who, text string) {
 // reMarker finds a line of a message or tool output that starts the way a block of the record does. say indents it,
 // so text a tool returned (a web page, a file) cannot open a block of its own, such as a USER block that would pass
 // for the user's words.
-var reMarker = regexp.MustCompile(`(?m)^((?:USER|ASSISTANT|RESULT|TOOL [^:\n]*): )`)
+var reMarker = regexp.MustCompile(`(?m)^((?:USER|ASSISTANT|RESULT(?: [^:\n]*)?|TOOL [^:\n]*): )`)
 
 // cut keeps the head and the tail of a long text: errors and conclusions tend to sit at either end.
 func cut(s string, n int) string {
@@ -164,11 +208,15 @@ func cut(s string, n int) string {
 	return string(r[:h]) + fmt.Sprintf("\n[… %d chars cut …]\n", len(r)-n) + string(r[len(r)-(n-h):])
 }
 
-// Message is one chat message in the OpenAI shape, as agents such as Hermes keep their sessions.
+// Message is one chat message in the OpenAI shape, as agents such as Hermes keep their sessions. A tool message may
+// name its tool and the call it answers; without them it answers the assistant's calls in order.
 type Message struct {
-	Role      string          `json:"role"`
-	Content   json.RawMessage `json:"content"`
-	ToolCalls []struct {
+	Role       string          `json:"role"`
+	Content    json.RawMessage `json:"content"`
+	Name       string          `json:"name"`
+	ToolCallID string          `json:"tool_call_id"`
+	ToolCalls  []struct {
+		ID       string `json:"id"`
 		Function struct {
 			Name      string `json:"name"`
 			Arguments string `json:"arguments"`
@@ -179,6 +227,7 @@ type Message struct {
 // RenderMessages renders chat messages the way Read renders a Claude Code transcript; system messages are left out.
 func RenderMessages(msgs []Message) string {
 	var b strings.Builder
+	var open calls
 	for _, m := range msgs {
 		text := resultText(m.Content)
 		switch m.Role {
@@ -186,11 +235,17 @@ func RenderMessages(msgs []Message) string {
 			say(&b, "USER", text)
 		case "assistant":
 			say(&b, "ASSISTANT", text)
+			open = open[:0]
 			for _, c := range m.ToolCalls {
+				open.add(c.ID, c.Function.Name)
 				say(&b, "TOOL "+c.Function.Name, toolInput(c.Function.Name, json.RawMessage(c.Function.Arguments)))
 			}
 		case "tool":
-			say(&b, "RESULT", cut(text, maxToolResult))
+			name := open.take(m.ToolCallID)
+			if m.Name != "" {
+				name = m.Name
+			}
+			say(&b, resultLabel(name), cut(text, maxToolResult))
 		}
 	}
 	return b.String()
