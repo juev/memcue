@@ -1,10 +1,7 @@
 package extract
 
 import (
-	"context"
 	_ "embed"
-	"encoding/json"
-	"fmt"
 	"strings"
 )
 
@@ -51,39 +48,7 @@ type Translated struct {
 	Translation string `json:"translation"`
 }
 
-// TranslateResult is the model's answer over a batch of facts.
-type TranslateResult struct {
-	Facts   []Translated `json:"facts"`
-	CostUSD float64
-	Tokens  Tokens
-}
-
+// translatePrompt is task 4 of a dream packet (#396): the session's model translates the facts owed a translation.
+//
 //go:embed translate_prompt.md
 var translatePrompt string
-
-const translateSchema = `{"type":"object","additionalProperties":false,"required":["facts"],"properties":{
-"facts":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","translation"],
-"properties":{"id":{"type":"string"},"translation":{"type":"string"}}}}}}`
-
-const translateShape = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
-	`{"facts": [{"id": "…", "translation": "…"}]}` + "\n"
-
-// TranslateFacts asks the main model, without reasoning, for each fact of the rendered input in the other language.
-// The caller checks the ids against what it sent.
-func TranslateFacts(ctx context.Context, input string) (TranslateResult, error) {
-	rp, err := callModel(ctx, Endpoint{URL: API.URL, Model: Model, Key: API.Key, Quick: true}, translatePrompt,
-		translateSchema, translateShape, input)
-	if err != nil {
-		return TranslateResult{}, err
-	}
-	var r TranslateResult
-	if err := json.Unmarshal(rp.payload, &r); err != nil {
-		return TranslateResult{}, fmt.Errorf("translation: %w", err)
-	}
-	r.CostUSD, r.Tokens = rp.cost, rp.tokens
-	for i := range r.Facts {
-		r.Facts[i].ID = strings.TrimSpace(r.Facts[i].ID)
-		r.Facts[i].Translation = strings.TrimSpace(r.Facts[i].Translation)
-	}
-	return r, nil
-}

@@ -26,7 +26,7 @@ var (
 	splitFn  = func(string) (splitReply, error) { return splitReply{}, nil }
 	expandFn = func(string) (extract.ExpandResult, error) { return extract.ExpandResult{}, nil }
 	// translateFn answers the facts a packet gives to translate (#396); by default the model writes none.
-	translateFn = func(string) (extract.TranslateResult, error) { return extract.TranslateResult{}, nil }
+	translateFn = func(string) ([]extract.Translated, error) { return nil, nil }
 )
 
 // dreamModel prepares a packet with args, answers it with the functions above and applies the answer; out gets what
@@ -99,7 +99,7 @@ func answerPacket(text string) (dreamAnswer, error) {
 		if err != nil {
 			return a, err
 		}
-		a.Translations = r.Facts
+		a.Translations = r
 	}
 	if i := strings.Index(text, "## Данные: группы\n\n"); i >= 0 {
 		groups := text[i+len("## Данные: группы\n\n"):]
