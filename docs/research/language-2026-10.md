@@ -135,9 +135,9 @@ translation into English or Russian in the index would not change that.
 
 ## 5. Variant E on the whole base, after #395
 
-#395 shipped variant E: the session extraction writes the translation into `queries` under `= `, and
-`TranslateFacts` translates stored facts. The pass over a base is left to the regular dream (#396), so this run used
-the pass from the #395 branch before it was dropped (batches of 40, 4 calls at once, Opus through `claude -p`).
+#395 shipped variant E: the session extraction writes the translation into `queries` under `= `. The facts already
+stored get theirs from the regular dream, 40 a dream (#396). This run translated the whole copy at once with the
+pass the #395 branch had before the dream took it over (batches of 40, 4 calls at once, Opus through `claude -p`).
 The base is a copy of the live one with 2 855 facts, and the questions are the 60 targets of part 2, in three
 languages.
 
