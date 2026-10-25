@@ -880,6 +880,18 @@ func (s *Store) Current() ([]Fact, error) {
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? ORDER BY f.id`, Active)
 }
 
+// CountNamed counts the facts Current would return whose origin is "<name> <date>" or whose scope is repo:<name>:
+// the facts still written under a name that is not a project key (#343). The filter on the text comes first, so only
+// the rows that carry the name look up their latest version.
+func (s *Store) CountNamed(name string) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT count(*) FROM facts f
+		WHERE ((length(f.origin) = length(?1) + 11 AND substr(f.origin, 1, length(?1) + 1) = ?1 || ' ')
+			OR f.scope = 'repo:' || ?1)
+			AND f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?2`, name, Active).Scan(&n)
+	return n, err
+}
+
 // Backup writes a consistent copy of the base to path, which must not exist.
 func (s *Store) Backup(path string) error {
 	_, err := s.db.Exec(`VACUUM INTO ?`, path)

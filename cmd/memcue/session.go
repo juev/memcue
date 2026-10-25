@@ -68,6 +68,9 @@ func runSessionStart(in io.Reader, out io.Writer) error {
 	if hint := dreamHint(); hint != "" {
 		context += "\n\n" + hint
 	}
+	if hint := upkeepHint(h.CWD); hint != "" {
+		context += "\n\n" + hint
+	}
 	var resp struct {
 		HookSpecificOutput struct {
 			HookEventName     string `json:"hookEventName"`
@@ -99,7 +102,8 @@ func dreamHint() string {
 }
 
 // runSessionCard returns only the card, for a host whose own system prompt already carries the memory note. It
-// takes the same input as session-start.
+// takes the same input as session-start. What this machine still owes an upgrade follows the card: such a host has
+// no other way to hear it.
 func runSessionCard(in io.Reader, out io.Writer) error {
 	var h sessionStartInput
 	if err := json.NewDecoder(in).Decode(&h); err != nil {
@@ -109,10 +113,15 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if card != "" {
+		logCard(h, ids, len([]rune(card)))
+	}
+	if hint := upkeepHint(h.CWD); hint != "" {
+		card = strings.TrimPrefix(card+"\n\n"+hint, "\n\n")
+	}
 	if card == "" {
 		return nil
 	}
-	logCard(h, ids, len([]rune(card)))
 	var resp struct {
 		HookSpecificOutput struct {
 			HookEventName     string `json:"hookEventName"`
