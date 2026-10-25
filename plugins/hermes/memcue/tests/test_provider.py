@@ -309,6 +309,32 @@ class ProviderTest(unittest.TestCase):
         self.p.on_pre_compress([])
         self.assertIn("Всегда отвечай", self.p.system_prompt_block())
 
+    def test_the_card_leaves_out_what_the_memory_notes_say(self):
+        """The built-in memory block is injected at every turn and cannot be removed, so a card line that states the
+        same thing is a second copy of it (#424). A line the notes do not carry stays on the card."""
+        memories = Path(self.home) / "memories"
+        memories.mkdir()
+        (memories / "MEMORY.md").write_text(
+            "- Требует, чтобы навыки содержали только процедуры: состояние среды — в памяти, замеры — в docs/research.\n",
+            encoding="utf-8")
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Пользователь требует, чтобы в навыках были только процедуры, а состояние среды лежало в памяти.")
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Мержить PR сразу после зелёных проверок.")
+        block = self.p.system_prompt_block()
+        self.assertNotIn("в навыках были только процедуры", block)
+        self.assertIn("Мержить PR сразу", block)
+
+    def test_a_card_of_copies_only_is_no_card(self):
+        memories = Path(self.home) / "memories"
+        memories.mkdir()
+        (memories / "USER.md").write_text(
+            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.")
+        block = self.p.system_prompt_block()
+        self.assertNotIn("memcue: rules and decisions", block)
+
     def test_a_cron_run_gets_no_card(self):
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
                     "Всегда отвечай пользователю по-русски.")
