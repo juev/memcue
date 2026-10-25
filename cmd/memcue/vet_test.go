@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
@@ -764,5 +765,51 @@ func TestVetDryRunReportsASplit(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "+ Данные gitea в /srv/gitea.") || !strings.Contains(out.String(), "разделено на части 1") {
 		t.Errorf("report:\n%s", out.String())
+	}
+}
+
+// A mirror is approved when the memory is written (#440), so the suspects pass is what retires it once its note is
+// gone: by rule, without a model, and only for a fact whose text the notes no longer hold.
+func TestVetRetiresAnApprovedMirrorWhoseNoteIsGone(t *testing.T) {
+	dir := env(t)
+	notes := filepath.Join(dir, "notes")
+	if err := os.MkdirAll(notes, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(notes, "MEMORY.md"), []byte("Пользователь пишет коммиты по-английски."), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	live := vetFact(t, "Пользователь пишет коммиты по-английски.", "hermes-memory 2026-10-20", "memory")
+	gone := vetFact(t, "В контейнере hermes нет CLI sqlite3, базу читают через python3.", "hermes-memory 2026-10-20", "memory")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{live, gone} { // as the provider leaves them: approved, not candidates
+		if _, err := s.Approve(id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+
+	lines, rec := func() ([]vetLine, vetRecord) {
+		st, err := store.Open(factsPath())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = st.Close() }()
+		return vetSuspects(st, vetOptions{memory: notes, noModel: true}, time.Now())
+	}()
+	if rec.SuspectsRetired != 1 {
+		t.Errorf("retired %d, want the one stale mirror: %+v", rec.SuspectsRetired, lines)
+	}
+	if f := vetStatus(t, gone); f.Status != store.Retired {
+		t.Errorf("stale mirror %+v", f)
+	}
+	if f := vetStatus(t, live); f.Status != store.Active {
+		t.Errorf("live mirror %+v", f)
+	}
+	if len(lines) != 1 || !strings.Contains(lines[0].Reason, "stale mirror") || lines[0].By != "rule" {
+		t.Errorf("lines %+v", lines)
 	}
 }

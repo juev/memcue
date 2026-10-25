@@ -196,11 +196,14 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(self.p.prefetch("какой порт у базы demo postgres"), "")
         self.assertFalse(Path(self.p._facts).exists())
 
-    def test_mirrored_fact_waits_for_review(self):
-        """A built-in memory note is mirrored as a candidate with its own origin, not as an approved fact."""
+    def test_a_mirror_is_approved_at_the_write_and_searchable(self):
+        """A built-in memory note is mirrored as an approved fact with its own origin (#440): a candidate has no index
+        row, so the note would stay unsearchable until the next vet run, and the note is the user's own words."""
         self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertIn("hermes-memory", self.pending()[0])
-        self.assertEqual(self.facts(), [])
+        self.assertEqual(self.pending(), [])
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
+        self.assertIn("55432", found["facts"][0]["content"])
+        self.assertIn("hermes-memory", "\n".join(self.memcue("dump", self.p._facts)))
 
     def test_no_fact_comes_with_a_message(self):
         """The model searches itself (#361): a matching approved fact stays out of the prefetch."""
@@ -214,28 +217,25 @@ class ProviderTest(unittest.TestCase):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
         new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
         self.p.on_memory_write("add", "memory", old)
+        fact_id = self.written()[self.p._key("memory", old)]
         self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
-        pending = self.pending()
-        self.assertEqual(len(pending), 1)
-        self.assertIn("55433", pending[0])
-        fact_id = pending[0].split()[0]
+        dump = "\n".join(self.memcue("dump", self.p._facts))
+        self.assertIn("55433", dump)
         self.assertIn(f"{fact_id} v2 active", "\n".join(self.memcue("dump", self.p._facts)))
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
         self.assertEqual(self.pending(), [])
 
-    def test_replace_of_a_retired_mirror_adds_a_new_candidate(self):
+    def test_replace_of_a_retired_mirror_adds_a_new_fact(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
         new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
         self.p.on_memory_write("add", "memory", old)
-        fact_id = self.pending()[0].split()[0]
+        fact_id = self.written()[self.p._key("memory", old)]
         self.memcue("retire", fact_id)
-        self.assertEqual(self.pending(), [])
         # The note is edited after vet or a person retired its mirror: correct must not revive the retired fact.
         self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
-        pending = self.pending()
-        self.assertEqual(len(pending), 1)
-        self.assertIn("55433", pending[0])
-        new_id = pending[0].split()[0]
+        dump = "\n".join(self.memcue("dump", self.p._facts))
+        self.assertIn("55433", dump)
+        new_id = self.written()[self.p._key("memory", new)]
         self.assertNotEqual(new_id, fact_id)
         self.assertEqual(self.written()[self.p._key("memory", new)], new_id)
         self.assertIn(f"{fact_id} v2 retired", "\n".join(self.memcue("dump", self.p._facts)))
@@ -247,8 +247,8 @@ class ProviderTest(unittest.TestCase):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
         new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
         self.p.on_memory_write("add", "memory", old)
-        fact_id = self.pending()[0].split()[0]
         old_key = self.p._key("memory", old)
+        fact_id = self.written()[old_key]
         self.assertEqual(self.written(), {old_key: fact_id})
 
         real_run = self.p._run
@@ -261,8 +261,9 @@ class ProviderTest(unittest.TestCase):
         # The failed correct must not drop the only link between the entry and its fact.
         self.assertEqual(self.written(), {old_key: fact_id})
         self.assertNotIn(self.p._key("memory", new), self.written())
-        self.assertIn("55432", self.pending()[0])
-        self.assertNotIn("55433", self.pending()[0])
+        dump = "\n".join(self.memcue("dump", self.p._facts))
+        self.assertIn("55432", dump)
+        self.assertNotIn("55433", dump)
 
         # The memory entry still says old, so a later remove reaches the fact through the kept mapping.
         self.p.on_memory_write("remove", "memory", "", {"previous_content": old})
@@ -272,8 +273,8 @@ class ProviderTest(unittest.TestCase):
     def test_failed_remove_keeps_the_mapping(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
         self.p.on_memory_write("add", "memory", old)
-        fact_id = self.pending()[0].split()[0]
         old_key = self.p._key("memory", old)
+        fact_id = self.written()[old_key]
 
         real_run = self.p._run
         self.p._run = lambda args, **kwargs: (False, "memcue timed out after 15s")
@@ -283,7 +284,7 @@ class ProviderTest(unittest.TestCase):
             self.p._run = real_run
 
         self.assertEqual(self.written(), {old_key: fact_id})
-        self.assertEqual(len(self.pending()), 1)  # the fact is still there to be retired later
+        self.assertIn("55432", "\n".join(self.memcue("dump", self.p._facts)))  # still there to be retired later
 
     def search(self, query: str) -> str:
         """What memcue_search returns to the model for query."""
@@ -384,11 +385,11 @@ class ProviderTest(unittest.TestCase):
 
     def test_replace_of_unknown_entry_adds(self):
         self.p.on_memory_write("replace", "user", "Пользователь пишет по-русски.", {"previous_content": "x"})
-        self.assertEqual(len(self.pending()), 1)
+        self.assertIn("пишет по-русски", "\n".join(self.memcue("dump", self.p._facts)))
 
     def test_content_starting_with_dash_is_stored(self):
         self.p.on_memory_write("add", "memory", "-v печатает версию memcue")
-        self.assertIn("-v печатает", self.pending()[0])
+        self.assertIn("-v печатает", "\n".join(self.memcue("dump", self.p._facts)))
 
     def test_subagent_does_not_write(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
