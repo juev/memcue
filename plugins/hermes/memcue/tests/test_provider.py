@@ -898,6 +898,82 @@ class AccumulationTest(unittest.TestCase):
         self.assertEqual(p._pending, {})
 
 
+TRUE = shutil.which("true") or "/bin/true"  # /usr/bin/true on macOS
+
+
+class DreamRunTest(unittest.TestCase):
+    """The dream after an extraction (#401); the extraction and the dream process are replaced, so no binary is
+    needed."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp()
+        self.started, self.procs = [], []
+        self.p = self.provider({})
+
+    def provider(self, extra):
+        p = memcue_provider.MemcueMemoryProvider({"binary": TRUE, "extract_url": "http://x",
+                                                  "extract_model": "m", "extract_threshold": 1000, **extra})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        p._compat, p._version = True, "0.13.0"
+        p._extract_in_background = lambda msgs, event, session="", on_done=None: on_done and on_done(self.ok)
+        p._start_dream = self.start
+        self.ok = True
+        return p
+
+    def start(self, cmd, env):
+        self.started.append((cmd, env.get("MEMCUE_API_URL"), env.get("MEMCUE_MODEL")))
+        proc = subprocess.Popen(["sleep", "5"] if len(self.started) == 1 else [TRUE])
+        self.procs.append(proc)
+        return proc
+
+    def tearDown(self):
+        self.p._stop.set()
+        for proc in self.procs:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait()
+        shutil.rmtree(self.home, ignore_errors=True)
+
+    def extract(self, p=None):
+        p = p or self.p
+        p.sync_turn("a" * 1200, "ok", session_id="s1", messages=[{"role": "user", "content": "a" * 1200}])
+
+    def test_a_successful_extraction_starts_one_dream(self):
+        self.extract()
+        self.assertEqual(self.started, [([TRUE, "dream", "-run"], "http://x", "m")])
+        # The first dream still runs: the next extraction does not start a second one.
+        self.p.on_session_end([{"role": "user", "content": "b" * 1200}])
+        self.assertEqual(len(self.started), 1)
+        self.p._dreaming.kill()
+        self.p._dreaming.wait()
+        self.p.on_session_end([{"role": "user", "content": "c" * 1200}])
+        self.assertEqual(len(self.started), 2)
+
+    def test_a_failed_extraction_starts_no_dream(self):
+        self.ok = False
+        self.extract()
+        self.assertEqual(self.started, [])
+
+    def test_dream_false_starts_no_dream(self):
+        p = self.provider({"dream": False})
+        self.extract(p)
+        p._stop.set()
+        self.assertEqual(self.started, [])
+
+    def test_an_older_binary_starts_no_dream(self):
+        self.p._version = "0.12.0"
+        self.extract()
+        self.assertEqual(self.started, [])
+
+    def test_a_subagent_starts_no_dream(self):
+        p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
+        p.initialize("s2", hermes_home=self.home, agent_context="subagent")
+        p._compat, p._version, p._start_dream = True, "0.13.0", self.start
+        p._dream_in_background()
+        p._stop.set()
+        self.assertEqual(self.started, [])
+
+
 @unittest.skipUnless(memcue_provider._release_target(), "no memcue release for this machine")
 class InstallTest(unittest.TestCase):
     """The provider installs the binary of its release when none is configured; a local server stands in for GitHub."""

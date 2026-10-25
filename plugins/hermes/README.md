@@ -62,17 +62,18 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 ## Dream
 
-memcue starts no model for the dream: Hermes's own model does it, in a cron job. One job every four hours, with its
-output kept out of the chats:
+With the session extraction configured, the provider runs the dream itself (#401): after an extraction exits 0 it
+starts `memcue dream -run` in the background with the same endpoint, model and key. memcue asks what the Claude Code
+session start asks: whether `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last dream and whether some
+fact is fresh or lacks a translation. With nothing due it exits without a model call; otherwise it prepares the
+packet, sends it to the endpoint and applies the answer under the checks of `-apply`. One run at a time; each is a line
+in `dream.log` with the tokens it took, and the model's answer stays as `dream.answer.json` next to the packet.
+`dream: false` in `memory.memcue` turns it off, and a binary older than 0.13.0 leaves the dream to the tools.
 
-```sh
-hermes cron create 'every 4h' --name memcue-dream --deliver local \
-  'Tidy long-term memory: call memcue_dream_prepare, follow its instructions, answer with memcue_dream_apply, and repeat while it still returns facts. Stop when it says "nothing for the dream".'
-```
-
-The first dream on a base needs `since: all` (the whole base) or a date; the job's first run can be told so once,
-or run `memcue dream -prepare -all` by hand. A packet holds up to 40 fresh facts and 30 groups, so a large backlog
-takes a few runs; the rules are in [Dream](../../README.md#dream).
+The dream follows activity: a gateway nobody talks to extracts nothing and starts no dream, and a base with work left
+gets one packet an hour while it is in use. The first dream on a base needs `since: all` (the whole base) or a date;
+run `memcue dream -prepare -all` by hand, or ask the agent to call `memcue_dream_prepare` with `since: all`. The
+dream tools stay for that and for a dream asked for in a chat; the rules are in [Dream](../../README.md#dream).
 
 ## Install
 

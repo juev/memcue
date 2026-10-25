@@ -10,6 +10,8 @@ gets tools to fix facts too; a reply is checked for the identifiers of the facts
 messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
 added: once enough new text gathers, after a pause in the conversation, before the context is compressed and when the
 session ends. A chat of a messaging gateway can stay one session for days, so its end alone would come too late.
+After an extraction the provider starts ``memcue dream -run`` through the same endpoint: memcue runs the dream when one
+is due (an hour since the last, and some fact fresh or owed a translation) and makes no model call otherwise (#401).
 
 Config, all optional (``memory.memcue`` in config.yaml):
   binary: path to memcue (default: found on PATH)
@@ -25,6 +27,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
   host: name of this machine for fact scope and the search tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   session_card: put the session card (global rules and repository decisions) in the system prompt (default true)
+  dream: run the dream through the extraction endpoint after an extraction, when one is due (default true; needs the
+          extraction configured)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
           pointing both at it)
   usage_log: write ``usage.log``, whether a reply used the facts its searches returned (default false; MEMCUE_USAGE_LOG=1 in
@@ -77,6 +81,7 @@ _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 _MIN_BINARY = "0.4.0"  # session-card and extract-messages -min-chars appeared here
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
 _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters and reach no prompt five does not
+_DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
 
 
 def _version_parts(value: str) -> Optional[tuple[int, int, int]]:
@@ -305,6 +310,9 @@ class MemcueMemoryProvider(MemoryProvider):
         self._dreams = True
         self._generation = 0  # grows with every compression: the facts of an earlier context may come again
         self._session_card = _on(self._config.get("session_card", True))
+        self._dream = _on(self._config.get("dream", True))
+        self._dreaming: Optional[subprocess.Popen] = None  # the dream -run started after an extraction, if any
+        self._dream_lock = threading.Lock()
         self._search_facts = _bounded_int(self._config.get("search_facts"), _SEARCH_FACTS, 1, 50)
         self._lock = threading.Lock()
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
@@ -857,6 +865,31 @@ class MemcueMemoryProvider(MemoryProvider):
                     else:
                         cur.append(m)
                 self._pending[session] = (cur, time.monotonic())
+        if ok:
+            self._dream_in_background()
+
+    def _dream_in_background(self) -> None:
+        """After an extraction, start ``memcue dream -run`` through the same endpoint (#401). Hermes has no session
+        model to hand a dream packet to and no hint at session start, so without this the dream ran only when someone
+        asked the agent. memcue decides whether a dream is due and makes no model call when none is, so a run costs a
+        process start; one at a time, and memcue's own lock keeps out a dream started elsewhere."""
+        if not self._dream or not self._writes:
+            return
+        env, binary = self._extract_env(), self._binary()
+        if not env or not binary or not _version_at_least(self._version, _DREAM_RUN):
+            return
+        with self._dream_lock:
+            if self._dreaming is not None and self._dreaming.poll() is None:
+                return
+            try:
+                self._dreaming = self._start_dream([binary, "dream", "-run"], env)
+            except OSError as e:
+                logger.warning("memcue dream did not start: %s", e)
+
+    def _start_dream(self, cmd: list[str], env: dict[str, str]) -> subprocess.Popen:
+        """The dream runs in its own process group and outlives the turn: a due packet takes minutes at the endpoint."""
+        return subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                env=env, start_new_session=True)
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "",
                   messages: Optional[list[dict[str, Any]]] = None, **kwargs) -> None:
