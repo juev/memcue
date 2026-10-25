@@ -336,6 +336,32 @@ func TestExpiryIsStoredAndKeptByCorrection(t *testing.T) {
 	}
 }
 
+// A mirror of the built-in memory never reaches the card: the memory tool already puts that note in the prompt (#424).
+// A fact of the same kind and scope from any other source does, and the mirror is counted.
+func TestCardFactsSkipMemoryMirrors(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, source string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "rule", Scope: "repo:shop", Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	mirror := add("Mirrored memory note.", "memory")
+	own := add("Shop rule written by a tool.", "tool")
+	got, mirrors, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != own.ID {
+		t.Errorf("card facts %+v, want only %s (not the mirror %s)", got, own.ID, mirror.ID)
+	}
+	if mirrors != 1 {
+		t.Errorf("mirrors = %d, want 1", mirrors)
+	}
+}
+
 // A card carries the rules and decisions that still hold on the given day and skips the expired ones; a fact whose
 // expiry is that day is still carried, as recall does.
 func TestCardFactsSkipExpired(t *testing.T) {
@@ -354,7 +380,7 @@ func TestCardFactsSkipExpired(t *testing.T) {
 	expiredDecision := add("Expired decision.", "decision", "repo:shop", "2026-10-19")
 	liveDecision := add("Live decision.", "decision", "repo:shop", "")
 
-	got, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
+	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +393,7 @@ func TestCardFactsSkipExpired(t *testing.T) {
 	}
 
 	old := add("Ancient rule.", "rule", "global", "2000-01-01")
-	got, err = s.CardFacts([]string{"repo:shop"}, "")
+	got, _, err = s.CardFacts([]string{"repo:shop"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1279,7 +1305,7 @@ func TestCardFactsCarryRepositoryRules(t *testing.T) {
 	own := add("Shop rule.", "rule", "repo:shop")
 	other := add("Lists rule.", "rule", "repo:lists")
 	pitfall := add("Shop pitfall.", "pitfall", "repo:shop")
-	got, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
+	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1548,7 +1574,7 @@ func TestCardFactsPutStatedRulesFirst(t *testing.T) {
 	stated := add("Stated rule.", "user")
 	confirmed := add("Confirmed rule.", "user_confirmed")
 	written := add("Written rule.", "tool")
-	got, err := s.CardFacts(nil, "2026-10-20")
+	got, _, err := s.CardFacts(nil, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1575,7 +1601,7 @@ func TestCardFactsTakeEveryScopeOfTheProject(t *testing.T) {
 	here := add("Решение на этом хосте зеркала.", "repo:example.com/me/x")
 	mirror := add("Решение на другом хосте зеркала.", "repo:example.org/me/x")
 	other := add("Решение другого проекта.", "repo:example.com/me/y")
-	got, err := s.CardFacts([]string{"repo:example.com/me/x", "repo:example.org/me/x"}, "2026-10-24")
+	got, _, err := s.CardFacts([]string{"repo:example.com/me/x", "repo:example.org/me/x"}, "2026-10-24")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -205,7 +206,7 @@ func TestSessionCardCarriesEveryStatedRule(t *testing.T) {
 		}
 	}
 	_ = s.Close()
-	card, _, err := sessionCard(dir)
+	card, _, _, err := sessionCard(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +245,7 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 		facts = append(facts, store.Fact{ID: fmt.Sprintf("r%02d", i), Content: long(i, "Решение"),
 			Meta: store.Meta{Kind: "decision", Scope: "repo:shop"}})
 	}
-	card, ids, err := renderCard(facts)
+	card, ids, _, err := renderCard(facts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +271,7 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 
 	// Half is a floor, not a cap: facts of the repository that come first in the order keep the room after it.
 	first := append(append([]store.Fact(nil), facts[20:]...), facts[:20]...)
-	_, firstIDs, err := renderCard(first)
+	_, firstIDs, _, err := renderCard(first)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,12 +286,78 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 	}
 
 	// Without facts of a repository the global rules get the whole card.
-	only, _, err := renderCard(facts[:20])
+	only, _, _, err := renderCard(facts[:20])
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Count(only, "\n- "); got <= global {
 		t.Errorf("global rules alone got %d lines, no more than %d next to the repository", got, global)
+	}
+}
+
+// One rule split into two facts is one line on the card (#424): a fact whose opening repeats a line already placed is
+// left out, the first in the given order is kept, and the card counts what it left out.
+func TestSessionCardDropsARepeatedRule(t *testing.T) {
+	facts := []store.Fact{
+		{ID: "a1", Content: "Commit messages are always in English, whatever the system: the ticket prefix comes first.",
+			Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}},
+		{ID: "b2", Content: "commit messages are always in English — whatever the system!! The prefix of the ticket goes first.",
+			Meta: store.Meta{Kind: "rule", Scope: "global"}},
+		{ID: "c3", Content: "Pull before a rebase.", Meta: store.Meta{Kind: "rule", Scope: "global"}},
+	}
+	card, ids, excluded, err := renderCard(facts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"a1", "c3"}; !slices.Equal(ids, want) {
+		t.Errorf("ids %v, want %v", ids, want)
+	}
+	if strings.Count(card, "\n- ") != 2 || !strings.Contains(card, "the ticket prefix comes first") ||
+		strings.Contains(card, "The prefix of the ticket") {
+		t.Errorf("card keeps the second wording or loses the first:\n%s", card)
+	}
+	if excluded != 1 {
+		t.Errorf("excluded = %d, want 1", excluded)
+	}
+}
+
+// The card log counts what the card left out: a mirror of the built-in memory and a repeated line (#424), while chars
+// stays the length of the card the model gets.
+func TestSessionCardLogsTheExcludedFacts(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []struct{ text, source string }{
+		{"Правило карты: тесты гонять перед коммитом.", "user"},
+		{"Правило карты — тесты гонять перед коммитом!", "agent"},
+		{"Заметка встроенной памяти о сервере.", "memory"},
+	} {
+		if _, err := s.AddWith(f.text, nil, "test 2026-10-20", "",
+			store.Meta{Kind: "rule", Scope: "global", Source: f.source}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+	card, ids, excluded, err := sessionCard(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || excluded != 2 || strings.Contains(card, "встроенной памяти") {
+		t.Fatalf("ids %v, excluded %d, card:\n%s", ids, excluded, card)
+	}
+	sessionStartContext(t, dir, "startup", "s1")
+	raw, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "card.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec cardRecord
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(raw))), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Excluded != 2 || rec.Chars != len([]rune(card)) || !slices.Equal(rec.Facts, ids) {
+		t.Errorf("card.log %+v, want excluded 2, chars %d, facts %v", rec, len([]rune(card)), ids)
 	}
 }
 
