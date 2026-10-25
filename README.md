@@ -41,11 +41,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.11.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.11.1`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.11.1 | 5 | 0.11.1 | 0.11.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.1 (`hermes-agent` 0.15.2) |
 | 0.11.0 | 5 | 0.11.0 | 0.11.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.11.0 (`hermes-agent` 0.15.2) |
 | 0.10.0 | 5 | 0.10.0 | 0.10.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.10.0 (`hermes-agent` 0.15.2) |
 | 0.9.0 | 5 | 0.9.0 | 0.9.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.9.0 (`hermes-agent` 0.15.2) |
@@ -160,6 +161,15 @@ The project only orders `memcue search`: of facts with equal scores, one learnt 
 a global one and the rest. `search -cwd DIR` names the session's directory; the default is the working directory.
 
 ## Upgrade
+
+### 0.11.1: the index repair asks a cheaper question
+
+- 0.11.0 asked every live fact carrying a digit whether the lexer would give it a number term by stemming it, on
+  every open of the base: search went from 17.0 ms to 39.7 ms end to end. `text.HasNumberTerm` answers the same
+  question with one regexp match and the latest version per id is a grouped join, which brings it to 23.5 ms on the
+  same prompts. The repair itself is unchanged — a base with 60 numbered rows and 2 without is repaired on the first
+  search and answers both version-only queries.
+- No schema change, no new flag: only the cost of the check.
 
 ### 0.11.0: a partly numbered index is repaired, and `reindex` (#383, #384)
 
