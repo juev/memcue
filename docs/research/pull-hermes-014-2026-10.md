@@ -130,8 +130,9 @@ when the binary is installed; the facts that describe the installation have to b
 ## What the answer does not tell the model
 
 The flags reach the model — they are in the tool schema, with `in` named as `all (the default)` and `min_score` as
-`0.6` — and in live traffic **they go unused**: none of the roughly twenty calls logged since the release named a
-single control. So the gap is not documentation of the flags.
+`0.6` — and the calls since the release did not use one: in the five logged since the install, four of them the
+model's, no call named a control. Five calls are a hint and not a rate; the point is only that the flags are not what
+the model reaches for.
 
 The loop the model already runs is reformulation: sessions in the log hold two to six calls with synonyms, and a
 one-word probe that returned nothing was followed by a worded query that found the fact (`v1.106.1` → 0 facts, then
