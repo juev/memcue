@@ -420,9 +420,8 @@ func (s *Store) ensureIndex() error {
 			return err
 		}
 		if missing == 0 && stale == 0 {
-			if err := saveStamp(s.db, "index", stamp); err != nil {
-				return err
-			}
+			// The stamp only saves the next open this check: a base locked by a long write must still open.
+			_ = saveStamp(s.db, "index", stamp)
 			return s.restamp()
 		}
 	}
