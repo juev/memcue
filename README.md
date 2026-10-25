@@ -323,6 +323,11 @@ memcue dream -apply answer.json      # check and carry out the model's answer to
 `migrate` and `import` skip such facts and report them without echoing the value, because the base may be synced
 through git.
 
+A fact is found by a question in either language. The session extraction stores, next to the search queries, the
+whole fact in the other language, Russian or English, as one query that starts with `= `: search reads it, while the
+card and the search output show the fact as it was written (#392, #395). Facts stored before, and those a correction
+left without one, get it through a later pass (#396).
+
 `memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
 decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
 (`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
