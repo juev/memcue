@@ -396,8 +396,9 @@ func (s *Store) ensureIndex() error {
 }
 
 // numbersMissing reports whether the index has no numeric terms while the base holds versions and dates and
-// MEMCUE_NUMBER_TERMS is on. Such an index was built before the terms existed, and a prompt naming a version
-// would be answered with nothing until Rebuild puts them in: the counts match, so nothing else would notice.
+// number terms are on (the default). Such an index was built before the terms existed, or with
+// MEMCUE_NUMBER_TERMS=0, and a prompt naming a version would be answered with nothing until Rebuild puts them in:
+// the counts match, so nothing else would notice.
 func (s *Store) numbersMissing() (bool, error) {
 	if !text.NumbersEnabled() {
 		return false, nil

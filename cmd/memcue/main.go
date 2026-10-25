@@ -120,6 +120,7 @@ environment:
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
+  MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
   MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in
                   the state directory)

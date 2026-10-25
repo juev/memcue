@@ -46,7 +46,9 @@ func TestStemsFoldYo(t *testing.T) {
 	}
 }
 
+// With MEMCUE_NUMBER_TERMS=0 the lexer is word-only: numbers, versions, ports and dates leave no stem at all.
 func TestNumbersVersionsAndPortsNeverMatch(t *testing.T) {
+	t.Setenv("MEMCUE_NUMBER_TERMS", "0")
 	for _, s := range []string{"1.27", "Go 1.27", "v0.21.6", "port 55432", "2026-10-19", "42", "(v1.2.3)"} {
 		for _, st := range Stems(s) {
 			if st != "go" && st != "port" {
