@@ -96,13 +96,21 @@ of #407 says as much and leaves user prompts out of the floor decision; measurin
   carry, returns nothing with no hint that the live key is `repo:github.com/…/memcue`. A wrong key is
   indistinguishable from an empty base.
 
-## The repository default has a price
+## Where the search looks: the binary's default and the Hermes override
 
-Inside a repository the search takes the project's facts alone. On this base that hides a lot: **255 of the 391 live
-facts carry the host scope**, and a question about the host asked from inside a configuration repository returned one
-fact (about the repository) where `-in all` returned five, three of them the host facts that answered it. The session
-note tells the agent to reach for `-in all` when the repository has nothing, so the escape hatch exists — but the agent
-has to know that the answer lives outside the project before it can ask for it, which is exactly what it does not know.
+The binary takes the project's facts alone inside a repository, and the whole base elsewhere. The Hermes plugin does
+not let a call run on that default: since 0.14.0 it appends `-in all` whenever the model names no place, on the ground
+that a Hermes chat is not about one repository. So **the scope hid no fact in this run** — both arms searched the whole
+base.
+
+The distinction matters for the other harnesses. Through the binary, a question about the host asked from inside a
+configuration repository returned **one fact** (about the repository) where `-in all` returned **five**, three of them
+the host facts that answer it, and **255 of the 391 live facts carry the host scope**. A harness that runs on the
+binary's default — the CLI, the Claude Code session — loses 65 % of this base in any repository session, and the agent
+has to know that the answer lives outside the project before it can ask for it.
+
+An earlier version of this note read that as a Hermes effect; it is not one, and the correction is the only change in
+this section.
 
 ## Adoption
 
@@ -119,12 +127,36 @@ the one rewritten for 0.12.0 is still a **candidate**, therefore not indexed, so
 returns no fact at all — correct behaviour of the index, wrong state of the base. Adoption of a release is not finished
 when the binary is installed; the facts that describe the installation have to be corrected in the same pass.
 
+## What the answer does not tell the model
+
+The flags reach the model — they are in the tool schema, with `in` named as `all (the default)` and `min_score` as
+`0.6` — and in live traffic **they go unused**: none of the roughly twenty calls logged since the release named a
+single control. So the gap is not documentation of the flags.
+
+The loop the model already runs is reformulation: sessions in the log hold two to six calls with synonyms, and a
+one-word probe that returned nothing was followed by a worded query that found the fact (`v1.106.1` → 0 facts, then
+"how to update memcue on hermes" → 2). What the loop cannot do is tell a thin answer from a thin base: when the floor
+drops the facts that answer, or the scope hides them, the model has no signal that anything was left out.
+
+Measured, so the design can be judged on numbers rather than taste:
+
+- **A "there are N more facts" counter would fire constantly.** The floor trims the answer in 4 of the 8 agent queries
+  and in 9 of the 20 long prompts. A field present on half the calls stops being read.
+- **Raising `-n` is not the lever.** Above the floor it adds nothing: of the 35 facts the floor cut from the twenty
+  prompts, 8 (23 %) were useful, so a wider `-n` mostly advertises the other 27.
+- **Padding the answer with other scopes costs what the floor bought.** Adding facts from other scopes returns the
+  payload to the 0.10.0 size — 868 characters per search at 30 % precision against 606 at 42 % — and on this base 65 %
+  of the facts are host-scoped, so the padding dominates the answer instead of trailing it.
+- **A hint on an empty or single-fact answer would fire rarely and land where the retry loop is blind:** 2 of 31
+  logged calls returned nothing, and the thin answers are exactly the floor-and-scope cases above.
+
 ## What is worse than at 0.10.0
 
 1. **The floor on long messages.** Useful facts are dropped (8 of 30 in the top five here) and two of twenty prompts
    lose their only useful fact. The floor is a share of the best score, so the longer the query, the higher it cuts.
-2. **The repository default hides the host.** 65 % of this base is the host scope; inside a repository those facts are
-   invisible unless the agent thinks to pass `-in all`.
+2. **A harness on the binary's default hides the host.** 65 % of this base is the host scope. Hermes appends `-in all`
+   to every call, the CLI and the Claude Code session do not, and inside a repository those facts are invisible unless
+   the caller thinks to pass `-in all` (measured through the binary: one fact against five).
 3. **`-in repo:KEY` fails silently** on a key that is not exactly the stored scope string.
 
 ## Reproduction
