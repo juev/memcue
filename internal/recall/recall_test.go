@@ -288,3 +288,27 @@ func TestNewerOrdersByCreatedThenID(t *testing.T) {
 	}
 }
 
+// A text that holds nearly all of a fact's own terms finds it under MinContained even when the fact holds too small a
+// share of the text's terms for MinCoverage; a fact with details of its own does not pass that way.
+func TestMinContainedFindsAFactTheTextRestates(t *testing.T) {
+	s := setup(t)
+	// The other words are known to the base, so they weigh in the share of the text's terms a fact holds.
+	prompt := "Прокси mihomo на 127.0.0.1:1080 смешанный: HTTP и SOCKS на одном порту, proxy; через него идёт " +
+		"сборка Gradle с JDK, перезагрузка конфига Caddy и обучение на vast.ai."
+	p := Params{Candidates: 80, MinTerms: 2, MinMatched: 3, MinCoverage: 0.6, MaxPromptTerms: 24, MaxFacts: 5}
+	hits, err := Recall(s, prompt, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("coverage alone found %v: the prompt no longer shows the case", ids(hits))
+	}
+	p.MinContained = 0.8
+	hits, err = Recall(s, prompt, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || !strings.Contains(hits[0].Content, "SOCKS") {
+		t.Fatalf("hits %v, want the mixed-proxy fact alone", ids(hits))
+	}
+}

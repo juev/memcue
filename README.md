@@ -401,6 +401,17 @@ after the last dream is new to the next one even when it was written earlier, an
 Without `dream.seen` (a machine that last dreamt with an older memcue), the next dream goes by when facts were written
 and writes the file.
 
+A pair of facts that both predate the last dream would never meet again, so each dream also sweeps up to 50 facts it
+has seen before, grouping them with their neighbours the way it groups fresh facts (#377). The sweep adds at most 20
+groups of its own and only as many as the packet has room for after the fresh groups. It goes through the base in
+id order, from the fact after the one kept in `dream.merge`, and starts over after the newest. A fact is grouped
+with a neighbour when it holds enough of the neighbour's terms, or when the neighbour's terms are nearly all in it:
+a short note and a longer restatement of it meet whichever of the two is fresh. `dream.log` lists every group by id
+under `grouped`, with its fresh facts and what came of it (`acted`, `refused`, `kept` or `deferred`), so the log
+says whether two facts were grouped in a run. Measured on a copy of the live base: a pair 165 facts apart in id
+order met in one group of 50 swept facts, the younger copy was retired in favour of the smaller id, and the run
+record names the group ([docs/research/dream-merge-2026-10.md](docs/research/dream-merge-2026-10.md)).
+
 The Jev triage that sorted out the groups needing no action before the model saw them is removed with the rest of the
 judge (#357); its measurements are in [docs/research/dream-triage-2026-10.md](docs/research/dream-triage-2026-10.md).
 
