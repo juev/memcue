@@ -95,8 +95,7 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 		}
 		switch {
 		case c.Source == "memory" && haveMemory:
-			// Word boundaries: a one-word mirror such as "Go" must not match "Django" or "Golang".
-			if key := norm(c.Content); key != "" && strings.Contains(" "+notes+" ", " "+key+" ") {
+			if HoldsNote(notes, c.Content) {
 				decided = append(decided, Decision{Fact: c, Verdict: Keep, By: "rule",
 					Reason: "mirror of the built-in memory, the note still holds it"})
 			} else {
@@ -210,6 +209,14 @@ func ahead(s string, i, n int) int {
 		i += size
 	}
 	return i
+}
+
+// HoldsNote reports whether the built-in memory notes hold a fact's text: a mirror of the notes lives only while its
+// note does, so the rule that retires a stale mirror and the rule that approves a live one ask the same question.
+// Word boundaries matter: a one-word mirror such as "Go" must not match "Django" or "Golang".
+func HoldsNote(notes, content string) bool {
+	key := norm(content)
+	return key != "" && strings.Contains(" "+norm(notes)+" ", " "+key+" ")
 }
 
 // isTestOrigin reports whether origin is a test run's: its tier, the first word of "<tier> <date>", has to be exactly

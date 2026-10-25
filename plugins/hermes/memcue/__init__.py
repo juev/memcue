@@ -1140,7 +1140,11 @@ class MemcueMemoryProvider(MemoryProvider):
     def on_memory_write(self, action: str, target: str, content: str,
                         metadata: Optional[dict[str, Any]] = None) -> None:
         """Keep the base in step with the built-in memory. Which fact an entry became is remembered in
-        $HERMES_HOME/memcue/written.json, so a later replace or remove of that entry reaches the same fact."""
+        $HERMES_HOME/memcue/written.json, so a later replace or remove of that entry reaches the same fact. The mirror
+        is approved at the write, not queued as a candidate (#440): the note is the user's own words, and a candidate
+        has no index row, so the memory would stay unsearchable until the next vet run. A mirror whose note is gone is
+        retired by the vet pass, which reads the same notes (vet.HoldsNote), so the copy still does not outlive its
+        source."""
         if not self._writes or not self._state:
             return
         previous = str((metadata or {}).get("previous_content") or "")
@@ -1150,7 +1154,7 @@ class MemcueMemoryProvider(MemoryProvider):
             previous_key = self._key(target, previous) if previous else ""
             fact_id = written.get(previous_key) if previous_key else None
             if action == "add" and content.strip():
-                ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
+                ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin", self._origin(mirror=True), "--",
                                      content.strip()])
                 if ok:
                     written[self._key(target, content)] = out.split()[0]
@@ -1163,13 +1167,13 @@ class MemcueMemoryProvider(MemoryProvider):
                     elif "is retired" in out:
                         # A retired fact is final: the edited note becomes a new candidate, and the entry is linked
                         # to it, so a later edit or remove reaches the live fact instead of the history.
-                        ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin",
+                        ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin",
                                              self._origin(mirror=True), "--", content.strip()])
                         if ok:
                             written.pop(previous_key, None)
                             written[self._key(target, content)] = out.split()[0]
                 else:
-                    ok, out = self._run(["add", "-candidate", "-source", "memory", "-origin", self._origin(mirror=True), "--",
+                    ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin", self._origin(mirror=True), "--",
                                      content.strip()])
                     if ok:
                         written[self._key(target, content)] = out.split()[0]
