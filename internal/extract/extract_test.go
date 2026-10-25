@@ -75,3 +75,22 @@ func TestSessionFactCarriesQueries(t *testing.T) {
 		t.Error("the session schema and answer shape must name queries")
 	}
 }
+
+// The translation of a session fact lands in its queries under the mark, so the store and the index carry it with no
+// field of their own (#395); the model's commas inside it do not split it on the store round trip.
+func TestSessionFactTranslationGoesToQueries(t *testing.T) {
+	r, err := decode(reply{payload: []byte(`{"facts":[{"content":"Порт db1 5432.","keywords":["порт"],` +
+		`"queries":["какой порт"],"translation":" Port of db1, 5432. "}],"dropped":""}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Facts[0].Queries; len(got) != 2 || got[0] != "какой порт" || got[1] != "= Port of db1 5432." {
+		t.Errorf("queries %q", got)
+	}
+	if r.Facts[0].Translation != "" {
+		t.Errorf("translation %q left on the fact: it is in the queries", r.Facts[0].Translation)
+	}
+	if !strings.Contains(sessionSchema, `"translation":{"type":"string"}`) || !strings.Contains(sessionAnswer, `"translation"`) {
+		t.Error("the session schema and answer shape must name translation")
+	}
+}

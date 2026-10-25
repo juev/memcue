@@ -25,6 +25,9 @@ type Fact struct {
 	Source   string   `json:"source,omitempty"`   // user, user_confirmed, tool, agent
 	Evidence string   `json:"evidence,omitempty"` // the words of the record the fact rests on, verbatim
 	Queries  []string `json:"queries,omitempty"`  // how a user would ask about the fact; recall searches them
+	// Translation is the fact in the other language, Russian or English; decode moves it into Queries under
+	// TranslationPrefix, so the store needs no field of its own (#395).
+	Translation string `json:"translation,omitempty"`
 }
 
 // Result is the model's answer.
@@ -52,12 +55,12 @@ const sessionSchema = `{"type":"object","additionalProperties":false,"required":
 "properties":{"content":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},
 "kind":{"type":"string","enum":["rule","decision","pitfall","environment","event","procedure","repo","other"]},
 "scope":{"type":"string"},"source":{"type":"string","enum":["user","user_confirmed","tool","agent"]},
-"evidence":{"type":"string"},"queries":{"type":"array","items":{"type":"string"}}}}},
+"evidence":{"type":"string"},"queries":{"type":"array","items":{"type":"string"}},"translation":{"type":"string"}}}},
 "dropped":{"type":"string"},"outdated":{"type":"array","items":{"type":"integer"}}}}`
 
 const sessionAnswer = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
 	`{"facts": [{"content": "…", "keywords": ["…"], "kind": "rule|decision|pitfall|environment|event|procedure|repo|other", ` +
-	`"scope": "…", "source": "user|user_confirmed|tool|agent", "evidence": "…", "queries": ["…"]}], "dropped": "…", "outdated": []}` + "\n"
+	`"scope": "…", "source": "user|user_confirmed|tool|agent", "evidence": "…", "queries": ["…"], "translation": "…"}], "dropped": "…", "outdated": []}` + "\n"
 
 var errEmpty = errors.New("model returned neither facts nor a reason")
 
@@ -193,7 +196,8 @@ func decode(rp reply) (Result, error) {
 	r.CostUSD, r.Tokens = rp.cost, rp.tokens
 	for i := range r.Facts {
 		r.Facts[i].Content = strings.TrimSpace(r.Facts[i].Content)
-		r.Facts[i].Queries = CleanQueries(r.Facts[i].Queries)
+		r.Facts[i].Queries = WithTranslation(CleanQueries(r.Facts[i].Queries), r.Facts[i].Translation)
+		r.Facts[i].Translation = ""
 	}
 	if len(r.Facts) == 0 && r.Dropped == "" {
 		return r, errEmpty
