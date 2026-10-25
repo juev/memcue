@@ -458,6 +458,16 @@ class ProviderTest(unittest.TestCase):
         for bad in ({"kind": "wish"}, {"in": "everywhere"}, {"words": "some"}):
             self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy", **bad))))
 
+    def test_search_takes_the_whole_base_in_a_repository(self):
+        """memcue searches only the workspace's repository by default; a Hermes chat is not about one (#409)."""
+        other = self.memcue("add", "-origin", "example.com/them/lib 2026-10-25", "-scope", "repo:example.com/them/lib",
+                            "-keywords", "caddy", "Caddy на server3 держит конфиг в /etc/caddy.")[0].split()[0]
+        self.p._workspace = str(Path(__file__).resolve().parents[4])  # this repository's checkout
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3"}))
+        self.assertEqual([f["id"] for f in found["facts"]], [other])
+        narrow = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
+        self.assertEqual(narrow["facts"], [])
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):

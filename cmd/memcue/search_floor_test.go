@@ -47,8 +47,8 @@ func TestSearchHandsOverWhatFits(t *testing.T) {
 	}
 }
 
-// The flags of #409 reach the search: -kind and -in narrow it, -all-words requires each word, and a wrong value
-// fails before the base is opened.
+// The flags of #409 reach the search: outside a repository the default is the whole base, -kind and -in narrow it,
+// -all-words requires each word, and a wrong value fails before the base is opened.
 func TestSearchFlags(t *testing.T) {
 	env(t)
 	rule := addFactForTest(t, "-origin", "x 2026-10-25", "-kind", "rule", "-scope", "global", "nats держим на 4222.")
@@ -70,8 +70,14 @@ func TestSearchFlags(t *testing.T) {
 		}
 		return ids
 	}
-	if got := ids("-min-score", "0", "nats"); len(got) != 1 || got[0] != rule {
-		t.Errorf("default: %q, want the rule alone: the pitfall belongs to another repository", got)
+	if got := ids("-min-score", "0", "nats"); len(got) != 2 {
+		t.Errorf("default outside a repository: %q, want both facts", got)
+	}
+	if got := ids("-min-score", "0", "-in", "repo:example.com/them/lib", "nats"); len(got) != 1 || got[0] != pit {
+		t.Errorf("-in repo:KEY: %q, want the pitfall", got)
+	}
+	if got := ids("-min-score", "0", "-in", "global", "nats"); len(got) != 1 || got[0] != rule {
+		t.Errorf("-in global: %q, want the rule", got)
 	}
 	if got := ids("-min-score", "0", "-in", "all", "-kind", "pitfall", "nats"); len(got) != 1 || got[0] != pit {
 		t.Errorf("-in all -kind pitfall: %q, want the pitfall", got)

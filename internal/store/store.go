@@ -1241,9 +1241,6 @@ type Filter struct {
 	// Origins and a space; both empty keep every fact.
 	Scopes  []string
 	Origins []string
-	// OtherRepos, when set, leaves out a fact bound to a repository (scope "repo:KEY") whose KEY is not in Repos.
-	OtherRepos bool
-	Repos      []string
 }
 
 // where returns the SQL conditions of f over facts under alias, with their arguments.
@@ -1276,14 +1273,6 @@ func (s *Store) where(alias string, f Filter) (string, []any) {
 			args = append(args, len(o)+1, o+" ")
 		}
 		conds = append(conds, "("+strings.Join(or, " OR ")+")")
-	}
-	if f.OtherRepos {
-		cond := scope + " NOT LIKE 'repo:%'"
-		for _, r := range f.Repos {
-			cond += " OR " + scope + " = ?"
-			args = append(args, strings.ToLower("repo:"+r))
-		}
-		conds = append(conds, "("+cond+")")
 	}
 	if len(conds) == 0 {
 		return "", nil

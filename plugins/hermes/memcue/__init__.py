@@ -266,14 +266,13 @@ SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. Only the facts that fit the words come back: one fact means one fits, none means the base has "
-    "nothing on them, so try other words or the other language rather than a larger limit. By default it leaves "
-    "out facts bound to other repositories and expired facts; the optional parameters narrow or widen that.",
+    "nothing on them, so try other words or the other language rather than a larger limit. By default it searches "
+    "the whole base and leaves out expired facts; the optional parameters narrow or widen that.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); fewer come "
               "when the rest do not fit.",
-     "in": "Optional where to look, comma-separated: project (this repository only), global, host (this machine), "
-           "all (every repository: all that is known about a tool), or a scope such as repo:KEY, host:NAME, "
-           "service:NAME.",
+     "in": "Optional where to look, comma-separated: all (the default), project (the session's repository only), "
+           "global, host (this machine), or a scope such as repo:KEY, host:NAME, service:NAME.",
      "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. "
              "E.g. rule,decision for what was decided.",
      "since": "Optional YYYY-MM-DD: only facts learnt on or after that day.",
@@ -1120,9 +1119,14 @@ class MemcueMemoryProvider(MemoryProvider):
                 return tool_error("words must be all or any")
             if arg("words") == "all":
                 controls.append("-all-words")
-            if controls and not _version_at_least(self._version, _SEARCH_CONTROLS):
+            controls_ok = _version_at_least(self._version, _SEARCH_CONTROLS)
+            if controls and not controls_ok:
                 return tool_error(f"in, kind, since, expired, words and min_score need memcue {_SEARCH_CONTROLS} "
                                   f"or later; this one is {self._version or 'unknown'}")
+            if controls_ok and not arg("in"):
+                # A Hermes chat is not about one repository: the whole base, where memcue would take the workspace's
+                # repository alone (#409).
+                controls += ["-in", "all"]
             ok, out = self._run(cmd + controls + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
                 try:

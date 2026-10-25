@@ -16,6 +16,9 @@ import (
 func env(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
+	// Outside a repository: search's default place depends on the working directory's repository (#409), and the
+	// suite must not depend on where it runs.
+	t.Chdir(dir)
 	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "facts.db"))
 	// The gateway's own environment carries these; a test that asks whether a log is off by default must not
 	// inherit the flag of the shell that runs it (the same reason the suite is run with env -u MEMCUE_*).
