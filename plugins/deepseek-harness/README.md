@@ -79,8 +79,8 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
    repository; a local checkout can use `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
 
    The plugin manager adds the package to the profile's `dsh.profile.bundles`; the install dialog's **Enable now**
-   switches the bundle on. A repository install is a Git dependency, so a `git pull` reaches the next start without
-   reinstalling.
+   switches the bundle on. dsh 0.2.0-rc.2 does not update installed plugins: to move to a new release, uninstall the
+   plugin and install it again ([Releasing](../../docs/releasing.md#after-the-release)).
 
 3. Configure the row by id in the profile's own patch layer, `$DSH_HOME/profiles/<name>/cordis.patch.yml`:
 
