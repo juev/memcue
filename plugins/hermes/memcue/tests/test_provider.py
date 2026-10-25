@@ -557,6 +557,29 @@ class ProviderTest(unittest.TestCase):
                 self.assertEqual(second[second.index("-n") + 1], wide_n)
                 self.assertEqual(second[second.index("-min-score") + 1], "0")
 
+    def test_an_empty_answer_hands_over_the_first_facts_below_the_floor(self):
+        """A count leaves the model nothing to read: when the floor leaves no fact and the wide arm has some, the first
+        ones come with the answer, marked, and the hint says what they are (#439)."""
+        stub = Path(self.home) / "empty-memcue"
+        stub.write_text("#!/bin/sh\n"
+                        "case \"$1\" in\n"
+                        "  version) printf '{\"version\":\"dev\"}\\n' ;;\n"
+                        "  search)\n"
+                        "    case \"$*\" in\n"
+                        "      *-min-score*0*) printf '[{\"id\":\"t1\",\"content\":\"tail one\"},"
+                        "{\"id\":\"t2\",\"content\":\"tail two\"}]\\n' ;;\n"
+                        "      *) printf '[]\\n' ;;\n"
+                        "    esac ;;\n"
+                        "esac\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
+        p.initialize("s-empty", hermes_home=self.home, agent_context="primary")
+        found = json.loads(p.handle_tool_call("memcue_search", {"query": "caddy"}))
+        self.assertEqual([f["id"] for f in found["facts"]], ["t1", "t2"])
+        self.assertTrue(all(f.get("below_floor") is True for f in found["facts"]), found["facts"])
+        self.assertIn("2 facts hold the words but sit below the score floor", found["hint"])
+        self.assertIn("below_floor: true", found["hint"])
+
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):
