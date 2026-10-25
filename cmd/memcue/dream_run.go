@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,73 +12,167 @@ import (
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
+	"github.com/juev/memcue/internal/store"
 )
 
-// dreamRunTimeout bounds the endpoint call of one dream: a packet of 40 fresh facts, 50 to expand, 40 to translate and
-// 30 groups is about 80,000 characters in and up to 20,000 tokens out.
+// dreamRunTimeout bounds the model call of one dream: a packet of 40 fresh facts, 50 to expand, 40 to translate and
+// 30 groups is about 80,000 characters in and up to 30,000 tokens out.
 const dreamRunTimeout = 10 * time.Minute
 
-// dreamRunFn is the endpoint call of dream -run, replaced in tests.
-var dreamRunFn = func(packet string) ([]byte, extract.Tokens, error) {
+// dreamAllPasses bounds dream -run -all: a base of 2,800 facts behind on everything takes about 70 passes. A base
+// larger than that continues where the bound stopped it on the next run.
+var dreamAllPasses = 200
+
+// dreamRunFn is the model call of dream -run, replaced in tests.
+var dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dreamRunTimeout)
 	defer cancel()
 	return extract.DreamAnswer(ctx, packet)
 }
 
-// runDreamOnce is memcue dream -run (#401): the whole dream on a host whose plugin has no session model to hand the
-// packet to, such as Hermes, which starts it after an extraction. It asks what the session start of Claude Code asks
-// before it says a dream is due: whether MEMCUE_DREAM_EVERY has passed and some fact is fresh or owed a translation.
-// With nothing due it makes no call. Otherwise it prepares the packet, sends it to the extraction's endpoint and
-// applies the answer under the same checks as -apply; dream.log records the run either way, with its tokens.
-func runDreamOnce(out io.Writer) error {
-	if extract.API.URL == "" {
+// dreamAllStalls is how many passes in a row may change nothing before dream -run -all gives up: a fact owed a
+// translation waits while a group of the packet holds it (#396), and the merge sweep moves the groups on.
+const dreamAllStalls = 3
+
+// runDreamOnce is memcue dream -run. A plain run (#401) is the dream of a host whose plugin has no session model to
+// hand the packet to, such as Hermes, which starts it after an extraction: it asks what the session start of Claude
+// Code asks before it says a dream is due, whether MEMCUE_DREAM_EVERY has passed and some fact is fresh or owed a
+// translation, and with nothing due makes no call. It needs MEMCUE_API_URL, so a long run never starts by surprise.
+//
+// With all (#405) it finishes the base: no interval, packets one after another while a packet has facts to split,
+// expand or translate or some fact still lacks a translation. The merge sweep walks the base in a circle and never
+// runs out of groups, so it does not keep the loop going. It runs on the endpoint when MEMCUE_API_URL is set and on
+// claude -p otherwise, and stops on the first failed pass, after dreamAllStalls passes that change nothing, or after
+// dreamAllPasses.
+func runDreamOnce(out io.Writer, all bool) error {
+	if !all && extract.API.URL == "" {
 		return fmt.Errorf("dream -run: %w", extract.ErrNoEndpoint)
 	}
 	dir, err := stateDir()
 	if err != nil {
 		return err
 	}
-	fresh, owed, last, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
-	if err != nil {
-		return err
-	}
-	if fresh == 0 && owed == 0 {
-		_, err := fmt.Fprintln(out, "dream: nothing due")
-		return err
+	if !all {
+		fresh, owed, _, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
+		if err != nil {
+			return err
+		}
+		if fresh == 0 && owed == 0 {
+			_, err := fmt.Fprintln(out, "dream: nothing due")
+			return err
+		}
 	}
 	unlock, err := lockDream(dir)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	seen, err := readDreamSeen(dir)
-	if err != nil {
+	if !all {
+		_, _, err := dreamPass(dir, out)
 		return err
 	}
+	stalls := 0
+	for pass := 1; pass <= dreamAllPasses; pass++ {
+		if _, err := fmt.Fprintf(out, "dream -all: pass %d\n", pass); err != nil {
+			return err
+		}
+		rec, work, err := dreamPass(dir, out)
+		if err != nil {
+			return fmt.Errorf("dream -all: pass %d: %w", pass, err)
+		}
+		if rec.Packet == "" { // nothing for the dream
+			_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
+			return err
+		}
+		owed, err := owedTranslations()
+		if err != nil {
+			return err
+		}
+		if rec.Translated+rec.Expanded+len(rec.Splits)+len(rec.Actions) == 0 {
+			stalls++
+		} else {
+			stalls = 0
+		}
+		switch {
+		case work == 0 && owed == 0:
+			_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
+			return err
+		case stalls >= dreamAllStalls:
+			_, err := fmt.Fprintf(out, "dream -all: stopped after %d passes that changed nothing; %d facts still "+
+				"lack a translation\n", stalls, owed)
+			return err
+		}
+	}
+	return fmt.Errorf("dream -all: stopped after %d passes with work left; run it again", dreamAllPasses)
+}
+
+// owedTranslations counts the active facts that have no translation yet.
+func owedTranslations() (int, error) {
+	s, err := store.Open(factsPath())
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = s.Close() }()
+	active, err := s.Active()
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, f := range active {
+		if owesTranslation(f) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// dreamPass is one dream under the caller's lock: the default packet, since the last dream with the facts it saw, or
+// every active fact on a machine with no dream yet; then the model's answer, applied under the -apply checks, and a
+// line in dream.log either way. It returns that line and how many facts the packet gave to split, expand or
+// translate; a record without a packet means there was nothing for the dream.
+func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
+	var from time.Time
+	var seen map[string]int
+	if last, ok := lastDream(dir); ok {
+		from = last
+		var err error
+		if seen, err = readDreamSeen(dir); err != nil {
+			return dreamRecord{}, 0, err
+		}
+	}
 	var packet bytes.Buffer
-	rec, err := prepare(dir, last, seen, false, &packet)
+	rec, err := prepare(dir, from, seen, false, &packet)
 	if err != nil || rec.Packet == "" {
 		if err != nil {
 			rec.Error = err.Error()
 		} else if _, err := io.Copy(out, &packet); err != nil {
-			return err
+			return rec, 0, err
 		}
-		return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
+		return rec, 0, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 	}
-	answer, tokens, err := dreamRunFn(packet.String())
+	b, err := os.ReadFile(filepath.Join(dir, packetFile))
 	if err != nil {
-		rec.Tokens, rec.Error = &tokens, "endpoint: "+err.Error()
-		return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
+		return rec, 0, err
+	}
+	var p dreamPacket
+	if err := json.Unmarshal(b, &p); err != nil {
+		return rec, 0, fmt.Errorf("%s: %w", packetFile, err)
+	}
+	work := len(p.Split) + len(p.Expand) + len(p.Translate)
+	answer, cost, tokens, err := dreamRunFn(packet.String())
+	if err != nil {
+		rec.Tokens, rec.CostUSD, rec.Error = &tokens, cost, "model: "+err.Error()
+		return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 	}
 	// The answer stays next to its packet: what the model said is the record a refused action is checked by.
 	path := filepath.Join(dir, "dream.answer.json")
 	if err := os.WriteFile(path, answer, 0o600); err != nil {
-		return err
+		return rec, work, err
 	}
 	rec, err = applyAnswer(dir, path, out)
-	rec.Tokens = &tokens
+	rec.Tokens, rec.CostUSD = &tokens, cost
 	if err != nil {
 		rec.Error = err.Error()
 	}
-	return errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
+	return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 }
