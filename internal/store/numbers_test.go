@@ -9,7 +9,7 @@ import (
 )
 
 // A base indexed word-only, by a release before the number terms or with MEMCUE_NUMBER_TERMS=0, must get the
-// numeric terms on the next open with no variable set: the counts match, so nothing but numbersMissing notices that
+// numeric terms on the next open with no variable set: the counts match, so nothing but numbersIncomplete notices that
 // a prompt naming a version would find nothing.
 func TestNumbersAreIndexedOnNextOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "facts.db")
@@ -103,4 +103,100 @@ func assertWordOnly(t *testing.T, s *Store) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// A base indexed word-only and then given one numbered row, as a newer release writes its next fact, is still
+// repaired on open: the other rows keep no number term, and a prompt naming their version must find them (#383).
+// With the opt-out the same base is left as it is.
+func TestPartlyNumberedIndexIsRepairedOnOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "facts.db")
+	t.Setenv("MEMCUE_NUMBER_TERMS", "0")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer, err := s.Add("Стенд собран под Go 1.27 и только под него.", nil, "notes 2026-10-19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, content := range []string{"Старый стенд жил на Go 1.20.", "Резолвер проверять через dig @1.1.1.1."} {
+		if _, err := s.Add(content, nil, "notes 2026-10-19"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The one row a newer release wrote, with its number term in both tables.
+	var rowid int64
+	var stems string
+	if err := s.db.QueryRow(`SELECT rowid, stems FROM fact_index WHERE id = ?`, newer.ID).Scan(&rowid, &stems); err != nil {
+		t.Fatal(err)
+	}
+	stems += " nm1x27"
+	if _, err := s.db.Exec(`UPDATE fact_index SET stems = ? WHERE rowid = ?`, stems, rowid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE fact_fts SET stems = ? WHERE rowid = ?`, stems, rowid); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The opt-out keeps the base as it is: a rebuild would take the term off the newer row.
+	off, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := numberedRows(t, off); got != 1 {
+		t.Fatalf("%d rows carry a number term with MEMCUE_NUMBER_TERMS=0, want the hand-written 1: rebuilt", got)
+	}
+	if err := off.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("MEMCUE_NUMBER_TERMS", "")
+	ro, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := ro.IndexStats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ro.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if want := (IndexStats{Live: 3, Rows: 3, Numbered: 1, Unnumbered: 2}); before != want {
+		t.Fatalf("before the repair %+v, want %+v", before, want)
+	}
+
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	after, err := reopened.IndexStats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (IndexStats{Live: 3, Rows: 3, Numbered: 3}); after != want {
+		t.Fatalf("after reopening %+v, want %+v", after, want)
+	}
+	for query, want := range map[string]string{"1.20": "Go 1.20", "1.1.1.1": "dig @1.1.1.1", "1.27": "Go 1.27"} {
+		hits, err := reopened.Search(text.Terms(query), 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(hits) != 1 || !strings.Contains(hits[0].Content, want) {
+			t.Errorf("Search(%q) = %+v, want the %s fact alone", query, hits, want)
+		}
+	}
+}
+
+func numberedRows(t *testing.T, s *Store) int {
+	t.Helper()
+	st, err := s.IndexStats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return st.Numbered
 }

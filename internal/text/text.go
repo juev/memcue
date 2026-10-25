@@ -19,7 +19,7 @@ import (
 
 var (
 	// v0.21.6, 1.27, 2026-10-19: never a match.
-	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
+	reNumeric = regexp.MustCompile(`(?:^|[\s(\[{"'@])(?:[#!]\d+|v?\d+(?:[.\-:/]\d+)+)\b`)
 	// PROJ-1234, JIRA-12, #123, !45: one exact term. Only an uppercase project key is a ticket; a versioned name
 	// such as PostgreSQL-16 keeps its word and its number is dropped.
 	reTicket = regexp.MustCompile(`\b[A-Z][A-Z0-9]*-\d+\b|#\d+|!\d+`)
@@ -129,9 +129,9 @@ func words(s string) []string {
 
 // numberTerm normalizes a version, date, port or address into one FTS token: the "nm" prefix keeps it apart from
 // an ordinary word or a ticket, and every separator becomes "x", so the unicode61 tokenizer cannot split it. The
-// boundary character the regexp swallowed (space, paren, quote) is dropped first.
+// boundary character the regexp swallowed (space, paren, quote, the @ of dig @1.1.1.1) is dropped first.
 func numberTerm(s string) string {
-	s = strings.TrimLeft(s, " 	\n([{\"'")
+	s = strings.TrimLeft(s, " 	\n([{\"'@")
 	s = strings.ToLower(s)
 	var b strings.Builder
 	b.WriteString("nm")
