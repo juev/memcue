@@ -40,7 +40,7 @@ func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	if got := strings.TrimSpace(out.String()); got != id+" v3 active" {
 		t.Errorf("reopen printed %q", got)
 	}
-	f := vetStatus(t, id)
+	f := storedFact(t, id)
 	if f.Scope != "repo:lists" || f.Source != "user" || !strings.Contains(f.Content, "openjdk@21") {
 		t.Errorf("reopened %+v", f)
 	}

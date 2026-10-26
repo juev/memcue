@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// API is an OpenAI-compatible chat completions endpoint. When URL is set the extraction calls it with Model instead
+// API is an OpenAI-compatible chat completions endpoint. When URL is set the model calls go to it with Model instead
 // of running `claude -p`: for hosts without Claude Code, such as Hermes Agent.
 var API struct {
 	URL string // base URL, e.g. https://api.deepseek.com; /chat/completions is appended

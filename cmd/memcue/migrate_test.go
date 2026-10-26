@@ -70,7 +70,7 @@ func TestNotMigratedSkipsNotesInTheBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if _, err := s.Add("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)"); err != nil {
+	if _, err := s.AddWith("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := notMigrated(s, []note{{path: "/m/lists/a.md", tier: "lists"}, {path: "/m/lists/b.md", tier: "lists"}}, 0)
@@ -154,7 +154,7 @@ func TestNamedNoteIsMigratedAgainButFoundOneIsSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)"); err != nil {
+	if _, err := s.AddWith("факт из заметки a", nil, "lists 2026-10-01 (lists/a.md)", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	_ = s.Close()

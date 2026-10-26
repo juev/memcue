@@ -1,5 +1,5 @@
 // Package recall finds facts for a text. Search serves the queries the agent writes itself (#361). Recall finds the
-// facts close to a text, which dream and vet use to group a fact with its neighbours.
+// facts close to a text, which the dream uses to group a fact with its neighbours.
 //
 // Recall takes candidates from FTS5 over all facts, in BM25 order. A fact passes when it holds enough of the text's
 // informative terms: a minimum number of them and a minimum IDF-weighted share. The facts that pass come in BM25

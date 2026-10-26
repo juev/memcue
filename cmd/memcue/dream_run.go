@@ -36,8 +36,8 @@ var dreamRunFn = func(packet string) (extract.DreamReply, error) {
 // translation waits while a group of the packet holds it (#396), and the merge sweep moves the groups on.
 const dreamAllStalls = 3
 
-// runDreamOnce is memcue dream -run. A plain run (#401) is the dream of a host whose plugin has no session model to
-// hand the packet to, such as Hermes, which starts it after an extraction: it asks what the session start of Claude
+// runDreamOnce is memcue dream -run. A plain run (#401) is the dream started by hand or by a job, without a session
+// model to hand the packet to: it asks what the session start of Claude
 // Code asks before it says a dream is due, whether MEMCUE_DREAM_EVERY has passed and some fact is fresh or owed a
 // translation, and with nothing due makes no call. It needs MEMCUE_API_URL, so a long run never starts by surprise.
 //

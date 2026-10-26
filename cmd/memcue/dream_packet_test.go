@@ -30,7 +30,7 @@ func TestDreamApplyRefusesAnotherPacket(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "run -prepare again") {
 		t.Fatalf("err %v", err)
 	}
-	if f := vetStatus(t, a); f.Status != store.Active || f.Version != 1 {
+	if f := storedFact(t, a); f.Status != store.Active || f.Version != 1 {
 		t.Errorf("an answer to another packet changed %+v", f)
 	}
 	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); ok {
@@ -56,13 +56,13 @@ func TestDreamApplyKeepsToThePacket(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, old); f.Status != store.Active || len(f.Queries) != 1 {
+	if f := storedFact(t, old); f.Status != store.Active || len(f.Queries) != 1 {
 		t.Errorf("old %+v", f)
 	}
-	if f := vetStatus(t, a); f.Status != store.Retired {
+	if f := storedFact(t, a); f.Status != store.Retired {
 		t.Errorf("the action of the group was not applied: %+v", f)
 	}
-	if f := vetStatus(t, other); len(f.Queries) != 1 || f.Queries[0] != "уже есть" {
+	if f := storedFact(t, other); len(f.Queries) != 1 || f.Queries[0] != "уже есть" {
 		t.Errorf("queries of a fact the packet did not ask about were written: %+v", f)
 	}
 }
@@ -191,10 +191,10 @@ func TestDreamRefusesABlankCorrection(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, a); f.Status != store.Retired {
+	if f := storedFact(t, a); f.Status != store.Retired {
 		t.Errorf("a %+v", f)
 	}
-	if f := vetStatus(t, b); f.Version != 1 {
+	if f := storedFact(t, b); f.Version != 1 {
 		t.Errorf("a blank correction was written: %+v", f)
 	}
 	recs := readDreamLog(t, dir)

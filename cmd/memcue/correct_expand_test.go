@@ -27,7 +27,7 @@ func TestCorrectExpandsTheCorrectedFact(t *testing.T) {
 	calls := fakeExpandOnce(t, nil)
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
 	printed := correctForTest(t, id, "Postgres демо-базы слушает порт 5433 на db2.")
-	f := vetStatus(t, id)
+	f := storedFact(t, id)
 	if f.Content != "Postgres демо-базы слушает порт 5433 на db2." || len(f.Queries) != 1 ||
 		f.Queries[0] != "какой порт у postgres" {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
@@ -44,13 +44,13 @@ func TestCorrectKeepsTheFactWithoutExpansion(t *testing.T) {
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
 	calls := fakeExpandOnce(t, nil)
 	correctForTest(t, id, "Без endpoint запрос не идёт.")
-	if f := vetStatus(t, id); *calls != 0 || len(f.Queries) != 0 || f.Content != "Без endpoint запрос не идёт." {
+	if f := storedFact(t, id); *calls != 0 || len(f.Queries) != 0 || f.Content != "Без endpoint запрос не идёт." {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
 	}
 	withAPI(t, "https://api.example.test")
 	failing := fakeExpandOnce(t, errors.New("endpoint down"))
 	correctForTest(t, id, "Endpoint лежит, факт всё равно правится.")
-	if f := vetStatus(t, id); *failing != 1 || len(f.Queries) != 0 ||
+	if f := storedFact(t, id); *failing != 1 || len(f.Queries) != 0 ||
 		f.Content != "Endpoint лежит, факт всё равно правится." {
 		t.Fatalf("calls %d, fact %+v", *failing, f)
 	}
@@ -80,7 +80,7 @@ func TestDreamCorrectionCarriesItsQueries(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, b); f.Content != "слитый текст" || len(f.Queries) != 1 || f.Queries[0] != "ночная подписка" {
+	if f := storedFact(t, b); f.Content != "слитый текст" || len(f.Queries) != 1 || f.Queries[0] != "ночная подписка" {
 		t.Fatalf("corrected fact %+v", f)
 	}
 }
@@ -94,7 +94,7 @@ func TestDreamCorrectionWithoutQueriesIsExpandedNext(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, b); f.Content != "слитый текст" || len(f.Queries) != 0 {
+	if f := storedFact(t, b); f.Content != "слитый текст" || len(f.Queries) != 0 {
 		t.Fatalf("corrected fact %+v", f)
 	}
 	sent := fakeExpand(t, nil)
@@ -105,7 +105,7 @@ func TestDreamCorrectionWithoutQueriesIsExpandedNext(t *testing.T) {
 	if !strings.Contains(strings.Join(*sent, " "), b) || len(*calls) != 0 {
 		t.Errorf("expanded %q, groups %q", *sent, *calls)
 	}
-	if f := vetStatus(t, b); len(f.Queries) != 1 {
+	if f := storedFact(t, b); len(f.Queries) != 1 {
 		t.Errorf("corrected fact after the next dream %+v", f)
 	}
 }

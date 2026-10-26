@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"strings"
 	"testing"
 	"time"
 )
@@ -56,56 +55,5 @@ func TestAnswerReportsModelError(t *testing.T) {
 func TestAnswerRejectsEmptyAnswer(t *testing.T) {
 	if _, err := answer([]byte(`{"is_error":false,"structured_output":{"facts":[],"dropped":""}}`)); err == nil {
 		t.Error("want error")
-	}
-}
-
-func TestSessionFactCarriesKindSourceEvidenceScope(t *testing.T) {
-	r, err := decode(reply{payload: []byte(`{"facts":[{"content":" Порт db1 5432. ","keywords":["порт"],` +
-		`"kind":"environment","scope":"host:db1","source":"tool","evidence":"port 5432"}],"dropped":""}`)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := Fact{Content: "Порт db1 5432.", Keywords: []string{"порт"}, Kind: "environment", Scope: "host:db1",
-		Source: "tool", Evidence: "port 5432"}
-	if len(r.Facts) != 1 || r.Facts[0].Content != want.Content || r.Facts[0].Kind != want.Kind ||
-		r.Facts[0].Scope != want.Scope || r.Facts[0].Source != want.Source || r.Facts[0].Evidence != want.Evidence {
-		t.Errorf("got %+v", r.Facts)
-	}
-	if !strings.Contains(sessionSchema, `"required":["content","keywords","kind","scope","source","evidence"]`) {
-		t.Error("the session schema does not require the fields the policy reads")
-	}
-}
-
-// The search queries of a session fact are kept, trimmed, without empty ones, repeats or commas inside one.
-func TestSessionFactCarriesQueries(t *testing.T) {
-	r, err := decode(reply{payload: []byte(`{"facts":[{"content":"Порт db1 5432.","keywords":["порт"],` +
-		`"queries":[" обратный, прокси ","","обратный прокси","какой порт"]}],"dropped":""}`)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := r.Facts[0].Queries; len(got) != 2 || got[0] != "обратный прокси" || got[1] != "какой порт" {
-		t.Errorf("queries %q", got)
-	}
-	if !strings.Contains(sessionSchema, `"queries":{"type":"array"`) || !strings.Contains(sessionAnswer, `"queries"`) {
-		t.Error("the session schema and answer shape must name queries")
-	}
-}
-
-// The translation of a session fact lands in its queries under the mark, so the store and the index carry it with no
-// field of their own (#395); the model's commas inside it do not split it on the store round trip.
-func TestSessionFactTranslationGoesToQueries(t *testing.T) {
-	r, err := decode(reply{payload: []byte(`{"facts":[{"content":"Порт db1 5432.","keywords":["порт"],` +
-		`"queries":["какой порт"],"translation":" Port of db1, 5432. "}],"dropped":""}`)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := r.Facts[0].Queries; len(got) != 2 || got[0] != "какой порт" || got[1] != "= Port of db1 5432." {
-		t.Errorf("queries %q", got)
-	}
-	if r.Facts[0].Translation != "" {
-		t.Errorf("translation %q left on the fact: it is in the queries", r.Facts[0].Translation)
-	}
-	if !strings.Contains(sessionSchema, `"translation":{"type":"string"}`) || !strings.Contains(sessionAnswer, `"translation"`) {
-		t.Error("the session schema and answer shape must name translation")
 	}
 }

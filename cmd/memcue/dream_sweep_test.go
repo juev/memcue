@@ -54,10 +54,10 @@ func TestDreamSweepRetiresAnOldDuplicate(t *testing.T) {
 	if len(*calls) != 1 || strings.Contains((*calls)[0], ", новый") {
 		t.Fatalf("calls %q", *calls)
 	}
-	if f := vetStatus(t, a); f.Status != store.Retired {
+	if f := storedFact(t, a); f.Status != store.Retired {
 		t.Errorf("larger id not retired: %+v", f)
 	}
-	if f := vetStatus(t, b); f.Status != store.Active {
+	if f := storedFact(t, b); f.Status != store.Active {
 		t.Errorf("smaller id not kept: %+v", f)
 	}
 	recs := readDreamLog(t, dir)
@@ -168,7 +168,7 @@ func TestDreamGroupOfDifferentAttributesChangesNothing(t *testing.T) {
 		t.Fatalf("calls %q", *calls)
 	}
 	for _, f := range []string{id, when} {
-		if got := vetStatus(t, f); got.Status != store.Active || got.Version != 1 {
+		if got := storedFact(t, f); got.Status != store.Active || got.Version != 1 {
 			t.Errorf("fact changed: %+v", got)
 		}
 	}
@@ -187,7 +187,7 @@ func TestDreamWithNothingToMergeIsRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range []string{"Postgres демо-базы слушает порт 5432 на db1.", "Gradle в demo-app требует JAVA_HOME=/opt/jdk-21."} {
-		f, err := s.Add(c, nil, "x 2026-10-19")
+		f, err := s.AddWith(c, nil, "x 2026-10-19", "", store.Meta{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -229,7 +229,7 @@ func TestDreamSweepGroupDryRunAndChangedGroup(t *testing.T) {
 	if err != nil || path == "" {
 		t.Fatalf("prepare: %q %v", path, err)
 	}
-	if f := vetStatus(t, a); f.Status != store.Active || f.Version != 1 {
+	if f := storedFact(t, a); f.Status != store.Active || f.Version != 1 {
 		t.Fatalf("prepare changed a fact: %+v", f)
 	}
 	if c := readCursor(t, dir); c != "" {
@@ -247,7 +247,7 @@ func TestDreamSweepGroupDryRunAndChangedGroup(t *testing.T) {
 	if err := runDream([]string{"-apply", path}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, a); f.Status != store.Active {
+	if f := storedFact(t, a); f.Status != store.Active {
 		t.Errorf("retired against a changed group: %+v", f)
 	}
 	recs := readDreamLog(t, dir)
@@ -262,7 +262,7 @@ func TestDreamSweepGroupDryRunAndChangedGroup(t *testing.T) {
 func tokenBase(t *testing.T, s *store.Store) (short, long, password, data store.Fact) {
 	t.Helper()
 	add := func(c string, k ...string) store.Fact {
-		f, err := s.Add(c, k, "x 2026-10-19")
+		f, err := s.AddWith(c, k, "x 2026-10-19", "", store.Meta{})
 		if err != nil {
 			t.Fatal(err)
 		}

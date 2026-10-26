@@ -46,7 +46,7 @@ func translateBase(t *testing.T) (first, second, done string) {
 	}
 	defer func() { _ = s.Close() }()
 	add := func(c string, q ...string) string {
-		f, err := s.Add(c, nil, "x 2026-10-19")
+		f, err := s.AddWith(c, nil, "x 2026-10-19", "", store.Meta{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,12 +76,12 @@ func TestDreamTranslatesTheFactsOwedATranslation(t *testing.T) {
 		t.Fatalf("sent %q, want %s and %s", *sent, first, second)
 	}
 	for id, q := range map[string]string{first: "база данных", second: "сборка"} {
-		f := vetStatus(t, id)
+		f := storedFact(t, id)
 		if tr, ok := extract.Translation(f.Queries); !ok || tr != "translated "+id || !slices.Contains(f.Queries, q) {
 			t.Errorf("fact %s queries %q", id, f.Queries)
 		}
 	}
-	if f := vetStatus(t, done); f.Version != 2 {
+	if f := storedFact(t, done); f.Version != 2 {
 		t.Errorf("a translated fact got another version: %+v", f)
 	}
 	if !strings.Contains(out.String(), "translated 2 facts") {
@@ -153,14 +153,14 @@ func TestDreamTranslatesTheFreshFactsItLeavesForLater(t *testing.T) {
 	if err := runDream([]string{"-apply", path}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, left); owesTranslation(f) {
+	if f := storedFact(t, left); owesTranslation(f) {
 		t.Fatalf("not translated: %q", f.Queries)
 	}
 	seen, err := readDreamSeen(filepath.Dir(path))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, ok := seen[left]; ok && v == vetStatus(t, left).Version {
+	if v, ok := seen[left]; ok && v == storedFact(t, left).Version {
 		t.Errorf("the translation marked a fresh fact seen at version %d", v)
 	}
 }
@@ -204,13 +204,13 @@ func TestDreamTranslationChecks(t *testing.T) {
 	if err := runDream([]string{"-apply", path}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, done); strings.Contains(strings.Join(f.Queries, " "), "not asked") {
+	if f := storedFact(t, done); strings.Contains(strings.Join(f.Queries, " "), "not asked") {
 		t.Errorf("a translation the packet did not ask for was written: %q", f.Queries)
 	}
-	if f := vetStatus(t, first); !owesTranslation(f) {
+	if f := storedFact(t, first); !owesTranslation(f) {
 		t.Errorf("a fact corrected since the packet got the old text's translation: %q", f.Queries)
 	}
-	if f := vetStatus(t, second); owesTranslation(f) {
+	if f := storedFact(t, second); owesTranslation(f) {
 		t.Errorf("second was not translated: %q", f.Queries)
 	}
 	recs := readDreamLog(t, dir)

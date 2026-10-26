@@ -243,13 +243,13 @@ func projectTier(dir, claude string) string {
 		if err != nil {
 			continue
 		}
-		sess, err := transcript.Read(io.LimitReader(f, 1<<20), 0)
+		cwd, err := transcript.CWD(io.LimitReader(f, 1<<20))
 		_ = f.Close()
-		if err == nil && sess.CWD != "" {
-			if name := tier.Of(sess.CWD, claude); name != "" {
+		if err == nil && cwd != "" {
+			if name := tier.Of(cwd, claude); name != "" {
 				return name
 			}
-			return filepath.Base(sess.CWD)
+			return filepath.Base(cwd)
 		}
 	}
 	if p := decodeProject(filepath.Base(dir)); p != "" {

@@ -594,17 +594,6 @@ func (s *Store) migrate() error {
 	return err
 }
 
-// Add stores a new fact as version 1.
-func (s *Store) Add(content string, keywords []string, origin string) (Fact, error) {
-	return s.AddExpiring(content, keywords, origin, "")
-}
-
-// AddExpiring stores a new fact as version 1 with the last day it is worth recalling ("YYYY-MM-DD"; empty never
-// expires).
-func (s *Store) AddExpiring(content string, keywords []string, origin, expires string) (Fact, error) {
-	return s.AddWith(content, keywords, origin, expires, Meta{})
-}
-
 // AddWith stores a new fact as version 1 with what it is and what it rests on. A fact with Review Candidate is not
 // recalled until it is approved.
 func (s *Store) AddWith(content string, keywords []string, origin, expires string, m Meta) (Fact, error) {
@@ -751,27 +740,6 @@ func (s *Store) ApproveExpiring(id, expires string) (Fact, error) {
 		f.Expires = "" // the TTL belonged to the provisional state, not to a human approval
 	}
 	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
-	return f, s.write(f)
-}
-
-// ApproveProvisional records an unsure candidate as provisional: recalled after approved facts, until expires, and
-// not part of the trusted base for duplicate or coverage rules. It writes one version.
-func (s *Store) ApproveProvisional(id, expires string) (Fact, error) {
-	cur, err := s.Get(id)
-	if err != nil {
-		return Fact{}, err
-	}
-	if cur.Status != Active || cur.Review != Candidate {
-		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
-	}
-	if err := ValidExpiry(expires); err != nil {
-		return Fact{}, err
-	}
-	f := cur
-	if expires != "" {
-		f.Expires = expires
-	}
-	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, Provisional
 	return f, s.write(f)
 }
 
@@ -950,35 +918,6 @@ func (s *Store) Retire(id string) (Fact, error) {
 	f := cur
 	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
 	return f, s.write(f)
-}
-
-// RetireCandidate retires a fact while it still waits for approval or is provisional. Unlike Retire, it refuses an
-// approval that a human or another run made in the meantime, so a stale vet decision cannot undo it.
-func (s *Store) RetireCandidate(id string) (Fact, error) {
-	cur, err := s.Get(id)
-	if err != nil {
-		return Fact{}, err
-	}
-	if cur.Status != Active || (cur.Review != Candidate && cur.Review != Provisional) {
-		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
-	}
-	f := cur
-	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
-	return f, s.write(f)
-}
-
-// SplitCandidate replaces a candidate that holds several claims with one candidate per part, in one transaction: the
-// original is retired and every part keeps its origin, expiry and meta. The keywords stay with the original, since
-// they were chosen for the whole text. Like RetireCandidate, it refuses a fact that is no longer a candidate.
-func (s *Store) SplitCandidate(id string, parts []string) ([]Fact, error) {
-	cur, err := s.Get(id)
-	if err != nil {
-		return nil, err
-	}
-	if cur.Status != Active || cur.Review != Candidate {
-		return nil, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
-	}
-	return s.split(cur, parts)
 }
 
 // SplitFact does for a fact in recall what SplitCandidate does for a candidate: the parts take its place with its
