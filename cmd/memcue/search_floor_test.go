@@ -92,6 +92,43 @@ func TestSearchFlags(t *testing.T) {
 	}
 }
 
+// Flags after the text steer the search as they do before it (#481): agents write `search "words" -in all`, and the
+// flags used to become words of the query. After "--" a dash is a word; an unknown flag still fails.
+func TestSearchFlagsAfterTheText(t *testing.T) {
+	env(t)
+	addFactForTest(t, "-origin", "x 2026-10-25", "-kind", "rule", "-scope", "global", "nats держим на 4222.")
+	pit := addFactForTest(t, "-origin", "x 2026-10-25", "-kind", "pitfall", "-scope", "repo:example.com/them/lib",
+		"nats на db1 падает без памяти.")
+	addFactForTest(t, "-origin", "x 2026-10-25", "-scope", "global", "Флаг -kind выбирает вид факта.")
+	search := func(args ...string) []string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runSearch(args, &out); err != nil {
+			t.Fatal(err)
+		}
+		var facts []struct{ ID string }
+		if err := unmarshalFacts(out.Bytes(), &facts); err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for _, f := range facts {
+			ids = append(ids, f.ID)
+		}
+		return ids
+	}
+	before := search("-json", "-min-score", "0", "-in", "all", "-kind", "pitfall", "-n", "1", "nats")
+	after := search("nats", "-in", "all", "-kind=pitfall", "-n", "1", "-json", "-min-score", "0")
+	if len(before) != 1 || before[0] != pit || strings.Join(after, ",") != strings.Join(before, ",") {
+		t.Errorf("flags after the text: %q, before it: %q, want the pitfall alone in both", after, before)
+	}
+	if got := search("-json", "-in", "global", "--", "-kind", "выбирает"); len(got) != 1 {
+		t.Errorf(`"--" then "-kind выбирает": %q, want the fact that holds the words`, got)
+	}
+	if err := runSearch([]string{"nats", "-everywhere"}, &bytes.Buffer{}); err == nil {
+		t.Error("an unknown flag after the text: want an error")
+	}
+}
+
 // A query in Chinese, Japanese or Korean gets the hint to search in the facts' languages, with facts or without
 // (#410); a Russian or English query does not.
 func TestSearchHintsOnCJK(t *testing.T) {

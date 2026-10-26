@@ -564,6 +564,44 @@ func runReindex(args []string, out io.Writer) error {
 	return err
 }
 
+// parseAnywhere parses the flags of fs wherever they stand among args and returns the other arguments in order. The
+// flag package stops at the first word, and agents write `search "words" -in all` (#481): the flags became words of
+// the query without an error. An argument after "--" is a word even if it starts with a dash; an unknown flag fails
+// as before.
+func parseAnywhere(fs *flag.FlagSet, args []string) ([]string, error) {
+	var flags, words []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			words = append(words, args[i+1:]...)
+			break
+		}
+		if len(a) < 2 || a[0] != '-' {
+			words = append(words, a)
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if strings.Contains(name, "=") {
+			continue
+		}
+		// A flag that takes a value takes the next argument with it, the way fs.Parse reads it.
+		if f := fs.Lookup(name); f != nil && !isBoolFlag(f) && i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	if err := fs.Parse(flags); err != nil {
+		return nil, err
+	}
+	return words, nil
+}
+
+func isBoolFlag(f *flag.Flag) bool {
+	b, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return ok && b.IsBoolFlag()
+}
+
 // runSearch lists the facts that fit the text, best first, with their IDs: how the agent reads its memory (#361), and
 // the way to find the fact to correct or retire. -n is the most it returns; a fact far below the best one does not fit
 // and is left out (#407), so one fitting fact comes alone and none says so.
@@ -584,14 +622,15 @@ func runSearch(args []string, out io.Writer) error {
 	asJSON := fs.Bool("json", false, `print one JSON object, {"facts": [...], "hints": [...]}, instead of lines`)
 	cwd := fs.String("cwd", ".", "session working directory: its repository is the project, and its facts win ties")
 	session := fs.String("session", "", "session id for the search log")
-	if err := fs.Parse(args); err != nil {
+	words, err := parseAnywhere(fs, args)
+	if err != nil {
 		return err
 	}
 	if *n < 1 {
 		// A limit below one asks for nothing, and the empty answer it gets would say the base holds nothing (#454).
 		return errors.New("search: -n must be >= 1")
 	}
-	q := recall.Query{Text: strings.Join(fs.Args(), " "), N: *n, MinScore: *minScore,
+	q := recall.Query{Text: strings.Join(words, " "), N: *n, MinScore: *minScore,
 		Project: tier.Keys(*cwd, claudeDir()), Host: currentHost(), In: splitKeywords(*in), Kinds: splitKeywords(*kind), Since: *since,
 		Expired: *expired, AllWords: *allWords}
 	f, err := q.Filter()

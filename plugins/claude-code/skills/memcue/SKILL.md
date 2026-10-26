@@ -5,7 +5,7 @@ description: Write to long-term memory (memcue). Use when the user asks to remem
 
 # memcue: writing to memory
 
-Memory is a base of atomic facts. You read it with `memcue search "<words>"`, as the session-start note says; facts
+Memory is a base of atomic facts. You read it with `memcue search [flags] "<words>"`, as the session-start note says; facts
 are extracted from every session automatically when it is compacted or ends. Write by hand only what the user asks for
 and corrections; the session extraction covers the rest.
 
