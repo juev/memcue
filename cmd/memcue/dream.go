@@ -162,14 +162,23 @@ func runDream(args []string, out io.Writer) error {
 	applyFile := fs.String("apply", "", "check and carry out the model's answer to the packet -prepare printed")
 	run := fs.Bool("run", false, "when a dream is due, send its packet to MEMCUE_API_URL and apply the answer (#401); "+
 		"with -all, packets until the base has no work left, on claude -p without MEMCUE_API_URL (#405)")
+	jobs := fs.Int("j", 4, "with -run, the packets of work sent to the model at once (#471)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	jSet := false
+	fs.Visit(func(f *flag.Flag) { jSet = jSet || f.Name == "j" })
 	if *run {
 		if *applyFile != "" || *since != "" || *prep || *list {
-			return errors.New("-run takes no other flag than -all")
+			return errors.New("-run takes no other flag than -all and -j")
 		}
-		return runDreamOnce(out, *all)
+		if *jobs < 1 {
+			return fmt.Errorf("-j %d: at least one packet", *jobs)
+		}
+		return runDreamOnce(out, *all, *jobs)
+	}
+	if jSet {
+		return errors.New("-j goes with -run")
 	}
 	if *applyFile != "" && (*since != "" || *all || *prep || *list) {
 		return errors.New("-apply takes no other flag")
@@ -210,7 +219,7 @@ func runDream(args []string, out io.Writer) error {
 			return err
 		}
 	}
-	rec, err := prepare(dir, from, seen, *list, out)
+	rec, _, err := prepare(dir, from, seen, *list, 1, out)
 	switch {
 	case *list:
 		return err
@@ -337,48 +346,53 @@ const packetFile = "dream.packet.json"
 // queries to expand, and the groups of similar facts to review, with the instructions for each. It keeps the packet
 // for -apply and prints it. Fresh facts left out by the packet bounds are not counted as seen, so the next packet
 // takes them.
-func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.Writer) (dreamRecord, error) {
+//
+// packets (#471) scales every bound: dream -run sends the work of that many packets at once, cut back into packets of
+// the usual bounds, so a pass of a base far behind does the work of several. The session's model gets one.
+func prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, out io.Writer) (dreamRecord, dreamWork, error) {
+	var work dreamWork
+	maxFresh, maxGroups := packets*packetFresh, packets*packetGroups
 	start := time.Now()
 	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339)}
 	s, err := store.Open(factsPath())
 	if err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	defer func() { _ = s.Close() }()
 	active, err := s.Active()
 	if err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	fresh, err := freshFacts(s, active, from, seen)
 	if err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	rec.Fresh = len(fresh)
 	batch := fresh
-	if len(batch) > packetFresh {
-		batch = batch[:packetFresh]
+	if len(batch) > maxFresh {
+		batch = batch[:maxFresh]
 	}
 	isFresh := freshSet(fresh)
 	gr := newGrouper(active)
 	for _, f := range batch {
 		if err := gr.add(s, f); err != nil {
-			return rec, err
+			return rec, work, err
 		}
 	}
 	// The sweep takes the room the fresh groups leave in the packet, so it never pushes a fresh fact to the next one.
-	room := min(mergeGroups, packetGroups-len(gr.groups()))
+	room := min(packets*mergeGroups, maxGroups-len(gr.groups()))
 	cursor, err := readMergeCursor(dir)
 	if err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	swept := 0
 	isBatch := freshSet(batch)
 	for _, f := range sweepFacts(active, isFresh, cursor) {
-		if swept == mergeSweep || gr.groupsWithout(isBatch) >= room {
+		if swept == packets*mergeSweep || gr.groupsWithout(isBatch) >= room {
 			break
 		}
 		if err := gr.add(s, f); err != nil {
-			return rec, err
+			return rec, work, err
 		}
 		cursor = f.ID
 		swept++
@@ -395,10 +409,10 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	}
 	groups = append(groups, sweepGroups...)
 	var deferred []dreamGroupRecord
-	if len(groups) > packetGroups {
+	if len(groups) > maxGroups {
 		// A fresh fact of a group left out waits for the next packet with the rest of its group.
 		left := map[string]bool{}
-		for _, g := range groups[packetGroups:] {
+		for _, g := range groups[maxGroups:] {
 			r := dreamGroupRecord{Outcome: "deferred"}
 			for _, f := range g {
 				left[f.ID] = true
@@ -409,14 +423,14 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 			}
 			deferred = append(deferred, r)
 		}
-		groups = groups[:packetGroups]
+		groups = groups[:maxGroups]
 		batch = slices.DeleteFunc(slices.Clone(batch), func(f store.Fact) bool { return left[f.ID] })
 		isBatch = freshSet(batch)
 	}
 	rec.Groups = len(groups)
 	if list {
 		_, err := io.WriteString(out, renderGroups(groups, isBatch))
-		return rec, err
+		return rec, work, err
 	}
 	// Every fact without search queries gets them, the fresh ones first, then the facts the dream has seen and will
 	// not see again, the newest first: an old base is expanded over a few dreams (#276).
@@ -427,13 +441,13 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 			bare = append(bare, f)
 		}
 	}
-	for i := len(active) - 1; i >= 0 && len(bare) < packetExpand; i-- {
+	for i := len(active) - 1; i >= 0 && len(bare) < packets*packetExpand; i-- {
 		if f := active[i]; !isFresh[f.ID] && len(extract.SearchQueries(f.Queries)) == 0 {
 			bare = append(bare, f)
 		}
 	}
-	if len(bare) > packetExpand {
-		bare = bare[:packetExpand]
+	if len(bare) > packets*packetExpand {
+		bare = bare[:packets*packetExpand]
 	}
 	// Facts owed a translation get it a packet at a time, the newest first (#396). A fact another part of the packet
 	// may change waits: a split retires it, and an expansion or a group action writes a version the translation would
@@ -446,7 +460,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 		}
 	}
 	var owed []store.Fact
-	for i := len(active) - 1; i >= 0 && len(owed) < packetTranslate; i-- {
+	for i := len(active) - 1; i >= 0 && len(owed) < packets*packetTranslate; i-- {
 		if f := active[i]; !isBatch[f.ID] && !busy[f.ID] && owesTranslation(f) {
 			owed = append(owed, f)
 		}
@@ -469,18 +483,19 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, out io.
 	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
-		return rec, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
+		return rec, work, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
 	}
 	if err := writeJSONFile(filepath.Join(dir, packetFile), p); err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	rec.Packet = p.ID
+	work = dreamWork{id: p.ID, split: batch, expand: bare, translate: owed, groups: groups, fresh: isBatch}
 	text, err := renderPacket(p.ID, batch, bare, owed, groups, isBatch)
 	if err != nil {
-		return rec, err
+		return rec, work, err
 	}
 	_, err = io.WriteString(out, text)
-	return rec, err
+	return rec, work, err
 }
 
 // renderPacket is the text the model reads: the instructions, the groups, and the facts to split, expand and translate.

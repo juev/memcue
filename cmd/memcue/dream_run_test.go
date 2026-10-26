@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,12 +14,16 @@ import (
 )
 
 // fakeDreamRun plays the endpoint of dream -run: it answers the packet with the functions of the session's model in
-// the tests (answerPacket) and counts the calls.
+// the tests (answerPacket) and counts the calls, which a pass makes at once (#471).
 func fakeDreamRun(t *testing.T, fail error) *int {
 	t.Helper()
 	calls := 0
+	var mu sync.Mutex
 	old := dreamRunFn
 	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+		// The fakes of the session's model behind answerPacket keep what they were sent: one answer at a time.
+		mu.Lock()
+		defer mu.Unlock()
 		calls++
 		r := extract.DreamReply{Tokens: extract.Tokens{Input: len(packet) / 4, Output: 100}}
 		if fail != nil {
@@ -98,7 +104,8 @@ func TestDreamRunAppliesTheAnswer(t *testing.T) {
 	if err := runDream([]string{"-run"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if *calls != 1 || !strings.Contains(out.String(), "translated 2 facts") {
+	// One call for the group of the two copies, one for the translations.
+	if *calls != 2 || !strings.Contains(out.String(), "translated 2 facts") {
 		t.Fatalf("%d calls, out %q", *calls, out.String())
 	}
 	for _, id := range []string{old, other} {
@@ -108,19 +115,19 @@ func TestDreamRunAppliesTheAnswer(t *testing.T) {
 	}
 	recs := readDreamLog(t, dir)
 	last := recs[len(recs)-1]
-	if last.Translated != 2 || last.Tokens == nil || last.Tokens.Output != 100 || last.Error != "" || last.Packet == "" {
+	if last.Translated != 2 || last.Tokens == nil || last.Tokens.Output != 200 || last.Error != "" || last.Packet == "" {
 		t.Errorf("record %+v", last)
 	}
 	// The record says where the time of the pass went: the API time and the first token as the call reports them (#471).
-	if tm := last.Timing; tm == nil || tm.API != 3000 || tm.TTFT != 1000 {
-		t.Errorf("timing %+v", last.Timing)
+	if tm := last.Timing; tm == nil || tm.API != 3000 || tm.TTFT != 1000 || tm.Calls != 2 || last.CostUSD != 1 {
+		t.Errorf("timing %+v, cost %v", last.Timing, last.CostUSD)
 	}
 
 	out.Reset()
 	if err := runDream([]string{"-run"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if *calls != 1 || out.String() != "dream: nothing due\n" {
+	if *calls != 2 || out.String() != "dream: nothing due\n" {
 		t.Errorf("second run: %d calls, out %q", *calls, out.String())
 	}
 }
@@ -164,12 +171,13 @@ func TestDreamRunLogsAFailedCall(t *testing.T) {
 	if last := recs[len(recs)-1]; !strings.HasPrefix(last.Error, "model: ") || last.Tokens == nil {
 		t.Errorf("record %+v", last)
 	}
+	failed := *calls
 	translateAll(t)
 	fakeDreamRun(t, nil)
 	if err := runDream([]string{"-run"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := extract.Translation(vetStatus(t, old).Queries); !ok || *calls != 1 {
+	if _, ok := extract.Translation(vetStatus(t, old).Queries); !ok || *calls != failed {
 		t.Errorf("the run after a failure did not translate (failed calls %d)", *calls)
 	}
 }
@@ -210,17 +218,20 @@ func TestDreamRunAllFinishesTheBase(t *testing.T) {
 			t.Errorf("fact %s left with queries %q", id, f.Queries)
 		}
 	}
-	priced := 0
+	logged := 0
 	for _, r := range readDreamLog(t, dir) {
 		if r.Error != "" {
 			t.Errorf("record %+v", r)
 		}
-		if r.CostUSD == 0.5 {
-			priced++
+		if r.Timing != nil {
+			logged += r.Timing.Calls
+			if r.CostUSD != 0.5*float64(r.Timing.Calls) {
+				t.Errorf("record of %d calls costs %v", r.Timing.Calls, r.CostUSD)
+			}
 		}
 	}
-	if priced != *calls {
-		t.Errorf("%d records carry the cost of %d calls", priced, *calls)
+	if logged != *calls {
+		t.Errorf("the records count %d calls of %d", logged, *calls)
 	}
 	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, extract.ErrNoEndpoint) {
 		t.Errorf("plain -run without an endpoint: err %v, want ErrNoEndpoint", err)
@@ -229,42 +240,54 @@ func TestDreamRunAllFinishesTheBase(t *testing.T) {
 
 // A failed pass stops dream -run -all with its error; the passes before it stay applied.
 func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
-	env(t)
+	dir := env(t)
 	dreamBase(t)
 	fewPerPacket(t)
 	fakeExpand(t, nil)
 	fakeDream(t, func(string) []extract.Action { return nil })
 	translateAll(t)
-	ok := fakeDreamRun(t, nil)
+	fakeDreamRun(t, nil)
 	good := dreamRunFn
-	n := 0
+	var mu sync.Mutex
+	first := ""
 	dreamRunFn = func(packet string) (extract.DreamReply, error) {
-		if n++; n == 2 {
+		// The packet of the second pass fails.
+		id := regexp.MustCompile("`packet` — ровно `([^`]+)`").FindStringSubmatch(packet)[1]
+		mu.Lock()
+		if first == "" {
+			first = id
+		}
+		second := id != first
+		mu.Unlock()
+		if second {
 			return extract.DreamReply{}, errModel
 		}
 		return good(packet)
 	}
 	err := runDream([]string{"-run", "-all"}, &bytes.Buffer{})
-	if !errors.Is(err, errModel) || !strings.Contains(err.Error(), "pass 2") || *ok != 1 {
-		t.Errorf("err %v after %d good passes", err, *ok)
+	if !errors.Is(err, errModel) || !strings.Contains(err.Error(), "pass 2") {
+		t.Fatalf("err %v", err)
+	}
+	if recs := readDreamLog(t, dir); len(recs) != 2 || recs[0].Error != "" || recs[0].Expanded == 0 {
+		t.Errorf("records %+v", recs)
 	}
 }
 
 // The bound of passes stops a run that still has work and says so; the next run continues.
 func TestDreamRunAllStopsAtTheBound(t *testing.T) {
-	env(t)
+	dir := env(t)
 	dreamBase(t)
 	fewPerPacket(t)
 	fakeExpand(t, nil)
 	fakeDream(t, func(string) []extract.Action { return nil })
 	translateAll(t)
-	calls := fakeDreamRun(t, nil)
+	fakeDreamRun(t, nil)
 	old := dreamAllPasses
 	dreamAllPasses = 1
 	t.Cleanup(func() { dreamAllPasses = old })
-	err := runDream([]string{"-run", "-all"}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "stopped after 1 passes") || *calls != 1 {
-		t.Fatalf("err %v after %d calls", err, *calls)
+	err := runDream([]string{"-run", "-all", "-j", "1"}, &bytes.Buffer{})
+	if n := len(readDreamLog(t, dir)); err == nil || !strings.Contains(err.Error(), "stopped after 1 passes") || n != 1 {
+		t.Fatalf("err %v after %d passes", err, n)
 	}
 	dreamAllPasses = old
 	if err := runDream([]string{"-run", "-all"}, &bytes.Buffer{}); err != nil {
@@ -276,19 +299,87 @@ func TestDreamRunAllStopsAtTheBound(t *testing.T) {
 // the duplicate pair on every pass, so after dreamAllStalls passes that change nothing the loop stops and says how
 // many facts are left, instead of running to the bound.
 func TestDreamRunAllStopsWhenNothingMoves(t *testing.T) {
-	env(t)
+	dir := env(t)
 	dreamBase(t)
 	fewPerPacket(t)
 	fakeExpand(t, nil)
 	fakeDream(t, func(string) []extract.Action { return nil })
 	translateAll(t)
-	calls := fakeDreamRun(t, nil)
+	fakeDreamRun(t, nil)
 	var out bytes.Buffer
 	if err := runDream([]string{"-run", "-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "stopped after 3 passes that changed nothing; 2 facts still lack a translation") ||
-		*calls >= dreamAllPasses {
-		t.Errorf("%d calls, out %q", *calls, out.String())
+	if n := len(readDreamLog(t, dir)); !strings.Contains(out.String(),
+		"stopped after 3 passes that changed nothing; 2 facts still lack a translation") || n >= dreamAllPasses {
+		t.Errorf("%d passes, out %q", n, out.String())
+	}
+}
+
+// -j packets of work go to the model in one pass (#471), each cut into calls by task: with one translation a packet,
+// -j 2 translates both owed facts in one pass, and -j 1 one of them. A failed call fails the pass whole.
+func TestDreamRunJoinsPackets(t *testing.T) {
+	for _, tc := range []struct {
+		j          string
+		translated int
+		calls      int // the group of the two copies, and a call a translation
+	}{{"1", 1, 2}, {"2", 2, 3}} {
+		t.Run("j"+tc.j, func(t *testing.T) {
+			dir := env(t)
+			withAPI(t, "https://api.example.test")
+			dreamBase(t)
+			dreamedHoursAgo(t, dir)
+			translateAll(t)
+			old := packetTranslate
+			packetTranslate = 1
+			t.Cleanup(func() { packetTranslate = old })
+			calls := fakeDreamRun(t, nil)
+			if err := runDream([]string{"-run", "-j", tc.j}, &bytes.Buffer{}); err != nil {
+				t.Fatal(err)
+			}
+			recs := readDreamLog(t, dir)
+			last := recs[len(recs)-1]
+			if last.Translated != tc.translated || last.Timing == nil || last.Timing.Calls != tc.calls ||
+				*calls != tc.calls {
+				t.Errorf("translated %d in %d calls (%+v), want %d in %d", last.Translated, *calls, last.Timing,
+					tc.translated, tc.calls)
+			}
+		})
+	}
+}
+
+// One failed call of a pass applies nothing of the others: the next pass asks for the same work again.
+func TestDreamRunOneFailedCallAppliesNothing(t *testing.T) {
+	dir := env(t)
+	withAPI(t, "https://api.example.test")
+	old, _, _, other := dreamBase(t)
+	dreamedHoursAgo(t, dir)
+	translateAll(t)
+	fakeDreamRun(t, nil)
+	good := dreamRunFn
+	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+		if strings.Contains(packet, "## Группа 1") {
+			return extract.DreamReply{}, errModel
+		}
+		return good(packet)
+	}
+	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
+		t.Fatalf("err %v, want the call's error", err)
+	}
+	for _, id := range []string{old, other} {
+		if _, ok := extract.Translation(vetStatus(t, id).Queries); ok {
+			t.Errorf("fact %s translated by a failed pass", id)
+		}
+	}
+}
+
+// -j takes a count of at least one and goes with -run only.
+func TestDreamRunPacketsFlag(t *testing.T) {
+	env(t)
+	withAPI(t, "https://api.example.test")
+	for _, args := range [][]string{{"-run", "-j", "0"}, {"-prepare", "-all", "-j", "2"}} {
+		if err := runDream(args, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "-j") {
+			t.Errorf("%q: err %v", args, err)
+		}
 	}
 }

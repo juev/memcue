@@ -612,6 +612,13 @@ Who runs it:
   the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. On a
   Claude Code machine that extracts through an endpoint, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all`
   runs it on Opus (#405).
+- **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
+  once: the fresh facts with the groups, the facts to expand and the facts to translate each go in their own calls of
+  one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
+  model writing its answer, so a pass of a base far behind does the work of four packets in about a third of the time
+  of one; a pass with little work makes one or two calls. `dream.log` records the calls, the time of the packet, the
+  calls and the apply, and the tokens of each pass (#471,
+  [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)).
 
 A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand and 40 to translate. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
