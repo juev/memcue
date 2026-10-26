@@ -471,7 +471,10 @@ class ProviderTest(unittest.TestCase):
         fact_id = added["result"].split()[0]
         line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
         self.assertIn("scope=shelf:research", line)
-        self.assertEqual(json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит"}))["facts"], [])
+        empty = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит"}))
+        self.assertEqual(empty["facts"], [])
+        # The shelf hint of the binary reaches the model: it is the only way back to a shelved fact (#453).
+        self.assertIn("-in shelf:research", empty.get("hint", ""))
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит", "in": "shelf:research"}))
         self.assertEqual([(f["id"], f.get("scope")) for f in found["facts"]], [(fact_id, "shelf:research")])
 
@@ -541,6 +544,13 @@ class ProviderTest(unittest.TestCase):
         narrow = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
         self.assertEqual(narrow["facts"], [])
 
+    def test_search_answer_reads_both_shapes(self):
+        """search -json is an object with facts and hints (#453); an older binary prints a bare array."""
+        self.assertEqual(memcue_provider._search_answer('[{"id": "a"}]'), ([{"id": "a"}], []))
+        self.assertEqual(memcue_provider._search_answer('{"facts": [], "hints": ["h", 3]}'), ([], ["h"]))
+        with self.assertRaises(ValueError):
+            memcue_provider._search_answer('{"result": "x"}')
+
     def test_search_hints_on_cjk(self):
         """A Chinese query gets the hint to search in the facts' languages, found or not; a Russian one does not (#410)."""
         json.loads(self.p.handle_tool_call("memcue_add", {
@@ -548,6 +558,7 @@ class ProviderTest(unittest.TestCase):
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启 caddy"}))
         self.assertEqual(len(found["facts"]), 1)
         self.assertIn("Russian and English", found["hint"])
+        self.assertEqual(found["hint"].count("Russian and English"), 1)  # the binary's hint and the plugin's are one
         self.assertIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启"})))
         self.assertNotIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})))
 
