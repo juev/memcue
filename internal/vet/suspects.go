@@ -116,7 +116,7 @@ func unknownVerbs(text string, known map[string]bool) []string {
 // tool's, as likely as memcue's) return "". An empty current (a dev build) returns "".
 func OutdatedInstall(f store.Fact, current string) string {
 	cur, ok := parseVersion(current)
-	if !ok || !stateKind(f.Kind) || installationState(f) == "" {
+	if !ok || State(f) == "" {
 		return ""
 	}
 	s := strings.ToLower(f.Content)

@@ -22,6 +22,7 @@ import (
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/text"
 	"github.com/juev/memcue/internal/tier"
+	"github.com/juev/memcue/internal/vet"
 )
 
 func factsPath() string {
@@ -142,6 +143,12 @@ func runAdd(args []string, out io.Writer) error {
 		return err
 	}
 	content, keywordsList := strings.Join(fs.Args(), " "), splitKeywords(*keywords)
+	// The agent's fact is live at once and never meets vet.Rules, so the state rule runs here (#475).
+	if *source == "agent" {
+		if part := vet.State(store.Fact{Kind: *kind, Source: *source, Content: content}); part != "" {
+			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; store what does not change with the next release or restart", part)
+		}
+	}
 	if !*force && hasSecret(content, keywordsList) {
 		return errors.New("add: the fact looks like a secret; use a password manager, or pass -force to store it anyway")
 	}
