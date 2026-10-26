@@ -54,24 +54,67 @@ type sessionStartInput struct {
 // runSessionStart is the SessionStart hook: the note, the card and, when one is due, the dream hint. It runs again
 // after a compaction or /clear, so the card comes back once the context lost it.
 func runSessionStart(in io.Reader, out io.Writer) error {
+	return runSessionStartPart(in, out, 0)
+}
+
+// startParts is how many SessionStart hooks the Claude Code plugin declares for the text, and partBudget the most
+// characters each one carries. Claude Code saves a hook's additionalContext of 10 000 characters or more to a file and
+// shows the model a 2 KB preview, so one hook lost the card (#480); the limit holds per hook, not per event.
+const (
+	startParts = 3
+	partBudget = 9500
+)
+
+// runSessionStartPart is the hook of one part: 0 is the whole text in one block, for a plugin older than #480; 1 to
+// startParts is that share of the text laid out by layoutParts, and a part with nothing to carry prints nothing.
+// Only part 0 or 1 logs the card, so a session start is one line of card.log.
+func runSessionStartPart(in io.Reader, out io.Writer, part int) error {
+	if part < 0 || part > startParts {
+		return fmt.Errorf("session-start: -part must be 0 to %d", startParts)
+	}
 	var h sessionStartInput
 	decodeErr := json.NewDecoder(in).Decode(&h)
-	context := sessionNote
+	var card string
+	var ids []string
+	excluded := 0
 	if decodeErr == nil {
-		card, ids, excluded, err := sessionCard(h.CWD)
-		if err != nil {
+		var err error
+		if card, ids, excluded, err = sessionCard(h.CWD); err != nil {
 			// The card is an addition to the note; a broken base must not keep the agent from starting.
-			fmt.Fprintln(os.Stderr, "memcue:", err)
-		} else if card != "" {
-			context += "\n\n" + card
-			logCard(h, ids, len([]rune(card)), excluded)
+			if part <= 1 {
+				fmt.Fprintln(os.Stderr, "memcue:", err)
+			}
+			card = ""
 		}
 	}
-	if hint := dreamHint(); hint != "" {
-		context += "\n\n" + hint
+	var hints []string
+	for _, hint := range []string{dreamHint(), upkeepHint(h.CWD)} {
+		if hint != "" {
+			hints = append(hints, hint)
+		}
 	}
-	if hint := upkeepHint(h.CWD); hint != "" {
-		context += "\n\n" + hint
+	var context string
+	if part == 0 {
+		context = sessionNote
+		if card != "" {
+			context += "\n\n" + card
+		}
+		for _, hint := range hints {
+			context += "\n\n" + hint
+		}
+		if card != "" {
+			logCard(h, ids, len([]rune(card)), excluded, 0)
+		}
+	} else {
+		parts, left := layoutParts(sessionNote, hints, card, startParts, partBudget)
+		if part == 1 && card != "" {
+			// The facts left out are the last ones in the card's order.
+			logCard(h, ids[:len(ids)-left], len([]rune(card)), excluded, left)
+		}
+		if part > len(parts) {
+			return nil
+		}
+		context = parts[part-1]
 	}
 	var resp struct {
 		HookSpecificOutput struct {
@@ -82,6 +125,64 @@ func runSessionStart(in io.Reader, out io.Writer) error {
 	resp.HookSpecificOutput.HookEventName = "SessionStart"
 	resp.HookSpecificOutput.AdditionalContext = context
 	return json.NewEncoder(out).Encode(resp)
+}
+
+// layoutParts lays the note, the hints and the card out over at most n parts of budget characters each. The note and
+// the hints open the first part, so no cut reaches them. A part ends only between lines of the card: a part that
+// starts inside a group repeats the card's header and the group's heading, because Claude Code may hand the parts to
+// the model in any order. Only past the last part does the card lose lines; that part then ends with a line that says
+// how many facts are left out and how to find them, and left counts them.
+func layoutParts(note string, hints []string, card string, n, budget int) (parts []string, left int) {
+	cur := note
+	for _, hint := range hints {
+		cur += "\n\n" + hint
+	}
+	if card == "" {
+		return []string{cur}, 0
+	}
+	lines := strings.Split(strings.TrimSuffix(card, "\n"), "\n")
+	header, lines := lines[0], lines[1:]
+	cur += "\n\n" + header + "\n"
+	size := func(s string) int { return len([]rune(s)) }
+	// The last part keeps room for the line that names what is left out.
+	room := func() int {
+		if len(parts) == n-1 {
+			return budget - 200
+		}
+		return budget
+	}
+	heading := ""
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		add := line + "\n"
+		if !strings.HasPrefix(line, "- ") {
+			heading = line
+			// A heading goes with the first fact under it, so no part ends on a heading alone.
+			if i+1 < len(lines) {
+				add += lines[i+1] + "\n"
+				i++
+			}
+		}
+		if size(cur)+size(add) > room() {
+			if len(parts) == n-1 {
+				for _, l := range lines[i-strings.Count(add, "\n")+1:] {
+					if strings.HasPrefix(l, "- ") {
+						left++
+					}
+				}
+				cur += fmt.Sprintf("memcue: %d more rules and decisions are left out of the card; "+
+					"`memcue search -kind rule,decision \"<words>\"` finds them.\n", left)
+				break
+			}
+			parts = append(parts, strings.TrimSuffix(cur, "\n"))
+			cur = header + " (continued)\n"
+			if strings.HasPrefix(line, "- ") && heading != "" {
+				cur += heading + "\n"
+			}
+		}
+		cur += add
+	}
+	return append(parts, strings.TrimSuffix(cur, "\n")), left
 }
 
 // dreamHint is the line the session start adds when a dream is due: the session's model does it with the
@@ -123,7 +224,7 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 		return err
 	}
 	if card != "" {
-		logCard(h, ids, len([]rune(card)), excluded)
+		logCard(h, ids, len([]rune(card)), excluded, 0)
 	}
 	if hint := upkeepHint(h.CWD); hint != "" {
 		card = strings.TrimPrefix(card+"\n\n"+hint, "\n\n")
@@ -328,7 +429,8 @@ func cardKey(content string) string {
 
 // cardRecord is one line of card.log: the facts the session-start card carried. It shows the rules and decisions
 // that reach the agent although no search found them, and so would look unused. Chars is the length of the card the
-// model gets; Excluded counts the facts the card left out as a repeat of the built-in memory or of another line.
+// model gets; Excluded counts the facts the card left out as a repeat of the built-in memory or of another line, and
+// Left the facts that did not fit in the parts of the session start (#480).
 type cardRecord struct {
 	Time     string   `json:"time"`
 	Session  string   `json:"session,omitempty"`
@@ -337,16 +439,17 @@ type cardRecord struct {
 	Facts    []string `json:"facts,omitempty"`
 	Chars    int      `json:"chars"`
 	Excluded int      `json:"excluded"`
+	Left     int      `json:"left,omitempty"`
 }
 
-func logCard(h sessionStartInput, ids []string, chars, excluded int) {
+func logCard(h sessionStartInput, ids []string, chars, excluded, left int) {
 	dir, err := stateDir()
 	if err != nil {
 		return
 	}
 	_ = appendJSON(filepath.Join(dir, "card.log"), cardRecord{Time: time.Now().UTC().Format(time.RFC3339),
 		Session: h.SessionID, Source: h.Source, Tier: tier.Of(h.CWD, claudeDir()), Facts: ids, Chars: chars,
-		Excluded: excluded})
+		Excluded: excluded, Left: left})
 }
 
 // runHookExtract is the PreCompact and SessionEnd hook. Extraction takes a minute or more, longer than a hook may

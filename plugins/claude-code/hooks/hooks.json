@@ -6,8 +6,26 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start || true",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 1 || true",
             "timeout": 90
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 2 || true",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 3 || true",
+            "timeout": 30
           }
         ]
       }

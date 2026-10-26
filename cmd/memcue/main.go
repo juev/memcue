@@ -89,7 +89,7 @@ func init() {
 const usage = `usage: memcue <command>
 
 commands:
-  session-start   SessionStart hook: tells the agent where its memory is
+  session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
   session-card    session-start without the note: the card for a host that has its own instructions
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
@@ -145,7 +145,11 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "session-start":
-		err = runSessionStart(os.Stdin, os.Stdout)
+		fs := flag.NewFlagSet("session-start", flag.ContinueOnError)
+		part := fs.Int("part", 0, "the share of the text this hook carries, 1 to 3; 0 is the whole text in one block")
+		if err = fs.Parse(os.Args[2:]); err == nil {
+			err = runSessionStartPart(os.Stdin, os.Stdout, *part)
+		}
 	case "session-card":
 		err = runSessionCard(os.Stdin, os.Stdout)
 	case "hook-extract":

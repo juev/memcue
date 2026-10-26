@@ -891,3 +891,138 @@ func TestExtractSessionHonoursTheOffSwitch(t *testing.T) {
 		t.Fatalf("the switch did not stop extraction before reading the transcript: %v", err)
 	}
 }
+
+// The card of stated facts comes in parts of at most partBudget characters, one per SessionStart hook, so Claude Code
+// never hides it in a file (#480). Every rule lands in exactly one part, the note and the hints open the first, a part
+// that starts inside a group repeats the header and the heading, and only past the last part are lines left out, with
+// a line that counts them.
+func TestLayoutPartsKeepsEveryStatedFact(t *testing.T) {
+	stated := func(global, repo int) []store.Fact {
+		var facts []store.Fact
+		for i := range global {
+			facts = append(facts, store.Fact{ID: fmt.Sprintf("g%03d", i), Content: fmt.Sprintf("Правило %03d: %s", i,
+				strings.Repeat("слово ", 50)), Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}})
+		}
+		for i := range repo {
+			facts = append(facts, store.Fact{ID: fmt.Sprintf("r%03d", i), Content: fmt.Sprintf("Решение %03d: %s", i,
+				strings.Repeat("слово ", 50)), Meta: store.Meta{Kind: "decision", Scope: "repo:shop", Source: "user"}})
+		}
+		return facts
+	}
+	count := func(parts []string, prefix string) map[string]int {
+		seen := map[string]int{}
+		for _, p := range parts {
+			for _, l := range strings.Split(p, "\n") {
+				if strings.HasPrefix(l, prefix) {
+					seen[l[:len(prefix)+4]]++
+				}
+			}
+		}
+		return seen
+	}
+	hints := []string{"memcue: 3 facts wait for the dream."}
+
+	card, _, _, err := renderCard(stated(40, 20))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts, left := layoutParts(sessionNote, hints, card, startParts, partBudget)
+	if len(parts) != startParts || left != 0 {
+		t.Fatalf("%d runes of card: %d parts, %d left out; want %d parts and none left", len([]rune(card)), len(parts),
+			left, startParts)
+	}
+	for i, p := range parts {
+		if n := len([]rune(p)); n > partBudget {
+			t.Errorf("part %d is %d runes, budget %d", i+1, n, partBudget)
+		}
+	}
+	if !strings.HasPrefix(parts[0], sessionNote+"\n\n"+hints[0]+"\n\n") {
+		t.Errorf("part 1 does not open with the note and the hints:\n%.300s", parts[0])
+	}
+	for i, p := range parts[1:] {
+		heading := strings.SplitN(p, "\n", 3)[1]
+		if !strings.HasPrefix(p, "memcue: rules and decisions from the base") ||
+			!strings.HasPrefix(heading, "Global rules") && !strings.HasPrefix(heading, "Rules and decisions of ") {
+			t.Errorf("part %d does not repeat the header and a heading:\n%.300s", i+2, p)
+		}
+	}
+	for prefix, want := range map[string]int{"- Правило ": 40, "- Решение ": 20} {
+		seen := count(parts, prefix)
+		if len(seen) != want {
+			t.Errorf("%q: %d distinct lines over the parts, want %d", prefix, len(seen), want)
+		}
+		for line, n := range seen {
+			if n != 1 {
+				t.Errorf("%q is in %d parts", line, n)
+			}
+		}
+	}
+
+	card, _, _, err = renderCard(stated(70, 30))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts, left = layoutParts(sessionNote, hints, card, startParts, partBudget)
+	placed := len(count(parts, "- Правило ")) + len(count(parts, "- Решение "))
+	if len(parts) != startParts || left == 0 || placed+left != 100 {
+		t.Fatalf("100 facts: %d parts, %d placed, %d left out", len(parts), placed, left)
+	}
+	last := parts[len(parts)-1]
+	if want := fmt.Sprintf("memcue: %d more rules and decisions are left out of the card", left); !strings.Contains(last, want) {
+		t.Errorf("the last part does not say what is left out:\n%s", last[max(0, len(last)-300):])
+	}
+	for i, p := range parts {
+		if n := len([]rune(p)); n > partBudget {
+			t.Errorf("part %d is %d runes, budget %d", i+1, n, partBudget)
+		}
+	}
+}
+
+// Each SessionStart hook prints its own part: a small card fits in part 1 with the note, a later part with nothing to
+// carry prints nothing, and part 0 is the whole text as before (#480). card.log gets one line per session start.
+func TestSessionStartParts(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Правило: части карточки.", nil, "test 2026-10-26", "", store.Meta{Kind: "rule",
+		Scope: "global", Source: "user"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	in, _ := json.Marshal(map[string]string{"session_id": "s1", "source": "startup", "cwd": dir})
+	run := func(part int) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runSessionStartPart(bytes.NewReader(in), &out, part); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	if one := run(1); !strings.Contains(one, "Long-term memory") || !strings.Contains(one, "Правило: части карточки.") {
+		t.Errorf("part 1: %s", one)
+	}
+	for _, part := range []int{2, 3} {
+		if got := run(part); got != "" {
+			t.Errorf("part %d of a small card printed %q", part, got)
+		}
+	}
+	if whole := run(0); !strings.Contains(whole, "Long-term memory") || !strings.Contains(whole, "Правило: части карточки.") {
+		t.Errorf("part 0: %s", whole)
+	}
+	if err := runSessionStartPart(bytes.NewReader(in), &bytes.Buffer{}, 4); err == nil {
+		t.Error("-part 4: want an error")
+	}
+	state, err := stateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(state, "card.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(data), "\n"); n != 2 {
+		t.Errorf("card.log has %d lines for a part 1, 2, 3 and a part 0 run; want 2", n)
+	}
+}
