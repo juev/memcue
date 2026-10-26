@@ -516,6 +516,23 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(len(found["facts"]), 2)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": "x"})))
 
+    def test_search_refuses_a_zero_limit(self):
+        """0 is refused like a negative limit, not read as the default (#477); an empty or false value is absent."""
+        for i in range(6):
+            json.loads(self.p.handle_tool_call("memcue_add", {
+                "content": f"Сервер server{i}: Caddy перечитывает Caddyfile после пересоздания контейнера.",
+                "keywords": "caddy"}))
+        for limit in (0, "0", -3, "-3"):
+            with self.subTest(limit=limit):
+                found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": limit}))
+                self.assertEqual(found.get("error"), "limit must be a positive integer")
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": 3}))
+        self.assertEqual(len(found["facts"]), 3)
+        for args in ({}, {"limit": None}, {"limit": ""}, {"limit": False}):
+            with self.subTest(args=args):
+                found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", **args}))
+                self.assertEqual(len(found["facts"]), memcue_provider._SEARCH_FACTS)
+
     def test_search_passes_the_controls(self):
         """in, kind, words and expired reach memcue search (#409); a wrong value comes back as an error."""
         rule = json.loads(self.p.handle_tool_call("memcue_add", {
