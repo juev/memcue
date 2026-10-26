@@ -307,15 +307,17 @@ ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory, at once, when you learn it: nothing is extracted from the "
     "session later. Store the user's rules and corrections (with the reason), the user's decisions the code does not "
     "show, pitfalls found by an error or a check, and hosts, services and pointers outside the repository. Not the "
-    "progress of the task, what a command shows, installation state or multi-step procedures. One self-contained "
+    "progress of the task, what a command shows, installation state or multi-step procedures, unless the user asks "
+    "to remember one (kind procedure). One self-contained "
     "statement in one to three sentences, naming the system or project, with exact values; only what the user said "
     "or a tool confirmed. Search first and correct a stored fact instead of adding a second copy.",
     {"content": "The fact.", "keywords": "Comma-separated words someone would ask with, synonyms and both "
                                          "languages included.",
      "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
                 "omit for a fact that stays true.",
-     "kind": "Optional: rule, decision, pitfall or environment. A rule or decision the user stated goes on the "
-             "session card.",
+     "kind": "Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event "
+             "(what happened that the next days need; expires after a week unless expires is given). A rule or "
+             "decision the user stated goes on the session card.",
      "source": "Optional who said it: user (the user's words; the default for rule and decision, and the only "
                "source that reaches the session card), user_confirmed, tool (seen in a tool's output) or agent (the "
                "default otherwise).",
