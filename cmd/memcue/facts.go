@@ -554,6 +554,10 @@ func runSearch(args []string, out io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if *n < 1 {
+		// A limit below one asks for nothing, and the empty answer it gets would say the base holds nothing (#454).
+		return errors.New("search: -n must be >= 1")
+	}
 	q := recall.Query{Text: strings.Join(fs.Args(), " "), N: *n, MinScore: *minScore,
 		Project: tier.Keys(*cwd, claudeDir()), Host: currentHost(), In: splitKeywords(*in), Kinds: splitKeywords(*kind), Since: *since,
 		Expired: *expired, AllWords: *allWords}

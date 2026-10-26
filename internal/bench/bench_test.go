@@ -189,6 +189,23 @@ func (b *base) run(t *testing.T, dir string, args ...string) (stdout, stderr str
 	return out.String(), errOut.String()
 }
 
+// refuse runs memcue in dir like run, for a command that must fail: a zero exit fails the test. It returns stderr.
+func (b *base) refuse(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(binary(t), args...)
+	cmd.Env = b.env
+	cmd.Dir = dir
+	if dir == "" {
+		cmd.Dir = b.dir
+	}
+	var out, errOut bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	if err := cmd.Run(); err == nil {
+		t.Fatalf("memcue %q succeeded, want a refusal\nstdout: %s", args, out.String())
+	}
+	return errOut.String()
+}
+
 // addOpts are the flags of `memcue add` the cases use; empty is the flag left out.
 type addOpts struct {
 	cwd      string // where add runs, so the default origin is that directory's project

@@ -194,6 +194,27 @@ var cases = []benchCase{
 		}},
 	},
 	{
+		id: "n-below-1-is-refused", stratum: rule,
+		note: "#454: `-n 0` and a negative `-n` ask for no fact. They are refused like `-n abc`, so the empty answer " +
+			"and its \"nothing matches\" line cannot say the base is empty when it is not.",
+		setup: seedAnsible,
+		action: func(t *testing.T, w *world) answer {
+			var stderr string
+			for _, n := range []string{"0", "-1"} {
+				stderr += w.b.refuse(t, "", "search", "-json", "-n", n, "--", "ansible")
+			}
+			return answer{stderr: stderr}
+		},
+		expect: expect{none: true, also: func(t *testing.T, w *world, a answer) {
+			if strings.Count(a.stderr, "-n must be >= 1") != 2 {
+				t.Errorf("stderr %q, want the limit named for -n 0 and -n -1", a.stderr)
+			}
+			if d := search(t, w.b, "ansible", searchOpts{n: "1"}); len(d.hits) != 1 {
+				t.Errorf("-n 1 served %d facts: the case tests nothing", len(d.hits))
+			}
+		}},
+	},
+	{
 		id: "min-score-0-returns-up-to-n", stratum: rule,
 		note: "README: `memcue search -min-score 0` — every fact up to -n, the floor off. The default floor leaves " +
 			"the facts that hold one of the two words out; with it off they all come, and still no more than -n.",
