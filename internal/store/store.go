@@ -121,7 +121,7 @@ type Fact struct {
 
 // Meta is what a fact is and what it rests on; every field may be empty, as in facts written before it existed.
 type Meta struct {
-	Kind          string // rule, decision, pitfall or environment
+	Kind          string // rule, decision, pitfall, environment, procedure or event; older facts also repo or other
 	Scope         string // where it holds: global, host:<name>, repo:<name>
 	Source        string // who said it: user, user_confirmed, tool, agent, note, memory
 	Evidence      string // the words of the source the fact rests on, verbatim
