@@ -1239,7 +1239,9 @@ class MemcueMemoryProvider(MemoryProvider):
             if _version_at_least(self._version, _SCOPED_SEARCH):
                 cmd += ["-cwd", self._workspace or ".", "-session", self._session_id]
             limit = self._search_facts  # the key of #372: ten facts were noise on a live base
-            if arg("limit"):
+            raw = args.get("limit")
+            # 0 is a value, not an absent key: arg() would turn it into "" and serve the default (#477).
+            if raw is not None and raw is not False and str(raw).strip():
                 try:
                     limit = int(arg("limit"))
                 except ValueError:
