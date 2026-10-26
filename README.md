@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.16.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.17.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.17.0 | 5 | 0.17.0 | 0.17.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.17.0 (`hermes-agent` 0.15.2) |
 | 0.16.0 | 5 | 0.16.0 | 0.16.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.16.0 (`hermes-agent` 0.15.2) |
 | 0.15.0 | 5 | 0.15.0 | 0.15.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.15.0 (`hermes-agent` 0.15.2) |
 | 0.14.0 | 5 | 0.14.0 | 0.14.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.14.0 (`hermes-agent` 0.15.2) |
@@ -203,6 +204,27 @@ are the lines the plain answer prints after the facts, this one included (#453);
 both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.17.0: every fact in a place, `-json` carries the hints, vet clears what code can tell is gone (#442, #453, #454, #456, #457, #458, #459, #467)
+
+- **Breaking: `search -json` prints one object**, `{"facts": [...], "hints": [...]}`, instead of a bare array (#453).
+  `hints` are the lines the plain answer prints after the facts: the shelf hint, the CJK hint, the `-in all` line of
+  an empty answer in a repository. The Hermes and DSH plugins of this release read both shapes and hand the hints to
+  the model; any other consumer of `-json` has to read `facts`.
+- **A fact written without a scope gets one** (#442): the project its origin names, or `global` when the origin names
+  none. An empty scope was in no place a search asks for, so only `-in all` found such a fact. `memcue vet` gives the
+  same scope to the facts stored without one before.
+- **vet retires by rule what code can tell is gone** (#457): a live fact past its expiry, and installation state of an
+  older memcue (a fact of no kind or `environment` that says which version is installed or where a binary lies, every
+  version it names older than the running release). A fact that names an old version as a change of behaviour stays.
+- **Mirrors of the memory notes queued before 0.16.0 are decided** (#458): the review after an extraction takes them
+  along, a mirror of a rule the base already holds word for word is dropped, an approved one becomes `global`. The
+  Hermes plugin names the notes directory for the extraction (`MEMCUE_MEMORY_DIR`), so the mirror rules run there.
+- **The extraction reads the memory notes** (#456) and leaves out what they already say, so a new fact does not
+  restate a note in other words; the facts stored before stay until the dream merges them.
+- `-in repo:KEY` takes a key the base knows only as an origin tier, such as `_global` (#459); `search -n` below 1 is an
+  error instead of an empty answer that said the base held nothing (#454); a search no longer reads the stored
+  repository keys unless `-in` names one, 12.7 → 9.9 ms end to end on a live base (#467).
 
 ### 0.16.0: a shelf for what a session read outside, a card that says the scope once, a mirror searchable at the write (#433, #437, #440)
 
