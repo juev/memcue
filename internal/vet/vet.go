@@ -153,6 +153,21 @@ func State(f store.Fact) string {
 	return part
 }
 
+// Moment names the moment of a process or a file a fact records — a restart, a line count, an mtime — or returns ""
+// (#475). Unlike a version or a path, such a moment is stale by the next restart whatever kind the fact carries, so
+// it is safe to retire from facts approved before the rule.
+func Moment(f store.Fact) string {
+	switch part := installationState(f); part {
+	case "restart", "line count", "mtime":
+		switch strings.ToLower(strings.TrimSpace(f.Kind)) {
+		case "rule", "decision":
+		default:
+			return part
+		}
+	}
+	return ""
+}
+
 // stateKind reports whether a fact can be mere installation state: knowledge kinds never are. A pitfall counts only
 // when extraction labelled it from the user's words or a tool's output: one with no source predates the policy, and
 // one the agent wrote has no evidence behind its label (#475).
@@ -162,16 +177,6 @@ func stateKind(f store.Fact) bool {
 		return true
 	case "pitfall":
 		return f.Source == "" || f.Source == "agent"
-	}
-	return false
-}
-
-// LegacyKind reports whether kind is one the base no longer keeps: neither extraction nor add writes it, so a live
-// fact of it was stored before the policy (#475).
-func LegacyKind(kind string) bool {
-	switch strings.ToLower(strings.TrimSpace(kind)) {
-	case "event", "repo", "procedure", "other":
-		return true
 	}
 	return false
 }

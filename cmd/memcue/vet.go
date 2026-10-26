@@ -67,10 +67,9 @@ type vetRecord struct {
 	// older memcue (#457).
 	Expired  int `json:"expired,omitempty"`
 	Outdated int `json:"outdated,omitempty"`
-	// Legacy and State count the live facts retired by rule as of a kind no longer kept and as installation state of
-	// anything but memcue (#475).
-	Legacy  int            `json:"legacy,omitempty"`
-	State   int            `json:"state,omitempty"`
+	// Moments counts the live facts retired by rule as the moment of a process or a file: a restart, a line count, an
+	// mtime (#475).
+	Moments int            `json:"moments,omitempty"`
 	DryRun  bool           `json:"dry_run,omitempty"`
 	CostUSD float64        `json:"cost_usd,omitempty"`
 	Tokens  extract.Tokens `json:"tokens,omitempty"`
@@ -368,8 +367,7 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Scoped += o.Scoped
 	r.Expired += o.Expired
 	r.Outdated += o.Outdated
-	r.Legacy += o.Legacy
-	r.State += o.State
+	r.Moments += o.Moments
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -558,13 +556,8 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 			return err
 		}
 	}
-	if rec.Legacy > 0 {
-		if _, err := fmt.Fprintf(out, "Фактов вида, который база больше не хранит, %d: сняты\n", rec.Legacy); err != nil {
-			return err
-		}
-	}
-	if rec.State > 0 {
-		if _, err := fmt.Fprintf(out, "Фактов о состоянии установки %d: сняты\n", rec.State); err != nil {
+	if rec.Moments > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов о рестарте, размере или mtime файла %d: сняты\n", rec.Moments); err != nil {
 			return err
 		}
 	}

@@ -264,11 +264,21 @@ func TestState(t *testing.T) {
 	}
 }
 
-func TestLegacyKind(t *testing.T) {
-	for kind, want := range map[string]bool{"event": true, "repo": true, "procedure": true, "other": true, "Event": true,
-		"rule": false, "decision": false, "pitfall": false, "environment": false, "": false} {
-		if got := LegacyKind(kind); got != want {
-			t.Errorf("LegacyKind(%q) = %v, want %v", kind, got, want)
-		}
+func TestMoment(t *testing.T) {
+	for _, c := range []struct{ name, kind, content, want string }{
+		{"restart of an event", "event", "Шлюз перезапущен 2026-10-19 в 23:30:02 (PID 46005).", "restart"},
+		{"line count of a repo fact", "repo", "File /srv/app/plugin.py (419 lines) is identical to main.", "line count"},
+		{"mtime of a pitfall", "pitfall", "File /srv/app/store.db has not changed since 2026-10-19 16:04.", "mtime"},
+		{"a version", "environment", "The Claude Code CLI on /srv is version 2.1.301.", ""},
+		{"a path", "", "The binary lies in /srv/bin/tool.", ""},
+		{"a decision", "decision", "Restart only after the job; it was restarted 2026-10-19 23:30:02 last.", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := fact("01x", c.content, "x 2026-10-20", "")
+			f.Kind = c.kind
+			if got := Moment(f); got != c.want {
+				t.Errorf("Moment(%q) = %q, want %q", c.content, got, c.want)
+			}
+		})
 	}
 }

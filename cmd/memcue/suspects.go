@@ -123,10 +123,9 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 	// - installation state of a memcue older than this one, such as "the binary on the host is 0.8.0": a command
 	//   reads the current state, and the copy is wrong since the release it names (#457). A rule or a decision that
 	//   names an old version as a change of behaviour is not state and stays;
-	// - a fact of a kind the base no longer keeps (event, repo, procedure, other): neither extraction nor add writes
-	//   one, so it predates the policy (#475);
-	// - installation state of anything else, such as a restart time or a line count: the rule a candidate meets
-	//   (vet.Rules) applied to the facts approved before it, or written by the agent past it (#475).
+	// - the moment of a process or a file — a restart time, a line count, an mtime — whatever the fact names and
+	//   whatever its kind but rule or decision (#475). The rest of the candidate rule (a version, a path, a config
+	//   default) is not applied here: on a live base it took real pitfalls and procedures stored without a kind.
 	k := knownSelf()
 	today := store.Today()
 	live := approved[:0:0]
@@ -145,12 +144,9 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 			if old := vet.OutdatedInstall(f, k.Version); old != "" {
 				reason = fmt.Sprintf("installation state of memcue %s, older than %s: a command reads it", old, k.Version)
 				rec.Outdated++
-			} else if vet.LegacyKind(f.Kind) {
-				reason = "kind " + f.Kind + " is no longer kept: stored before the policy"
-				rec.Legacy++
-			} else if part := vet.State(f); part != "" {
-				reason = "installation state (" + part + "): a command reads it"
-				rec.State++
+			} else if part := vet.Moment(f); part != "" {
+				reason = "the moment of a process or a file (" + part + "): stale by the next restart"
+				rec.Moments++
 			}
 		}
 		if reason == "" {
