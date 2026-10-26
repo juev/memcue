@@ -62,11 +62,15 @@ type vetRecord struct {
 	Suspects        int `json:"suspects,omitempty"`
 	SuspectsRetired int `json:"suspects_retired,omitempty"`
 	// Scoped counts the live facts without a scope that got the one their origin names (#442).
-	Scoped  int            `json:"scoped,omitempty"`
-	DryRun  bool           `json:"dry_run,omitempty"`
-	CostUSD float64        `json:"cost_usd,omitempty"`
-	Tokens  extract.Tokens `json:"tokens,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	Scoped int `json:"scoped,omitempty"`
+	// Expired and Outdated count the live facts retired by rule as past their expiry and as installation state of an
+	// older memcue (#457).
+	Expired  int            `json:"expired,omitempty"`
+	Outdated int            `json:"outdated,omitempty"`
+	DryRun   bool           `json:"dry_run,omitempty"`
+	CostUSD  float64        `json:"cost_usd,omitempty"`
+	Tokens   extract.Tokens `json:"tokens,omitempty"`
+	Error    string         `json:"error,omitempty"`
 }
 
 // vetOptions is how a run was asked for.
@@ -358,6 +362,8 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Suspects += o.Suspects
 	r.SuspectsRetired += o.SuspectsRetired
 	r.Scoped += o.Scoped
+	r.Expired += o.Expired
+	r.Outdated += o.Outdated
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -538,6 +544,16 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 	if rec.Suspects > 0 {
 		if _, err := fmt.Fprintf(out, "Подозрительных одобренных фактов %d: снято %d\n", rec.Suspects,
 			rec.SuspectsRetired); err != nil {
+			return err
+		}
+	}
+	if rec.Outdated > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов о состоянии установки старше текущего релиза %d: сняты\n", rec.Outdated); err != nil {
+			return err
+		}
+	}
+	if rec.Expired > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов с истёкшим сроком %d: сняты\n", rec.Expired); err != nil {
 			return err
 		}
 	}

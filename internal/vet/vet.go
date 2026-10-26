@@ -26,7 +26,7 @@ var (
 	// semVer is a release number such as 1.2.3 or v0.40.1; an address such as 10.0.0.1 is filtered out by the caller.
 	semVer = regexp.MustCompile(`v?\d+\.\d+\.\d+`)
 	// installWord says the number is the version of something installed, not a value of some other kind.
-	installWord = regexp.MustCompile(`верси|version|установлен|installed|бинар|binary|обёртк|обертк|wrapper|релиз|release|тег|tag|сборк|build`)
+	installWord = regexp.MustCompile(`верси|version|установлен|installed|бинар|binar|обёртк|обертк|wrapper|релиз|release|тег|tag|сборк|build`)
 	// installPath is a place binaries, wrappers and plugins are installed to: the part of a base that carries the
 	// tool itself. A service's directory or a data path is knowledge a command does not give, so it is not here.
 	installPath = regexp.MustCompile(`/(?:bin|plugins)/`)

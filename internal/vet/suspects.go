@@ -109,6 +109,36 @@ func unknownVerbs(text string, known map[string]bool) []string {
 	return out
 }
 
+// OutdatedInstall returns the oldest version an installation-state fact about memcue names when every version it names
+// is older than current, or "": the fact records which version is installed, where a binary lies or what a config
+// holds (installationState), and the releases it names are gone (#457). A fact of a knowledge kind, one that names an
+// old version without describing an installation, and one that also names a version not older than current (another
+// tool's, as likely as memcue's) return "". An empty current (a dev build) returns "".
+func OutdatedInstall(f store.Fact, current string) string {
+	cur, ok := parseVersion(current)
+	if !ok || !stateKind(f.Kind) || installationState(f) == "" {
+		return ""
+	}
+	s := strings.ToLower(f.Content)
+	if !strings.Contains(s, "memcue") {
+		return ""
+	}
+	oldest, found := [3]int{}, ""
+	for _, at := range semVer.FindAllStringIndex(s, -1) {
+		if !isVersion(s, at) {
+			continue
+		}
+		v, ok := parseVersion(strings.TrimPrefix(s[at[0]:at[1]], "v"))
+		if !ok || !less(v, cur) {
+			return ""
+		}
+		if found == "" || less(v, oldest) {
+			oldest, found = v, fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2])
+		}
+	}
+	return found
+}
+
 // olderVersion returns the oldest memcue version text names that is older than current, or "". Both signals count: the
 // version right after the word, and the one a version word carries a few words later.
 func olderVersion(text, current string) string {

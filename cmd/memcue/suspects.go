@@ -116,17 +116,37 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 		lines = append(lines, vetLine{Time: rec.Time, ID: f.ID, Decision: "scoped", Verdict: string(vet.Keep),
 			By: "rule", Reason: "no scope: " + scope + " from the origin", Source: f.Source, Content: clip(f.Content, 200)})
 	}
-	// A mirror of the built-in memory is approved when it is written (#440), so nothing would ever retire it once its
-	// note is gone unless this pass does: the note is the source of truth, and a copy that outlives it is wrong.
+	// Three kinds of fact no longer hold, and code can tell them without a model, so they are retired by rule:
+	// - a mirror of the built-in memory whose note is gone: it is approved when it is written (#440), so nothing else
+	//   would retire it, and the note is the source of truth;
+	// - a fact past its expiry: search and the card already leave it out, so it is only dead weight (#457);
+	// - installation state of a memcue older than this one, such as "the binary on the host is 0.8.0": a command
+	//   reads the current state, and the copy is wrong since the release it names (#457). A rule or a decision that
+	//   names an old version as a change of behaviour is not state and stays.
+	k := knownSelf()
+	today := store.Today()
 	live := approved[:0:0]
 	memory, haveMemory := memoryNotes(o.memory)
 	stale := 0
 	for _, f := range approved {
-		if f.Source != "memory" || !haveMemory || vet.HoldsNote(memory, f.Content) {
+		var reason string
+		switch {
+		case f.Source == "memory" && haveMemory && !vet.HoldsNote(memory, f.Content):
+			reason = "stale mirror: the built-in memory no longer holds it"
+			stale++
+		case f.Expires != "" && f.Expires < today:
+			reason = "expired on " + f.Expires
+			rec.Expired++
+		default:
+			if old := vet.OutdatedInstall(f, k.Version); old != "" {
+				reason = fmt.Sprintf("installation state of memcue %s, older than %s: a command reads it", old, k.Version)
+				rec.Outdated++
+			}
+		}
+		if reason == "" {
 			live = append(live, f)
 			continue
 		}
-		stale++
 		if !o.dry {
 			if _, err := s.Retire(f.ID); err != nil {
 				rec.Error = err.Error()
@@ -134,12 +154,10 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 			}
 		}
 		lines = append(lines, vetLine{Time: rec.Time, ID: f.ID, Decision: "retired", Verdict: string(vet.Drop),
-			By: "rule", Reason: "stale mirror: the built-in memory no longer holds it", Source: f.Source,
-			Content: clip(f.Content, 200)})
+			By: "rule", Reason: reason, Source: f.Source, Content: clip(f.Content, 200)})
 	}
 	rec.SuspectsRetired += stale
 	approved = live
-	k := knownSelf()
 	var todo []vet.Suspect
 	for _, sp := range vet.Suspects(approved, k, now) {
 		if !checked[checkKey(sp.Fact, version)] {

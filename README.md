@@ -505,6 +505,12 @@ answer. `split` is for a candidate that still holds several claims, one of which
 true: the candidate is retired, each part is stored as a candidate with its origin, scope, kind and source (not its
 keywords, which were chosen for the whole text), and the same run reviews the parts. A part is not split again in that
 run, and a split into fewer than two parts leaves the candidate in the queue. `vet.log` records the parts and their ids.
+The approved facts get the same rules after the queue: a live fact past its expiry is retired (search and the card
+already left it out), and so is installation state of an older memcue — a fact of no kind or of kind `environment`
+that says which version is installed, where a binary or a wrapper lies or what a config holds, and every version it
+names is older than the running release, such as `The memcue binaries on the build host are 0.8.0.` A fact that
+names an old version as a change of behaviour, or names any version that is not older, stays (#457). A dev build
+skips that rule.
 Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
 answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
 an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
