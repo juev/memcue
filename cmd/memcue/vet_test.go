@@ -813,3 +813,51 @@ func TestVetRetiresAnApprovedMirrorWhoseNoteIsGone(t *testing.T) {
 		t.Errorf("lines %+v", lines)
 	}
 }
+
+// A mirror queued before the write-time approval (#440) is no session's candidate: a session's review takes it along,
+// approves the one whose note is new as a global fact, and retires the one whose rule the base already holds (#458).
+func TestMaybeVetDecidesTheMirrorBacklog(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_VET", "1")
+	oldURL := extract.API.URL
+	t.Cleanup(func() { extract.API.URL = oldURL })
+	extract.API.URL = "http://127.0.0.1:1"
+	notes := filepath.Join(dir, "notes")
+	if err := os.MkdirAll(notes, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	note := "Пользователь пишет коммиты по-английски.\n§\nНавыки держат только процедуры: шаги, команды и критерии приёмки."
+	if err := os.WriteFile(filepath.Join(notes, "MEMORY.md"), []byte(note), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_MEMORY_DIR", notes)
+	rule := vetFact(t, "Навыки держат только процедуры: шаги, команды и критерии приёмки.", "x 2026-10-20", "user")
+	session := vetFact(t, "Ключ DeepSeek берут из окружения процесса шлюза.", "hermes 2026-10-26", "tool")
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirror := func(content string) string { // as the provider queued it before #440: no kind, no scope
+		t.Helper()
+		f, err := s.AddWith(content, nil, "hermes-memory 2026-10-24", "", store.Meta{Source: "memory", Review: store.Candidate})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.ID
+	}
+	fresh := mirror("Пользователь пишет коммиты по-английски.")
+	dup := mirror("Навыки держат только процедуры: шаги, команды и критерии приёмки.")
+	if _, err := s.Approve(rule); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	fakeJudge(t, judgeByID(session))
+
+	maybeVet([]string{session})
+	if f := vetStatus(t, fresh); f.Status != store.Active || f.Review != "" || f.Scope != "global" {
+		t.Errorf("a new mirror is not an approved global fact: %+v", f)
+	}
+	if f := vetStatus(t, dup); f.Status != store.Retired {
+		t.Errorf("a mirror of a live rule was not retired: %+v", f)
+	}
+}

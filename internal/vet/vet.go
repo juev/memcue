@@ -74,7 +74,8 @@ type Decision struct {
 // Rules decides what code can decide and returns the candidates it left for the model.
 //
 // A mirror of the built-in notes (Source memory) stays only while the notes still hold its text: approving a mirror
-// whose note was deleted would keep a deleted memory alive, approving a live one only makes it recallable. The notes
+// whose note was deleted would keep a deleted memory alive, approving a live one only makes it recallable, and a live
+// one whose words an approved fact already holds is a second copy of that fact and is dropped (#458). The notes
 // are given as the whole text of their directory; haveMemory says whether that directory was found at all, because
 // an unreadable directory must not turn every mirror into "stale".
 //
@@ -95,12 +96,19 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 		}
 		switch {
 		case c.Source == "memory" && haveMemory:
-			if HoldsNote(notes, c.Content) {
-				decided = append(decided, Decision{Fact: c, Verdict: Keep, By: "rule",
-					Reason: "mirror of the built-in memory, the note still holds it"})
-			} else {
+			// A live note is kept unless the base already states it: a mirror of a rule that is live would put the
+			// rule in the base twice (#458).
+			cover, covered := covers(c, approved)
+			switch {
+			case !HoldsNote(notes, c.Content):
 				decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
 					Reason: "stale mirror: the built-in memory no longer holds it"})
+			case covered:
+				decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",
+					Reason: fmt.Sprintf("mirror of a note the base already holds: covered by approved fact %s", cover)})
+			default:
+				decided = append(decided, Decision{Fact: c, Verdict: Keep, By: "rule",
+					Reason: "mirror of the built-in memory, the note still holds it"})
 			}
 		case isTestOrigin(c.Origin):
 			decided = append(decided, Decision{Fact: c, Verdict: Drop, By: "rule",

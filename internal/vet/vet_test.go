@@ -49,6 +49,31 @@ func TestRulesDecideMirrorsTestsAndCoveredFacts(t *testing.T) {
 	}
 }
 
+// A live mirror whose words an approved fact already holds is a second copy of a live rule: dropped, not approved
+// (#458). The mirror whose note is new is still kept.
+func TestRulesDropAMirrorOfALiveRule(t *testing.T) {
+	notes := "Навыки держат только процедуры: шаги, команды и критерии приёмки.\n§\nПользователь пишет коммиты по-английски."
+	cands := []store.Fact{
+		fact("01dup", "Навыки держат только процедуры: шаги, команды и критерии приёмки.", "hermes-memory 2026-10-24", "memory"),
+		fact("01new", "Пользователь пишет коммиты по-английски.", "hermes-memory 2026-10-24", "memory"),
+	}
+	approved := []store.Fact{fact("01rule", "Навыки держат только процедуры: шаги, команды и критерии приёмки.", "x 2026-10-20", "user")}
+	decided, rest := Rules(cands, approved, notes, true)
+	got := map[string]Decision{}
+	for _, d := range decided {
+		got[d.Fact.ID] = d
+	}
+	if d := got["01dup"]; d.Verdict != Drop || !strings.Contains(d.Reason, "01rule") {
+		t.Errorf("mirror of a live rule: %+v", d)
+	}
+	if d := got["01new"]; d.Verdict != Keep {
+		t.Errorf("new mirror: %+v", d)
+	}
+	if len(rest) != 0 {
+		t.Errorf("left for the model: %+v", rest)
+	}
+}
+
 // Origins are "<tier> <date>", and only a tier that is exactly "test" marks a test run. A repository named test-utils
 // (or testing, or test-infra) is real, and its facts must not be retired on every vet run.
 func TestRulesOnlyExactTestTierIsATrace(t *testing.T) {
