@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -1148,5 +1149,54 @@ func TestCardRoom(t *testing.T) {
 		if got := cardRoom(); got != want {
 			t.Errorf("MEMCUE_CARD_BUDGET=%q: %d, want %d", v, got, want)
 		}
+	}
+}
+
+// The parts of the Claude Code session start carry every stated fact, outside the card budget (#480, #495), while
+// session-card, the card of Hermes and DSH, keeps them inside it (#487).
+func TestSessionStartPartsCarryEveryStatedRule(t *testing.T) {
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 40 {
+		if _, err := s.AddWith(fmt.Sprintf("Правило %02d: %s", i, strings.Repeat("слово ", 50)), nil, "test 2026-10-26", "",
+			store.Meta{Kind: "rule", Scope: "global", Source: "user"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+	in, _ := json.Marshal(map[string]string{"session_id": "s1", "source": "startup", "cwd": dir})
+	context := func(run func(io.Reader, io.Writer) error) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := run(bytes.NewReader(in), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Len() == 0 {
+			return ""
+		}
+		var resp struct {
+			HookSpecificOutput struct {
+				AdditionalContext string `json:"additionalContext"`
+			} `json:"hookSpecificOutput"`
+		}
+		if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		return resp.HookSpecificOutput.AdditionalContext
+	}
+	rules := func(text string) int { return strings.Count(text, "\n- Правило ") }
+	var parts string
+	for part := 1; part <= startParts; part++ {
+		parts += "\n" + context(func(r io.Reader, w io.Writer) error { return runSessionStartPart(r, w, part) })
+	}
+	if n := rules(parts); n != 40 || strings.Contains(parts, cardHintTail) {
+		t.Errorf("the parts carry %d of 40 stated rules (hint: %v)", n, strings.Contains(parts, cardHintTail))
+	}
+	card := context(runSessionCard)
+	if n := rules(card); n == 0 || n >= 40 || !strings.Contains(card, cardHintTail) {
+		t.Errorf("session-card carries %d of 40 stated rules; want the budget of #487 to cut them, with the hint", n)
 	}
 }
