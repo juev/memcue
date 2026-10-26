@@ -1,6 +1,6 @@
 # Bundle patch for memcue-dsh: the patch inserts the plugin row with the plugin's
-# defaults, so installing the bundle is enough to get recall, extraction and the
-# two fact tools. A profile overrides the row by id (binary, facts, model, ...)
+# defaults, so installing the bundle is enough to get the session card, the note
+# and the fact tools. A profile overrides the row by id (binary, facts, model, ...)
 # in its own cordis.patch.yml; see README.md.
 #
 # The entry is plain ESM because dsh installs a bundle under node_modules, where
