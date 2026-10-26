@@ -17,18 +17,19 @@ func fakeDreamRun(t *testing.T, fail error) *int {
 	t.Helper()
 	calls := 0
 	old := dreamRunFn
-	dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
+	dreamRunFn = func(packet string) (extract.DreamReply, error) {
 		calls++
-		tokens := extract.Tokens{Input: len(packet) / 4, Output: 100}
+		r := extract.DreamReply{Tokens: extract.Tokens{Input: len(packet) / 4, Output: 100}}
 		if fail != nil {
-			return nil, 0, tokens, fail
+			return r, fail
 		}
 		a, err := answerPacket(packet)
 		if err != nil {
-			return nil, 0, tokens, err
+			return r, err
 		}
-		b, err := json.Marshal(a)
-		return b, 0.5, tokens, err
+		r.Answer, err = json.Marshal(a)
+		r.CostUSD, r.API, r.TTFT = 0.5, 3*time.Second, time.Second
+		return r, err
 	}
 	t.Cleanup(func() { dreamRunFn = old })
 	return &calls
@@ -109,6 +110,10 @@ func TestDreamRunAppliesTheAnswer(t *testing.T) {
 	last := recs[len(recs)-1]
 	if last.Translated != 2 || last.Tokens == nil || last.Tokens.Output != 100 || last.Error != "" || last.Packet == "" {
 		t.Errorf("record %+v", last)
+	}
+	// The record says where the time of the pass went: the API time and the first token as the call reports them (#471).
+	if tm := last.Timing; tm == nil || tm.API != 3000 || tm.TTFT != 1000 {
+		t.Errorf("timing %+v", last.Timing)
 	}
 
 	out.Reset()
@@ -233,9 +238,9 @@ func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
 	ok := fakeDreamRun(t, nil)
 	good := dreamRunFn
 	n := 0
-	dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
+	dreamRunFn = func(packet string) (extract.DreamReply, error) {
 		if n++; n == 2 {
-			return nil, 0, extract.Tokens{}, errModel
+			return extract.DreamReply{}, errModel
 		}
 		return good(packet)
 	}

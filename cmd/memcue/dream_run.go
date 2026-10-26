@@ -24,7 +24,7 @@ const dreamRunTimeout = 10 * time.Minute
 var dreamAllPasses = 200
 
 // dreamRunFn is the model call of dream -run, replaced in tests.
-var dreamRunFn = func(packet string) ([]byte, float64, extract.Tokens, error) {
+var dreamRunFn = func(packet string) (extract.DreamReply, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dreamRunTimeout)
 	defer cancel()
 	return extract.DreamAnswer(ctx, packet)
@@ -141,8 +141,11 @@ func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
 		}
 	}
 	var packet bytes.Buffer
+	start := time.Now()
 	rec, err := prepare(dir, from, seen, false, &packet)
+	timing := dreamTiming{Prepare: ms(time.Since(start))}
 	if err != nil || rec.Packet == "" {
+		rec.Timing = &timing
 		if err != nil {
 			rec.Error = err.Error()
 		} else if _, err := io.Copy(out, &packet); err != nil {
@@ -159,20 +162,37 @@ func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
 		return rec, 0, fmt.Errorf("%s: %w", packetFile, err)
 	}
 	work := len(p.Split) + len(p.Expand) + len(p.Translate)
-	answer, cost, tokens, err := dreamRunFn(packet.String())
+	start = time.Now()
+	r, err := dreamRunFn(packet.String())
+	timing.Model, timing.API, timing.TTFT = ms(time.Since(start)), ms(r.API), ms(r.TTFT)
 	if err != nil {
-		rec.Tokens, rec.CostUSD, rec.Error = &tokens, cost, "model: "+err.Error()
+		rec.Tokens, rec.CostUSD, rec.Timing, rec.Error = &r.Tokens, r.CostUSD, &timing, "model: "+err.Error()
 		return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 	}
 	// The answer stays next to its packet: what the model said is the record a refused action is checked by.
 	path := filepath.Join(dir, "dream.answer.json")
-	if err := os.WriteFile(path, answer, 0o600); err != nil {
+	if err := os.WriteFile(path, r.Answer, 0o600); err != nil {
 		return rec, work, err
 	}
+	start = time.Now()
 	rec, err = applyAnswer(dir, path, out)
-	rec.Tokens, rec.CostUSD = &tokens, cost
+	timing.Apply = ms(time.Since(start))
+	rec.Tokens, rec.CostUSD, rec.Timing = &r.Tokens, r.CostUSD, &timing
 	if err != nil {
 		rec.Error = err.Error()
 	}
 	return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 }
+
+// dreamTiming is where the time of one dream -run pass went (#471), in milliseconds: the packet, the model call as
+// memcue waits for it, the part of that call `claude -p` reports as the API's and as the wait for the first token,
+// and the apply. A packet with nothing to ask has only Prepare.
+type dreamTiming struct {
+	Prepare int64 `json:"prepare_ms"`
+	Model   int64 `json:"model_ms,omitempty"`
+	API     int64 `json:"api_ms,omitempty"`
+	TTFT    int64 `json:"ttft_ms,omitempty"`
+	Apply   int64 `json:"apply_ms,omitempty"`
+}
+
+func ms(d time.Duration) int64 { return d.Milliseconds() }

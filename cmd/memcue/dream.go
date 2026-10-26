@@ -99,7 +99,9 @@ type dreamRecord struct {
 	Tokens *extract.Tokens `json:"tokens,omitempty"`
 	// CostUSD is what a claude -p call of dream -run -all reports (#405); an endpoint reports tokens only.
 	CostUSD float64 `json:"cost_usd,omitempty"`
-	Error   string  `json:"error,omitempty"`
+	// Timing is where the time of a dream -run pass went (#471).
+	Timing *dreamTiming `json:"timing,omitempty"`
+	Error  string       `json:"error,omitempty"`
 }
 
 // dreamGroupRecord is one group of a dream in dream.log. Outcome is "acted" when an action on it was applied,

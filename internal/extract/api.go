@@ -23,11 +23,13 @@ var API struct {
 const jsonAnswer = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
 	`{"facts": [{"content": "…", "keywords": ["…"]}], "dropped": "…", "outdated": []}` + "\n"
 
-// Tokens is the usage an endpoint reports; it has no price, so the cost is counted from tokens.
+// Tokens is the usage a call reports: an endpoint has no price, so its cost is counted from tokens; `claude -p` reports
+// both (#471).
 type Tokens struct {
-	Input  int `json:"input"`
-	Cached int `json:"cached,omitempty"` // part of Input served from the provider's prompt cache
-	Output int `json:"output"`
+	Input    int `json:"input"`
+	Cached   int `json:"cached,omitempty"` // part of Input served from the provider's prompt cache
+	Output   int `json:"output"`
+	Thinking int `json:"thinking,omitempty"` // part of Output the model spent reasoning, as `claude -p` reports it
 }
 
 // Add sums usage over calls.
@@ -35,6 +37,7 @@ func (t *Tokens) Add(o Tokens) {
 	t.Input += o.Input
 	t.Cached += o.Cached
 	t.Output += o.Output
+	t.Thinking += o.Thinking
 }
 
 // Endpoint is where a model call goes: an OpenAI-compatible base URL with its key and model, or, with no URL, the
