@@ -668,7 +668,7 @@ uses.
 | `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them, on `MEMCUE_API_URL` or `claude -p` | on |
 | `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
 | `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
-| `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes the mirror rule checks | unset: the rule is skipped |
+| `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes: the mirror rule checks them, and the extraction reads them so it does not restate a note (#456) | unset: the rule is skipped, the extraction reads no notes |
 | `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log` and per-session read offsets are kept | `~/.local/state` |
 
 Search is the words alone: FTS5 over the query's terms, in BM25 order, with no threshold, because the agent reads

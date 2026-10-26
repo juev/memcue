@@ -82,18 +82,11 @@ var sessionPrompt string
 // Session extracts the facts of a rendered session transcript. where names the repository, date, host and system of
 // the session: the model uses them to name a fact's scope. For a later part of a long session, prior holds the facts of the earlier parts:
 // the model returns only what is new and names the prior facts that are outdated, and the result holds the session's
-// whole list. Prior facts stay unless named, so a model that forgets to repeat them loses nothing.
-func Session(ctx context.Context, where, text string, prior []Fact) (Result, error) {
-	input := fmt.Sprintf("Сессия (%s):\n\n%s", where, text)
-	if len(prior) > 0 {
-		var b strings.Builder
-		b.WriteString("Факты из предыдущих частей сессии:\n")
-		for i, f := range prior {
-			fmt.Fprintf(&b, "%d. %s\n", i+1, f.Content)
-		}
-		input = b.String() + "\nСледующая часть. " + input
-	}
-	rp, err := call(ctx, sessionPrompt, sessionSchema, sessionAnswer, input)
+// whole list. Prior facts stay unless named, so a model that forgets to repeat them loses nothing. notes are the
+// agent's built-in memory notes, which its prompt carries anyway: the model leaves out what they already say, so the
+// base and the card do not repeat them in other words (#456). Empty notes are none.
+func Session(ctx context.Context, where, text string, prior []Fact, notes string) (Result, error) {
+	rp, err := call(ctx, sessionPrompt, sessionSchema, sessionAnswer, sessionInput(where, text, prior, notes))
 	var r Result
 	if err == nil {
 		r, err = decode(rp)
@@ -106,6 +99,24 @@ func Session(ctx context.Context, where, text string, prior []Fact) (Result, err
 	}
 	r.Facts = mergeParts(prior, r.Facts, r.Outdated)
 	return r, nil
+}
+
+// sessionInput is what the model reads for one part of a session: the memory notes, the facts of the earlier parts,
+// then the part itself.
+func sessionInput(where, text string, prior []Fact, notes string) string {
+	input := fmt.Sprintf("Сессия (%s):\n\n%s", where, text)
+	if len(prior) > 0 {
+		var b strings.Builder
+		b.WriteString("Факты из предыдущих частей сессии:\n")
+		for i, f := range prior {
+			fmt.Fprintf(&b, "%d. %s\n", i+1, f.Content)
+		}
+		input = b.String() + "\nСледующая часть. " + input
+	}
+	if notes = strings.TrimSpace(notes); notes != "" {
+		input = "Заметки встроенной памяти агента (они и так в его промпте):\n" + notes + "\n\n" + input
+	}
+	return input
 }
 
 // mergeParts keeps the prior facts not named outdated (numbers from 1) and appends the new ones.

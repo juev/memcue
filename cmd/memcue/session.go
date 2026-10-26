@@ -614,6 +614,23 @@ func clip(s string, n int) string {
 // extractFn is the model step, replaced in tests.
 var extractFn = extractText
 
+// maxNotes is the most of the memory notes an extraction call reads, in characters: a host's notes are a few
+// thousand, and a bigger directory must not crowd out the session itself.
+const maxNotes = 8000
+
+// extractionNotes are the built-in memory notes of MEMCUE_MEMORY_DIR for the extraction (#456), cut to maxNotes; empty
+// when the directory is unset or cannot be read whole.
+func extractionNotes() string {
+	notes, ok := memoryNotes(os.Getenv("MEMCUE_MEMORY_DIR"))
+	if !ok {
+		return ""
+	}
+	if r := []rune(strings.TrimSpace(notes)); len(r) > maxNotes {
+		return string(r[:maxNotes])
+	}
+	return strings.TrimSpace(notes)
+}
+
 // extracted is what a run over a session gives: its facts and what the model calls cost.
 type extracted struct {
 	Facts   []extract.Fact
@@ -625,9 +642,10 @@ type extracted struct {
 // extractText runs the model over a rendered session in parts; each part returns the session's whole list.
 func extractText(origin, text string) (extracted, error) {
 	var x extracted
+	notes := extractionNotes()
 	for _, chunk := range chunks(text, maxChunk) {
 		ctx, cancel := contextTimeout()
-		r, err := extract.Session(ctx, origin, chunk, x.Facts)
+		r, err := extract.Session(ctx, origin, chunk, x.Facts, notes)
 		cancel()
 		x.CostUSD += r.CostUSD
 		x.Tokens.Add(r.Tokens)

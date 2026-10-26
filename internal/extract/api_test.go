@@ -80,7 +80,7 @@ func TestEndpointEmptyAnswerIsEmptySession(t *testing.T) {
 	if _, err := run(context.Background(), "system", "сессия"); !errors.Is(err, errEmpty) {
 		t.Errorf("err %v", err)
 	}
-	if r, err := Session(context.Background(), "x", "сессия", nil); err != nil || len(r.Facts) != 0 {
+	if r, err := Session(context.Background(), "x", "сессия", nil, ""); err != nil || len(r.Facts) != 0 {
 		t.Errorf("session: %+v %v", r, err)
 	}
 }
@@ -98,7 +98,7 @@ func TestLaterPartKeepsPriorFactsUnlessOutdated(t *testing.T) {
 	t.Cleanup(srv.Close)
 	useEndpoint(t, srv.URL)
 	prior := []Fact{{Content: "порт 55432"}, {Content: "в контейнере нет rsync"}, {Content: "модель deepseek-flash"}}
-	r, err := Session(context.Background(), "x", "сессия", prior)
+	r, err := Session(context.Background(), "x", "сессия", prior, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,5 +151,37 @@ func TestQuickCallAsksForNoSampling(t *testing.T) {
 		if ok && temperature != float64(0) {
 			t.Errorf("quick=%v: temperature = %v, want 0", tc.quick, temperature)
 		}
+	}
+}
+
+// The built-in memory notes go to the model before the session, and the prompt tells it to leave out what they say:
+// a paraphrase of a note would be a second copy of it on the card (#456). No notes add nothing.
+func TestSessionShowsTheMemoryNotes(t *testing.T) {
+	var inputs []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		var req struct{ Messages []struct{ Content string } }
+		_ = json.Unmarshal(b, &req)
+		inputs = append(inputs, req.Messages[1].Content)
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"{\"facts\":[],\"dropped\":\"\"}"},"finish_reason":"stop"}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	useEndpoint(t, srv.URL)
+	note := "Навыки держат только процедуры; состояние среды живёт в памяти."
+	if _, err := Session(context.Background(), "x", "сессия", nil, note); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Session(context.Background(), "x", "сессия", nil, "  "); err != nil {
+		t.Fatal(err)
+	}
+	if len(inputs) != 2 || !strings.HasPrefix(inputs[0], "Заметки встроенной памяти") ||
+		strings.Index(inputs[0], note) > strings.Index(inputs[0], "Сессия (x)") {
+		t.Errorf("notes not before the session: %q", inputs)
+	}
+	if strings.Contains(inputs[1], "Заметки") {
+		t.Errorf("empty notes reached the model: %q", inputs[1])
+	}
+	if !strings.Contains(sessionPrompt, "заметках встроенной памяти") {
+		t.Error("the session prompt does not say what to do with the notes")
 	}
 }
