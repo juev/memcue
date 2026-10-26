@@ -81,7 +81,13 @@ func runSessionStartPart(in io.Reader, out io.Writer, part int) error {
 	var fit cardFit
 	if decodeErr == nil {
 		var err error
-		if card, ids, excluded, fit, err = sessionCard(h.CWD); err != nil {
+		// The parts of the Claude Code session start carry every stated fact (#480); the whole text in one block keeps
+		// the budget of #487.
+		statedRoom := 0
+		if part > 0 {
+			statedRoom = startParts * partBudget
+		}
+		if card, ids, excluded, fit, err = sessionCardWith(h.CWD, statedRoom); err != nil {
 			// The card is an addition to the note; a broken base must not keep the agent from starting.
 			if part <= 1 {
 				fmt.Fprintln(os.Stderr, "memcue:", err)
@@ -265,6 +271,14 @@ func cardRoom() int {
 // rest fit the budget. No base means no card; a base that cannot be read is an error the caller reports without
 // failing the session.
 func sessionCard(cwd string) (string, []string, int, cardFit, error) {
+	return sessionCardWith(cwd, 0)
+}
+
+// sessionCardWith is sessionCard with the room of the stated facts: 0 puts them inside the card budget (#487), the way
+// session-card serves Hermes and DSH, whose card sits in every turn's system prompt; a positive room keeps them
+// outside the budget up to that many characters, the way the parts of the Claude Code session start carry them (#480,
+// #495).
+func sessionCardWith(cwd string, statedRoom int) (string, []string, int, cardFit, error) {
 	if _, err := os.Stat(factsPath()); os.IsNotExist(err) {
 		return "", nil, 0, cardFit{}, nil
 	}
@@ -277,7 +291,7 @@ func sessionCard(cwd string) (string, []string, int, cardFit, error) {
 	if err != nil {
 		return "", nil, 0, cardFit{}, err
 	}
-	card, ids, repeats, fit, err := renderCard(facts, cardRoom())
+	card, ids, repeats, fit, err := renderCardWith(facts, cardRoom(), statedRoom)
 	return card, ids, mirrors + repeats, fit, err
 }
 
@@ -294,6 +308,12 @@ func sessionCard(cwd string) (string, []string, int, cardFit, error) {
 // into two facts takes one line (#424); the fact that comes first in the given order is kept. The third result counts
 // the facts left out that way.
 func renderCard(facts []store.Fact, budget int) (string, []string, int, cardFit, error) {
+	return renderCardWith(facts, budget, 0)
+}
+
+// renderCardWith is renderCard with statedRoom characters for the stated facts: 0 places them inside the budget, a
+// positive room places them outside it, newest first up to that room, and leaves the whole budget to the other facts.
+func renderCardWith(facts []store.Fact, budget, statedRoom int) (string, []string, int, cardFit, error) {
 	seen := map[string]bool{}
 	unique := facts[:0:0]
 	for _, f := range facts {
@@ -337,15 +357,21 @@ func renderCard(facts []store.Fact, budget int) (string, []string, int, cardFit,
 		taken := make([]bool, len(facts))
 		used := 0
 		size := func(i int) int { return len([]rune(lines[i])) + 1 }
+		// The stated facts count against the budget, or against a room of their own.
+		statedUsed, statedLimit := &used, room
+		own := 0
+		if statedRoom > 0 {
+			statedUsed, statedLimit = &own, statedRoom
+		}
 		for i, f := range facts {
 			if !stated(f) {
 				continue
 			}
-			if used+size(i) > room {
+			if *statedUsed+size(i) > statedLimit {
 				break // the stated facts that follow are older: they go first
 			}
 			taken[i] = true
-			used += size(i)
+			*statedUsed += size(i)
 		}
 		repo := 0
 		for i, f := range facts {
@@ -358,7 +384,10 @@ func renderCard(facts []store.Fact, budget int) (string, []string, int, cardFit,
 				repo += n
 			}
 		}
-		for i := range facts {
+		for i, f := range facts {
+			if statedRoom > 0 && stated(f) {
+				continue // past their own room; the budget is for the other facts
+			}
 			if n := size(i); !taken[i] && used+n <= room {
 				taken[i] = true
 				used += n
