@@ -30,9 +30,11 @@ memcue fact base:
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes an approved
   global fact (source `memory`, origin `hermes-memory`; #440). When the agent edits that entry the fact gets a new
   version, when it removes it the fact is retired. Which fact an entry became is kept in
-  `$HERMES_HOME/memcue/written.json`. The built-in memory is a second memory next to memcue: turn it off in Hermes once
-  the model writes to memcue. memcue does not change Hermes's settings; while `MEMORY.md` or `USER.md` holds entries,
-  the provider logs one warning per start.
+  `$HERMES_HOME/memcue/written.json`. The built-in memory is a second memory next to memcue: turn it off once the
+  model writes to memcue, with `hermes config set memory.memory_enabled false` and
+  `hermes config set memory.user_profile_enabled false`. memcue does not change Hermes's settings. While Hermes still
+  injects `MEMORY.md` or `USER.md` and the file holds entries, the provider logs one warning per start; a file Hermes
+  no longer injects is no note for it, so its lines neither leave the card nor raise the warning.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   `memcue_search` takes an optional `limit` and runs `memcue search` with the session's workspace and id, so facts of
   this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the session; `memcue_correct`
@@ -52,7 +54,8 @@ a deliberate correction. A candidate comes only from `memcue add -candidate` or 
 `memcue approve ID...` (see [Candidates](../../README.md#candidates)).
 
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
-…). The built-in `MEMORY.md`/`USER.md` is not a provider and stays on until you turn it off in Hermes.
+…). The built-in `MEMORY.md`/`USER.md` is not a provider and stays on until `memory.memory_enabled` and
+`memory.user_profile_enabled` turn it off.
 
 ## Dream
 

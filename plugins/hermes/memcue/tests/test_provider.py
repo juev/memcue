@@ -330,6 +330,28 @@ class ProviderTest(unittest.TestCase):
         self.assertNotIn("в навыках были только процедуры", block)
         self.assertIn("Мержить PR сразу", block)
 
+    def test_a_memory_hermes_turned_off_is_no_note(self):
+        """memory.memory_enabled and memory.user_profile_enabled turn the built-in memory off and leave its files (#494):
+        a file Hermes no longer injects neither takes lines off the card nor is warned about."""
+        memories = Path(self.home) / "memories"
+        memories.mkdir()
+        (memories / "MEMORY.md").write_text(
+            "- Требует, чтобы навыки содержали только процедуры: состояние среды — в памяти, замеры — в docs/research.\n",
+            encoding="utf-8")
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Пользователь требует, чтобы в навыках были только процедуры, а состояние среды лежало в памяти.")
+        for flags, injected in (((True, True), True), ((False, True), False)):
+            with self.subTest(flags=flags), \
+                    unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
+                self.assertEqual("в навыках были только процедуры" not in self.p.system_prompt_block(), injected)
+                p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+                if injected:
+                    with self.assertLogs("memcue_provider", level="WARNING"):
+                        p.initialize("s1", hermes_home=self.home)
+                else:
+                    with self.assertNoLogs("memcue_provider", level="WARNING"):
+                        p.initialize("s1", hermes_home=self.home)
+
     def test_a_card_of_copies_only_is_no_card(self):
         memories = Path(self.home) / "memories"
         memories.mkdir()

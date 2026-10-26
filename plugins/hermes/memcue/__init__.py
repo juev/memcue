@@ -243,6 +243,17 @@ def _load_plugin_config() -> dict[str, Any]:
     return dict(block) if isinstance(block, dict) else {}
 
 
+def _builtin_memory_flags() -> tuple[bool, bool]:
+    """Whether Hermes injects its MEMORY.md and USER.md, as Hermes itself reads its config; both on when it cannot
+    tell, the way Hermes defaults them."""
+    try:
+        from tools.memory_tool import get_builtin_memory_store_flags
+        memory_on, user_on = get_builtin_memory_store_flags()
+    except Exception:
+        return True, True
+    return bool(memory_on), bool(user_on)
+
+
 def _search_answer(out: str) -> tuple[list[Any], list[str]]:
     """The facts and the hints of ``memcue search -json``: an object ``{"facts": [...], "hints": [...]}`` (#453), or
     the bare array of facts an older binary prints. Anything else is not an answer and raises ValueError."""
@@ -534,10 +545,14 @@ class MemcueMemoryProvider(MemoryProvider):
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the card: MEMORY.md and USER.md of this
-        Hermes home, one entry per bullet or paragraph. A missing file is no entry."""
+        Hermes home, one entry per bullet or paragraph. A missing file is no entry, and so is a file Hermes no longer
+        injects: memory.memory_enabled and memory.user_profile_enabled turn the two off, and the files stay (#494)."""
         home = Path(self._state).parent
         entries: list[str] = []
-        for name in ("MEMORY.md", "USER.md"):
+        memory_on, user_on = _builtin_memory_flags()
+        for name, on in (("MEMORY.md", memory_on), ("USER.md", user_on)):
+            if not on:
+                continue
             try:
                 text = (home / "memories" / name).read_text(encoding="utf-8")
             except OSError:
