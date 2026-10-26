@@ -522,7 +522,10 @@ class ProviderTest(unittest.TestCase):
             "content": "Caddy на server1 перечитывает Caddyfile после пересоздания.", "keywords": "caddy",
             "kind": "rule", "scope": "global"}))["result"].split()[0]
         json.loads(self.p.handle_tool_call("memcue_add", {
-            "content": "Caddy на server2 падает без конфига.", "keywords": "caddy", "kind": "pitfall"}))
+            # A scope of its own: without one the fact takes the working directory's project, or global outside a
+            # repository (#442), and the -in global check below would depend on where the suite runs.
+            "content": "Caddy на server2 падает без конфига.", "keywords": "caddy", "kind": "pitfall",
+            "scope": "host:server2"}))
         def ids(**kw):
             found = json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy server1", **kw)))
             return [f["id"] for f in found["facts"]]
