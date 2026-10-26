@@ -42,4 +42,4 @@ env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all
 ```
 
 It answers packet after packet until the base has no work left, and logs each pass with its cost in `dream.log`.
-Without `env -u` it uses the extraction's endpoint when `MEMCUE_API_URL` is set.
+Without `env -u` it uses the endpoint of `MEMCUE_API_URL` when that is set.
