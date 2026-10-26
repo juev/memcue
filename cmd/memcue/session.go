@@ -522,15 +522,16 @@ func extractSession(path string, rec *extractRecord, minChars int) error {
 	}
 	rec.To, rec.Chars = sess.Lines, len(sess.Text)
 	rec.Origin = originAt(sess.CWD, sess.Start)
-	return storeExtracted(sess.Text, rec, minChars, "")
+	return storeExtracted(sess.Text, rec, minChars, "", false)
 }
 
 // storeExtracted runs the extraction over rendered text and stores the facts that pass the policy as candidates with
 // rec.Origin: recall gives them only after the user approves them. Too little text waits: minChars is chosen by the
 // caller, so a host that flushes a final short tail can lower it without changing the transcript path. A shelf names
 // where a fact read from the outside world goes instead of the scope the model gave it (#433); empty, every fact keeps
-// its own.
-func storeExtracted(text string, rec *extractRecord, minChars int, shelf string) error {
+// its own. With shelfOnly every other fact is rejected: a run whose own work must not reach the base, such as a cron
+// job, still keeps what it read from outside (#476).
+func storeExtracted(text string, rec *extractRecord, minChars int, shelf string, shelfOnly bool) error {
 	if rec.Chars == 0 {
 		rec.Skipped = "no text"
 		return nil
@@ -556,6 +557,9 @@ func storeExtracted(text string, rec *extractRecord, minChars int, shelf string)
 			// Before the check: the shelf is the scope a fact read from a page gets, so one the model left
 			// without a scope is not rejected for it.
 			fact.Scope = recall.ShelfPrefix + shelf
+		} else if shelfOnly {
+			rec.Rejected = append(rec.Rejected, "shelf only: not quoted from an external tool's result: "+clip(fact.Content, 80))
+			continue
 		}
 		if ok, why := policy.Check(fact, text); !ok {
 			rec.Rejected = append(rec.Rejected, why+": "+clip(fact.Content, 80))
@@ -682,7 +686,7 @@ func appendLog(path string, rec extractRecord) error { return appendJSON(path, r
 
 // runExtractMessages extracts and stores the facts of chat messages in the OpenAI shape read from stdin: the session
 // of an agent that is not Claude Code, such as Hermes. memcue extract-messages [-origin O] [-cwd DIR] [-session ID]
-// [-min-chars N] [-shelf SLUG]. Without -origin the origin is the repository of -cwd and today, the same as add -cwd; -cwd "" is a
+// [-min-chars N] [-shelf SLUG [-shelf-only]]. Without -origin the origin is the repository of -cwd and today, the same as add -cwd; -cwd "" is a
 // session with no project, so the origin stays empty (#347).
 func runExtractMessages(args []string, in io.Reader) error {
 	if os.Getenv("MEMCUE_EXTRACT") == "0" {
@@ -696,6 +700,7 @@ func runExtractMessages(args []string, in io.Reader) error {
 	event := fs.String("event", "", "what started the run, for the log")
 	minChars := fs.Int("min-chars", minNew, "least rendered text worth a model call")
 	shelf := fs.String("shelf", "", "store a fact quoted from an external tool's result (a web page, a PDF) on this shelf, scope shelf:<slug> (default: off)")
+	shelfOnly := fs.Bool("shelf-only", false, "store only the facts that go on the -shelf and reject the rest, as for a cron run (needs -shelf)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -706,6 +711,8 @@ func runExtractMessages(args []string, in io.Reader) error {
 		if err := validShelf("extract-messages", *shelf); err != nil {
 			return err
 		}
+	} else if *shelfOnly {
+		return errors.New("extract-messages: -shelf-only needs -shelf")
 	}
 	if *origin == "" && !emptyFlag(fs, "cwd") {
 		*origin = defaultOriginAt(*cwd)
@@ -717,7 +724,7 @@ func runExtractMessages(args []string, in io.Reader) error {
 	text := transcript.RenderMessages(msgs)
 	rec := extractRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: *session, Event: *event,
 		Origin: *origin, To: len(msgs), Chars: len(text)}
-	err := storeExtracted(text, &rec, *minChars, *shelf)
+	err := storeExtracted(text, &rec, *minChars, *shelf, *shelfOnly)
 	if err != nil {
 		rec.Error = err.Error()
 	}

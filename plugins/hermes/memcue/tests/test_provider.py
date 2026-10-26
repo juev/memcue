@@ -491,6 +491,29 @@ class ProviderTest(unittest.TestCase):
         old._version = "0.15.0"
         self.assertNotIn("-shelf", old._extract_command("memcue", "threshold", "s1"))
 
+    def test_a_cron_run_extracts_for_the_shelf_only(self):
+        """A cron run extracts with -shelf-only, so only a fact read from outside is stored; a primary run does not
+        pass the flag, and an empty shelf or a binary older than the flag keeps the cron run out (#476)."""
+        conf = {"binary": BIN, "extract_url": "http://127.0.0.1:9/v1", "extract_model": "m"}
+        cron = memcue_provider.MemcueMemoryProvider(dict(conf))
+        cron.initialize("c1", hermes_home=self.home, agent_context="cron")
+        self.assertIsNotNone(cron._extract_env())
+        cmd = cron._extract_command("memcue", "session_end", "c1")
+        self.assertEqual(cmd[cmd.index("-shelf") + 1:cmd.index("-shelf") + 3], ["research", "-shelf-only"])
+        primary = memcue_provider.MemcueMemoryProvider(dict(conf))
+        primary.initialize("p1", hermes_home=self.home)
+        self.assertNotIn("-shelf-only", primary._extract_command("memcue", "session_end", "p1"))
+        off = memcue_provider.MemcueMemoryProvider(dict(conf, shelf=""))
+        off.initialize("c2", hermes_home=self.home, agent_context="cron")
+        self.assertIsNone(off._extract_env())
+        old = memcue_provider.MemcueMemoryProvider(dict(conf))
+        old.initialize("c3", hermes_home=self.home, agent_context="cron")
+        old._compat, old._version = True, "0.17.0"
+        self.assertIsNone(old._extract_env())
+        sub = memcue_provider.MemcueMemoryProvider(dict(conf))
+        sub.initialize("s1", hermes_home=self.home, agent_context="subagent")
+        self.assertIsNone(sub._extract_env())
+
     def test_search_documents_the_shelf(self):
         schema = next(s for s in self.p.get_tool_schemas() if s["name"] == "memcue_search")
         self.assertIn("shelf:research", schema["parameters"]["properties"]["in"]["description"])

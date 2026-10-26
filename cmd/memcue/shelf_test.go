@@ -237,3 +237,34 @@ func TestSearchJSONCarriesScope(t *testing.T) {
 		t.Errorf("hits %v", hits)
 	}
 }
+
+// -shelf-only keeps the page's fact on the shelf and rejects the rest, a user's rule included: a cron run's own work
+// must not reach the base, but what it read from outside may (#476).
+func TestExtractMessagesShelfOnly(t *testing.T) {
+	dir := env(t)
+	shelfExtraction(t)
+	if err := runExtractMessages([]string{"-origin", "hermes 2026-10-26", "-min-chars", "0", "-shelf", "research",
+		"-shelf-only"}, strings.NewReader(shelfMessages)); err != nil {
+		t.Fatal(err)
+	}
+	if got := scopesByContent(t); len(got) != 1 || got["Example API: 60 запросов в минуту на ключ."] != "shelf:research" {
+		t.Errorf("stored %v, want only the page's fact on the shelf", got)
+	}
+	recs := readLog(t, dir+"/state")
+	if len(recs) != 1 || len(recs[0].Rejected) != 2 {
+		t.Fatalf("log %+v", recs)
+	}
+	for _, r := range recs[0].Rejected {
+		if !strings.HasPrefix(r, "shelf only: not quoted from an external tool's result") {
+			t.Errorf("rejected %q", r)
+		}
+	}
+}
+
+func TestExtractMessagesShelfOnlyNeedsAShelf(t *testing.T) {
+	env(t)
+	err := runExtractMessages([]string{"-shelf-only"}, strings.NewReader("[]"))
+	if err == nil || !strings.Contains(err.Error(), "-shelf-only needs -shelf") {
+		t.Errorf("err = %v", err)
+	}
+}
