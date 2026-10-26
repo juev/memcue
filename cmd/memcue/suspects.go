@@ -97,6 +97,25 @@ func vetSuspects(s *store.Store, o vetOptions, now time.Time) ([]vetLine, vetRec
 		return nil, rec
 	}
 	var lines []vetLine
+	// A fact stored before the write gave every fact a scope is in no place a search asks for (#442): it gets the
+	// scope its origin names, the one it would get written today. A dry run only lists them.
+	for i, f := range approved {
+		if strings.TrimSpace(f.Scope) != "" {
+			continue
+		}
+		scope := defaultScope("", f.Origin)
+		if !o.dry {
+			g, err := s.Relabel(f.ID, f.Version, f.Kind, scope, f.Expires)
+			if err != nil {
+				rec.Error = err.Error()
+				continue
+			}
+			approved[i] = g
+		}
+		rec.Scoped++
+		lines = append(lines, vetLine{Time: rec.Time, ID: f.ID, Decision: "scoped", Verdict: string(vet.Keep),
+			By: "rule", Reason: "no scope: " + scope + " from the origin", Source: f.Source, Content: clip(f.Content, 200)})
+	}
 	// A mirror of the built-in memory is approved when it is written (#440), so nothing would ever retire it once its
 	// note is gone unless this pass does: the note is the source of truth, and a copy that outlives it is wrong.
 	live := approved[:0:0]

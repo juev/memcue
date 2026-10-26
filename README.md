@@ -164,7 +164,10 @@ comes from where the session works, read from the files and never by running git
 - **The Claude config directory** is the global tier; **a temporary directory** names nothing.
 
 The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
-writes the key. `memcue add -scope repo` does the same for the working directory.
+writes the key. `memcue add -scope repo` does the same for the working directory. A fact written with no scope,
+by `memcue add` without `-scope` or by an extraction that named none, gets the project its origin names, and `global`
+when the origin names none (#442): an empty scope is in no place a search asks for, so only `-in all` found such a
+fact. `memcue vet` gives the same scope to a live fact stored without one before.
 
 The project narrows and orders `memcue search`. In a session that works in a repository, search looks at that
 repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default

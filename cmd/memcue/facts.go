@@ -153,7 +153,7 @@ func runAdd(args []string, out io.Writer) error {
 			return errors.New("add: -scope repo needs a project: run it in one, or pass -cwd or -origin")
 		}
 	}
-	m := store.Meta{Kind: *kind, Scope: *scope, Source: *source}
+	m := store.Meta{Kind: *kind, Scope: defaultScope(*scope, *origin), Source: *source}
 	if *candidate {
 		m.Review = store.Candidate
 	}
@@ -303,6 +303,32 @@ func repoScope(scope, origin string) string {
 		return scope
 	}
 	return tier.Scope(originKey(origin))
+}
+
+// defaultScope is the scope a fact gets when nobody named one (#442): the project its origin names (tier.Scope of the
+// key, global for the global tier), or global when the origin names none. An empty scope is in no place a search
+// asks for, so a fact written without one would be found only by -in all.
+func defaultScope(scope, origin string) string {
+	if strings.TrimSpace(scope) != "" {
+		return scope
+	}
+	if key := originTier(origin); key != "" {
+		return tier.Scope(key)
+	}
+	return "global"
+}
+
+// originTier is the project key an origin starts with, "<key> <date>" with anything after the date, such as the
+// "(file.md)" a migrated memory note keeps; "" when the second word is not a date.
+func originTier(origin string) string {
+	fields := strings.Fields(origin)
+	if len(fields) < 2 {
+		return ""
+	}
+	if _, err := time.Parse(time.DateOnly, fields[1]); err != nil {
+		return ""
+	}
+	return fields[0]
 }
 
 // originKey is the project key at the head of an origin "<key> <date>"; "" when the origin does not end in a date.

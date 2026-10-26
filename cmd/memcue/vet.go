@@ -59,12 +59,14 @@ type vetRecord struct {
 	Failed      int    `json:"failed,omitempty"`
 	// Suspects counts the approved facts the binary found suspect and asked the model about (#289); SuspectsRetired
 	// those the model said describe a past state as current.
-	Suspects        int            `json:"suspects,omitempty"`
-	SuspectsRetired int            `json:"suspects_retired,omitempty"`
-	DryRun          bool           `json:"dry_run,omitempty"`
-	CostUSD         float64        `json:"cost_usd,omitempty"`
-	Tokens          extract.Tokens `json:"tokens,omitempty"`
-	Error           string         `json:"error,omitempty"`
+	Suspects        int `json:"suspects,omitempty"`
+	SuspectsRetired int `json:"suspects_retired,omitempty"`
+	// Scoped counts the live facts without a scope that got the one their origin names (#442).
+	Scoped  int            `json:"scoped,omitempty"`
+	DryRun  bool           `json:"dry_run,omitempty"`
+	CostUSD float64        `json:"cost_usd,omitempty"`
+	Tokens  extract.Tokens `json:"tokens,omitempty"`
+	Error   string         `json:"error,omitempty"`
 }
 
 // vetOptions is how a run was asked for.
@@ -355,6 +357,7 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Failed += o.Failed
 	r.Suspects += o.Suspects
 	r.SuspectsRetired += o.SuspectsRetired
+	r.Scoped += o.Scoped
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -535,6 +538,11 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 	if rec.Suspects > 0 {
 		if _, err := fmt.Fprintf(out, "Подозрительных одобренных фактов %d: снято %d\n", rec.Suspects,
 			rec.SuspectsRetired); err != nil {
+			return err
+		}
+	}
+	if rec.Scoped > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов без scope %d: scope взят из origin\n", rec.Scoped); err != nil {
 			return err
 		}
 	}

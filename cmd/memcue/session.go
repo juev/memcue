@@ -576,7 +576,7 @@ func storeExtracted(text string, rec *extractRecord, minChars int, shelf string)
 	for _, fact := range keep {
 		batch = append(batch, store.FactInput{Content: fact.Content, Keywords: fact.Keywords, Origin: rec.Origin,
 			Expires: eventExpires(fact.Kind, ""),
-			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: repoScope(fact.Scope, rec.Origin), Source: fact.Source,
+			Queries: fact.Queries, Meta: store.Meta{Kind: fact.Kind, Scope: defaultScope(repoScope(fact.Scope, rec.Origin), rec.Origin), Source: fact.Source,
 				Evidence: fact.Evidence, Review: store.Candidate}})
 	}
 	stored, err := s.AddBatch(batch)
