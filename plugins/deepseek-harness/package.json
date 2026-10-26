@@ -1,7 +1,7 @@
 {
   "name": "memcue-dsh",
   "version": "0.18.1",
-  "description": "memcue long-term memory for DeepSeek Harness (dsh): facts recalled before a step, extracted when a turn ends",
+  "description": "memcue long-term memory for DeepSeek Harness (dsh): the model searches and writes its facts itself",
   "type": "module",
   "license": "MIT",
   "main": "./src/index.mjs",
