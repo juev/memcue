@@ -1,7 +1,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GOLANGCI_VERSION ?= v2.13.0
 
-.PHONY: build test test-plugins lint
+.PHONY: build test test-plugins lint bench
 
 build:
 	go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -10,6 +10,11 @@ test: build
 	go test -race ./...
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I plugins/hermes/memcue/tests/test_provider.py
 	$(MAKE) test-plugins
+
+# The bench drives a built binary through search -json (#451). make test already runs it under go test ./...; this
+# target runs it alone, case by case. MEMCUE_BIN=/path/to/memcue judges another build instead of this tree.
+bench:
+	go test -race ./internal/bench -v
 
 # The plugin tests need the harness packages as peers. A checkout without node_modules (a release build, the CI Go
 # job) skips them with the command that would install them, instead of failing on an import the task does not need.
