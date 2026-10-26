@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.18.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.18.1`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.18.1 | 5 | 0.18.1 | 0.18.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.1 (`hermes-agent` 0.15.2) |
 | 0.18.0 | 5 | 0.18.0 | 0.18.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.0 (`hermes-agent` 0.15.2) |
 | 0.17.0 | 5 | 0.17.0 | 0.17.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.17.0 (`hermes-agent` 0.15.2) |
 | 0.16.0 | 5 | 0.16.0 | 0.16.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.16.0 (`hermes-agent` 0.15.2) |
@@ -227,6 +228,14 @@ are the lines the plain answer prints after the facts, this one included (#453);
 both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.18.1: the Claude Code session start carries every stated rule again (#495)
+
+- In 0.18.0 the budget of #487 also cut the stated rules and decisions at the Claude Code session start, against #480:
+  on the author's base the card fell from 53 lines over two parts to 22. Now `session-start -part N` keeps the stated
+  facts outside the 3,500-character budget and bounds them only by the three parts; the other facts share the budget.
+- `session-card` (Hermes, DSH) and `session-start` without `-part` keep the budget of #487 over the stated facts.
+- No schema or flag changed.
 
 ### 0.18.0: a card with a ceiling, in three parts, and a report of the notes already in the base (#475, #476, #477, #480, #481, #487, #488, #489)
 
@@ -617,7 +626,11 @@ about 28,000 characters, does the card leave lines out. The last part then says 
 and `card.log` counts them as `left`. `session-start` without `-part` prints the whole text in one block, as before.
 
 Every rule and decision the user stated (`source` `user` or `user_confirmed`) is on the card, each cut to 400
-characters (#363): since the agent searches itself, the card is the only memory it gets unasked. On the author's
+characters (#363): since the agent searches itself, the card is the only memory it gets unasked. Where it holds them
+depends on the host. At the Claude Code session start they sit outside the budget, bounded only by the three parts
+(#480, #495). On `session-card`, which Hermes and DSH put in the system prompt of every turn, they share the budget
+(`MEMCUE_CARD_BUDGET`, 3,500 by default): the oldest go first, and a cut card ends with a line that counts the rest
+(#487). On the author's
 archived base that is 9 global rules, about 1,300 characters. The other facts share a budget of about 3,500 characters,
 a dozen facts, and a labelled base has more rules than that. They are chosen in this order:
 

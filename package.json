@@ -1,6 +1,6 @@
 {
   "name": "memcue-dsh",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "private": true,
   "description": "Repository-root dsh bundle for the memcue plugin in plugins/deepseek-harness",
   "type": "module",
