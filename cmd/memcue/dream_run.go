@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/juev/memcue/internal/extract"
@@ -44,7 +46,7 @@ const dreamAllStalls = 3
 // runs out of groups, so it does not keep the loop going. It runs on the endpoint when MEMCUE_API_URL is set and on
 // claude -p otherwise, and stops on the first failed pass, after dreamAllStalls passes that change nothing, or after
 // dreamAllPasses.
-func runDreamOnce(out io.Writer, all bool) error {
+func runDreamOnce(out io.Writer, all bool, packets int) error {
 	if !all && extract.API.URL == "" {
 		return fmt.Errorf("dream -run: %w", extract.ErrNoEndpoint)
 	}
@@ -68,7 +70,7 @@ func runDreamOnce(out io.Writer, all bool) error {
 	}
 	defer unlock()
 	if !all {
-		_, _, err := dreamPass(dir, out)
+		_, _, err := dreamPass(dir, packets, out)
 		return err
 	}
 	stalls := 0
@@ -76,7 +78,7 @@ func runDreamOnce(out io.Writer, all bool) error {
 		if _, err := fmt.Fprintf(out, "dream -all: pass %d\n", pass); err != nil {
 			return err
 		}
-		rec, work, err := dreamPass(dir, out)
+		rec, work, err := dreamPass(dir, packets, out)
 		if err != nil {
 			return fmt.Errorf("dream -all: pass %d: %w", pass, err)
 		}
@@ -130,7 +132,12 @@ func owedTranslations() (int, error) {
 // every active fact on a machine with no dream yet; then the model's answer, applied under the -apply checks, and a
 // line in dream.log either way. It returns that line and how many facts the packet gave to split, expand or
 // translate; a record without a packet means there was nothing for the dream.
-func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
+//
+// The work of up to packets packets is cut into calls the model answers at once (#471): each packet's fresh facts and
+// groups, each packet's facts to expand, and each packet's facts to translate. Most of a call's time is the model
+// writing its answer, so three calls of a third of it each take about a third of the time. Their answers are joined
+// and applied as one.
+func dreamPass(dir string, packets int, out io.Writer) (dreamRecord, int, error) {
 	var from time.Time
 	var seen map[string]int
 	if last, ok := lastDream(dir); ok {
@@ -142,7 +149,7 @@ func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
 	}
 	var packet bytes.Buffer
 	start := time.Now()
-	rec, err := prepare(dir, from, seen, false, &packet)
+	rec, w, err := prepare(dir, from, seen, false, packets, &packet)
 	timing := dreamTiming{Prepare: ms(time.Since(start))}
 	if err != nil || rec.Packet == "" {
 		rec.Timing = &timing
@@ -162,9 +169,13 @@ func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
 		return rec, 0, fmt.Errorf("%s: %w", packetFile, err)
 	}
 	work := len(p.Split) + len(p.Expand) + len(p.Translate)
+	calls, err := w.calls()
+	if err != nil {
+		return rec, work, err
+	}
 	start = time.Now()
-	r, err := dreamRunFn(packet.String())
-	timing.Model, timing.API, timing.TTFT = ms(time.Since(start)), ms(r.API), ms(r.TTFT)
+	r, err := askAll(calls)
+	timing.Model, timing.API, timing.TTFT, timing.Calls = ms(time.Since(start)), ms(r.API), ms(r.TTFT), len(calls)
 	if err != nil {
 		rec.Tokens, rec.CostUSD, rec.Timing, rec.Error = &r.Tokens, r.CostUSD, &timing, "model: "+err.Error()
 		return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
@@ -184,11 +195,12 @@ func dreamPass(dir string, out io.Writer) (dreamRecord, int, error) {
 	return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 }
 
-// dreamTiming is where the time of one dream -run pass went (#471), in milliseconds: the packet, the model call as
-// memcue waits for it, the part of that call `claude -p` reports as the API's and as the wait for the first token,
+// dreamTiming is where the time of one dream -run pass went (#471), in milliseconds: the packet, the model calls as
+// memcue waits for them, the longest of them as `claude -p` reports its API time and its wait for the first token,
 // and the apply. A packet with nothing to ask has only Prepare.
 type dreamTiming struct {
 	Prepare int64 `json:"prepare_ms"`
+	Calls   int   `json:"calls,omitempty"` // model calls made at once
 	Model   int64 `json:"model_ms,omitempty"`
 	API     int64 `json:"api_ms,omitempty"`
 	TTFT    int64 `json:"ttft_ms,omitempty"`
@@ -196,3 +208,84 @@ type dreamTiming struct {
 }
 
 func ms(d time.Duration) int64 { return d.Milliseconds() }
+
+// dreamWork is the work prepare gathered for the model, kept apart so dream -run can cut it into calls.
+type dreamWork struct {
+	id                       string
+	split, expand, translate []store.Fact
+	groups                   [][]store.Fact
+	fresh                    map[string]bool // the facts of the groups the dream reviews as new
+}
+
+// calls cuts the work into packets of the usual bounds, one task kind a call: fresh facts with groups, which need the
+// model's judgement and their neighbours, then the facts to expand, then the facts to translate. Every call is a
+// whole packet with its instructions and the other data sections empty, so the model reads it as it reads one packet.
+func (w dreamWork) calls() ([]string, error) {
+	var out []string
+	add := func(split, expand, translate []store.Fact, groups [][]store.Fact) error {
+		text, err := renderPacket(w.id, split, expand, translate, groups, w.fresh)
+		out = append(out, text)
+		return err
+	}
+	for i := 0; i < len(w.split) || i/packetFresh*packetGroups < len(w.groups); i += packetFresh {
+		k := i / packetFresh * packetGroups
+		if err := add(w.split[min(i, len(w.split)):min(i+packetFresh, len(w.split))], nil, nil,
+			w.groups[min(k, len(w.groups)):min(k+packetGroups, len(w.groups))]); err != nil {
+			return nil, err
+		}
+	}
+	for c := range slices.Chunk(w.expand, packetExpand) {
+		if err := add(nil, c, nil, nil); err != nil {
+			return nil, err
+		}
+	}
+	for c := range slices.Chunk(w.translate, packetTranslate) {
+		if err := add(nil, nil, c, nil); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// askAll sends the calls at once and joins their answers into the one answer -apply reads. A failed call fails the
+// pass, as a failed packet did: the next pass prepares the same work again. The tokens and the cost are summed; the
+// API time and the first token are the longest call's.
+func askAll(calls []string) (extract.DreamReply, error) {
+	replies := make([]extract.DreamReply, len(calls))
+	errs := make([]error, len(calls))
+	var wg sync.WaitGroup
+	for i, c := range calls {
+		wg.Go(func() { replies[i], errs[i] = dreamRunFn(c) })
+	}
+	wg.Wait()
+	var r extract.DreamReply
+	var joined dreamAnswer
+	for i, rp := range replies {
+		r.Tokens.Add(rp.Tokens)
+		r.CostUSD += rp.CostUSD
+		r.API, r.TTFT = max(r.API, rp.API), max(r.TTFT, rp.TTFT)
+		if errs[i] != nil {
+			continue
+		}
+		var a dreamAnswer
+		if err := json.Unmarshal(rp.Answer, &a); err != nil {
+			errs[i] = fmt.Errorf("answer: %w", err)
+			continue
+		}
+		if i > 0 && a.Packet != joined.Packet {
+			errs[i] = fmt.Errorf("answer is for packet %q, the others for %q", a.Packet, joined.Packet)
+			continue
+		}
+		joined.Packet = a.Packet
+		joined.Splits = append(joined.Splits, a.Splits...)
+		joined.Expansions = append(joined.Expansions, a.Expansions...)
+		joined.Actions = append(joined.Actions, a.Actions...)
+		joined.Translations = append(joined.Translations, a.Translations...)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return r, err
+	}
+	var err error
+	r.Answer, err = json.Marshal(joined)
+	return r, err
+}
