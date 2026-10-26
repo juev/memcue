@@ -170,7 +170,8 @@ The project narrows and orders `memcue search`. In a session that works in a rep
 repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default
 (#418). Outside a repository, and in the Hermes tool, the default is the whole base. `-in all` searches every
 repository, `-in project` searches this repository only, and `-in host`, `-in global` or a scope such as
-`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`. The default was
+`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`, or the tier of an origin,
+`-in repo:_global` (#459). The default was
 measured, not assumed: the project's facts alone answered a question about the host with 1 fact where the whole base
 gave 5, three of them the host facts that answered it, and 255 of the 391 live facts of that base carry the host scope
 ([scope-418-2026-10](docs/research/scope-418-2026-10.md)) — so the host and the global facts are in the default, and a

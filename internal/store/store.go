@@ -1194,10 +1194,23 @@ func (s *Store) Active() ([]Fact, error) {
 // that is active and not a candidate — sorted and without duplicates. It is how a caller names a repository key it
 // does not know exactly.
 func (s *Store) RepoScopes() ([]string, error) {
-	scope, review := s.col("f", "scope"), s.col("f", "review")
-	rows, err := s.db.Query(`SELECT DISTINCT `+scope+` FROM facts f
+	scope := s.col("f", "scope")
+	return s.liveStrings(scope, "lower("+scope+") LIKE 'repo:%'")
+}
+
+// OriginTiers returns the tiers the live facts were learnt in — the first word of an origin "<tier> <date>" — sorted and
+// without duplicates. A search by "-in repo:KEY" matches these as well as the repository scopes (#459).
+func (s *Store) OriginTiers() ([]string, error) {
+	return s.liveStrings("substr(f.origin, 1, instr(f.origin, ' ') - 1)", "instr(f.origin, ' ') > 1")
+}
+
+// liveStrings returns the distinct values of expr over the latest version of every fact that is active and not a
+// candidate and that meets cond, sorted.
+func (s *Store) liveStrings(expr, cond string) ([]string, error) {
+	review := s.col("f", "review")
+	rows, err := s.db.Query(`SELECT DISTINCT `+expr+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
-		AND `+review+` IN ('', ?) AND lower(`+scope+`) LIKE 'repo:%' ORDER BY 1`, Active, Provisional)
+		AND `+review+` IN ('', ?) AND `+cond+` ORDER BY 1`, Active, Provisional)
 	if err != nil {
 		return nil, err
 	}
