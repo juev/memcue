@@ -300,6 +300,30 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(self.written(), {old_key: fact_id})
         self.assertIn("55432", "\n".join(self.memcue("dump", self.p._facts)))  # still there to be retired later
 
+    def test_a_mirror_add_carries_kind_and_scope(self):
+        """The add of a mirror names the derived kind and scope (#488); a note without the host passes no -scope, so
+        the binary keeps its own default instead of being told global."""
+        calls = Path(self.home) / "mirror-args"
+        stub = Path(self.home) / "mirror-memcue"
+        stub.write_text("#!/bin/sh\n"
+                        "case \"$1\" in\n"
+                        "  version) printf '{\"version\":\"dev\"}\\n' ;;\n"
+                        f"  add) printf '%s\\n' \"$@\" --- >> {shlex.quote(str(calls))}; echo f1 ;;\n"
+                        "esac\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "host": "builder"})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        p.on_memory_write("add", "memory", "На builder Caddy слушает порт 8443.")
+        p.on_memory_write("replace", "memory", "Сборка падает без CGO.", {"previous_content": "unknown"})
+        hosted, plain = [c.strip("\n").split("\n") for c in calls.read_text(encoding="utf-8").split("---\n")
+                         if c.strip()]
+        self.assertEqual(hosted[hosted.index("-kind") + 1], "environment")
+        self.assertEqual(hosted[hosted.index("-scope") + 1], "host:builder")
+        self.assertEqual(hosted[hosted.index("-source") + 1], "memory")
+        self.assertEqual(plain[plain.index("-kind") + 1], "pitfall")
+        self.assertNotIn("-scope", plain)
+        self.assertEqual(plain[-1], "Сборка падает без CGO.")
+
     def search(self, query: str) -> str:
         """What memcue_search returns to the model for query."""
         return self.p.handle_tool_call("memcue_search", {"query": query})
@@ -941,6 +965,29 @@ class ProviderTest(unittest.TestCase):
     def test_missing_binary_is_unavailable(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": "/nonexistent/memcue"})
         self.assertFalse(p.is_available())
+
+
+class NoteLabelsTest(unittest.TestCase):
+    def test_labels_of_a_mirrored_note(self):
+        """A mirrored note gets a kind from its wording and a scope from the host it names (#488)."""
+        cases = (
+            ("user", "Пользователь пишет по-русски.", "builder", "rule", "global"),  # a stated preference
+            ("memory", "На builder Caddy слушает порт 8443.", "builder", "environment", "host:builder"),
+            ("memory", "BUILDER: docker compose up fails without .env", "builder", "pitfall", "host:builder"),
+            ("memory", "Никогда не пушить в main напрямую.", "builder", "rule", ""),  # a prohibition
+            ("memory", "Сначала git fetch, потом rebase.", "builder", "rule", ""),  # a required order
+            ("memory", "Сборка падает на Go 1.21 без CGO.", "builder", "pitfall", ""),  # a failure
+            ("memory", "Хук pre-commit не работает в worktree.", "builder", "pitfall", ""),  # failure, not "не "
+            ("memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.", "builder", "environment", ""),
+            ("memory", "На omega стоит headscale.", "builder", "environment", ""),  # names no host of this provider
+            ("memory", "Сервер buildernet в другой сети.", "builder", "environment", ""),  # the host inside a longer word
+            ("memory", "На builder Caddy слушает порт 8443.", "", "environment", ""),  # no host configured
+            ("memory", "Мне ближе commonly used tooling.", "builder", "environment", ""),  # markers inside words
+        )
+        for target, content, host, kind, scope in cases:
+            with self.subTest(content=content, host=host):
+                p = memcue_provider.MemcueMemoryProvider({"host": host})
+                self.assertEqual(p._note_labels(target, content), (kind, scope))
 
 
 class AccumulationTest(unittest.TestCase):

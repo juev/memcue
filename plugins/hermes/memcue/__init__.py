@@ -3,8 +3,10 @@
 Runs the ``memcue`` binary (github.com/juev/memcue): no facts come with a message; the model searches the base itself
 with ``memcue_search`` before it answers from earlier sessions (#361), and the session card (global rules and the
 decisions of the repository) is part of the system prompt, which Hermes builds once and rebuilds after a compression
-or a reset (#363), but not for a cron run; every write of the built-in memory tool is mirrored into the base as a candidate for review (add → ``memcue add
--candidate``, replace → ``memcue correct``, remove → ``memcue retire``), with the origin ``hermes-memory``; the model
+or a reset (#363), but not for a cron run; every write of the built-in memory tool is mirrored into the base as a live
+fact (#440: add → ``memcue add``, replace → ``memcue correct``, remove → ``memcue retire``), with the origin
+``hermes-memory``, a kind (``rule`` for a user preference or an order, ``pitfall`` for a failure, ``environment``
+otherwise) and a scope (``global`` for a user preference, ``host:<host>`` for a note naming the host) (#488); the model
 gets tools to fix facts too; a reply is checked for the identifiers of the facts its searches returned, and
 ``usage.log`` keeps that score when ``usage_log`` is on. With an OpenAI-compatible endpoint configured, the new
 messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
@@ -75,6 +77,14 @@ _WRITE_TIMEOUT = 15
 _DREAM_TIMEOUT = 60  # a packet groups up to 40 facts by recall, and an answer writes up to a few hundred versions
 _ORIGIN = "hermes"
 _ORIGIN_MIRROR = "hermes-memory"  # a fact that only mirrors a built-in memory note
+# The words that label a mirrored note (#488). A marker starts a word, so "не " does not match inside "мне " and
+# "only " not inside "commonly "; a failure is checked first, because "не работает" also holds the prohibition "не ".
+_PITFALL_WORDS = ("не работает", "не срабатывает", "падает", "ломается", "ломает", "не даёт", "fails", "breaks",
+                  "does not work", "ошибка")
+_RULE_WORDS = ("всегда", "никогда", "не ", "только", "сначала", "обязательно", "always", "never", "must ", "only ",
+               "before you")
+_PITFALL_NOTE = re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, _PITFALL_WORDS)) + ")", re.IGNORECASE)
+_RULE_NOTE = re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, _RULE_WORDS)) + ")", re.IGNORECASE)
 _THRESHOLD = 20000  # characters of new messages that make a run worth a model call
 _IDLE_MINUTES = 30
 _MIN_IDLE = 2000  # a pause sends no less; memcue skips smaller texts anyway
@@ -1178,6 +1188,30 @@ class MemcueMemoryProvider(MemoryProvider):
     def _key(target: str, content: str) -> str:
         return hashlib.sha256(f"{target}\n{content.strip()}".encode()).hexdigest()
 
+    def _note_labels(self, target: str, content: str) -> tuple[str, str]:
+        """kind and scope for a mirrored note: a user preference is a global rule; a memory note is scoped to the host
+        when it names the provider's host, and its wording makes it a pitfall, a rule or else an environment fact. An
+        empty scope leaves the binary's own default. The labels do not change the session card: store.CardFacts skips
+        facts whose source is memory, so a mirror never reaches it. They serve search (-kind rule, -scope and -in
+        filtering) and the vet and dream passes, which would otherwise see an unlabelled fact (#488)."""
+        if target == "user":
+            return "rule", "global"
+        scope = ""
+        if self._host and re.search(r"(?<!\w)" + re.escape(self._host) + r"(?!\w)", content, re.IGNORECASE):
+            scope = f"host:{self._host}"
+        if _PITFALL_NOTE.search(content):
+            return "pitfall", scope
+        if _RULE_NOTE.search(content):
+            return "rule", scope
+        return "environment", scope
+
+    def _add_mirror(self, target: str, content: str) -> tuple[bool, str]:
+        kind, scope = self._note_labels(target, content)
+        cmd = ["add", "-source", "memory", "-kind", kind]
+        if scope:
+            cmd += ["-scope", scope]
+        return self._run(cmd + ["-origin", self._origin(mirror=True), "--", content.strip()])
+
     def on_memory_write(self, action: str, target: str, content: str,
                         metadata: Optional[dict[str, Any]] = None) -> None:
         """Keep the base in step with the built-in memory. Which fact an entry became is remembered in
@@ -1195,8 +1229,7 @@ class MemcueMemoryProvider(MemoryProvider):
             previous_key = self._key(target, previous) if previous else ""
             fact_id = written.get(previous_key) if previous_key else None
             if action == "add" and content.strip():
-                ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin", self._origin(mirror=True), "--",
-                                     content.strip()])
+                ok, out = self._add_mirror(target, content)
                 if ok:
                     written[self._key(target, content)] = out.split()[0]
             elif action == "replace" and content.strip():
@@ -1206,16 +1239,14 @@ class MemcueMemoryProvider(MemoryProvider):
                         written.pop(previous_key, None)
                         written[self._key(target, content)] = fact_id
                     elif "is retired" in out:
-                        # A retired fact is final: the edited note becomes a new candidate, and the entry is linked
+                        # A retired fact is final: the edited note becomes a new fact, and the entry is linked
                         # to it, so a later edit or remove reaches the live fact instead of the history.
-                        ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin",
-                                             self._origin(mirror=True), "--", content.strip()])
+                        ok, out = self._add_mirror(target, content)
                         if ok:
                             written.pop(previous_key, None)
                             written[self._key(target, content)] = out.split()[0]
                 else:
-                    ok, out = self._run(["add", "-source", "memory", "-scope", "global", "-origin", self._origin(mirror=True), "--",
-                                     content.strip()])
+                    ok, out = self._add_mirror(target, content)
                     if ok:
                         written[self._key(target, content)] = out.split()[0]
             elif action == "remove" and fact_id:
