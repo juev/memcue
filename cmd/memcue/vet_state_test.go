@@ -8,9 +8,10 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// vet retires by rule a live fact of a kind the base no longer keeps and installation state of anything, not only of
-// memcue; a rule, a decision and an extracted pitfall stay (#475).
-func TestVetRetiresLegacyKindsAndState(t *testing.T) {
+// vet retires by rule a live fact that records the moment of a process or a file, whatever its kind but a rule or a
+// decision; a version, a path and a fact of an old kind are left alone, since on a live base they also hold real
+// pitfalls and procedures (#475).
+func TestVetRetiresMoments(t *testing.T) {
 	env(t)
 	s, err := store.Open(factsPath())
 	if err != nil {
@@ -24,32 +25,29 @@ func TestVetRetiresLegacyKindsAndState(t *testing.T) {
 		}
 		return f.ID
 	}
-	event := add("Шлюз перезапущен командой gateway run --replace, после рестарта создана новая сессия.", "event", "")
-	repo := add("Репозиторий держит плагин в plugins/hermes/memcue.", "repo", "")
-	restart := add("The gateway was restarted 2026-10-19 23:30:02 with run --replace.", "environment", "agent")
+	restart := add("Шлюз перезапущен 2026-10-19 в 23:30:02 командой gateway run --replace (PID 46005).", "event", "")
+	lines := add("File /srv/app/plugin.py (419 lines) is identical to main.", "repo", "")
+	mtime := add("File /srv/app/store.db has not changed since 2026-10-19 16:04.", "environment", "agent")
+	procedure := add("Create a GPU instance with `tool create instance <offer> --disk 32`.", "procedure", "")
 	version := add("The Claude Code CLI on /srv is version 2.1.301.", "pitfall", "")
-	rule := add("We stay on tool 1.2.3 until the schema migration lands.", "rule", "user")
-	decision := add("Restart the gateway at 23:30 only, after the nightly job.", "decision", "user")
-	pitfall := add("The CLI 2.1.301 on /srv drops the session on a revoked token; log in again.", "pitfall", "tool")
+	decision := add("Restart the gateway only after the nightly job; it was restarted 2026-10-19 23:30:02 last.", "decision", "user")
 	_ = s.Close()
 
 	var out bytes.Buffer
 	if err := runVet([]string{"-no-model", "-dry-run"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"больше не хранит, 2", "о состоянии установки 2"} {
-		if !strings.Contains(out.String(), want) {
-			t.Errorf("dry run report lacks %q:\n%s", want, out.String())
-		}
+	if want := "mtime файла 3"; !strings.Contains(out.String(), want) {
+		t.Errorf("dry run report lacks %q:\n%s", want, out.String())
 	}
-	if f := factByID(t, event); f.Status != store.Active {
-		t.Errorf("a dry run retired %s", event)
+	if f := factByID(t, restart); f.Status != store.Active {
+		t.Errorf("a dry run retired %s", restart)
 	}
 	if err := runVet([]string{"-no-model"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	for id, want := range map[string]string{event: store.Retired, repo: store.Retired, restart: store.Retired,
-		version: store.Retired, rule: store.Active, decision: store.Active, pitfall: store.Active} {
+	for id, want := range map[string]string{restart: store.Retired, lines: store.Retired, mtime: store.Retired,
+		procedure: store.Active, version: store.Active, decision: store.Active} {
 		if f := factByID(t, id); f.Status != want {
 			t.Errorf("%q: %s, want %s", f.Content, f.Status, want)
 		}

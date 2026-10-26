@@ -532,12 +532,12 @@ already left it out), and so is installation state of an older memcue — a fact
 that says which version is installed, where a binary or a wrapper lies or what a config holds, and every version it
 names is older than the running release, such as `The memcue binaries on the build host are 0.8.0.` A fact that
 names an old version as a change of behaviour, or names any version that is not older, stays (#457). A dev build
-skips that rule. Two more rules retire what the policy would no longer let in (#475): a fact of kind `event`, `repo`,
-`procedure` or `other`, which neither extraction nor `add` writes any more, and installation state of anything — the
-rule a candidate meets, which now also knows a restart time or PID, a line count such as `(419 lines)` and a file's
-mtime. A pitfall with no source or written by the agent is checked by its text too, for a version or such a moment
-only; a pitfall extracted from the user's or a tool's words, a rule and a decision are not. `add -source agent` (the
-plugins' `memcue_add`) refuses installation state, since that fact is live at once and never meets vet.
+skips that rule. A live fact that records the moment of a process or a file — a restart time or PID, a line count
+such as `(419 lines)`, a file's mtime — is retired too, whatever it names and whatever its kind but a rule or a
+decision (#475). The candidate rule knows the same moments, and checks a pitfall with no source or written by the
+agent by its text, for a version or such a moment only; a pitfall extracted from the user's or a tool's words is
+left alone. `add -source agent` (the plugins' `memcue_add`) refuses installation state, since that fact is live at
+once and never meets vet.
 Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
 answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
 an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
