@@ -105,6 +105,7 @@ commands:
   facts     list the active facts
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
   dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all] [-j N]
+  notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]
   import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
   extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
@@ -186,6 +187,8 @@ func main() {
 		err = runReindex(os.Args[2:], os.Stdout)
 	case "dream":
 		err = runDream(os.Args[2:], os.Stdout)
+	case "notes":
+		err = runNotes(os.Args[2:], os.Stdout)
 	case "migrate":
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":
