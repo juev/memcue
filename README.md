@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.17.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.18.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.18.0 | 5 | 0.18.0 | 0.18.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.0 (`hermes-agent` 0.15.2) |
 | 0.17.0 | 5 | 0.17.0 | 0.17.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.17.0 (`hermes-agent` 0.15.2) |
 | 0.16.0 | 5 | 0.16.0 | 0.16.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.16.0 (`hermes-agent` 0.15.2) |
 | 0.15.0 | 5 | 0.15.0 | 0.15.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.15.0 (`hermes-agent` 0.15.2) |
@@ -226,6 +227,27 @@ are the lines the plain answer prints after the facts, this one included (#453);
 both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.18.0: a card with a ceiling, in three parts, and a report of the notes already in the base (#475, #476, #477, #480, #481, #487, #488, #489)
+
+- **`memcue notes`** reports which entries of the built-in memory note files are already facts, with their ids, and
+  which are not (#489). It reads the notes, calls no model and writes nothing; an entry marked `ok` can leave the
+  file, a `new` one moves with `memcue add` first.
+- **The session card's budget bounds the stated rules too** (#487). `MEMCUE_CARD_BUDGET` sets it, 3500 characters by
+  default. Before, a fact the user stated was placed outside that room, and the card could grow without a ceiling;
+  now the oldest stated fact goes first, and a card the budget cuts ends with a line that counts what it left out.
+  `card.log` records `budget`, `used` and `omitted`.
+- **The Claude Code plugin reads the session-start text in three parts**, `session-start -part 1` to `-part 3`, one
+  `SessionStart` hook each, at most 9,500 characters a part (#480). Claude Code keeps a hook's text of 10,000
+  characters or more out of the context and shows a 2 KB preview, so in the busiest repositories the card never
+  reached the model. `session-start` without `-part` prints the whole text, as before.
+- The Hermes provider option `session_card_chars` passes that budget through as `MEMCUE_CARD_BUDGET`, and its memory
+  mirror labels a note with its kind and scope instead of `global` with no kind (#488).
+- `memcue_search` refuses a limit of 0 instead of serving the default (#477); a flag after the query text steers the
+  search (#481).
+- `memcue vet` retires the state moments of live facts only (#475).
+- Hermes cron runs feed the shelf through `extract-messages -shelf-only` (#476): what a research job read stays on
+  the shelf, and nothing else from the run reaches the base.
 
 ### 0.17.0: every fact in a place, `-json` carries the hints, vet clears what code can tell is gone (#442, #453, #454, #456, #457, #458, #459, #467)
 
