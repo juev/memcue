@@ -1,30 +1,47 @@
 ---
 name: memcue
-description: Write to long-term memory (memcue). Use when the user asks to remember, note or keep something for later ("запомни", "remember this"), to forget it or says a stored fact is wrong or outdated, or when a fact found with memcue search turns out wrong in this session.
+description: Write to long-term memory (memcue). Use as soon as the user states a rule or a correction ("не так, делай так", "always", "never"), makes a decision the code does not show, or you find a pitfall, a host, a service or a pointer outside the repository that a later session will need; also when the user asks to remember or forget something ("запомни", "remember this"), or a stored fact turns out wrong or outdated.
 ---
 
 # memcue: writing to memory
 
-Memory is a base of atomic facts. You read it with `memcue search [flags] "<words>"`, as the session-start note says; facts
-are extracted from every session automatically when it is compacted or ends. Write by hand only what the user asks for
-and corrections; the session extraction covers the rest.
+Memory is a base of atomic facts. You read it with `memcue search [flags] "<words>"`, as the session-start note says.
+You also write it: nothing is extracted from the session afterwards, so a fact you do not store now is lost. Store it
+when you learn it, not at the end of the session.
+
+## What to store
+
+- **Rules and corrections of the user**, with the reason when the user gave one: `-kind rule`, `-scope global` unless
+  the user ties it to one repository (`-scope repo`).
+- **Decisions of the user** on goals, scope and approach that the code and the git history do not show:
+  `-kind decision -scope repo`.
+- **Pitfalls** found by an error or a check: what happens, why, and the workaround: `-kind pitfall -source tool`.
+- **Environment outside the repository**: hosts and what runs there, services, where logs and data live, ids and
+  addresses of external systems: `-kind environment -source tool` with `-scope host:<name>` or `-scope service:<name>`.
+
+Rules and decisions take `-source user` (the default): they are the user's words, and only they reach the session
+card, which carries the global rules and the decisions of the repository even when a prompt shares no word with them.
+
+Do not store: the progress of the task, what the repository, its git history or a command shows, installation state
+(versions, paths of binaries, defaults of a config), multi-step procedures (they belong in a skill or the docs), and
+your own guesses nothing confirmed.
 
 ## Remember
 
+Search first: if a stored fact says the same or an older version of it, correct that fact instead of adding a second
+one.
+
 ```bash
-memcue add -keywords "word1, word2, синоним" -origin "<repository> <YYYY-MM-DD>" "<fact>"
+memcue search -in all "<words of the fact>"
+memcue add -kind rule -scope global -keywords "word1, word2, синоним, english word" -- "<fact>"
 ```
 
 - One statement in one to three sentences; a rule goes with its reason.
 - Self-contained: name the system, host, repository, path. No "it", "this project", "above".
 - Exact values byte for byte: paths, commands with flags, versions, ports.
-- Only what the user said or a command confirmed; no guesses.
-- Keywords: 3–8 words someone would ask with, including synonyms and the other language.
-- Origin: the repository directory name and today's date.
-- Session card: add `-kind rule -scope global` for a rule the user stated for every project, and
-  `-kind decision -scope repo:<name>` for a choice of this repository. The card carries exactly these two combinations,
-  newest first, so a durable rule or decision reaches the agent even when a prompt shares no word with it.
-- Other values: `-kind pitfall` or `-kind environment`; `-scope host:<name>` or `-scope service:<name>`.
+- Keywords: 3–8 words someone would ask with, including synonyms and both languages: until a dream translates the
+  fact, a search in the other language finds it only through these words.
+- The origin is the repository of the working directory and today's date; pass `-origin` only to name another.
 
 ## Correct or forget
 

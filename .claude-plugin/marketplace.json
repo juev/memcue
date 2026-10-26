@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "memcue",
-      "description": "Long-term memory for Claude Code: a base of atomic facts, recalled by words before each prompt and extracted from sessions automatically",
+      "description": "Long-term memory for Claude Code: a base of atomic facts the agent searches and writes itself",
       "source": "./plugins/claude-code"
     }
   ]

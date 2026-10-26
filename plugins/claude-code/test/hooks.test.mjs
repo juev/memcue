@@ -23,10 +23,9 @@ test('the marketplace points at the Claude Code plugin', async () => {
 	assert.equal(plugin.source, './plugins/claude-code')
 })
 
-test('the hooks cover the three lifecycle events; no recall with a prompt (#361)', async () => {
+test('the hooks cover the session start only: no recall with a prompt (#361), no extraction (#494)', async () => {
 	const config = await json('hooks/hooks.json')
-	assert.deepEqual(Object.keys(config.hooks).sort(),
-		['PreCompact', 'SessionEnd', 'SessionStart'])
+	assert.deepEqual(Object.keys(config.hooks), ['SessionStart'])
 })
 
 test('the SessionStart hook can install the binary and warns about an older one', async () => {
@@ -44,8 +43,6 @@ test('every hook runs the binary through the plugin script, with a timeout', asy
 	// or more, and the limit holds per hook (#480).
 	const expected = {
 		SessionStart: ['session-start -part 1', 'session-start -part 2', 'session-start -part 3'],
-		PreCompact: ['hook-extract'],
-		SessionEnd: ['hook-extract'],
 	}
 	for (const [event, commands] of Object.entries(expected)) {
 		const groups = config.hooks[event]

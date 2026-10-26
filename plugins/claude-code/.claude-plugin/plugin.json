@@ -1,7 +1,7 @@
 {
   "name": "memcue",
   "version": "0.18.1",
-  "description": "Long-term memory for Claude Code: a base of atomic facts the agent searches itself, extracted from sessions automatically",
+  "description": "Long-term memory for Claude Code: a base of atomic facts the agent searches and writes itself",
   "author": {
     "name": "Denis Evsyukov"
   },
