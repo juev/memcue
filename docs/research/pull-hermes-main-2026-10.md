@@ -66,16 +66,37 @@ The five stale mirrors are all installation state that the notes no longer hold 
 "the gateway restarted on 23.10", "add expands queries", …): the rule of #440 removes them only now that the plugin
 names the notes directory (#458).
 
-What did not work as hoped:
+Two results looked like failures; checked against the code and the logs, neither is one.
 
-- **The version rule retires nothing here.** 16 live facts name a memcue version. 13 of them are of a knowledge
-  kind (pitfall, rule, decision, event), which the rule leaves alone by design; most describe behaviour that is still
-  true ("in 0.14.0 an expired fact is cut from search"). Two are stale state the rule misses: "in memcue 0.9.0 there
-  are no `sessions/<id>.recalled` files" (environment, but no installation word near the version) and "in plugin
-  0.2.1 the key … is deprecated" (a pitfall). The 14 of the issue counted facts that name a version, not facts that
-  should go; the rule of #457 is conservative and on this base its share is zero.
-- **A mirror that restates a live rule in other words is approved.** #458 drops a mirror an approved fact covers word
-  for word; the two duplicates the 0.16.0 note names are paraphrases, and the covers check does not see them.
+**The version rule retires nothing, because this base holds nothing for it.** 16 live facts name a memcue version;
+13 are of a knowledge kind (pitfall, rule, decision, event) and describe behaviour that is still true ("in 0.14.0 an
+expired fact is cut from search"). The two the 0.16.0 note called stale are true today:
+
+- "in plugin 0.2.1 the key `extract_include_tool_results` is deprecated and ignored": the current plugin still says
+  so (`plugins/hermes/memcue/__init__.py`, the config docstring). The version says when, not that it stopped.
+- "in memcue 0.9.0 there are no `sessions/<id>.recalled` files": no code writes such a file; the fact is true and
+  repeats a neighbour ("only the removed push version wrote them"), which is the dream's work, not vet's.
+
+The model of vet had already judged both: `vet.log` keeps them as suspects asked and kept after every release since
+0.6.0, the reason each time "history of version X, not the current state". The 14 of #457 counted facts that name a
+version; the share of them that is stale state is zero on this base, and the rule leaves it at zero.
+
+The same log shows a cost: **120 suspect judgements over 18 runs for 53 facts, 98 kept**, five facts asked five
+times or more (eleven at most). A suspect is remembered by its text and the binary version, so every release asks
+the model again about a fact it has kept as history each time.
+
+**A mirror that restates an extracted fact in other words is approved — and it costs little.** Seven of the eight
+mirrors have an extracted fact on the same subject: the share of the mirror's stems the fact holds is 0.88, 0.75,
+0.61 and 0.53 for four pairs that say the same thing, and 0.67 for a pair that does not (the SSH key against the API
+token of the same forge). No stem share separates them, the observation of #436 again, so `covers()` (every stem of
+the mirror in the fact) stays as strict as it is. What the duplicate costs:
+
+- **Not the card.** A mirror never goes on the card (#424). The extracted paraphrases do, and the plugin's filter
+  already drops them: the binary's card is 3 079 characters and 18 lines, the plugin hands the model **2 727 and
+  13** — 5 of the 6 lines the 0.16.0 note counted as repeats are gone before the model reads the card. That note
+  read `card.log`, which records the binary's card; the drop happens in the plugin and is not logged (#456).
+- **A second hit in search.** The mirror and the paraphrase can both come back for one query. Merging neighbours is
+  the dream's work.
 
 ## Errors of the 0.16.0 note, reproduced on main
 
