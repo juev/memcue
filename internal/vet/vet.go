@@ -43,6 +43,16 @@ var (
 	hostExt = regexp.MustCompile(`^(?:com|org|net|io|ru|de|me|co|ai|app|cloud|dev|local|internal|online|site|tech|xyz|info)$`)
 	// baseSize is the size of a base or the count of its facts.
 	baseSize = regexp.MustCompile(`живых фактов|фактов в базе|live facts|facts in the base|размер базы|занимает \d+(?:[.,]\d+)? ?(?:кб|мб|гб|kb|mb|gb)`)
+	// clock and pid are the time and the process of a start; restartWord says a start happened, so a schedule ("runs
+	// at 03:00") is not one (#475).
+	clock       = regexp.MustCompile(`\b\d{1,2}:\d{2}(?::\d{2})?\b`)
+	pid         = regexp.MustCompile(`\bpid\s*\d+`)
+	restartWord = regexp.MustCompile(`перезапущен|restarted`)
+	// lineCount is the size of a file at one moment, "(419 lines)"; a limit such as "reads 2000 lines" is not in
+	// brackets.
+	lineCount = regexp.MustCompile(`\(\d+ (?:lines?|строк[аи]?)\)`)
+	// mtime is when a file last changed.
+	mtime = regexp.MustCompile(`mtime \d|не менял\p{L}* с \d|(?:has not|hasn't) changed since|not modified since|unchanged since`)
 )
 
 // nearRunes is how far, in characters either side, a signal looks for the word that confirms it.
@@ -83,17 +93,14 @@ type Decision struct {
 // "<tier> <date>", so a repository called test-utils or testing must not be mistaken for one.
 //
 // An environment fact (or one of no kind) that only records installation state is dropped: a command reads it, and
-// the stored copy is stale after the next release (#426). A rule, a decision, a pitfall or a procedure that names a
-// version is knowledge, not state, and is left alone.
+// the stored copy is stale after the next release (#426). A rule, a decision, or a pitfall extracted from the user's
+// or a tool's words that names a version is knowledge, not state, and is left alone; see State for the rest (#475).
 //
 // A candidate whose words are all in an approved fact says nothing new and would only take room in a prompt.
 func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decided []Decision, rest []store.Fact) {
 	notes := norm(memory)
 	for _, c := range cands {
-		state := ""
-		if stateKind(c.Kind) {
-			state = installationState(c)
-		}
+		state := State(c)
 		switch {
 		case c.Source == "memory" && haveMemory:
 			// A live note is kept unless the base already states it: a mirror of a rule that is live would put the
@@ -128,21 +135,55 @@ func Rules(cands, approved []store.Fact, memory string, haveMemory bool) (decide
 	return decided, rest
 }
 
-// stateKind reports whether a fact of this kind can be mere installation state: knowledge kinds never are.
-func stateKind(kind string) bool {
-	switch strings.ToLower(strings.TrimSpace(kind)) {
+// State names the installation state a fact only records (installationState), or returns "" when the fact is of a
+// knowledge kind or records none.
+func State(f store.Fact) string {
+	if !stateKind(f) {
+		return ""
+	}
+	part := installationState(f)
+	if strings.EqualFold(strings.TrimSpace(f.Kind), "pitfall") {
+		// A pitfall names a wrapper's path or a config key as its cause, so only a version and a moment are state in
+		// one: on a live base the path and size signals took two real pitfalls of six they fired on.
+		switch part {
+		case "path", "config default", "size":
+			return ""
+		}
+	}
+	return part
+}
+
+// stateKind reports whether a fact can be mere installation state: knowledge kinds never are. A pitfall counts only
+// when extraction labelled it from the user's words or a tool's output: one with no source predates the policy, and
+// one the agent wrote has no evidence behind its label (#475).
+func stateKind(f store.Fact) bool {
+	switch strings.ToLower(strings.TrimSpace(f.Kind)) {
 	case "", "environment", "other":
+		return true
+	case "pitfall":
+		return f.Source == "" || f.Source == "agent"
+	}
+	return false
+}
+
+// LegacyKind reports whether kind is one the base no longer keeps: neither extraction nor add writes it, so a live
+// fact of it was stored before the policy (#475).
+func LegacyKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "event", "repo", "procedure", "other":
 		return true
 	}
 	return false
 }
 
 // installationState reports whether a fact only records the state of an installation: the version of something
-// installed, the path of a binary or a wrapper, the variables a wrapper exports, a config default, or the size and
-// the fact count of a base. A command reads each of these (#426), and the stored copy is stale after the next
-// release; a rule, a decision or a pitfall that merely names a version is not this.
+// installed, the path of a binary or a wrapper, the variables a wrapper exports, a config default, the size and
+// the fact count of a base, or the moment of a process or a file — a restart time or PID, a line count, an mtime
+// (#475). A command reads each of these (#426), and the stored copy is stale after the next release or restart; a
+// rule, a decision or a pitfall that merely names a version is not this.
 //
-// It names the part found — version, path, config default or size — or returns "" when there is none. When in doubt
+// It names the part found — version, path, config default, size, restart, line count or mtime — or returns "" when
+// there is none. When in doubt
 // it returns "": a wrong drop loses knowledge, an undecided candidate only costs a line in a report.
 func installationState(c store.Fact) string {
 	s := strings.ToLower(c.Content)
@@ -155,6 +196,12 @@ func installationState(c store.Fact) string {
 		return "config default"
 	case baseSize.MatchString(s):
 		return "size"
+	case near(s, clock, restartWord, nil) || near(s, pid, restartWord, nil):
+		return "restart"
+	case lineCount.MatchString(s):
+		return "line count"
+	case mtime.MatchString(s):
+		return "mtime"
 	}
 	return ""
 }

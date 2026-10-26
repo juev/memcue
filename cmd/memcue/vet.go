@@ -65,12 +65,16 @@ type vetRecord struct {
 	Scoped int `json:"scoped,omitempty"`
 	// Expired and Outdated count the live facts retired by rule as past their expiry and as installation state of an
 	// older memcue (#457).
-	Expired  int            `json:"expired,omitempty"`
-	Outdated int            `json:"outdated,omitempty"`
-	DryRun   bool           `json:"dry_run,omitempty"`
-	CostUSD  float64        `json:"cost_usd,omitempty"`
-	Tokens   extract.Tokens `json:"tokens,omitempty"`
-	Error    string         `json:"error,omitempty"`
+	Expired  int `json:"expired,omitempty"`
+	Outdated int `json:"outdated,omitempty"`
+	// Legacy and State count the live facts retired by rule as of a kind no longer kept and as installation state of
+	// anything but memcue (#475).
+	Legacy  int            `json:"legacy,omitempty"`
+	State   int            `json:"state,omitempty"`
+	DryRun  bool           `json:"dry_run,omitempty"`
+	CostUSD float64        `json:"cost_usd,omitempty"`
+	Tokens  extract.Tokens `json:"tokens,omitempty"`
+	Error   string         `json:"error,omitempty"`
 }
 
 // vetOptions is how a run was asked for.
@@ -364,6 +368,8 @@ func (r *vetRecord) add(o vetRecord) {
 	r.Scoped += o.Scoped
 	r.Expired += o.Expired
 	r.Outdated += o.Outdated
+	r.Legacy += o.Legacy
+	r.State += o.State
 	r.CostUSD += o.CostUSD
 	r.Tokens.Add(o.Tokens)
 	if r.Error == "" {
@@ -549,6 +555,16 @@ func printVet(out io.Writer, lines []vetLine, rec vetRecord) error {
 	}
 	if rec.Outdated > 0 {
 		if _, err := fmt.Fprintf(out, "Фактов о состоянии установки старше текущего релиза %d: сняты\n", rec.Outdated); err != nil {
+			return err
+		}
+	}
+	if rec.Legacy > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов вида, который база больше не хранит, %d: сняты\n", rec.Legacy); err != nil {
+			return err
+		}
+	}
+	if rec.State > 0 {
+		if _, err := fmt.Fprintf(out, "Фактов о состоянии установки %d: сняты\n", rec.State); err != nil {
 			return err
 		}
 	}
