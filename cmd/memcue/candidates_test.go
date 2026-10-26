@@ -130,7 +130,8 @@ func TestImportUsesTheReviewFlag(t *testing.T) {
 func TestAddValidatesKindAndScope(t *testing.T) {
 	env(t)
 	for _, args := range [][]string{
-		{"-kind", "event", "x"},
+		{"-kind", "repo", "x"},
+		{"-kind", "planet", "x"},
 		{"-scope", "planet", "x"},
 		{"-scope", "host:", "x"},
 		{"-scope", "repo:a b", "x"},

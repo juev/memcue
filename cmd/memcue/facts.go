@@ -62,8 +62,10 @@ func splitKeywords(s string) []string {
 }
 
 var (
-	// kinds are the fact kinds the base understands; the card uses rule and decision.
-	kinds = map[string]bool{"rule": true, "decision": true, "pitfall": true, "environment": true}
+	// kinds are the fact kinds add writes; the card uses rule and decision, an event expires (#287). repo and other,
+	// labels of the extraction era, are searched but not written: a scope says the first, no kind the second (#505).
+	kinds = map[string]bool{"rule": true, "decision": true, "pitfall": true, "environment": true, "procedure": true,
+		"event": true}
 	// reScope is where a fact holds: global, a named host, repository or service, a directory, a shelf, or bare repo
 	// for the project of the working directory.
 	reScope = regexp.MustCompile(`^(global|repo|host:[^ ]+|repo:[^ ]+|service:[^ ]+|dir:/.+|shelf:` + shelfSlug + `)$`)
@@ -85,7 +87,7 @@ func validShelf(cmd, slug string) error {
 // validKindScope checks the values a caller may pass to add. An empty value means "not stated" and is allowed.
 func validKindScope(kind, scope string) error {
 	if kind != "" && !kinds[kind] {
-		return fmt.Errorf("add: unknown -kind %q; use rule, decision, pitfall or environment", kind)
+		return fmt.Errorf("add: unknown -kind %q; use rule, decision, pitfall, environment, procedure or event", kind)
 	}
 	if scope != "" && !reScope.MatchString(scope) {
 		if recall.IsShelf(scope) {
@@ -120,7 +122,7 @@ func runAdd(args []string, out io.Writer) error {
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
 	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
-	kind := fs.String("kind", "", "rule, decision, pitfall or environment")
+	kind := fs.String("kind", "", "rule, decision, pitfall, environment, procedure or event (an event expires, see MEMCUE_EVENT_TTL_DAYS)")
 	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>, shelf:<slug> (read only by a search that names it)")
 	shelf := fs.String("shelf", "", "put it on this shelf: the same as -scope shelf:<slug>")
 	force := fs.Bool("force", false, "store it even when it looks like a secret")
