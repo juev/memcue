@@ -1,5 +1,5 @@
 {
-  "description": "memcue: the session card and the note to search memory at session start, extract facts at compaction and session end",
+  "description": "memcue: the note to search and keep memory, and the session card, at session start",
   "hooks": {
     "SessionStart": [
       {
@@ -26,28 +26,6 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 3 || true",
             "timeout": 30
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook-extract || true",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" hook-extract || true",
-            "timeout": 10
           }
         ]
       }

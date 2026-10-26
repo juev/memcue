@@ -1200,3 +1200,36 @@ func TestSessionStartPartsCarryEveryStatedRule(t *testing.T) {
 		t.Errorf("session-card carries %d of 40 stated rules; want the budget of #487 to cut them, with the hint", n)
 	}
 }
+
+// While Claude Code's built-in memory is on, the session start says so and how to turn it off; the user settings or
+// the environment turn the line off (#494).
+func TestSessionStartWarnsWhileAutoMemoryIsOn(t *testing.T) {
+	dir := env(t)
+	t.Setenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "")
+	const warning = "built-in memory is on"
+	if ctx := sessionStartContext(t, dir, "startup", "s1"); !strings.Contains(ctx, warning) {
+		t.Errorf("no settings: the warning is missing:\n%s", ctx)
+	}
+	settings := filepath.Join(claudeDir(), "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settings), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		json string
+		warn bool
+	}{{`{"autoMemoryEnabled": true}`, true}, {`{"theme": "dark"}`, true}, {`{"autoMemoryEnabled": false}`, false}} {
+		if err := os.WriteFile(settings, []byte(c.json), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(sessionStartContext(t, dir, "startup", "s1"), warning); got != c.warn {
+			t.Errorf("%s: warning %v, want %v", c.json, got, c.warn)
+		}
+	}
+	if err := os.WriteFile(settings, []byte(`{"autoMemoryEnabled": true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")
+	if strings.Contains(sessionStartContext(t, dir, "startup", "s1"), warning) {
+		t.Error("CLAUDE_CODE_DISABLE_AUTO_MEMORY=1: the warning is still there")
+	}
+}
