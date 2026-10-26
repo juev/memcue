@@ -491,7 +491,8 @@ left without one, get it from the regular dream, 40 a dream (#396).
 `memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
 decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
 (`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
-mirror), an origin whose tier is exactly `test` (as in `test 2026-10-19`; a repository such as `test-utils` is not a
+mirror) and is not approved when an approved fact already holds its words; an approved mirror without a scope becomes
+`global`, and the review after an extraction takes the mirrors that wait as candidates along (#458); an origin whose tier is exactly `test` (as in `test 2026-10-19`; a repository such as `test-utils` is not a
 test run) is retired as a test trace, and a candidate whose words are all in an
 approved fact is retired as covered. The rest goes to the `keep / drop / unsure / split` judge, twelve candidates a
 call, each with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the

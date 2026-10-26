@@ -20,9 +20,11 @@ memcue fact base:
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset clears its buffers, and an undo forgets the seen fingerprints so the
   truncated part can be extracted again.
-- **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes a candidate
-  fact (source `memory`, origin `hermes-memory`) and waits for approval with `memcue approve`. When the agent
-  edits that entry the fact gets a new version, when it removes it the fact is retired. Which fact an entry became is
+- **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes an approved
+  global fact (source `memory`, origin `hermes-memory`; #440). When the agent edits that entry the fact gets a new
+  version, when it removes it the fact is retired. The vet run after an extraction reads the notes of
+  `$HERMES_HOME/memories` (`MEMCUE_MEMORY_DIR`, unless it is set already): it retires a mirror whose note is gone and
+  decides the mirrors queued as candidates before 0.16.0 (#458). Which fact an entry became is
   kept in `$HERMES_HOME/memcue/written.json`. An explicit `memcue_correct` of an approved fact stays active: it is a
   correction, not a new candidate.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.

@@ -164,6 +164,20 @@ class ProviderTest(unittest.TestCase):
         p.system_prompt_block()
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
 
+    def test_the_extraction_names_the_memory_notes(self):
+        """The vet run after an extraction decides the mirrors by the notes of this Hermes home (#458); a directory
+        the operator set already is kept."""
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": "http://127.0.0.1:9/v1",
+                                                  "extract_model": "m"})
+        p.initialize("s1", hermes_home=self.home)
+        env = p._extract_env()
+        self.assertEqual(env["MEMCUE_MEMORY_DIR"], str(Path(self.home) / "memories"))
+        os.environ["MEMCUE_MEMORY_DIR"] = "/elsewhere"
+        try:
+            self.assertEqual(p._extract_env()["MEMCUE_MEMORY_DIR"], "/elsewhere")
+        finally:
+            os.environ.pop("MEMCUE_MEMORY_DIR", None)
+
     def test_the_environment_off_switch_wins_over_the_endpoint(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": "http://127.0.0.1:9/v1",
                                                   "extract_model": "m"})

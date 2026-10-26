@@ -401,6 +401,17 @@ func applyVet(s *store.Store, d vet.Decision, decision string) string {
 	if err != nil {
 		return "failed: " + err.Error()
 	}
+	if f := d.Fact; d.Verdict == vet.Keep && f.Source == "memory" && strings.TrimSpace(f.Scope) == "" {
+		// A note of the built-in memory holds wherever the agent works: the scope a mirror gets at the write (#440),
+		// given here to a mirror written before that, so an approved one is not in no place (#458).
+		cur, err := s.Get(f.ID)
+		if err == nil {
+			_, err = s.Relabel(f.ID, cur.Version, cur.Kind, "global", cur.Expires)
+		}
+		if err != nil {
+			return "failed: " + err.Error()
+		}
+	}
 	return decision
 }
 
@@ -624,6 +635,17 @@ func maybeVet(ids []string) {
 			continue
 		}
 		cands = append(cands, f)
+	}
+	// A mirror of the built-in memory is no session's candidate, so a mirror queued before the write-time approval
+	// (#440) would wait for a manual vet forever: each run takes the waiting ones along (#458).
+	waiting, err := s.Candidates()
+	if err != nil {
+		return
+	}
+	for _, f := range waiting {
+		if f.Source == "memory" && !slices.ContainsFunc(cands, func(c store.Fact) bool { return c.ID == f.ID }) {
+			cands = append(cands, f)
+		}
 	}
 	o := vetOptions{auto: vetAutoPolicy(), ttlDays: vetTTLDays(), memory: os.Getenv("MEMCUE_MEMORY_DIR")}
 	lines, rec := vetQueue(s, cands, o)

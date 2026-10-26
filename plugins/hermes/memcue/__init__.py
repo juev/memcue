@@ -716,6 +716,10 @@ class MemcueMemoryProvider(MemoryProvider):
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
         if self._host:
             env["MEMCUE_HOST"] = self._host
+        if self._state:
+            # The vet run after an extraction decides the mirrors by the notes they mirror (#458): without the
+            # directory it skips that rule, and a mirror whose note is gone would never be retired.
+            env.setdefault("MEMCUE_MEMORY_DIR", str(Path(self._state).parent / "memories"))
         return env
 
     def _extract_command(self, binary: str, event: str, session: str) -> list[str]:
