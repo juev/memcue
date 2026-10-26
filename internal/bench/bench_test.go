@@ -131,8 +131,6 @@ func newBase(t *testing.T) *base {
 		"MEMCUE_FACTS="+filepath.Join(dir, "facts.db"),
 		"XDG_STATE_HOME="+filepath.Join(dir, "state"),
 		"CLAUDE_CONFIG_DIR="+filepath.Join(dir, "claude"),
-		"MEMCUE_VET=0",
-		"MEMCUE_EXTRACT=0",
 		"MEMCUE_AUTO_INSTALL=0",
 		"MEMCUE_HOST=bench-host",
 	)}
