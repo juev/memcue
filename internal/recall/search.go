@@ -143,6 +143,14 @@ func IsShelf(scope string) bool {
 // has the answer.
 func (q Query) NarrowByDefault() bool { return len(q.In) == 0 && inRepo(q.Project) }
 
+// NamesRepo reports whether In names a repository, "repo:KEY": the only place ResolveRepos changes.
+func (q Query) NamesRepo() bool {
+	return slices.ContainsFunc(q.In, func(place string) bool {
+		place = strings.TrimSpace(place)
+		return len(place) > len("repo:") && strings.EqualFold(place[:len("repo:")], "repo:")
+	})
+}
+
 // maxKnownKeys is how many stored repository keys an error of ResolveRepos names before it counts the rest.
 const maxKnownKeys = 12
 

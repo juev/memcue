@@ -592,16 +592,20 @@ func runSearch(args []string, out io.Writer) error {
 		return err
 	}
 	return withStore(func(s *store.Store) error {
-		known, err := s.RepoScopes()
-		if err != nil {
-			return err
-		}
-		tiers, err := s.OriginTiers()
-		if err != nil {
-			return err
-		}
-		if q, err = q.ResolveRepos(known, tiers); err != nil {
-			return err
+		// The stored keys are two scans of the base, a quarter of a search's time: read them only for a place that
+		// names a repository, the one ResolveRepos changes.
+		if q.NamesRepo() {
+			known, err := s.RepoScopes()
+			if err != nil {
+				return err
+			}
+			tiers, err := s.OriginTiers()
+			if err != nil {
+				return err
+			}
+			if q, err = q.ResolveRepos(known, tiers); err != nil {
+				return err
+			}
 		}
 		start := time.Now()
 		hits, err := recall.Search(s, q)
