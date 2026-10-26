@@ -234,8 +234,10 @@ both it and the bare array of an older binary.
   and `MEMCUE_VET_TTL_DAYS` are no longer read. `hook-extract`, `extract-session` and `extract-messages` stay as
   commands that read their input and exit 0, so an older plugin logs no failure. Candidates the extraction left wait
   for `memcue approve` or `memcue retire`; a provisional fact is found until its expiry.
-- **Turn the host's built-in memory off yourself**: `"autoMemoryEnabled": false` in Claude Code's settings, the memory
-  of Hermes in its own config. memcue does not change them; it says so while they are on.
+- **Turn the host's built-in memory off yourself**: `"autoMemoryEnabled": false` in Claude Code's settings, and
+  `memory.memory_enabled: false` and `memory.user_profile_enabled: false` in Hermes's config. memcue does not change
+  them; it says so while they are on, and a Hermes note file the memory no longer injects stops filtering the card
+  (#502).
 - `memcue_add` of Hermes and DSH takes a `source`: a rule or decision is the user's by default, so it reaches the
   session card, which the `agent` source these tools always wrote never did.
 - `add` refuses installation state written with `-source tool` as well as `-source agent` (#475).
