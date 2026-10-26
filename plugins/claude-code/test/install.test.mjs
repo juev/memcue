@@ -96,6 +96,16 @@ test('MEMCUE_AUTO_INSTALL=0 downloads nothing', { skip: !os || !arch }, () => {
 	assert.match(out, /MEMCUE_AUTO_INSTALL=0/)
 })
 
+test('a later part of the card installs nothing and says nothing without a current binary (#480)', { skip: !os || !arch }, () => {
+	const { env, bin, installed } = setup()
+	assert.equal(run(env, ['session-start', '-part', '2'], '{}'), '')
+	assert.equal(existsSync(installed), false, 'only part 1 may install')
+	fakeBinary(join(bin, 'memcue'), { current: false, name: 'old' })
+	assert.equal(run(env, ['session-start', '-part', '3'], '{}'), '', 'an older binary must not print the whole text again')
+	fakeBinary(join(bin, 'memcue'), { name: 'path' })
+	assert.match(run(env, ['session-start', '-part', '2'], '{}'), /^path session-start -part 2/)
+})
+
 test('a current binary on PATH wins and nothing is downloaded', { skip: !os || !arch }, () => {
 	const { env, bin, installed } = setup()
 	fakeBinary(join(bin, 'memcue'), { name: 'path' })

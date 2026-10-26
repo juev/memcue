@@ -119,6 +119,12 @@ note() {
 
 cmd=${1:-}
 bin=$(resolve)
+# The card comes in parts, one hook each, and the hooks run at once (#480): part 1 installs and tells what is missing,
+# the others print nothing unless a current binary is already there.
+if [ "$cmd" = session-start ] && [ "${2:-}" = -part ] && [ "${3:-}" != 1 ]; then
+	{ [ -n "$bin" ] && current "$bin"; } || exit 0
+	exec "$bin" "$@"
+fi
 if [ "$cmd" = session-start ]; then
 	if [ -z "$bin" ] || ! current "$bin"; then
 		install && bin=$(resolve)

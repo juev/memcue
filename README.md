@@ -563,6 +563,14 @@ the Jev pass 8–10 and 1–4, for about 420k more input tokens
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so a rule shows as used even though no search found it.
 
+Claude Code keeps a hook's `additionalContext` of 10,000 characters or more out of the context: it saves the text to
+a file and shows the model a 2 KB preview. The limit holds per hook, so the plugin declares three `SessionStart`
+hooks, `session-start -part 1` to `-part 3`, and the binary lays the note, the hints and the card out over them, at most
+9,500 characters each (#480). The note and the hints open part 1. A part ends only between lines, and a part that
+starts inside a group repeats its heading. A part with nothing to carry prints nothing. Only past all three parts,
+about 28,000 characters, does the card leave lines out. The last part then says how many and how to search them,
+and `card.log` counts them as `left`. `session-start` without `-part` prints the whole text in one block, as before.
+
 Every rule and decision the user stated (`source` `user` or `user_confirmed`) is on the card, each cut to 400
 characters (#363): since the agent searches itself, the card is the only memory it gets unasked. On the author's
 archived base that is 9 global rules, about 1,300 characters. The other facts share a budget of about 3,500 characters,

@@ -40,19 +40,23 @@ test('the SessionStart hook can install the binary and warns about an older one'
 
 test('every hook runs the binary through the plugin script, with a timeout', async () => {
 	const config = await json('hooks/hooks.json')
+	// The card comes in three parts, one SessionStart hook each: Claude Code hides a hook's text of 10 000 characters
+	// or more, and the limit holds per hook (#480).
 	const expected = {
-		SessionStart: 'session-start',
-		PreCompact: 'hook-extract',
-		SessionEnd: 'hook-extract',
+		SessionStart: ['session-start -part 1', 'session-start -part 2', 'session-start -part 3'],
+		PreCompact: ['hook-extract'],
+		SessionEnd: ['hook-extract'],
 	}
-	for (const [event, command] of Object.entries(expected)) {
+	for (const [event, commands] of Object.entries(expected)) {
 		const groups = config.hooks[event]
-		assert.equal(groups.length, 1, `${event} needs one matcher group`)
-		const [hook] = groups[0].hooks
-		assert.equal(hook.type, 'command', `${event} must run a command`)
-		assert.equal(typeof hook.timeout, 'number')
-		assert.ok(hook.timeout > 0, `${event} needs a positive timeout`)
-		assert.equal(hook.command, `sh "\${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh" ${command} || true`,
-			`${event} must run the plugin script and never block the session`)
+		assert.equal(groups.length, commands.length, `${event} needs ${commands.length} matcher groups`)
+		commands.forEach((command, i) => {
+			const [hook] = groups[i].hooks
+			assert.equal(hook.type, 'command', `${event} must run a command`)
+			assert.equal(typeof hook.timeout, 'number')
+			assert.ok(hook.timeout > 0, `${event} needs a positive timeout`)
+			assert.equal(hook.command, `sh "\${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh" ${command} || true`,
+				`${event} must run the plugin script and never block the session`)
+		})
 	}
 })
