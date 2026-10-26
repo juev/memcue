@@ -143,8 +143,9 @@ func runAdd(args []string, out io.Writer) error {
 		return err
 	}
 	content, keywordsList := strings.Join(fs.Args(), " "), splitKeywords(*keywords)
-	// The agent's fact is live at once and never meets vet.Rules, so the state rule runs here (#475).
-	if *source == "agent" {
+	// The agent writes its own facts (#494): what it saw (tool) or concluded (agent) is live at once and meets no other
+	// check, so the state rule runs here (#475). A fact in the user's words keeps them.
+	if *source == "agent" || *source == "tool" {
 		if part := vet.State(store.Fact{Kind: *kind, Source: *source, Content: content}); part != "" {
 			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; store what does not change with the next release or restart", part)
 		}
