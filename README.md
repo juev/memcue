@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.19.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.20.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.20.0 | 5 | 0.20.0 | 0.20.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.20.0 (`hermes-agent` 0.15.2) |
 | 0.19.0 | 5 | 0.19.0 | 0.19.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.19.0 (`hermes-agent` 0.15.2) |
 | 0.18.1 | 5 | 0.18.1 | 0.18.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.1 (`hermes-agent` 0.15.2) |
 | 0.18.0 | 5 | 0.18.0 | 0.18.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.0 (`hermes-agent` 0.15.2) |
@@ -223,6 +224,16 @@ are the lines the plain answer prints after the facts, this one included (#453);
 both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.20.0: add writes procedure and event facts (#505)
+
+- `memcue add -kind procedure` stores steps the user asked to remember; `search -kind procedure` finds them. Until now
+  such a fact had to go in as `environment`.
+- `memcue add -kind event` stores what happened that the next days need. It expires after `MEMCUE_EVENT_TTL_DAYS`
+  (default 7) unless `-expires` gives a date; before, `add` rejected the kind and the expiry of #287 never applied.
+- `repo` and `other` are still refused by `add`. Neither new kind reaches the session card.
+- The session-start note, the skill and the `kind` description of `memcue_add` (Hermes, DSH) say when to use them.
+- The schema is unchanged.
 
 ### 0.19.0: the agent writes its memory itself; extraction and vet are removed (#494)
 
