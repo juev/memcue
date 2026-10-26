@@ -1,8 +1,8 @@
 # Where the time of `dream -run -all` goes, October 2026
 
-Status: **measured 2026-10-26 for [#471](https://github.com/juev/memcue/issues/471); the change to ship is not chosen
-yet.** The full run of 2026-10-25 took 191 min for 106 packets. This note splits a packet's time and measures four
-ways to cut it on saved packets, without a full run of the model over the base.
+Status: **measured 2026-10-26 for [#471](https://github.com/juev/memcue/issues/471); shipped: up to four packets a
+pass, each cut into calls by task.** The full run of 2026-10-25 took 191 min for 106 packets. This note splits a
+packet's time, measures four ways to cut it on saved packets, and ends with one full run of the shipped change.
 
 ## Setup
 
@@ -59,11 +59,42 @@ the group input. It does not touch the writing of translations and queries, wher
 
 **Smaller output.** Not tried. Corrections were 88 of the run's 252 actions, and actions are a small part of an answer.
 
-## Estimate
+## Decision
+
+Both changes, together: a pass of `dream -run` takes the work of up to `-j` packets (default 4), and each packet's
+work goes in its own calls: the fresh facts with the groups, the facts to expand, the facts to translate. All calls
+of a pass run at once and their answers are applied as one. The price is the split's: the instructions travel with
+every call.
+
+## The full run with the change
+
+One `memcue dream -run -all` on a copy with the debt put back (3,612 live facts, none translated, 3,104 without
+search queries), Opus through `claude -p`, `-j 4`, 2026-10-26:
+
+| | 2026-10-25, one call a packet | 2026-10-26, `-j 4` cut by task |
+|---|---|---|
+| wall time | 191 min | **45.7 min** |
+| passes | 106 | 32, 11–12 calls each |
+| a pass, median | 98 s | 80 s (prepare 9 s, calls 66 s, apply 0.3 s); slowest calls 204 s |
+| translations | 4,024 | 3,987 |
+| facts given queries | 1,414 | 3,432 |
+| splits | 612 | 221 |
+| retired / corrected | 164 / 88 | 72 / 41, 7 refused |
+| cost | $63.16 | $96.32 |
+| end | done after 106 passes | done after 32 passes; 10 of 3,844 facts lack a translation |
+
+The bases differ: the copy is the base after the 2026-10-25 run cleaned it, so it had fewer compound facts and
+duplicates and more facts without queries. Counts of actions are therefore not comparable one to one. Twelve of the
+113 actions, drawn at random, were read against their facts: each retire removed a fact the remaining one covers, each
+correct merged the retired copy's details into the kept text. None was wrong.
+
+Prepare grew from 1–3 s to a median of 9 s: four packets' groups are built in one pass.
+
+## Estimate before the run
 
 At 108 s a pass, the 2026-10-25 run took 191 min. Six packets per pass, in parallel, would make it about 18 passes of
 about 100 s: 30–35 min at the same cost. The split by task alone would make it 106 passes of 35–90 s: 60–100 min at
 1.7 times the cost. Neither is measured on a whole run yet.
 
-Not measured: a whole `-run -all` with either change, the quality of the group decisions on packets with real
-duplicates (these packets came from a base the 2026-10-25 run had already cleaned), more than one run per cell.
+Not measured: the split by task alone over a whole run, more than one run per cell, and how many calls at once a
+DeepSeek endpoint takes before it refuses: `-run` on Hermes now sends up to 12.
