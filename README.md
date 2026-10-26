@@ -123,6 +123,28 @@ plugin and the binary from the same release.
    whose base is in git without the driver hears it on the session card, Hermes and DSH included, until
    `memcue install` runs there.
 
+### The note file and the base
+
+A built-in memory note file (`MEMORY.md` of Claude Code, `MEMORY.md` and `USER.md` of Hermes) is injected whole at
+every turn, while a fact costs nothing until a search returns it. So the note file carries only what must hold before
+any search can run; everything else is a fact. The Hermes mirror copies every note into the base on its own, which
+means most entries end up in the file and in the base at once. `memcue notes` shows which:
+
+```bash
+memcue notes                 # one line per entry: ok ID kind/scope, or new with its size, then a summary
+memcue notes -dir ~/.hermes/memories -json
+```
+
+It reads every `*.md` directly inside `-dir` (default `MEMCUE_MEMORY_DIR`, else `~/.claude/memory`), splits the files
+into entries at a blank line or a `§`, and compares each entry with the live facts by the same word rule the Hermes
+plugin uses to keep the card from repeating the notes; `-min-share` makes that rule stricter or looser. It writes
+nothing and calls no model. An entry marked `ok` can leave the file; a `new` one moves with
+`memcue add -kind K -scope S -- "TEXT"` first.
+
+Do not empty the note file before the session card has a budget of its own, `MEMCUE_CARD_BUDGET` over the stated
+rules too (#487): without it the card grows by exactly the characters the file lost, because the card lines left out
+as copies of the notes come back.
+
 ### Binary from the plugin
 
 All three plugins (Claude Code, DSH, Hermes) find the binary in this order: the one configured explicitly
@@ -499,6 +521,7 @@ memcue vet                           # decide it: approve what belongs in the ba
 memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
 memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
+memcue notes                         # which entries of the built-in memory note files are already facts
 memcue reindex -dry-run              # index rows against the live facts, and how many lack their number term
 memcue reindex                       # rebuild the index from the live facts (-json for one JSON object)
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
