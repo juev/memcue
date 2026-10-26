@@ -36,7 +36,7 @@ func dreamBase(t *testing.T) (old, a, b, other string) {
 	}
 	defer func() { _ = s.Close() }()
 	add := func(c string, k ...string) string {
-		f, err := s.Add(c, k, "x 2026-10-19")
+		f, err := s.AddWith(c, k, "x 2026-10-19", "", store.Meta{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +101,7 @@ func TestDreamGroupKeepsAProvisionalNeighbour(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	approved, err := s.Add("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19")
+	approved, err := s.AddWith("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestDreamListShowsAProvisionalNeighbour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	approved, err := s.Add("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19")
+	approved, err := s.AddWith("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestDreamPrepareChangesNothing(t *testing.T) {
 		t.Fatalf("packet %s: %v", raw, err)
 	}
 	for _, id := range []string{a, b} {
-		if f := vetStatus(t, id); f.Version != 1 || f.Status != store.Active {
+		if f := storedFact(t, id); f.Version != 1 || f.Status != store.Active {
 			t.Errorf("%s changed: %+v", id, f)
 		}
 	}
@@ -350,7 +350,7 @@ func addFact(t *testing.T, content string, keywords ...string) string {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	f, err := s.Add(content, keywords, "y 2026-10-20")
+	f, err := s.AddWith(content, keywords, "y 2026-10-20", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}

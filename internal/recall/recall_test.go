@@ -26,7 +26,7 @@ func setup(t *testing.T) *store.Store {
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	for _, f := range facts {
-		if _, err := s.Add(f.content, splitKW(f.keywords), f.origin); err != nil {
+		if _, err := s.AddWith(f.content, splitKW(f.keywords), f.origin, "", store.Meta{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -40,25 +40,19 @@ func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	approved, err := s.Add("Caddy config.", nil, "x")
+	approved, err := s.AddWith("Caddy config.", nil, "x", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cand, err := s.AddWith("Caddy reload path for the public config.", nil, "x", "",
-		store.Meta{Review: store.Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Nothing makes a fact provisional any more (#494), but a live base still holds such facts from the vet.
 	until := time.Now().AddDate(0, 0, 7).Format(time.DateOnly)
-	if _, err := s.ApproveProvisional(cand.ID, until); err != nil {
+	if _, err := s.AddWith("Caddy reload path for the public config.", nil, "x", until,
+		store.Meta{Review: store.Provisional}); err != nil {
 		t.Fatal(err)
 	}
-	expired, err := s.AddWith("Caddy reload path from an old note.", nil, "x", "",
-		store.Meta{Review: store.Candidate})
+	expired, err := s.AddWith("Caddy reload path from an old note.", nil, "x",
+		time.Now().AddDate(0, 0, -1).Format(time.DateOnly), store.Meta{Review: store.Provisional})
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.ApproveProvisional(expired.ID, time.Now().AddDate(0, 0, -1).Format(time.DateOnly)); err != nil {
 		t.Fatal(err)
 	}
 	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 1, MinCoverage: 0.1, MaxFacts: 3}
@@ -105,13 +99,13 @@ func TestConfirmationsRecallNothing(t *testing.T) {
 // fact on the two rarest prompt terms comes before a long one that holds every term with a larger share.
 func TestPassingFactsAreServedInBM25Order(t *testing.T) {
 	s := setup(t)
-	short, err := s.Add("Конфиг kafka без zookeeper.", []string{"kafka", "zookeeper"}, "infra 2026-10-01")
+	short, err := s.AddWith("Конфиг kafka без zookeeper.", []string{"kafka", "zookeeper"}, "infra 2026-10-01", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	filler := strings.Repeat("брокеры топики ретеншн мониторинг алерты дашборды бэкапы ротация ", 8)
-	long, err := s.Add("Кластер kafka в staging: "+filler+"zookeeper больше не нужен, конфиг лежит в репозитории.",
-		[]string{"kafka"}, "infra 2026-10-02")
+	long, err := s.AddWith("Кластер kafka в staging: "+filler+"zookeeper больше не нужен, конфиг лежит в репозитории.",
+		[]string{"kafka"}, "infra 2026-10-02", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +219,7 @@ func TestVersionedPromptIsNotATicket(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	f, err := s.Add("Postgres 16 runs in a container on port 55432.", nil, "demo 2026-10-19")
+	f, err := s.AddWith("Postgres 16 runs in a container on port 55432.", nil, "demo 2026-10-19", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,8 +234,8 @@ func TestVersionedPromptIsNotATicket(t *testing.T) {
 
 func TestExpiredFactIsNotRecalled(t *testing.T) {
 	s := setup(t)
-	f, err := s.AddExpiring("Стенд нагрузки поднимается на порту 8443 в staging.", []string{"staging"},
-		"loadtest 2026-10-01", "2026-10-10")
+	f, err := s.AddWith("Стенд нагрузки поднимается на порту 8443 в staging.", []string{"staging"},
+		"loadtest 2026-10-01", "2026-10-10", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}

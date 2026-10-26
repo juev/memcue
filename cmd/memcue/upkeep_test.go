@@ -43,14 +43,14 @@ func TestCardNamesTheOldNameOfTheSessionRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("Магазин собирается через make.", nil, "shop 2026-10-01"); err != nil {
+	if _, err := s.AddWith("Магазин собирается через make.", nil, "shop 2026-10-01", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.AddWith("Правило: в магазине без force-push.", nil, "x 2026-10-02", "",
 		store.Meta{Kind: "rule", Scope: "repo:shop", Source: "user"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("Другой проект, другое имя.", nil, "garden 2026-10-03"); err != nil {
+	if _, err := s.AddWith("Другой проект, другое имя.", nil, "garden 2026-10-03", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -118,7 +118,7 @@ func seedUpkeepBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("Факт для проверки драйвера.", nil, "x 2026-10-01"); err != nil {
+	if _, err := s.AddWith("Факт для проверки драйвера.", nil, "x 2026-10-01", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {

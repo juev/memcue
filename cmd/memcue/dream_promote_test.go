@@ -18,14 +18,14 @@ func promoteBase(t *testing.T, originB, originA string) (a, b string) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	fb, err := s.Add("Workflow nightly-sync.yml подписывает bot на все репозитории владельца кроме форков и архивных.",
-		[]string{"nightly-sync", "workflow"}, originB)
+	fb, err := s.AddWith("Workflow nightly-sync.yml подписывает bot на все репозитории владельца кроме форков и архивных.",
+		[]string{"nightly-sync", "workflow"}, originB, "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(3 * time.Millisecond) // a ULID orders by millisecond only
-	fa, err := s.Add("Каждую ночь workflow nightly-sync.yml подписывает аккаунт bot на все репозитории владельца, кроме форков.",
-		[]string{"nightly-sync", "workflow"}, originA)
+	fa, err := s.AddWith("Каждую ночь workflow nightly-sync.yml подписывает аккаунт bot на все репозитории владельца, кроме форков.",
+		[]string{"nightly-sync", "workflow"}, originA, "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}

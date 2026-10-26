@@ -25,8 +25,8 @@ import (
 // to it in words, and the session's own model says which of them to retire as duplicates or contradicted, and which
 // to correct. memcue starts no model for it: -prepare hands the work to the model of the session that runs it (a Claude
 // Code skill, a Hermes cron job), and -apply checks and carries out the answer.
-// Extraction never sees the base, so this is where two sessions' copies of one fact, or an old fact and the fact
-// that disproved it, meet.
+// A session writes a fact without reading every neighbour, so this is where two sessions' copies of one fact, or an
+// old fact and the fact that replaced it, meet; the model of the session decides which one stays (#494).
 
 // dreamNeighbours finds the facts close to a fact: the fact itself is the prompt. Coverage is higher than for a
 // prompt because a fact holds many words and shares some of them with unrelated facts.
@@ -56,7 +56,7 @@ const (
 
 // The bounds of one packet keep the context a session spends on a dream small: the fresh facts it reviews, the groups
 // it holds and the facts without search queries it gives them to. What is left waits for the next packet: a base
-// written before extraction wrote queries is expanded over a few dreams (#276).
+// written without queries is expanded over a few dreams (#276).
 var (
 	packetFresh  = 40
 	packetGroups = 30
@@ -966,18 +966,6 @@ func freshSet(fresh []store.Fact) map[string]bool {
 		m[f.ID] = true
 	}
 	return m
-}
-
-// groupFacts joins each fresh fact with its neighbours; groups that share a fact become one. A group is cut at
-// maxGroup facts, and a fact with no neighbour makes no group.
-func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, error) {
-	gr := newGrouper(active)
-	for _, f := range fresh {
-		if err := gr.add(s, f); err != nil {
-			return nil, err
-		}
-	}
-	return gr.groups(), nil
 }
 
 // grouper joins facts with their neighbours one fact at a time, so the sweep can stop once it has made enough groups.

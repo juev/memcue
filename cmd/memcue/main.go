@@ -91,13 +91,9 @@ const usage = `usage: memcue <command>
 commands:
   session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
   session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
-  hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
-  extract-session extract and store the facts of a session since the last run (started by hook-extract)
-  extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-cwd DIR] [-session ID] [-event E] [-min-chars N] [-shelf SLUG [-shelf-only]]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   candidates list the facts that wait for approval: memcue candidates [-json]
-  vet       decide the candidates without asking: memcue vet [-dry-run] [-limit N] [-no-model] [-json] [-memory DIR]
   approve   take candidates into recall: memcue approve ID...
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
@@ -107,8 +103,7 @@ commands:
   dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]
-  import    store the facts of migrate or extract -dry-run output (a session's facts as candidates): memcue import FILE.json...
-  extract   add the facts of a session transcript: memcue extract [-dry-run] [-from N] [-model M] TRANSCRIPT.jsonl
+  import    store the facts of migrate -dry-run output: memcue import FILE.json...
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
   install   set up the git repository of the base for sync: memcue install [-repo DIR]
@@ -117,10 +112,10 @@ commands:
 environment:
   MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
   MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base
-  MEMCUE_MODEL    model of the extraction (default claude-opus-5-5)
-  MEMCUE_API_URL  OpenAI-compatible endpoint for the extraction instead of claude -p (with MEMCUE_API_KEY)
+  MEMCUE_MODEL    model of migrate, dream -run and the search queries add asks for (default claude-opus-5-5)
+  MEMCUE_API_URL  OpenAI-compatible endpoint for those calls instead of claude -p (with MEMCUE_API_KEY); add asks
+                  for search queries only when it is set
   MEMCUE_API_KEY  key for MEMCUE_API_URL
-  MEMCUE_EXTRACT  0 switches the extraction hook off
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
@@ -128,12 +123,7 @@ environment:
                   dropped first
   MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in
                   the state directory)
-  MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when
-                  claude is on PATH), after storing them; undecided ones become provisional for
-                  MEMCUE_VET_TTL_DAYS
-  MEMCUE_VET_POLICY  provisional (default) turns an unsure candidate into a provisional fact; quarantine
-                  (or "memcue vet -quarantine") keeps the human queue
-  MEMCUE_MEMORY_DIR  directory of the built-in memory notes the mirrors are checked against; empty skips that rule
+  MEMCUE_MEMORY_DIR  directory of the built-in memory notes memcue notes reads by default
 `
 
 func main() {
@@ -159,16 +149,10 @@ func main() {
 		if err = fs.Parse(os.Args[2:]); err == nil {
 			err = runSessionCardWith(os.Stdin, os.Stdout, *dreamTools)
 		}
-	case "hook-extract":
-		err = runHookExtract(os.Stdin)
-		if err != nil { // never block the session
-			fmt.Fprintln(os.Stderr, "memcue:", err)
-			err = nil
-		}
-	case "extract-session":
-		err = runExtractSession(os.Args[2:])
-	case "extract-messages":
-		err = runExtractMessages(os.Args[2:], os.Stdin)
+	case "hook-extract", "extract-session", "extract-messages":
+		// Nothing is extracted any more (#494), but a plugin older than that still calls these after a turn or at
+		// the end of a session: take its input and exit 0, so it logs no failure for every turn.
+		_, _ = io.Copy(io.Discard, os.Stdin)
 	case "search":
 		err = runSearch(os.Args[2:], os.Stdout)
 	case "add":
@@ -177,8 +161,6 @@ func main() {
 		err = runCorrect(os.Args[2:], os.Stdout)
 	case "candidates":
 		err = runCandidates(os.Args[2:], os.Stdout)
-	case "vet":
-		err = runVet(os.Args[2:], os.Stdout)
 	case "approve":
 		err = runApprove(os.Args[2:], os.Stdout)
 	case "retire":
@@ -197,8 +179,6 @@ func main() {
 		err = runMigrate(os.Args[2:], os.Stdout)
 	case "import":
 		err = runImport(os.Args[2:], os.Stdout)
-	case "extract":
-		err = runExtract(os.Args[2:], os.Stdout)
 	case "merge":
 		err = runMerge(os.Args[2:], os.Stderr)
 	case "dump":

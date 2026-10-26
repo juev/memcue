@@ -50,8 +50,8 @@ func seed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if _, err := s.Add("Gradle вне make требует JAVA_HOME=/opt/homebrew/opt/openjdk@21, иначе сборка не находит JDK.",
-		[]string{"gradle", "jdk"}, "lists 2026-10-09 (lists/android.md)"); err != nil {
+	if _, err := s.AddWith("Gradle вне make требует JAVA_HOME=/opt/homebrew/opt/openjdk@21, иначе сборка не находит JDK.",
+		[]string{"gradle", "jdk"}, "lists 2026-10-09 (lists/android.md)", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -380,4 +380,19 @@ func unmarshalFacts(data []byte, facts any) error {
 		return err
 	}
 	return json.Unmarshal(a.Facts, facts)
+}
+
+// storedFact reads the latest version of a fact from the test base.
+func storedFact(t *testing.T, id string) store.Fact {
+	t.Helper()
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	f, err := s.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
 }

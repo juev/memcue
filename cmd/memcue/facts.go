@@ -97,8 +97,8 @@ func validKindScope(kind, scope string) error {
 	return nil
 }
 
-// hasSecret says whether a fact's text or keywords looks like a credential. Extraction applies the same policy; this
-// guard covers the by-hand and migration paths, whose text may be a note or a user request.
+// hasSecret says whether a fact's text or keywords looks like a credential: the agent's, a user request or a
+// migrated note may quote one.
 func hasSecret(content string, keywords []string) bool {
 	return policy.Secret(content) || policy.Secret(strings.Join(keywords, " "))
 }
@@ -263,7 +263,7 @@ func runApprove(args []string, out io.Writer) error {
 	})
 }
 
-// defaultOriginAt names the repository of dir and today, the way extracted facts are named. An empty dir means
+// defaultOriginAt names the repository of dir and today, the way every fact of a session is named. An empty dir means
 // the process working directory; a caller that knows the session workspace passes it explicitly.
 func defaultOriginAt(dir string) string {
 	if dir == "" {
@@ -428,7 +428,7 @@ func runCorrect(args []string, out io.Writer) error {
 			return err
 		}
 		// The text changed, so the queries have to be asked for again: the words the fact was found by no longer
-		// describe it (#297). A candidate waits for the vet, whose approval expands it.
+		// describe it (#297). A candidate is left to the dream, as add leaves it.
 		if f.Review == "" && extract.API.URL != "" {
 			f = expandStored(s, f)
 		}

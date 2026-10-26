@@ -109,7 +109,7 @@ func TestDreamRunAppliesTheAnswer(t *testing.T) {
 		t.Fatalf("%d calls, out %q", *calls, out.String())
 	}
 	for _, id := range []string{old, other} {
-		if tr, ok := extract.Translation(vetStatus(t, id).Queries); !ok || tr != "translated "+id {
+		if tr, ok := extract.Translation(storedFact(t, id).Queries); !ok || tr != "translated "+id {
 			t.Errorf("fact %s: translation %q, %v", id, tr, ok)
 		}
 	}
@@ -164,7 +164,7 @@ func TestDreamRunLogsAFailedCall(t *testing.T) {
 	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
 		t.Fatalf("err %v, want the endpoint's error", err)
 	}
-	if _, ok := extract.Translation(vetStatus(t, old).Queries); ok {
+	if _, ok := extract.Translation(storedFact(t, old).Queries); ok {
 		t.Error("a failed call wrote a translation")
 	}
 	recs := readDreamLog(t, dir)
@@ -177,7 +177,7 @@ func TestDreamRunLogsAFailedCall(t *testing.T) {
 	if err := runDream([]string{"-run"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := extract.Translation(vetStatus(t, old).Queries); !ok || *calls != failed {
+	if _, ok := extract.Translation(storedFact(t, old).Queries); !ok || *calls != failed {
 		t.Errorf("the run after a failure did not translate (failed calls %d)", *calls)
 	}
 }
@@ -213,7 +213,7 @@ func TestDreamRunAllFinishesTheBase(t *testing.T) {
 		t.Fatalf("%d calls, out %q", *calls, out.String())
 	}
 	for _, id := range ids {
-		f := vetStatus(t, id)
+		f := storedFact(t, id)
 		if _, ok := extract.Translation(f.Queries); !ok || len(extract.SearchQueries(f.Queries)) == 0 {
 			t.Errorf("fact %s left with queries %q", id, f.Queries)
 		}
@@ -367,7 +367,7 @@ func TestDreamRunOneFailedCallAppliesNothing(t *testing.T) {
 		t.Fatalf("err %v, want the call's error", err)
 	}
 	for _, id := range []string{old, other} {
-		if _, ok := extract.Translation(vetStatus(t, id).Queries); ok {
+		if _, ok := extract.Translation(storedFact(t, id).Queries); ok {
 			t.Errorf("fact %s translated by a failed pass", id)
 		}
 	}

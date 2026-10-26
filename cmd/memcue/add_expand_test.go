@@ -49,7 +49,7 @@ func TestAddExpandsTheFact(t *testing.T) {
 	withAPI(t, "https://api.example.test")
 	calls := fakeExpandOnce(t, nil)
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
-	if f := vetStatus(t, id); *calls != 1 || len(f.Queries) != 1 || f.Queries[0] != "какой порт у postgres" {
+	if f := storedFact(t, id); *calls != 1 || len(f.Queries) != 1 || f.Queries[0] != "какой порт у postgres" {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
 	}
 }
@@ -60,7 +60,7 @@ func TestAddKeepsTheFactWhenExpansionFails(t *testing.T) {
 	withAPI(t, "https://api.example.test")
 	calls := fakeExpandOnce(t, errors.New("endpoint down"))
 	id := addFactForTest(t, "-origin", "x 2026-10-22", "Postgres демо-базы слушает порт 5432 на db1.")
-	if f := vetStatus(t, id); *calls != 1 || len(f.Queries) != 0 || f.Content == "" {
+	if f := storedFact(t, id); *calls != 1 || len(f.Queries) != 0 || f.Content == "" {
 		t.Fatalf("calls %d, fact %+v", *calls, f)
 	}
 }

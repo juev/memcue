@@ -55,7 +55,7 @@ func TestDreamExpandsFactsWithoutQueries(t *testing.T) {
 		t.Fatalf("sent %q, want the three facts without queries", *sent)
 	}
 	for _, id := range []string{old, a, b} {
-		if f := vetStatus(t, id); len(f.Queries) != 1 || f.Queries[0] != "запрос "+id || f.Version != 2 {
+		if f := storedFact(t, id); len(f.Queries) != 1 || f.Queries[0] != "запрос "+id || f.Version != 2 {
 			t.Errorf("fact %s: %+v", id, f)
 		}
 	}
@@ -93,7 +93,7 @@ func TestDreamExpandsATranslatedFactAndKeepsTheTranslation(t *testing.T) {
 	if !slices.Contains(*sent, a) {
 		t.Fatalf("sent %q, want the translated fact among them", *sent)
 	}
-	if f := vetStatus(t, a); !slices.Equal(f.Queries, []string{"запрос " + a, tr}) {
+	if f := storedFact(t, a); !slices.Equal(f.Queries, []string{"запрос " + a, tr}) {
 		t.Errorf("queries %q, want the new query and the translation", f.Queries)
 	}
 }
@@ -109,7 +109,7 @@ func TestDreamExpandsTheParts(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, compound); f.Status != store.Retired || len(f.Queries) != 0 {
+	if f := storedFact(t, compound); f.Status != store.Retired || len(f.Queries) != 0 {
 		t.Errorf("the compound fact was expanded instead of split: %+v", f)
 	}
 	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
@@ -135,10 +135,10 @@ func TestDreamAppliesQueriesAndTheGroupOfTheFact(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, a); f.Status != store.Retired {
+	if f := storedFact(t, a); f.Status != store.Retired {
 		t.Errorf("the group action was refused after the expansion: %+v", f)
 	}
-	if f := vetStatus(t, b); f.Content != "слитый текст" {
+	if f := storedFact(t, b); f.Content != "слитый текст" {
 		t.Errorf("b %+v", f)
 	}
 	recs := readDreamLog(t, dir)
@@ -157,7 +157,7 @@ func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 	s, _ := store.Open(factsPath())
-	fa := vetStatus(t, a)
+	fa := storedFact(t, a)
 	fa, err := s.SetQueries(a, fa.Version, []string{"новые запросы"})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestDreamDoesNotReviewAFactAgainForItsQueries(t *testing.T) {
 	if _, err := s.Relabel(a, fa.Version, "pitfall", "repo:nightly-sync", ""); err != nil {
 		t.Fatal(err)
 	}
-	fb := vetStatus(t, b)
+	fb := storedFact(t, b)
 	if _, err := s.Correct(b, fb.Content+" Проверено.", fb.Keywords); err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestDreamExpandsTheBacklog(t *testing.T) {
 		t.Errorf("third dream sent %q, want nothing", *sent)
 	}
 	for _, id := range byAge {
-		if f := vetStatus(t, id); len(f.Queries) != 1 || f.Version != 2 {
+		if f := storedFact(t, id); len(f.Queries) != 1 || f.Version != 2 {
 			t.Errorf("fact %s: %+v", id, f)
 		}
 	}

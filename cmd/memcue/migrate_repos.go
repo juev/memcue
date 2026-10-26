@@ -271,10 +271,10 @@ func repoDirs(roots []string) []string {
 		if err != nil {
 			continue
 		}
-		sess, err := transcript.Read(io.LimitReader(f, 1<<20), 0)
+		cwd, err := transcript.CWD(io.LimitReader(f, 1<<20))
 		_ = f.Close()
 		if err == nil {
-			add(sess.CWD)
+			add(cwd)
 		}
 	}
 	for _, root := range roots {

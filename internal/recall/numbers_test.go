@@ -16,7 +16,7 @@ func TestVersionOnlyPromptRecallsTheFact(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	if _, err := s.Add("Стенд собран под Go 1.27, другой версии не поддерживает.", nil, "notes 2026-10-19"); err != nil {
+	if _, err := s.AddWith("Стенд собран под Go 1.27, другой версии не поддерживает.", nil, "notes 2026-10-19", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := Recall(s, "1.27", testParams)
@@ -37,7 +37,7 @@ func TestVersionOnlyPromptWithTheOptOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	if _, err := s.Add("Стенд собран под Go 1.27, другой версии не поддерживает.", nil, "notes 2026-10-19"); err != nil {
+	if _, err := s.AddWith("Стенд собран под Go 1.27, другой версии не поддерживает.", nil, "notes 2026-10-19", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := Recall(s, "1.27", testParams); err != nil {
@@ -56,10 +56,10 @@ func TestVersionDoesNotFilterThePool(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	if _, err := s.Add("Сборка стенда идёт под Go 1.27, другой версии стенд не поддерживает.", nil, "notes 2026-10-19"); err != nil {
+	if _, err := s.AddWith("Сборка стенда идёт под Go 1.27, другой версии стенд не поддерживает.", nil, "notes 2026-10-19", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("Сборка стенда идёт через make stand и требует пин версии.", nil, "notes 2026-10-20"); err != nil {
+	if _, err := s.AddWith("Сборка стенда идёт через make stand и требует пин версии.", nil, "notes 2026-10-20", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	p := testParams

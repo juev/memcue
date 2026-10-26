@@ -1,6 +1,8 @@
-// Package extract turns text (a memory note or a session transcript) into atomic facts with the main model, through
-// `claude -p` with structured output, or through an OpenAI-compatible endpoint when one is configured (API). Hooks are
-// switched off for the `claude -p` call, so the model sees no stored memory and cannot copy facts from it.
+// Package extract holds memcue's model calls: a memory note turned into atomic facts for migrate, the search queries
+// of a stored fact, and the dream run by hand. They go through `claude -p` with structured output, or through an
+// OpenAI-compatible endpoint when one is configured (API). Hooks are switched off for the `claude -p` call, so the
+// model sees no stored memory and cannot copy facts from it. No session is read: the agent writes its facts itself
+// (#494).
 package extract
 
 import (
@@ -49,23 +51,9 @@ const schema = `{"type":"object","additionalProperties":false,"required":["facts
 "properties":{"content":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}}}}},
 "dropped":{"type":"string"},"outdated":{"type":"array","items":{"type":"integer"}}}}`
 
-// sessionSchema is schema with the fields a session's facts must carry for the policy to judge them.
-const sessionSchema = `{"type":"object","additionalProperties":false,"required":["facts","dropped"],"properties":{
-"facts":{"type":"array","items":{"type":"object","additionalProperties":false,
-"required":["content","keywords","kind","scope","source","evidence"],
-"properties":{"content":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},
-"kind":{"type":"string","enum":["rule","decision","pitfall","environment","event","procedure","repo","other"]},
-"scope":{"type":"string"},"source":{"type":"string","enum":["user","user_confirmed","tool","agent"]},
-"evidence":{"type":"string"},"queries":{"type":"array","items":{"type":"string"}},"translation":{"type":"string"}}}},
-"dropped":{"type":"string"},"outdated":{"type":"array","items":{"type":"integer"}}}}`
-
-const sessionAnswer = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
-	`{"facts": [{"content": "…", "keywords": ["…"], "kind": "rule|decision|pitfall|environment|event|procedure|repo|other", ` +
-	`"scope": "…", "source": "user|user_confirmed|tool|agent", "evidence": "…", "queries": ["…"], "translation": "…"}], "dropped": "…", "outdated": []}` + "\n"
-
 var errEmpty = errors.New("model returned neither facts nor a reason")
 
-// Model is the model the extraction runs on (the main one, by the user's decision).
+// Model is the model of the calls (the main one, by the user's decision).
 var Model = "claude-opus-5-5"
 
 // NotePromptVersion is the version of note_prompt.md. It is 0 for the prompt that produced the migrated base;
@@ -75,64 +63,6 @@ const NotePromptVersion = 0
 // Note extracts the facts of a memory note. name is the note's path, for the model's orientation only.
 func Note(ctx context.Context, name, content string) (Result, error) {
 	return run(ctx, notePrompt, fmt.Sprintf("Заметка `%s`:\n\n%s", name, content))
-}
-
-//go:embed session_prompt.md
-var sessionPrompt string
-
-// Session extracts the facts of a rendered session transcript. where names the repository, date, host and system of
-// the session: the model uses them to name a fact's scope. For a later part of a long session, prior holds the facts of the earlier parts:
-// the model returns only what is new and names the prior facts that are outdated, and the result holds the session's
-// whole list. Prior facts stay unless named, so a model that forgets to repeat them loses nothing. notes are the
-// agent's built-in memory notes, which its prompt carries anyway: the model leaves out what they already say, so the
-// base and the card do not repeat them in other words (#456). Empty notes are none.
-func Session(ctx context.Context, where, text string, prior []Fact, notes string) (Result, error) {
-	rp, err := call(ctx, sessionPrompt, sessionSchema, sessionAnswer, sessionInput(where, text, prior, notes))
-	var r Result
-	if err == nil {
-		r, err = decode(rp)
-	}
-	if errors.Is(err, errEmpty) {
-		err = nil // a part that teaches nothing is the common case
-	}
-	if err != nil {
-		return r, err
-	}
-	r.Facts = mergeParts(prior, r.Facts, r.Outdated)
-	return r, nil
-}
-
-// sessionInput is what the model reads for one part of a session: the memory notes, the facts of the earlier parts,
-// then the part itself.
-func sessionInput(where, text string, prior []Fact, notes string) string {
-	input := fmt.Sprintf("Сессия (%s):\n\n%s", where, text)
-	if len(prior) > 0 {
-		var b strings.Builder
-		b.WriteString("Факты из предыдущих частей сессии:\n")
-		for i, f := range prior {
-			fmt.Fprintf(&b, "%d. %s\n", i+1, f.Content)
-		}
-		input = b.String() + "\nСледующая часть. " + input
-	}
-	if notes = strings.TrimSpace(notes); notes != "" {
-		input = "Заметки встроенной памяти агента (они и так в его промпте):\n" + notes + "\n\n" + input
-	}
-	return input
-}
-
-// mergeParts keeps the prior facts not named outdated (numbers from 1) and appends the new ones.
-func mergeParts(prior, fresh []Fact, outdated []int) []Fact {
-	drop := map[int]bool{}
-	for _, n := range outdated {
-		drop[n] = true
-	}
-	var out []Fact
-	for i, f := range prior {
-		if !drop[i+1] {
-			out = append(out, f)
-		}
-	}
-	return append(out, fresh...)
 }
 
 func run(ctx context.Context, system, input string) (Result, error) {

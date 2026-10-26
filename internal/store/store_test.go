@@ -544,137 +544,6 @@ func TestApproveTakesACandidateIntoRecall(t *testing.T) {
 	}
 }
 
-func TestProvisionalIsRecallableButNotTrusted(t *testing.T) {
-	s, _ := open(t)
-	until := time.Now().AddDate(0, 0, 7).Format(time.DateOnly)
-	cand, err := s.AddWith("В контейнере gitea порт 3000.", []string{"gitea"}, "x", "",
-		Meta{Review: Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := s.ApproveProvisional(cand.ID, until)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.Review != Provisional || p.Expires != until || p.Version != 2 {
-		t.Errorf("provisional = %+v", p)
-	}
-	if _, ok := ids(t, s, "gitea")[cand.ID]; !ok {
-		t.Error("provisional fact missing from search")
-	}
-	active, err := s.Active()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range active {
-		if f.ID == cand.ID {
-			t.Error("provisional fact is in the trusted active set")
-		}
-	}
-	if cs, _ := s.Candidates(); len(cs) != 0 {
-		t.Errorf("provisional fact is back in the human queue: %+v", cs)
-	}
-	promoted, err := s.Approve(cand.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if promoted.Review != "" || promoted.Expires != "" {
-		t.Errorf("promoted = %+v, want an approved fact without the provisional TTL", promoted)
-	}
-	cand2, err := s.AddWith("В контейнере gitea порт 3001.", nil, "x", "", Meta{Review: Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.ApproveProvisional(cand2.ID, until); err != nil {
-		t.Fatal(err)
-	}
-	ret, err := s.RetireCandidate(cand2.ID)
-	if err != nil || ret.Status != Retired {
-		t.Fatalf("retire provisional = %+v %v", ret, err)
-	}
-}
-
-func TestRetireCandidateRefusesAnApprovedFact(t *testing.T) {
-	s, _ := open(t)
-	f, err := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "x", "", Meta{Review: Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Approve(f.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.RetireCandidate(f.ID); !errors.Is(err, ErrNotCandidate) {
-		t.Errorf("retiring an approved fact: %v", err)
-	}
-	got, err := s.Get(f.ID)
-	if err != nil || got.Status != Active || got.Review != "" || got.Version != 2 {
-		t.Errorf("a refused candidate retirement changed the fact: %+v %v", got, err)
-	}
-	cand, err := s.AddWith("Другой кандидат.", nil, "", "", Meta{Review: Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ret, err := s.RetireCandidate(cand.ID)
-	if err != nil || ret.Status != Retired || ret.Version != 2 {
-		t.Errorf("retiring a candidate: %+v %v", ret, err)
-	}
-}
-
-// A split retires the compound candidate and stores each part as a candidate of its own, with the origin, expiry and
-// meta of the original.
-func TestSplitCandidate(t *testing.T) {
-	s, _ := open(t)
-	meta := Meta{Kind: "environment", Scope: "host:loffe", Source: "tool", Evidence: "memcue version", Review: Candidate}
-	f, err := s.AddWith("На loffe стоит memcue 0.4.0; бинарь лежит в /opt/data/bin.", []string{"memcue"},
-		"hermes 2026-10-22", "2027-01-01", meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	parts, err := s.SplitCandidate(f.ID, []string{" На loffe стоит memcue 0.4.0. ", "Бинарь memcue на loffe лежит в /opt/data/bin."})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(parts) != 2 || parts[0].Content != "На loffe стоит memcue 0.4.0." {
-		t.Fatalf("parts %+v", parts)
-	}
-	for _, p := range parts {
-		got, err := s.Get(p.ID)
-		if err != nil || got.Origin != f.Origin || got.Expires != f.Expires || got.Meta != meta ||
-			got.Status != Active || got.Version != 1 || len(got.Keywords) != 0 {
-			t.Errorf("part %+v %v", got, err)
-		}
-	}
-	if got, _ := s.Get(f.ID); got.Status != Retired || got.Version != 2 || got.Content != f.Content {
-		t.Errorf("original %+v", got)
-	}
-	cands, err := s.Candidates()
-	if err != nil || len(cands) != 2 {
-		t.Errorf("candidates %+v %v", cands, err)
-	}
-}
-
-// A split that cannot be applied whole changes nothing: an approved fact, one part, or an empty part.
-func TestSplitCandidateRefuses(t *testing.T) {
-	s, _ := open(t)
-	approved, _ := s.Add("Одобренный факт про порт 3000 и путь /srv.", nil, "")
-	if _, err := s.SplitCandidate(approved.ID, []string{"Порт 3000.", "Путь /srv."}); !errors.Is(err, ErrNotCandidate) {
-		t.Errorf("splitting an approved fact: %v", err)
-	}
-	cand, _ := s.AddWith("Кандидат про порт 3000 и путь /srv.", nil, "", "", Meta{Review: Candidate})
-	for _, parts := range [][]string{{"Порт 3000."}, {"Порт 3000.", "  "}} {
-		if _, err := s.SplitCandidate(cand.ID, parts); err == nil {
-			t.Errorf("split into %q was accepted", parts)
-		}
-	}
-	rows, err := s.Rows()
-	if err != nil || len(rows) != 2 {
-		t.Errorf("a refused split wrote to the base: %d rows %v", len(rows), err)
-	}
-	if got, _ := s.Get(cand.ID); got.Status != Active || got.Review != Candidate || got.Version != 1 {
-		t.Errorf("candidate after refused splits %+v", got)
-	}
-}
-
 func TestApproveRefusesWhatIsNotACandidate(t *testing.T) {
 	s, _ := open(t)
 	act, _ := s.Add("Активный факт.", nil, "")
@@ -1372,7 +1241,7 @@ func TestRestoreUndoesARetire(t *testing.T) {
 	}
 
 	c, _ := s.AddWith("Кандидат про порт forgejo 3000.", []string{"forgejo"}, "", "", Meta{Review: Candidate})
-	if _, err := s.RetireCandidate(c.ID); err != nil {
+	if _, err := s.Retire(c.ID); err != nil {
 		t.Fatal(err)
 	}
 	got, err = s.Restore(c.ID)
@@ -1636,10 +1505,7 @@ func TestRepoScopes(t *testing.T) {
 	if _, err := s.Retire(retired.ID); err != nil {
 		t.Fatal(err)
 	}
-	prov := add("repo:example.com/a/provisional", Candidate)
-	if _, err := s.ApproveProvisional(prov.ID, time.Now().AddDate(0, 0, 7).Format(time.DateOnly)); err != nil {
-		t.Fatal(err)
-	}
+	add("repo:example.com/a/provisional", Provisional)
 	got, err := s.RepoScopes()
 	if err != nil {
 		t.Fatal(err)

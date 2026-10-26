@@ -56,7 +56,7 @@ func TestSearchOrdersTiesByHostProjectGlobal(t *testing.T) {
 func TestSearchAnyProjectKeyWinsTies(t *testing.T) {
 	s := emptyBase(t)
 	for _, origin := range []string{"example.com/elsewhere/z 2026-09-10", "example.com/them/upstream 2026-08-01"} {
-		if _, err := s.Add("Брокер nats слушает 4222, мониторинг на 8222.", []string{"nats"}, origin); err != nil {
+		if _, err := s.AddWith("Брокер nats слушает 4222, мониторинг на 8222.", []string{"nats"}, origin, "", store.Meta{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -104,12 +104,12 @@ func TestSearchNoRoomFindsNothing(t *testing.T) {
 // fact answers gets that fact alone, while minScore 0 hands over every fact up to n as before.
 func TestSearchLeavesOutWhatDoesNotFit(t *testing.T) {
 	s := emptyBase(t)
-	if _, err := s.Add("Брокер nats на db1 слушает порт 4222, мониторинг nats на 8222, кластер nats из трёх узлов.",
-		[]string{"nats", "брокер"}, "x 2026-09-10"); err != nil {
+	if _, err := s.AddWith("Брокер nats на db1 слушает порт 4222, мониторинг nats на 8222, кластер nats из трёх узлов.",
+		[]string{"nats", "брокер"}, "x 2026-09-10", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []string{"Порт postgres на db1 — 5432.", "На db1 стоит node_exporter.", "db1 перезагружали в среду."} {
-		if _, err := s.Add(c, nil, "x 2026-09-10"); err != nil {
+		if _, err := s.AddWith(c, nil, "x 2026-09-10", "", store.Meta{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -346,7 +346,7 @@ func TestSearchSince(t *testing.T) {
 func TestSearchFiltersBeforeTheLimit(t *testing.T) {
 	s := emptyBase(t)
 	for range 30 {
-		if _, err := s.Add("nats nats nats broker", nil, "x 2026-09-10"); err != nil {
+		if _, err := s.AddWith("nats nats nats broker", nil, "x 2026-09-10", "", store.Meta{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -364,7 +364,7 @@ func TestSearchFiltersBeforeTheLimit(t *testing.T) {
 func TestSearchAllWords(t *testing.T) {
 	s := emptyBase(t)
 	for _, c := range []string{"nats on db1", "nats elsewhere", "db1 reboots"} {
-		if _, err := s.Add(c, nil, "x 2026-09-10"); err != nil {
+		if _, err := s.AddWith(c, nil, "x 2026-09-10", "", store.Meta{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -392,7 +392,7 @@ func TestSearchRefusesUnknownControls(t *testing.T) {
 // An origin key outside ASCII still names its facts: the database counts characters, not bytes.
 func TestSearchProjectKeyOutsideASCII(t *testing.T) {
 	s := emptyBase(t)
-	if _, err := s.Add("nats на стенде", nil, "dir:/дом/проект 2026-10-25"); err != nil {
+	if _, err := s.AddWith("nats на стенде", nil, "dir:/дом/проект 2026-10-25", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	hits, err := Search(s, Query{Text: "nats", N: 5, Project: []string{"dir:/дом/проект"}, In: []string{"project"}})
@@ -430,11 +430,11 @@ func TestQueryFloor(t *testing.T) {
 // that answers one part of the message shares several. -min-score 0 stays the wide net (#417).
 func TestSearchMessageLeavesOutAFactOfOneTerm(t *testing.T) {
 	s := emptyBase(t)
-	if _, err := s.Add("NAS на хосте loffe держит restic-репозиторий в каталоге /volume1/backup.", nil,
-		"example.org/me/app 2026-10-20"); err != nil {
+	if _, err := s.AddWith("NAS на хосте loffe держит restic-репозиторий в каталоге /volume1/backup.", nil,
+		"example.org/me/app 2026-10-20", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Add("Файл /opt/data/memory_store.db занимает 260 КБ.", nil, "example.org/me/app 2026-10-20"); err != nil {
+	if _, err := s.AddWith("Файл /opt/data/memory_store.db занимает 260 КБ.", nil, "example.org/me/app 2026-10-20", "", store.Meta{}); err != nil {
 		t.Fatal(err)
 	}
 	msg := "Давай посмотрим сколько у нас свободно на диске на nas? Что больше всего занимает и сколько весят бекапы с loffe?"

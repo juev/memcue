@@ -151,7 +151,7 @@ func TestDreamApplyRefusesAChangedSplit(t *testing.T) {
 	if err := runDream([]string{"-apply", plan}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if f := vetStatus(t, compound); f.Status != store.Active || f.Version != 2 {
+	if f := storedFact(t, compound); f.Status != store.Active || f.Version != 2 {
 		t.Errorf("a changed fact was split: %+v", f)
 	}
 	recs := readDreamLog(t, dir)
@@ -200,7 +200,7 @@ func TestDreamModelFailureChangesNothing(t *testing.T) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
 		t.Fatalf("err %v", err)
 	}
-	if f := vetStatus(t, compound); f.Status != store.Active || f.Version != 1 {
+	if f := storedFact(t, compound); f.Status != store.Active || f.Version != 1 {
 		t.Errorf("a failed answer changed the fact: %+v", f)
 	}
 	if _, ok := lastDream(filepath.Join(dir, "state", "memcue")); ok {
