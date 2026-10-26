@@ -536,3 +536,21 @@ func TestSearchShelf(t *testing.T) {
 		})
 	}
 }
+
+// Only a place that names a repository needs the stored keys.
+func TestNamesRepo(t *testing.T) {
+	for _, c := range []struct {
+		in   []string
+		want bool
+	}{
+		{nil, false},
+		{[]string{"all"}, false},
+		{[]string{"project", "host"}, false},
+		{[]string{"repo:"}, false},
+		{[]string{"global", " REPO:memcue"}, true},
+	} {
+		if got := (Query{In: c.in}).NamesRepo(); got != c.want {
+			t.Errorf("NamesRepo(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
