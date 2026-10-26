@@ -22,7 +22,7 @@ import (
 // release that had it (#289). TestKnownEnvCoversTheSource checks it against the os.Getenv calls of the source.
 var knownEnv = []string{
 	"MEMCUE_API_KEY", "MEMCUE_API_URL", "MEMCUE_DREAM_EVERY", "MEMCUE_EVENT_TTL_DAYS", "MEMCUE_EXTRACT", "MEMCUE_FACTS",
-	"MEMCUE_HOST",
+	"MEMCUE_CARD_BUDGET", "MEMCUE_HOST",
 	"MEMCUE_MEMORY_DIR", "MEMCUE_MODEL",
 	"MEMCUE_NUMBER_TERMS",
 	"MEMCUE_SEARCH_LOG", "MEMCUE_STATE_DIR",
