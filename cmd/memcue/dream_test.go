@@ -654,3 +654,37 @@ func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 		t.Fatalf("approved fact not retired: %+v", f)
 	}
 }
+
+// session-card -dream-tools tells a host whose model has the dream as tools, Hermes, that a dream is due and which
+// tools run it; without the flag the card says nothing of the dream (#494).
+func TestSessionCardNamesTheDreamTools(t *testing.T) {
+	dir := env(t)
+	state := filepath.Join(dir, "state", "memcue")
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	dreamBase(t)
+	if _, _, _, err := dreamDue(state, time.Hour); err != nil { // the first check marks the base
+		t.Fatal(err)
+	}
+	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",
+		"nightly-sync", "workflow")
+	card := func(tools bool) string {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runSessionCardWith(strings.NewReader(`{"cwd":"`+dir+`"}`), &out, tools); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	if got := card(true); !strings.Contains(got, "1 facts wait for the dream") || !strings.Contains(got, "memcue_dream_prepare") ||
+		strings.Contains(got, "memcue-dream skill") {
+		t.Errorf("-dream-tools: %s", got)
+	}
+	if got := card(false); strings.Contains(got, "wait for the dream") {
+		t.Errorf("without -dream-tools the card names the dream: %s", got)
+	}
+}

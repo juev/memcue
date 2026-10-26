@@ -90,7 +90,7 @@ const usage = `usage: memcue <command>
 
 commands:
   session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
-  session-card    session-start without the note: the card for a host that has its own instructions
+  session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
   hook-extract    PreCompact and SessionEnd hook: extracts the session's new facts in the background
   extract-session extract and store the facts of a session since the last run (started by hook-extract)
   extract-messages extract and store the facts of chat messages (OpenAI shape, JSON array on stdin): [-origin O] [-cwd DIR] [-session ID] [-event E] [-min-chars N] [-shelf SLUG [-shelf-only]]
@@ -154,7 +154,11 @@ func main() {
 			err = runSessionStartPart(os.Stdin, os.Stdout, *part)
 		}
 	case "session-card":
-		err = runSessionCard(os.Stdin, os.Stdout)
+		fs := flag.NewFlagSet("session-card", flag.ContinueOnError)
+		dreamTools := fs.Bool("dream-tools", false, "also say when a dream is due, naming the memcue_dream_* tools")
+		if err = fs.Parse(os.Args[2:]); err == nil {
+			err = runSessionCardWith(os.Stdin, os.Stdout, *dreamTools)
+		}
 	case "hook-extract":
 		err = runHookExtract(os.Stdin)
 		if err != nil { // never block the session

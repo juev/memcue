@@ -12,7 +12,6 @@ import inspect
 import json
 import re
 import threading
-import time
 import os
 import shlex
 import shutil
@@ -23,7 +22,6 @@ import tempfile
 import types
 import unittest
 import unittest.mock
-from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
@@ -82,9 +80,6 @@ class ProviderTest(unittest.TestCase):
                 os.environ[key] = value
 
     def tearDown(self):
-        self.p._stop.set()
-        if self.p._watcher is not None:
-            self.p._watcher.join(timeout=2)
         shutil.rmtree(self.home, ignore_errors=True)
 
     def facts(self):
@@ -128,17 +123,15 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(p.is_available())
         self.assertIn("absolute", p.unavailable_reason())
 
-    def test_an_older_binary_turns_the_card_and_extraction_off(self):
+    def test_an_older_binary_turns_the_card_off(self):
         stub = Path(self.home, "old-memcue")
         stub.write_text("#!/bin/sh\ncase \"$1\" in\n  version) printf '{\"version\":\"0.3.0\"}\\n' ;;\n"
                         "  hook) printf '{}\\n' ;;\nesac\nexit 0\n", encoding="utf-8")
         stub.chmod(0o755)
-        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "extract_url": "http://127.0.0.1:9/v1",
-                                                  "extract_model": "m"})
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
         p.initialize("s1", hermes_home=self.home)
         self.assertFalse(p._binary_ok())
         self.assertEqual(p._card_text(), "")
-        self.assertIsNone(p._extract_env())
 
     def test_the_current_binary_is_compatible(self):
         self.assertTrue(self.p._binary_ok())
@@ -164,34 +157,6 @@ class ProviderTest(unittest.TestCase):
         # Hermes asks again only when it rebuilds the system prompt; that rebuild asks for the card again.
         p.system_prompt_block()
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
-
-    def test_the_extraction_names_the_memory_notes(self):
-        """The vet run after an extraction decides the mirrors by the notes of this Hermes home (#458); a directory
-        the operator set already is kept."""
-        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": "http://127.0.0.1:9/v1",
-                                                  "extract_model": "m"})
-        p.initialize("s1", hermes_home=self.home)
-        env = p._extract_env()
-        self.assertEqual(env["MEMCUE_MEMORY_DIR"], str(Path(self.home) / "memories"))
-        os.environ["MEMCUE_MEMORY_DIR"] = "/elsewhere"
-        try:
-            self.assertEqual(p._extract_env()["MEMCUE_MEMORY_DIR"], "/elsewhere")
-        finally:
-            os.environ.pop("MEMCUE_MEMORY_DIR", None)
-
-    def test_the_environment_off_switch_wins_over_the_endpoint(self):
-        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": "http://127.0.0.1:9/v1",
-                                                  "extract_model": "m"})
-        p.initialize("s1", hermes_home=self.home)
-        previous = os.environ.get("MEMCUE_EXTRACT")
-        os.environ["MEMCUE_EXTRACT"] = "0"
-        try:
-            self.assertIsNone(p._extract_env())
-        finally:
-            if previous is None:
-                os.environ.pop("MEMCUE_EXTRACT", None)
-            else:
-                os.environ["MEMCUE_EXTRACT"] = previous
 
     def test_provider_matches_real_hermes_api(self):
         from agent.memory_provider import MemoryProvider
@@ -391,24 +356,12 @@ class ProviderTest(unittest.TestCase):
 
     def test_session_switch_rebinds_and_resets_state(self):
         self.p._generation = 3
-        self.p._pending["s2"] = ([{"role": "user", "content": "x"}], 0.0)
         self.p._delivered["s2"] = [{"tokens": ["x"], "chars": 1}]
-        self.p._inflight["s2"] = Counter({"fp": 1})
         self.p.on_session_switch("s2", reset=True)
         self.assertEqual(self.p._session_id, "s2")
         self.assertEqual(self.p._generation, 0)
-        self.assertNotIn("s2", self.p._pending)
-        self.assertNotIn("s2", self.p._inflight)
         self.assertNotIn("s2", self.p._delivered)
-
-    def test_rewound_session_forgets_seen_fingerprints(self):
-        path = self.p._seen_path("s1")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(["old-fingerprint"]), encoding="utf-8")
-        self.p._pending["s1"] = ([{"role": "user", "content": "x"}], 0.0)
-        self.p.on_session_switch("s1", rewound=True)
-        self.assertEqual(self.p._seen("s1"), [])
-        self.assertNotIn("s1", self.p._pending)
+        self.p.on_session_switch("s2", rewound=True)
         self.assertGreaterEqual(self.p._generation, 1)
 
     def test_a_cron_turn_gets_no_facts(self):
@@ -488,6 +441,72 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("kind=rule", line)
         self.assertIn("scope=global", line)
 
+    def test_the_model_is_told_to_keep_its_memory(self):
+        """Nothing is extracted any more (#494): the system prompt tells the model to store what it learns itself."""
+        block = self.p.system_prompt_block()
+        self.assertIn("You keep this memory yourself", block)
+        self.assertIn("memcue_add", block)
+        self.assertNotIn("copied into memcue", block)
+        self.assertIn("at once, when you learn it", memcue_provider.ADD_SCHEMA["description"])
+
+    def test_a_stated_rule_reaches_the_card(self):
+        """A rule or decision is the user's words by default, and only those reach the session card (#494); another
+        source is passed as given, and an unknown one is refused."""
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Всегда пиши коммиты по-английски.", "kind": "rule", "scope": "global"}))
+        fact_id = added["result"].split()[0]
+        line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
+        self.assertIn("source=user", line)
+        self.assertIn("Всегда пиши коммиты", self.p.system_prompt_block())
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Контейнер demo пишет логи в /var/log/demo.", "kind": "environment", "source": "tool"}))
+        fact_id = added["result"].split()[0]
+        line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
+        self.assertIn("source=tool", line)
+        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {"content": "x", "source": "boss"})))
+
+    def test_the_card_asks_for_the_dream_tools(self):
+        """With no extraction, the card's hint is what starts a dream in Hermes (#494): the card asks memcue to name
+        the dream tools, unless dream is off or the binary predates the flag."""
+        for version, config, want in (("0.19.0", {}, True), ("0.18.1", {}, False), ("0.19.0", {"dream": False}, False)):
+            with self.subTest(version=version, config=config):
+                calls = Path(self.home) / f"card-args-{version}-{len(config)}"
+                stub = Path(self.home) / f"card-memcue-{version}-{len(config)}"
+                stub.write_text("#!/bin/sh\n"
+                                f"case \"$1\" in\n  version) printf '{{\"version\":\"{version}\"}}\\n' ;;\n"
+                                f"  session-card) printf '%s\\n' \"$@\" >> {shlex.quote(str(calls))} ;;\nesac\nexit 0\n",
+                                encoding="utf-8")
+                stub.chmod(0o755)
+                base = Path(self.home) / "dream.db"
+                base.write_text("", encoding="utf-8")
+                p = memcue_provider.MemcueMemoryProvider(dict(config, binary=str(stub), facts=str(base)))
+                p.initialize("s1", hermes_home=self.home)
+                p.system_prompt_block()
+                self.assertEqual("-dream-tools" in calls.read_text(encoding="utf-8").splitlines(), want)
+
+    def test_the_built_in_memory_is_warned_about_once(self):
+        """The built-in memory is a second memory (#494): while its notes are there the provider says so once per
+        start, and says nothing without them."""
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        with self.assertNoLogs("memcue_provider", level="WARNING"):
+            p.initialize("s1", hermes_home=self.home)
+        Path(self.home, "memories").mkdir(exist_ok=True)
+        Path(self.home, "memories", "MEMORY.md").write_text("Заметка встроенной памяти.\n", encoding="utf-8")
+        p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        with self.assertLogs("memcue_provider", level="WARNING") as logs:
+            p.initialize("s1", hermes_home=self.home)
+            p.initialize("s1", hermes_home=self.home)
+        self.assertEqual(sum("built-in memory" in m for m in logs.output), 1)
+
+    def test_the_extraction_state_of_an_older_provider_goes(self):
+        """sessions/ and pending/ held what the extraction saw; pending/ holds raw messages (#494)."""
+        for name in ("sessions", "pending"):
+            Path(self.p._state, name).mkdir(parents=True, exist_ok=True)
+            Path(self.p._state, name, "x.json").write_text("[]", encoding="utf-8")
+        self.p.initialize("s1", hermes_home=self.home)
+        for name in ("sessions", "pending"):
+            self.assertFalse(Path(self.p._state, name).exists(), name)
+
     def test_add_passes_shelf(self):
         """memcue_add puts a fact on the shelf: no search reads it but one that names the shelf (#433)."""
         added = json.loads(self.p.handle_tool_call("memcue_add", {
@@ -502,42 +521,6 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("-in shelf:research", empty.get("hint", ""))
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит", "in": "shelf:research"}))
         self.assertEqual([(f["id"], f.get("scope")) for f in found["facts"]], [(fact_id, "shelf:research")])
-
-    def test_extract_command_carries_the_shelf(self):
-        """Extraction always names the shelf, research by default; an empty value and an older binary drop it."""
-        cmd = self.p._extract_command("memcue", "threshold", "s1")
-        self.assertEqual(cmd[cmd.index("-shelf") + 1], "research")
-        named = memcue_provider.MemcueMemoryProvider({"binary": BIN, "shelf": "papers"})
-        cmd = named._extract_command("memcue", "threshold", "s1")
-        self.assertEqual(cmd[cmd.index("-shelf") + 1], "papers")
-        off = memcue_provider.MemcueMemoryProvider({"binary": BIN, "shelf": ""})
-        self.assertNotIn("-shelf", off._extract_command("memcue", "session_end", "s1"))
-        old = memcue_provider.MemcueMemoryProvider({"binary": BIN})
-        old._version = "0.15.0"
-        self.assertNotIn("-shelf", old._extract_command("memcue", "threshold", "s1"))
-
-    def test_a_cron_run_extracts_for_the_shelf_only(self):
-        """A cron run extracts with -shelf-only, so only a fact read from outside is stored; a primary run does not
-        pass the flag, and an empty shelf or a binary older than the flag keeps the cron run out (#476)."""
-        conf = {"binary": BIN, "extract_url": "http://127.0.0.1:9/v1", "extract_model": "m"}
-        cron = memcue_provider.MemcueMemoryProvider(dict(conf))
-        cron.initialize("c1", hermes_home=self.home, agent_context="cron")
-        self.assertIsNotNone(cron._extract_env())
-        cmd = cron._extract_command("memcue", "session_end", "c1")
-        self.assertEqual(cmd[cmd.index("-shelf") + 1:cmd.index("-shelf") + 3], ["research", "-shelf-only"])
-        primary = memcue_provider.MemcueMemoryProvider(dict(conf))
-        primary.initialize("p1", hermes_home=self.home)
-        self.assertNotIn("-shelf-only", primary._extract_command("memcue", "session_end", "p1"))
-        off = memcue_provider.MemcueMemoryProvider(dict(conf, shelf=""))
-        off.initialize("c2", hermes_home=self.home, agent_context="cron")
-        self.assertIsNone(off._extract_env())
-        old = memcue_provider.MemcueMemoryProvider(dict(conf))
-        old.initialize("c3", hermes_home=self.home, agent_context="cron")
-        old._compat, old._version = True, "0.17.0"
-        self.assertIsNone(old._extract_env())
-        sub = memcue_provider.MemcueMemoryProvider(dict(conf))
-        sub.initialize("s1", hermes_home=self.home, agent_context="subagent")
-        self.assertIsNone(sub._extract_env())
 
     def test_search_documents_the_shelf(self):
         schema = next(s for s in self.p.get_tool_schemas() if s["name"] == "memcue_search")
@@ -794,59 +777,6 @@ class ProviderTest(unittest.TestCase):
         self.p.sync_turn("…", "55432", session_id="s1")
         self.assertFalse((Path(self.home) / "state" / "memcue" / "usage.log").exists())
 
-    def test_session_end_extracts_through_the_endpoint(self):
-        answer = json.dumps({"facts": [{"content": "Hermes на server1: модель по умолчанию deepseek-flash.",
-                                        "keywords": ["модель", "model"], "kind": "environment",
-                                        "scope": "host:server1", "source": "user",
-                                        "evidence": "на server1 у hermes модель по умолчанию deepseek-flash"}],
-                          "dropped": ""}, ensure_ascii=False)
-        seen = {}
-
-        class Handler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self):
-                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                seen.update(model=body["model"], auth=self.headers.get("Authorization"),
-                            text=body["messages"][1]["content"])
-                out = json.dumps({"choices": [{"message": {"content": answer}, "finish_reason": "stop"}],
-                                  "usage": {"prompt_tokens": 10, "completion_tokens": 5}}).encode()
-                self.send_response(200)
-                self.send_header("Content-Length", str(len(out)))
-                self.end_headers()
-                self.wfile.write(out)
-
-            def log_message(self, *a):
-                pass
-
-        srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
-        threading.Thread(target=srv.serve_forever, daemon=True).start()
-        self.addCleanup(srv.server_close)
-        self.addCleanup(srv.shutdown)
-        os.environ["TEST_MEMCUE_KEY"] = "k1"
-        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_url": f"http://127.0.0.1:{srv.server_port}",
-                                                  "extract_model": "m1", "extract_key_env": "TEST_MEMCUE_KEY"})
-        workspace = Path(self.home) / "demo"
-        workspace.mkdir()
-        (workspace / ".git").mkdir()
-        # The project is named by its remote, not by the directory (#343).
-        (workspace / ".git" / "config").write_text('[remote "origin"]\n\turl = git@example.com:team/demo.git\n')
-        # Hermes passes the session's directory as cwd; agent_workspace is the constant "hermes" (#347).
-        p.initialize("sess-9", hermes_home=self.home, agent_workspace="hermes", cwd=str(workspace),
-                     agent_context="primary")
-        p.on_session_end([{"role": "system", "content": "prompt"},
-                          {"role": "user",
-                           "content": "на server1 у hermes модель по умолчанию deepseek-flash. " * 60},
-                          {"role": "assistant", "content": "запомнил"}])
-        for _ in range(100):
-            if Path(p._facts).exists() and self.facts_of(p):
-                break
-            time.sleep(0.1)
-        facts = self.facts_of(p)
-        self.assertEqual(len(facts), 1)
-        self.assertIn("deepseek-flash", facts[0])
-        self.assertIn(" example.com/team/demo ", facts[0])
-        self.assertEqual((seen["model"], seen["auth"]), ("m1", "Bearer k1"))
-        self.assertNotIn("SYSTEM", seen["text"])
-
     def test_session_cwd_is_the_project_only_in_git(self):
         """The session's cwd names the project when it lies in a git repository; outside git (Hermes's own
         directories) memcue gets an empty -cwd, so it does not fall back to its own directory (#347). A session
@@ -869,16 +799,13 @@ class ProviderTest(unittest.TestCase):
                 script.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" >> {shlex.quote(str(calls))}\n"
                                   "cat >/dev/null\nexit 0\n", encoding="utf-8")
                 script.chmod(0o755)
-                p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "extract_url": "http://x",
-                                                           "extract_model": "m"})
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(script)})
                 kwargs = {"hermes_home": self.home, "agent_workspace": "hermes", "agent_context": "primary"}
                 if cwd is not None:
                     kwargs["cwd"] = cwd
                 p.initialize("s1", **kwargs)
-                done = threading.Event()
-                p._extract_in_background([{"role": "user", "content": "x"}], "idle", "s1",
-                                         on_done=lambda ok: done.set())
-                self.assertTrue(done.wait(5))
+                # The fact the model stores names the session's project as its origin, the way search scopes by it.
+                self.assertNotIn("error", json.loads(p.handle_tool_call("memcue_add", {"content": "x"})))
                 args = calls.read_text(encoding="utf-8").splitlines()
                 i = args.index("-cwd")
                 self.assertEqual(args[i + 1] if i + 1 < len(args) else "", want)
@@ -915,40 +842,6 @@ class ProviderTest(unittest.TestCase):
                 self.assertEqual("-session" in args, scoped, args)
                 self.assertEqual(args[-2:], ["--", "порт"])
 
-    def test_final_flushes_pass_min_chars(self):
-        """session_end, pre_compress and shutdown are the last chance for a tail; threshold and idle wait."""
-        for event, final in (("session_end", True), ("pre_compress", True), ("shutdown", True),
-                             ("threshold", False), ("idle", False)):
-            with self.subTest(event=event):
-                calls = Path(self.home) / f"args-{event}"
-                script = Path(self.home) / f"bin-{event}"
-                script.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$@\" >> {shlex.quote(str(calls))}\n"
-                                  "cat >/dev/null\nexit 0\n", encoding="utf-8")
-                script.chmod(0o755)
-                p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "extract_url": "http://x",
-                                                           "extract_model": "m"})
-                p.initialize("s1", hermes_home=self.home, agent_context="primary")
-                done = threading.Event()
-                p._extract_in_background([{"role": "user", "content": "x"}], event, "s1",
-                                         on_done=lambda ok: done.set())
-                self.assertTrue(done.wait(5), event)
-                args = calls.read_text(encoding="utf-8").splitlines()
-                if final:
-                    self.assertIn("-min-chars", args, event)
-                    self.assertEqual(args[args.index("-min-chars") + 1], "1", event)
-                else:
-                    self.assertNotIn("-min-chars", args, event)
-
-    def test_no_endpoint_no_extraction(self):
-        self.p.on_session_end([{"role": "user", "content": "x " * 3000}])
-        self.assertFalse(Path(self.p._facts).exists())
-
-    def facts_of(self, p):
-        """The facts an extraction wrote: candidates for review."""
-        out = subprocess.run([BIN, "candidates"], env=dict(os.environ, MEMCUE_FACTS=p._facts),
-                             capture_output=True, text=True).stdout
-        return [line for line in out.splitlines() if line]
-
     def test_host_config_is_forwarded_to_memcue(self):
         script = Path(self.home) / "host.sh"
         script.write_text("#!/bin/sh\nprintf '%s' \"$MEMCUE_HOST\"\n", encoding="utf-8")
@@ -958,10 +851,6 @@ class ProviderTest(unittest.TestCase):
         ok, out = p._run([])
         self.assertTrue(ok)
         self.assertEqual(out, "mac")
-        p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "host": "mac", "extract_url": "http://x",
-                                                   "extract_model": "m"})
-        p.initialize("s1", hermes_home=self.home, agent_context="primary")
-        self.assertEqual(p._extract_env()["MEMCUE_HOST"], "mac")
 
     def test_session_card_chars_is_forwarded_to_memcue(self):
         # The binary places the card's lines (#487): the plugin passes the budget on and cuts nothing itself.
@@ -1009,277 +898,7 @@ class NoteLabelsTest(unittest.TestCase):
                 self.assertEqual(p._note_labels(target, content), (kind, scope))
 
 
-class AccumulationTest(unittest.TestCase):
-    """Turn-based extraction; the model call is replaced, so no binary is needed."""
-
-    def setUp(self):
-        self.home = tempfile.mkdtemp()
-        self.p = memcue_provider.MemcueMemoryProvider({"binary": "/bin/true", "extract_url": "http://x",
-                                                       "extract_model": "m", "extract_threshold": 1000,
-                                                       "extract_idle_minutes": 0})
-        self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
-        self.p._tick = 0.05
-        self.calls = []
-        self.p._extract_in_background = self.succeed
-        self.msgs = [{"role": "system", "content": "prompt"}]
-
-    def succeed(self, msgs, event, session="", on_done=None):
-        self.calls.append((event, session, [m["content"] for m in msgs]))
-        if on_done:
-            on_done(True)
-
-    def tearDown(self):
-        self.p._stop.set()
-        shutil.rmtree(self.home, ignore_errors=True)
-
-    def turn(self, user, answer="ok"):
-        self.msgs += [{"role": "user", "content": user}, {"role": "assistant", "content": answer}]
-        self.p.sync_turn(user, answer, session_id="s1", messages=list(self.msgs))
-
-    def test_threshold_sends_only_new_messages_once(self):
-        self.p._idle = 3600
-        self.turn("a" * 300)
-        self.assertEqual(self.calls, [])
-        self.turn("b" * 800)
-        self.assertEqual(len(self.calls), 1)
-        self.assertEqual(self.calls[0][0:2], ("threshold", "s1"))
-        self.assertEqual(self.calls[0][2], ["a" * 300, "ok", "b" * 800, "ok"])
-        self.turn("c" * 1200)
-        self.assertEqual(self.calls[1][2], ["c" * 1200, "ok"])
-
-    def test_compressed_list_sends_nothing_twice(self):
-        self.p._idle = 3600
-        self.turn("a" * 1200)
-        # Compression replaces the head with a summary and keeps the last turn; only the new turn is new.
-        self.msgs = [{"role": "user", "content": "summary of a"}, *self.msgs[-2:]]
-        self.turn("d" * 1200)
-        self.assertEqual([c[2] for c in self.calls], [["a" * 1200, "ok"], ["summary of a", "d" * 1200, "ok"]])
-
-    def test_pause_sends_a_smaller_batch(self):
-        self.turn("e" * 2100)  # under the threshold of the run below
-        self.p._threshold = 10000
-        self.calls.clear()
-        self.turn("f" * 2100)
-        for _ in range(100):
-            if self.calls:
-                break
-            time.sleep(0.02)
-        self.assertEqual(self.calls[-1][0], "idle")
-        self.assertIn("f" * 2100, self.calls[-1][2])
-
-    def test_session_end_and_shutdown_send_the_rest(self):
-        self.p._idle = 3600
-        self.turn("g" * 100)
-        self.p.on_session_end(list(self.msgs))
-        self.assertEqual(self.calls, [("session_end", "s1", ["g" * 100, "ok"])])
-        self.turn("h" * 100)
-        self.p.shutdown()
-        self.assertEqual(self.calls[-1], ("shutdown", "s1", ["h" * 100, "ok"]))
-
-    def test_shutdown_waits_for_inflight_extraction(self):
-        done = threading.Event()
-
-        def slow():
-            time.sleep(0.2)
-            done.set()
-
-        feed = threading.Thread(target=slow, daemon=True)
-        with self.p._feeds_lock:
-            self.p._feeds.append(feed)
-        feed.start()
-        started = time.monotonic()
-        self.p.shutdown()
-        self.assertTrue(done.is_set())
-        self.assertGreaterEqual(time.monotonic() - started, 0.15)
-
-    def test_session_end_after_switch_flushes_new_session(self):
-        self.p._idle = 3600
-        self.turn("a" * 1200)
-        self.p.on_session_end(list(self.msgs))
-        self.assertEqual([call[1] for call in self.calls], ["s1"])
-        self.p.on_session_switch("s2", reset=True)
-        self.msgs = [{"role": "user", "content": "b" * 1200}]
-        self.p.sync_turn("b" * 1200, "ok", session_id="s2", messages=list(self.msgs))
-        self.p.on_session_end(list(self.msgs))
-        self.assertEqual([call[1] for call in self.calls], ["s1", "s2"])
-
-    def test_seen_survives_a_restart(self):
-        self.p._idle = 3600
-        self.turn("i" * 1200)
-        p2 = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
-        p2.initialize("s1", hermes_home=self.home, agent_context="primary")
-        sent = []
-
-        def capture(msgs, event, session="", on_done=None):
-            sent.append([m["content"] for m in msgs])
-            if on_done:
-                on_done(True)
-
-        p2._extract_in_background = capture
-        p2.on_session_end(list(self.msgs))
-        self.assertEqual(sent, [])
-        p2._stop.set()
-
-    def test_tool_output_is_cut_and_extracted(self):
-        """A tool-sourced fact may quote only tool output, so the extraction has to see it — but cut short."""
-        self.p._idle = 3600
-        self.p._threshold = 10
-        self.msgs += [{"role": "user", "content": "a" * 600}, {"role": "tool", "content": "x" * 60000}]
-        self.p.sync_turn("a" * 600, "ok", session_id="s1", messages=list(self.msgs))
-        tool_texts = [t for call in self.calls for t in call[2] if t.startswith("x")]
-        self.assertTrue(tool_texts, self.calls)
-        self.assertTrue(all(len(t) <= self.p._tool_result_chars + 20 for t in tool_texts), tool_texts)
-
-    def test_tool_output_can_be_turned_off(self):
-        p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "extract_tool_result_chars": 0})
-        p.initialize("s1", hermes_home=self.home, agent_context="primary")
-        self.assertFalse(p._keep({"role": "tool", "content": "x" * 100}))
-        self.assertTrue(p._keep({"role": "user", "content": "x"}))
-
-    def test_long_messages_are_cut_before_extraction(self):
-        self.p._idle = 3600
-        self.p._max_message = 50
-        self.p._threshold = 10
-        self.turn("y" * 400)
-        self.assertEqual(len(self.calls), 1)
-        self.assertTrue(all(len(text) <= 70 for text in self.calls[0][2]), self.calls[0][2])
-
-    def test_failed_extraction_is_retried_not_marked_seen(self):
-        self.p._idle = 3600
-        attempts = []
-
-        def fail(msgs, event, session="", on_done=None):
-            attempts.append([m["content"] for m in msgs])
-            if on_done:
-                on_done(False)
-
-        self.p._extract_in_background = fail
-        self.turn("a" * 1200)
-        self.assertEqual(len(attempts), 1)
-        self.assertEqual(self.p._seen("s1"), [])  # the failure must not acknowledge anything
-
-        # The next successful run takes the same messages from the pending batch and only then marks them seen.
-        self.p._extract_in_background = self.succeed
-        self.p._flush("s1", "idle")
-        self.assertEqual(len(attempts), 1)
-        self.assertEqual(len(self.calls), 1)
-        self.assertIn("a" * 1200, self.calls[0][2])
-        seen = self.p._seen("s1")
-        self.assertIn(memcue_provider._fingerprint({"role": "user", "content": "a" * 1200}), seen)
-
-    def test_pending_batch_survives_a_restart(self):
-        """A crash between the launch and the acknowledgement leaves the batch on disk; the next process retries it."""
-        self.p._idle = 3600
-        captured = []
-
-        def crash(msgs, event, session="", on_done=None):
-            captured.append([m["content"] for m in msgs])  # the process dies before _extracted runs
-
-        self.p._extract_in_background = crash
-        self.turn("z" * 1200)
-        self.assertEqual(len(captured), 1)
-        pending = list((Path(self.p._state) / "pending").glob("*.json"))
-        self.assertEqual(len(pending), 1)
-        saved = json.loads(pending[0].read_text(encoding="utf-8"))
-        self.assertEqual([m["content"] for m in saved], ["z" * 1200, "ok"])
-
-        p2 = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
-        p2.initialize("s1", hermes_home=self.home, agent_context="primary")
-        self.assertIn("s1", p2._pending)
-        sent = []
-
-        def succeed(msgs, event, session="", on_done=None):
-            sent.append([m["content"] for m in msgs])
-            if on_done:
-                on_done(True)
-
-        p2._extract_in_background = succeed
-        p2.on_session_end([])
-        self.assertEqual([text for call in sent for text in call], ["z" * 1200, "ok"])
-        self.assertEqual(list((Path(self.p._state) / "pending").glob("*.json")), [])
-        p2._stop.set()
-
-    def test_subagent_gathers_nothing(self):
-        p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
-        p.initialize("s2", hermes_home=self.home, agent_context="subagent")
-        p.sync_turn("x" * 5000, "ok", session_id="s2", messages=[{"role": "user", "content": "x" * 5000}])
-        self.assertEqual(p._pending, {})
-
-
 TRUE = shutil.which("true") or "/bin/true"  # /usr/bin/true on macOS
-
-
-class DreamRunTest(unittest.TestCase):
-    """The dream after an extraction (#401); the extraction and the dream process are replaced, so no binary is
-    needed."""
-
-    def setUp(self):
-        self.home = tempfile.mkdtemp()
-        self.started, self.procs = [], []
-        self.p = self.provider({})
-
-    def provider(self, extra):
-        p = memcue_provider.MemcueMemoryProvider({"binary": TRUE, "extract_url": "http://x",
-                                                  "extract_model": "m", "extract_threshold": 1000, **extra})
-        p.initialize("s1", hermes_home=self.home, agent_context="primary")
-        p._compat, p._version = True, "0.13.0"
-        p._extract_in_background = lambda msgs, event, session="", on_done=None: on_done and on_done(self.ok)
-        p._start_dream = self.start
-        self.ok = True
-        return p
-
-    def start(self, cmd, env):
-        self.started.append((cmd, env.get("MEMCUE_API_URL"), env.get("MEMCUE_MODEL")))
-        proc = subprocess.Popen(["sleep", "5"] if len(self.started) == 1 else [TRUE])
-        self.procs.append(proc)
-        return proc
-
-    def tearDown(self):
-        self.p._stop.set()
-        for proc in self.procs:
-            if proc.poll() is None:
-                proc.kill()
-            proc.wait()
-        shutil.rmtree(self.home, ignore_errors=True)
-
-    def extract(self, p=None):
-        p = p or self.p
-        p.sync_turn("a" * 1200, "ok", session_id="s1", messages=[{"role": "user", "content": "a" * 1200}])
-
-    def test_a_successful_extraction_starts_one_dream(self):
-        self.extract()
-        self.assertEqual(self.started, [([TRUE, "dream", "-run"], "http://x", "m")])
-        # The first dream still runs: the next extraction does not start a second one.
-        self.p.on_session_end([{"role": "user", "content": "b" * 1200}])
-        self.assertEqual(len(self.started), 1)
-        self.p._dreaming.kill()
-        self.p._dreaming.wait()
-        self.p.on_session_end([{"role": "user", "content": "c" * 1200}])
-        self.assertEqual(len(self.started), 2)
-
-    def test_a_failed_extraction_starts_no_dream(self):
-        self.ok = False
-        self.extract()
-        self.assertEqual(self.started, [])
-
-    def test_dream_false_starts_no_dream(self):
-        p = self.provider({"dream": False})
-        self.extract(p)
-        p._stop.set()
-        self.assertEqual(self.started, [])
-
-    def test_an_older_binary_starts_no_dream(self):
-        self.p._version = "0.12.0"
-        self.extract()
-        self.assertEqual(self.started, [])
-
-    def test_a_subagent_starts_no_dream(self):
-        p = memcue_provider.MemcueMemoryProvider(dict(self.p._config))
-        p.initialize("s2", hermes_home=self.home, agent_context="subagent")
-        p._compat, p._version, p._start_dream = True, "0.13.0", self.start
-        p._dream_in_background()
-        p._stop.set()
-        self.assertEqual(self.started, [])
 
 
 @unittest.skipUnless(memcue_provider._release_target(), "no memcue release for this machine")
