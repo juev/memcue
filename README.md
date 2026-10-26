@@ -43,11 +43,12 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.18.1`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
+This release is `0.19.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
 version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.19.0 | 5 | 0.19.0 | 0.19.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.19.0 (`hermes-agent` 0.15.2) |
 | 0.18.1 | 5 | 0.18.1 | 0.18.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.1 (`hermes-agent` 0.15.2) |
 | 0.18.0 | 5 | 0.18.0 | 0.18.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.0 (`hermes-agent` 0.15.2) |
 | 0.17.0 | 5 | 0.17.0 | 0.17.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.17.0 (`hermes-agent` 0.15.2) |
@@ -222,6 +223,28 @@ are the lines the plain answer prints after the facts, this one included (#453);
 both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.19.0: the agent writes its memory itself; extraction and vet are removed (#494)
+
+- **Breaking: nothing is extracted from sessions.** The agent stores a rule or a correction of the user, a decision
+  the code does not show, a pitfall or an external pointer with `memcue add` (Claude Code) or `memcue_add` (Hermes,
+  DSH) when it learns it; the session-start note, the skill and the tool descriptions say so. The Claude Code plugin
+  has no PreCompact or SessionEnd hook any more, the Hermes provider and the DSH plugin send no messages to the binary.
+- **Breaking: `memcue vet` and `memcue extract` are removed**, and `MEMCUE_EXTRACT`, `MEMCUE_VET`, `MEMCUE_VET_POLICY`
+  and `MEMCUE_VET_TTL_DAYS` are no longer read. `hook-extract`, `extract-session` and `extract-messages` stay as
+  commands that read their input and exit 0, so an older plugin logs no failure. Candidates the extraction left wait
+  for `memcue approve` or `memcue retire`; a provisional fact is found until its expiry.
+- **Turn the host's built-in memory off yourself**: `"autoMemoryEnabled": false` in Claude Code's settings, the memory
+  of Hermes in its own config. memcue does not change them; it says so while they are on.
+- `memcue_add` of Hermes and DSH takes a `source`: a rule or decision is the user's by default, so it reaches the
+  session card, which the `agent` source these tools always wrote never did.
+- `add` refuses installation state written with `-source tool` as well as `-source agent` (#475).
+- **Hermes:** the dream starts from a line of the card in the system prompt (`session-card -dream-tools`), which the
+  model answers with `memcue_dream_prepare` and `memcue_dream_apply`; the provider no longer runs `dream -run`. The
+  `extract_*`, `shelf` and old `sessions/`, `pending/` state go; the latter are removed at start.
+- **DSH:** the `extract`, `minNewChars`, `stateDir` and `maxToolResultChars` settings go; a profile that sets them
+  still loads.
+- The schema is unchanged.
 
 ### 0.18.1: the Claude Code session start carries every stated rule again (#495)
 
