@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Fact is one fact the model extracted. A session's facts also say what they are and what they rest on; a note's
@@ -146,7 +147,9 @@ func run(ctx context.Context, system, input string) (Result, error) {
 type reply struct {
 	payload []byte
 	cost    float64 // as `claude -p` reports it
-	tokens  Tokens  // as an endpoint reports them
+	tokens  Tokens
+	// api and ttft are the time `claude -p` says the API took and took to its first token; an endpoint has neither.
+	api, ttft time.Duration
 }
 
 // call runs the model once on the extraction endpoint. `claude -p` enforces schema; an endpoint only promises some
@@ -185,6 +188,17 @@ func envelope(b []byte) (reply, error) {
 		Result           string          `json:"result"`
 		StructuredOutput json.RawMessage `json:"structured_output"`
 		TotalCostUSD     float64         `json:"total_cost_usd"`
+		DurationAPIMS    int64           `json:"duration_api_ms"`
+		TTFTMS           int64           `json:"ttft_ms"`
+		Usage            struct {
+			Input         int `json:"input_tokens"`
+			CacheCreation int `json:"cache_creation_input_tokens"`
+			CacheRead     int `json:"cache_read_input_tokens"`
+			Output        int `json:"output_tokens"`
+			Details       struct {
+				Thinking int `json:"thinking_tokens"`
+			} `json:"output_tokens_details"`
+		} `json:"usage"`
 	}
 	if err := json.Unmarshal(b, &env); err != nil {
 		return reply{}, fmt.Errorf("claude output: %w", err)
@@ -196,7 +210,11 @@ func envelope(b []byte) (reply, error) {
 	if len(payload) == 0 || string(payload) == "null" {
 		payload = json.RawMessage(strings.TrimSpace(env.Result))
 	}
-	return reply{payload: payload, cost: env.TotalCostUSD}, nil
+	u := env.Usage
+	return reply{payload: payload, cost: env.TotalCostUSD,
+		tokens: Tokens{Input: u.Input + u.CacheCreation + u.CacheRead, Cached: u.CacheRead, Output: u.Output,
+			Thinking: u.Details.Thinking},
+		api: time.Duration(env.DurationAPIMS) * time.Millisecond, ttft: time.Duration(env.TTFTMS) * time.Millisecond}, nil
 }
 
 func decode(rp reply) (Result, error) {

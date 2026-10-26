@@ -31,12 +31,12 @@ func TestDreamAnswerSendsThePacket(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	useEndpoint(t, srv.URL)
-	answer, _, tokens, err := DreamAnswer(context.Background(), packet)
+	r, err := DreamAnswer(context.Background(), packet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(answer) != `{"packet":"p1","translations":[]}` || tokens.Input != 900 || tokens.Output != 40 {
-		t.Errorf("answer %s, tokens %+v", answer, tokens)
+	if string(r.Answer) != `{"packet":"p1","translations":[]}` || r.Tokens.Input != 900 || r.Tokens.Output != 40 {
+		t.Errorf("answer %s, tokens %+v", r.Answer, r.Tokens)
 	}
 }
 

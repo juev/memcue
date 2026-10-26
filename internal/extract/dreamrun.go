@@ -3,6 +3,7 @@ package extract
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // dreamRunSystem is the system message of a dream packet sent to a model: the packet itself carries the instructions,
@@ -38,7 +39,7 @@ var ErrNoEndpoint = errors.New("no MEMCUE_API_URL: the dream runs on the session
 // review them, and on two live packets deepseek-flash without reasoning retired a fact its "duplicate" did not cover,
 // split a list of two domains into two facts, and on the larger packet cut its answer at the token limit, so nothing
 // was applied. With reasoning both packets came back whole and right, for 22,000-29,000 output tokens and 94-137 s.
-func DreamAnswer(ctx context.Context, packet string) ([]byte, float64, Tokens, error) {
+func DreamAnswer(ctx context.Context, packet string) (DreamReply, error) {
 	var rp reply
 	var err error
 	if API.URL != "" {
@@ -46,8 +47,19 @@ func DreamAnswer(ctx context.Context, packet string) ([]byte, float64, Tokens, e
 	} else {
 		rp, err = callModel(ctx, Endpoint{Model: Model}, dreamRunSystem, dreamSchema, "", packet)
 	}
+	r := DreamReply{CostUSD: rp.cost, Tokens: rp.tokens, API: rp.api, TTFT: rp.ttft}
 	if err != nil {
-		return nil, rp.cost, rp.tokens, err
+		return r, err
 	}
-	return rp.payload, rp.cost, rp.tokens, nil
+	r.Answer = rp.payload
+	return r, nil
+}
+
+// DreamReply is the answer to a dream packet and what the call took. API and TTFT are what `claude -p` reports of
+// its API time and the time to the first token (#471); an endpoint reports neither.
+type DreamReply struct {
+	Answer    []byte
+	CostUSD   float64
+	Tokens    Tokens
+	API, TTFT time.Duration
 }
