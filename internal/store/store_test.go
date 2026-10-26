@@ -1650,6 +1650,36 @@ func TestRepoScopes(t *testing.T) {
 	}
 }
 
+// OriginTiers names the tiers of the live facts' origins, sorted and once each; a retired fact, a candidate and an
+// origin without a date are not among them (#459).
+func TestOriginTiers(t *testing.T) {
+	s, _ := open(t)
+	add := func(origin, review string) Fact {
+		t.Helper()
+		f, err := s.AddWith("fact from "+origin, nil, origin, "", Meta{Review: review})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	add("widget-notes 2026-10-01", "")
+	add("widget-notes 2026-10-02", "")
+	add("_global 2026-10-03", "")
+	add("bare", "")
+	add("candidate-tier 2026-10-04", Candidate)
+	retired := add("retired-tier 2026-10-05", "")
+	if _, err := s.Retire(retired.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.OriginTiers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"_global", "widget-notes"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestSearchFilteredShelf(t *testing.T) {
 	s, _ := open(t)
 	shelved, err := s.AddWith("the api allows sixty requests", nil, "", "", Meta{Kind: "environment", Scope: "shelf:research"})

@@ -168,3 +168,18 @@ func TestSearchResolvesARepositorySuffix(t *testing.T) {
 		t.Errorf("got %v, want %q", err, want)
 	}
 }
+
+// -in repo:KEY finds the facts learnt in the origin tier KEY although no fact carries the scope repo:KEY: the filter
+// matches origins too, and the key check must not refuse what the filter would find (#459).
+func TestSearchRepoKeyIsAnOriginTier(t *testing.T) {
+	env(t)
+	notes := addFactForTest(t, "-origin", "widget-notes 2026-10-01", "-scope", "repo:example.com/team/widget",
+		"Widget deploy runs from the release branch.")
+	var out bytes.Buffer
+	if err := runSearch([]string{"-in", "repo:widget-notes", "deploy"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), notes) {
+		t.Errorf("-in repo:widget-notes printed %q, want the fact learnt there", out.String())
+	}
+}

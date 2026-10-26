@@ -566,7 +566,11 @@ func runSearch(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if q, err = q.ResolveRepos(known); err != nil {
+		tiers, err := s.OriginTiers()
+		if err != nil {
+			return err
+		}
+		if q, err = q.ResolveRepos(known, tiers); err != nil {
 			return err
 		}
 		start := time.Now()

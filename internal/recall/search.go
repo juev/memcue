@@ -150,7 +150,10 @@ const maxKnownKeys = 12
 // means "repo:github.com/me/memcue" when exactly one stored key ends that way (#418). A key that matches nothing, or
 // more than one stored key, is an error that names the stored keys, so a typo cannot be read as an empty base. The
 // other places in In are untouched, and an empty known list leaves In as it is.
-func (q Query) ResolveRepos(known []string) (Query, error) {
+//
+// tiers are the origin tiers of the base (store.OriginTiers): "-in repo:KEY" also keeps a fact learnt in tier KEY, so a
+// key that is a tier is stored as well, matched exactly as the origin filter matches it (#459).
+func (q Query) ResolveRepos(known, tiers []string) (Query, error) {
 	if len(known) == 0 {
 		return q, nil
 	}
@@ -170,7 +173,7 @@ func (q Query) ResolveRepos(known []string) (Query, error) {
 		}
 		key := place[len("repo:"):]
 		var ends []string
-		stored := false
+		stored := slices.Contains(tiers, key)
 		for _, k := range keys {
 			switch lk, lkey := strings.ToLower(k), strings.ToLower(key); {
 			case lk == lkey || "repo:"+lk == lkey:

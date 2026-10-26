@@ -252,24 +252,32 @@ func TestResolveRepos(t *testing.T) {
 		name    string
 		in      []string
 		known   []string
+		tiers   []string
 		want    []string
 		wantErr []string // parts the error must hold; nil is no error
 	}{
-		{"exact key keeps its spelling", []string{"REPO:github.com/me/MEMCUE"}, known,
+		{"exact key keeps its spelling", []string{"REPO:github.com/me/MEMCUE"}, known, nil,
 			[]string{"REPO:github.com/me/MEMCUE"}, nil},
-		{"unique suffix", []string{"repo:memcue"}, known, []string{"repo:github.com/me/memcue"}, nil},
-		{"suffix of several parts, case aside", []string{"repo:c/tool"}, known, []string{"repo:Example.com/c/Tool"}, nil},
-		{"other places untouched", []string{"host", "global", "service:x", "repo:memcue"}, known,
+		{"unique suffix", []string{"repo:memcue"}, known, nil, []string{"repo:github.com/me/memcue"}, nil},
+		{"suffix of several parts, case aside", []string{"repo:c/tool"}, known, nil, []string{"repo:Example.com/c/Tool"}, nil},
+		{"other places untouched", []string{"host", "global", "service:x", "repo:memcue"}, known, nil,
 			[]string{"host", "global", "service:x", "repo:github.com/me/memcue"}, nil},
-		{"empty known list", []string{"repo:nothing"}, nil, []string{"repo:nothing"}, nil},
-		{"no match", []string{"repo:memcu"}, known, nil,
+		{"empty known list", []string{"repo:nothing"}, nil, nil, []string{"repo:nothing"}, nil},
+		{"no match", []string{"repo:memcu"}, known, nil, nil,
 			[]string{`-in repo:memcu: no stored repository key ends with "memcu"; known keys: `, "github.com/me/memcue"}},
-		{"two matches", []string{"repo:app"}, known, nil,
+		{"two matches", []string{"repo:app"}, known, nil, nil,
 			[]string{`-in repo:app: 2 stored repository keys end with "app": example.com/a/app, example.com/b/app`}},
-		{"a part of a name is no suffix", []string{"repo:cue"}, known, nil, []string{"no stored repository key"}},
+		{"a part of a name is no suffix", []string{"repo:cue"}, known, nil, nil, []string{"no stored repository key"}},
+		// #459: -in repo:KEY also matches the origin tier KEY, so a tier is a known key as it is.
+		{"an origin tier is kept", []string{"repo:widget-notes"}, known, []string{"widget-notes", "_global"},
+			[]string{"repo:widget-notes"}, nil},
+		{"the global tier is kept", []string{"repo:_global"}, known, []string{"widget-notes", "_global"},
+			[]string{"repo:_global"}, nil},
+		{"a tier matches exactly, as the origin filter does", []string{"repo:widget"}, known,
+			[]string{"widget-notes"}, nil, []string{"no stored repository key"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			q, err := Query{In: c.in}.ResolveRepos(c.known)
+			q, err := Query{In: c.in}.ResolveRepos(c.known, c.tiers)
 			if c.wantErr != nil {
 				if err == nil {
 					t.Fatalf("got %q, want an error", q.In)
@@ -294,7 +302,7 @@ func TestResolveReposCountsTheRest(t *testing.T) {
 	for i := range 15 {
 		known = append(known, fmt.Sprintf("repo:example.com/a/r%02d", i))
 	}
-	_, err := Query{In: []string{"repo:nope"}}.ResolveRepos(known)
+	_, err := Query{In: []string{"repo:nope"}}.ResolveRepos(known, nil)
 	if err == nil {
 		t.Fatal("want an error")
 	}
