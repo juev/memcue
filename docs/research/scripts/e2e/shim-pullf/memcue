@@ -36,6 +36,7 @@ r = subprocess.run([os.environ["MEMCUE_REAL"], "search", "-json", "-n", str(max(
 if r.returncode:
     sys.stderr.write(r.stderr); sys.exit(r.returncode)
 hits = json.loads(r.stdout or "[]")
+hits = hits["facts"] if isinstance(hits, dict) else hits  # {"facts", "hints"} since #453
 db = sqlite3.connect(f"file:{os.environ['MEMCUE_FACTS']}?mode=ro", uri=True)
 def scope(i):
     row = db.execute("select scope from facts where id = ? order by version desc limit 1", (i,)).fetchone()

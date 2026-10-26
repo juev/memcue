@@ -30,6 +30,12 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+
+def search_facts(stdout: str) -> list:
+    """The facts of memcue search -json: {"facts", "hints"} since #453, a bare array before it."""
+    answer = json.loads(stdout) if stdout.strip() else []
+    return answer["facts"] if isinstance(answer, dict) else answer
+
 TOOL = {
     "type": "function",
     "function": {
@@ -78,13 +84,13 @@ class Run:
             cmd += ["-min-score", str(params["min_score"])]
         cmd += ["--", query]
         out = subprocess.run(cmd, capture_output=True, text=True, env=self.env)
-        facts = json.loads(out.stdout) if out.stdout.strip() else []
+        facts = search_facts(out.stdout)
         result: dict = {"facts": facts}
         if arm == "B" and len(facts) <= 1 and params.get("min_score") is None:
             wide = [self.args.binary, "search", "-json", "-cwd", self.args.cwd, "-n", limit, "-in", "all",
                     "-min-score", "0", "--", query]
             more = subprocess.run(wide, capture_output=True, text=True, env=self.env)
-            held = [f for f in (json.loads(more.stdout) if more.stdout.strip() else [])
+            held = [f for f in search_facts(more.stdout)
                     if f.get("id") not in {x.get("id") for x in facts}]
             if held:
                 result["hint"] = HINT.format(n=len(held))

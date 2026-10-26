@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,7 +23,7 @@ func TestSearchHandsOverWhatFits(t *testing.T) {
 			t.Fatal(err)
 		}
 		var facts []struct{ ID string }
-		if err := json.Unmarshal(out.Bytes(), &facts); err != nil {
+		if err := unmarshalFacts(out.Bytes(), &facts); err != nil {
 			t.Fatal(err)
 		}
 		var ids []string
@@ -62,7 +61,7 @@ func TestSearchFlags(t *testing.T) {
 			t.Fatal(err)
 		}
 		var facts []struct{ ID string }
-		if err := json.Unmarshal(out.Bytes(), &facts); err != nil {
+		if err := unmarshalFacts(out.Bytes(), &facts); err != nil {
 			t.Fatal(err)
 		}
 		var ids []string

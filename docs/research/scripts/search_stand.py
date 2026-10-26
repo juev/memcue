@@ -50,6 +50,7 @@ def search(binary: str, base: str, state: str, cwd: str, prompt: str, n: int) ->
     if not out:
         return [], ms
     facts = json.loads(out)
+    facts = facts["facts"] if isinstance(facts, dict) else facts  # {"facts", "hints"} since #453
     return facts if isinstance(facts, list) else [], ms
 
 

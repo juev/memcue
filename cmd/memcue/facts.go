@@ -548,7 +548,7 @@ func runSearch(args []string, out io.Writer) error {
 	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
 	expired := fs.Bool("expired", false, "include facts whose expiry has passed")
 	allWords := fs.Bool("all-words", false, "a fact must hold every word of the query, not any of them")
-	asJSON := fs.Bool("json", false, "print a JSON array of facts instead of one line each")
+	asJSON := fs.Bool("json", false, `print one JSON object, {"facts": [...], "hints": [...]}, instead of lines`)
 	cwd := fs.String("cwd", ".", "session working directory: its repository is the project, and its facts win ties")
 	session := fs.String("session", "", "session id for the search log")
 	if err := fs.Parse(args); err != nil {
@@ -580,21 +580,33 @@ func runSearch(args []string, out io.Writer) error {
 		}
 		query := q.Text
 		logSearch(*session, *cwd, query, hits, time.Since(start))
-		if *asJSON {
-			return json.NewEncoder(out).Encode(searchJSON(hits))
-		}
+		// The lines that follow the facts, in the order the plain answer prints them; -json carries the same ones, so
+		// a host that parses the answer is told what a reader is (#453).
+		var hints []string
 		if len(hits) == 0 {
-			msg := "No stored facts match."
 			if q.NarrowByDefault() {
-				msg = "No facts of this repository, this host or global match; -in all searches every repository."
-			}
-			if _, err := fmt.Fprintln(out, msg); err != nil {
-				return err
+				hints = append(hints, "No facts of this repository, this host or global match; -in all searches every repository.")
 			}
 			if len(f.ExcludePrefixes) > 0 {
-				if err := shelfHint(out, s, q); err != nil {
+				hint, err := shelfHint(s, q)
+				if err != nil {
 					return err
 				}
+				if hint != "" {
+					hints = append(hints, hint)
+				}
+			}
+		}
+		if text.HasCJK(q.Text) {
+			// Found or not: a CJK query that finds facts matched only on its Latin names (#410).
+			hints = append(hints, cjkHint)
+		}
+		if *asJSON {
+			return json.NewEncoder(out).Encode(searchAnswer{Facts: searchJSON(hits), Hints: hints})
+		}
+		if len(hits) == 0 && !q.NarrowByDefault() {
+			if _, err := fmt.Fprintln(out, "No stored facts match."); err != nil {
+				return err
 			}
 		}
 		for _, h := range hits {
@@ -602,10 +614,10 @@ func runSearch(args []string, out io.Writer) error {
 				return err
 			}
 		}
-		if text.HasCJK(q.Text) {
-			// Found or not: a CJK query that finds facts matched only on its Latin names (#410).
-			_, err := fmt.Fprintln(out, cjkHint)
-			return err
+		for _, h := range hints {
+			if _, err := fmt.Fprintln(out, h); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -618,12 +630,12 @@ const (
 )
 
 // shelfHint follows an empty search that did not read the shelves: when the same words find facts on a shelf, it says
-// how many and which -in reads them (#433), so a fact put away is not a fact lost. Nothing when the shelves hold none.
-func shelfHint(out io.Writer, s *store.Store, q recall.Query) error {
+// how many and which -in reads them (#433), so a fact put away is not a fact lost. Empty when the shelves hold none.
+func shelfHint(s *store.Store, q recall.Query) (string, error) {
 	q.In, q.N = []string{"shelf"}, shelfHints
 	hits, err := recall.Search(s, q)
 	if err != nil || len(hits) == 0 {
-		return err
+		return "", err
 	}
 	var names []string
 	for _, h := range hits {
@@ -635,8 +647,7 @@ func shelfHint(out io.Writer, s *store.Store, q recall.Query) error {
 	if len(hits) == 1 {
 		verb = "fact on the shelf matches"
 	}
-	_, err = fmt.Fprintf(out, "%d %s: -in %s\n", len(hits), verb, strings.Join(names, ","))
-	return err
+	return fmt.Sprintf("%d %s: -in %s", len(hits), verb, strings.Join(names, ",")), nil
 }
 
 // cjkHint follows the answer to a query in Chinese, Japanese or Korean: the facts are in Russian and English, and a
@@ -685,6 +696,12 @@ type searchFact struct {
 	Scope    string   `json:"scope,omitempty"`
 	Created  string   `json:"created"`
 	Expires  string   `json:"expires,omitempty"`
+}
+
+// searchAnswer is what search -json prints: the facts, and the lines the plain answer prints after them (#453).
+type searchAnswer struct {
+	Facts []searchFact `json:"facts"`
+	Hints []string     `json:"hints,omitempty"`
 }
 
 func searchJSON(hits []store.Hit) []searchFact {

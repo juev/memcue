@@ -195,7 +195,9 @@ A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
 that still read the shelf would hide nothing. A search that finds nothing, while its words fit a shelved fact, says
 where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json` carries each fact's `scope`, so a
-fact from the shelf can be told from the rest.
+fact from the shelf can be told from the rest, and prints one object, `{"facts": [...], "hints": [...]}`, whose `hints`
+are the lines the plain answer prints after the facts, this one included (#453); the Hermes and DSH plugins read
+both it and the bare array of an older binary.
 
 ## Upgrade
 
@@ -454,7 +456,7 @@ came from). See [Projects](#projects) for how a project is named. A fact of `kin
 says otherwise: what happened in one run is not the knowledge a later session needs:
 
 ```bash
-memcue search -json postgres port    # the facts that fit, best first, with their IDs (JSON with -json; at most -n, default 5)
+memcue search -json postgres port    # the facts that fit, best first, with their IDs (-json: {"facts", "hints"}; at most -n, default 5)
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
 memcue search -in all postgres       # every repository; the default in a repository is its own, this host's and the global facts
 memcue search -in shelf:research rate limit  # facts read from pages and documents, which no other place returns
