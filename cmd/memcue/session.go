@@ -217,6 +217,17 @@ func autoMemoryHint() string {
 // dreamHint is the line the session start adds when a dream is due: the session's model does it with the
 // memcue-dream skill when the user's task allows. A failure to tell says nothing; the session must start either way.
 func dreamHint() string {
+	return dreamHintTo("run the memcue-dream skill")
+}
+
+// dreamToolsHint is dreamHint for a host whose model has the dream as two tools, Hermes (#494): with no extraction
+// left, the hint is the only thing that starts a dream there.
+func dreamToolsHint() string {
+	return dreamHintTo("call memcue_dream_prepare and answer its packet with memcue_dream_apply")
+}
+
+// dreamHintTo is the dream hint that names how the model runs the dream.
+func dreamHintTo(how string) string {
 	if _, err := os.Stat(factsPath()); err != nil {
 		return "" // no base yet: the hint must not create one
 	}
@@ -235,15 +246,20 @@ func dreamHint() string {
 	if owed > 0 {
 		what = append(what, fmt.Sprintf("%d facts lack a translation", owed))
 	}
-	return fmt.Sprintf("memcue: %s (last dream %s). When the user's task allows, run the memcue-dream skill to tidy "+
-		"the memory; never interrupt the user's work for it.", strings.Join(what, ", "),
-		last.Local().Format("2006-01-02 15:04"))
+	return fmt.Sprintf("memcue: %s (last dream %s). When the user's task allows, %s to tidy the memory; never "+
+		"interrupt the user's work for it.", strings.Join(what, ", "), last.Local().Format("2006-01-02 15:04"), how)
 }
 
 // runSessionCard returns only the card, for a host whose own system prompt already carries the memory note. It
 // takes the same input as session-start. What this machine still owes an upgrade follows the card: such a host has
 // no other way to hear it.
 func runSessionCard(in io.Reader, out io.Writer) error {
+	return runSessionCardWith(in, out, false)
+}
+
+// runSessionCardWith is runSessionCard that, with dreamTools, also says when a dream is due and how to run it with the
+// dream tools (#494).
+func runSessionCardWith(in io.Reader, out io.Writer, dreamTools bool) error {
 	var h sessionStartInput
 	if err := json.NewDecoder(in).Decode(&h); err != nil {
 		return fmt.Errorf("session-card input: %w", err)
@@ -255,8 +271,14 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 	if card != "" {
 		logCard(h, ids, len([]rune(card)), excluded, 0, fit)
 	}
-	if hint := upkeepHint(h.CWD); hint != "" {
-		card = strings.TrimPrefix(card+"\n\n"+hint, "\n\n")
+	hints := []string{upkeepHint(h.CWD)}
+	if dreamTools {
+		hints = append(hints, dreamToolsHint())
+	}
+	for _, hint := range hints {
+		if hint != "" {
+			card = strings.TrimPrefix(card+"\n\n"+hint, "\n\n")
+		}
 	}
 	if card == "" {
 		return nil
