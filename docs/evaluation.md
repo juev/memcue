@@ -99,6 +99,8 @@ prompt forbade anything not written in the note, 2.5 %; wrong facts: none in eit
 
 ### Extraction from sessions
 
+Extraction is removed since #494: the agent writes its facts itself. This section describes it as it was measured.
+
 10 recorded Claude Code sessions from nine repositories, 22–272 thousand characters of transcript each. Every fact
 was labelled SUPPORTED (said by the user or confirmed by tool output), INFERRED (a guess, or an agent's proposal
 presented as the user's decision) or WRONG (contradicts the transcript, or keeps a state the session later changed),

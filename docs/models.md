@@ -4,6 +4,11 @@ Status: **accepted 2026-10-21 and implemented in 0.4.0.** The old opt-in endpoin
 this document is the contract the code and the README follow.
 Implementation: [#62](https://github.com/juev/memcue/issues/62).
 
+**2026-10-26:** the main chat model no longer extracts or reviews: the agent writes its facts itself, and the
+extraction and `memcue vet` are removed with `MEMCUE_EXTRACT` and `MEMCUE_VET*`
+([#494](https://github.com/juev/memcue/issues/494)). It serves `migrate`, the search queries `add` asks for and
+`dream -run`.
+
 **2026-10-22:** the embeddings role is removed ([#250](https://github.com/juev/memcue/issues/250)). Recall stopped
 reading vectors ([#232](https://github.com/juev/memcue/issues/232)), and `memcue embed` and `MEMCUE_EMBED_*` are gone;
 the sections below keep the decision as it was made.

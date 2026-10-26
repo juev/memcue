@@ -12,11 +12,11 @@ through hooks:
   answered more questions right than facts matched to the prompt's words (see [Results](#results)). A search returns
   at most five facts, and only those that fit: a fact whose BM25 is below 0.6 of the best one's is left out, so a
   query one fact answers gets that fact alone (#407, [search-floor](docs/research/search-floor-2026-10.md)).
-- **When a session is compacted or ends** it sends the new part of the transcript to Claude, which writes down what
-  will still matter later: decisions, how systems are set up, confirmed causes, what did not work. Facts are only
-  added; nothing is compared or overwritten.
-- **When you ask** ("remember…", "that is outdated") the agent adds, corrects or retires a fact through the bundled
-  skill.
+- **When the agent learns something that will matter later** (a rule or a correction you gave, a decision the code
+  does not show, a pitfall, a host or a service outside the repository) it stores it at once with `memcue add`,
+  through the bundled skill. Nothing is extracted from the transcript afterwards (#494): the agent decides what is
+  worth keeping, the way Claude Code's built-in memory does.
+- **When you ask** ("remember…", "that is outdated") the agent adds, corrects or retires a fact the same way.
 
 Search is lexical (SQLite FTS5 with Snowball stemming for English and Russian), runs offline in one binary and
 takes about 10 ms per query. A fact keeps where and when it was learnt and where it holds (`scope`), and facts from
@@ -37,8 +37,8 @@ not yet run for long in daily work.
 ## Requirements
 
 - macOS or Linux.
-- Claude Code with the `claude` command on `PATH`: extraction runs `claude -p`, unless an OpenAI-compatible
-  endpoint is configured instead (see [Configuration](#configuration)).
+- Claude Code. Only `memcue migrate` and `memcue dream -run` call a model, through the `claude` command on `PATH` or
+  an OpenAI-compatible endpoint (see [Configuration](#configuration)).
 - Go 1.27 or later, to build from source.
 
 ## Compatibility
@@ -71,7 +71,7 @@ version, and a release bumps all of them together.
 
 The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
 tests ran against. The binary and the adapters check each other's release: the DSH and Hermes plugins ask
-`memcue version -json` at startup and turn the session card and extraction off with one warning on a binary older
+`memcue version -json` at startup and turn the session card off with one warning on a binary older
 than 0.4.0 (search keeps working), and the Claude Code `SessionStart` hook checks `memcue version -minimum 0.4.0` and
 prints the same hint. A build from source reports a suffixed version and is treated as the current tree. Install the
 plugin and the binary from the same release.
@@ -101,7 +101,8 @@ plugin and the binary from the same release.
    ```
 
    or set `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. With the plugin on, each session starts with a short note that tells
-   the agent its memory is memcue.
+   the agent its memory is memcue and to write it. memcue does not change the setting itself: while neither is set,
+   the session start says that built-in memory is still on (#494).
 
 4. Optional: bring over what the built-in memory already holds. Each note goes through the model once; a note
    already in the base is skipped, so the command can be repeated.
@@ -183,16 +184,13 @@ comes from where the session works, read from the files and never by running git
   `[include] path` is followed, `includeIf` is not. The directory's own name plays no part.
 - **A repository without a remote** is `dir:<path of its main worktree>`.
 - **Outside git** the project is the `module` of the nearest `go.mod`, or else `dir:<working directory>`.
-- **No working directory** is no project: a host passes an empty `cwd` for such a session (`-cwd ""` to `add` and
-  `extract-messages`). The Hermes plugin does so for a session outside git (#347); a session Hermes gives no `cwd`
+- **No working directory** is no project: a host passes an empty `cwd` for such a session (`-cwd ""` to `add`). The Hermes plugin does so for a session outside git (#347); a session Hermes gives no `cwd`
   takes the directory Hermes falls back to (#354).
 - **The Claude config directory** is the global tier; **a temporary directory** names nothing.
 
-The extraction model chooses only whether a fact holds in the repository (`repo`), everywhere or on a host; memcue
-writes the key. `memcue add -scope repo` does the same for the working directory. A fact written with no scope,
-by `memcue add` without `-scope` or by an extraction that named none, gets the project its origin names, and `global`
-when the origin names none (#442): an empty scope is in no place a search asks for, so only `-in all` found such a
-fact. `memcue vet` gives the same scope to a live fact stored without one before.
+The agent chooses only whether a fact holds in the repository (`-scope repo`), everywhere or on a host; memcue writes
+the key. A fact written with no scope gets the project its origin names, and `global` when the origin names none
+(#442): an empty scope is in no place a search asks for, so only `-in all` found such a fact.
 
 The project narrows and orders `memcue search`. In a session that works in a repository, search looks at that
 repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default
@@ -211,13 +209,9 @@ learnt in the session's project comes before a global one and the rest.
 
 **The shelf** holds what a session read from the outside world: another system's limits, versions and terms, wanted
 only when the same subject comes up again (#433). Such a fact is stored in the same base under the scope
-`shelf:<slug>`, and in practice there is one shelf, `shelf:research`. What goes there is decided by where the fact's
-evidence sits, not by a model: `extract-messages -shelf research` (the Hermes plugin passes it, the `shelf` option;
-empty turns it off) puts a fact on the shelf when its quote is in the result of a tool that reads the outside world —
-a name starting with `web_`, `browser`, `fetch`, `http`, `curl`, `arxiv` or `pdf` — and in no other tool's result. A
-fact quoted from `terminal`, `read_file` or `ssh` keeps its scope, and a fact in the user's words is never shelved:
-the user already chose to say it. Without `-shelf`, as in Claude Code sessions, nothing is shelved. By hand,
-`memcue add -shelf research` is `-scope shelf:research`; a slug is `[a-z0-9][a-z0-9-]{0,63}`.
+`shelf:<slug>`, and in practice there is one shelf, `shelf:research`. The agent puts a fact there itself:
+`memcue add -shelf research` (the `shelf` parameter of `memcue_add` in Hermes) is `-scope shelf:research`; a slug is
+`[a-z0-9][a-z0-9-]{0,63}`. Until #494 the extraction shelved a fact by the tool its quote came from.
 
 A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf` for every shelf. Every other place
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
@@ -512,7 +506,7 @@ memcue facts | grep -E 'MEMCUE_EMBED|MEMCUE_(VET|RERANK|TRIAGE)_(URL|MODEL|KEY)|
 
 `memcue retire ID` a fact that describes the removed state as current, `memcue correct ID TEXT` one that is partly
 true, and keep one that records what was measured or decided then. Since 0.5.3 `vet` finds most of these itself (see
-[Review and vet](#review-and-vet)); facts about the host's own config files are still found only this way.
+[Candidates](#candidates)); facts about the host's own config files are still found only this way.
 
 Schema 4 was the schema of 0.3.0 and 0.4.0; 0.2.1 and older refuse a newer base with `update memcue`: upgrade
 every machine that shares the base before the first new memcue writes to it. If you ran `memcue install` before
@@ -524,11 +518,10 @@ stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 
 ## Use
 
-Nothing to do in a session: the agent searches the base when it needs to, and facts are extracted at the end.
-Extracted facts are candidates: search finds them only after someone approves them — `memcue vet` by a rule or a model, or by hand (`memcue candidates`,
-`memcue approve ID`; `memcue retire ID` rejects one). A fact you add yourself with `memcue add` is active at once. An explicit `correct` of
-an approved fact also writes a new active version: it is a deliberate correction, not a new candidate. Only new
-extracted and mirrored facts wait for review. By hand (`add` without `-origin` names the project of the working directory and
+Nothing to do in a session: the agent searches the base when it needs to and stores what it learns. A fact written
+with `memcue add` is active at once. `add -candidate`, and `import` for a file that asks for review, store a
+**candidate** instead: search finds it only after `memcue approve ID` (`memcue retire ID` rejects one). An explicit
+`correct` of an approved fact writes a new active version. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs:
@@ -546,10 +539,7 @@ memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
 memcue reopen ID                     # undo a retire: back as it was before, approved or waiting for review
-memcue candidates                    # extracted facts waiting for approval, newest first (-json for a JSON array)
-memcue vet -dry-run                  # what the rules and the judge would decide about the queue
-memcue vet                           # decide it: approve what belongs in the base, retire what does not
-memcue vet -no-model                 # only the deterministic rules; undecided candidates stay for review
+memcue candidates                    # facts waiting for approval, newest first (-json for a JSON array)
 memcue approve ID [ID ...]           # take candidates into recall
 memcue facts                         # every active fact, with expires= when it has one
 memcue notes                         # which entries of the built-in memory note files are already facts
@@ -564,55 +554,21 @@ memcue dream -apply answer.json      # check and carry out the model's answer to
 `migrate` and `import` skip such facts and report them without echoing the value, because the base may be synced
 through git.
 
-A fact is found by a question in either language. The session extraction stores, next to the search queries, the
-whole fact in the other language, Russian or English, as one query that starts with `= `: search reads it, while the
-card and the search output show the fact as it was written (#392, #395). Facts stored before, and those a correction
-left without one, get it from the regular dream, 40 a dream (#396).
+A fact is found by a question in either language. The dream stores, next to the search queries, the whole fact in
+the other language, Russian or English, as one query that starts with `= `: search reads it, while the card and the
+search output show the fact as it was written (#392, #395); it gives a translation to 40 facts a dream (#396). Until
+then the keywords the agent writes in both languages are what a question in the other language finds.
 
-`memcue vet` is the automatic half of the same review, so the queue does not have to be cleared by hand. Three rules
-decide first, without a model: a mirror of the built-in memory stays only while the notes still hold its text
-(`-memory DIR` or `MEMCUE_MEMORY_DIR` names them; without that directory the rule is skipped rather than retiring every
-mirror) and is not approved when an approved fact already holds its words; an approved mirror without a scope becomes
-`global`, and the review after an extraction takes the mirrors that wait as candidates along (#458); an origin whose tier is exactly `test` (as in `test 2026-10-19`; a repository such as `test-utils` is not a
-test run) is retired as a test trace, and a candidate whose words are all in an
-approved fact is retired as covered. The rest goes to the `keep / drop / unsure / split` judge, twelve candidates a
-call, each with the approved facts nearest to it, so a duplicate or a contradiction of an approved fact is visible in the
-answer. `split` is for a candidate that still holds several claims, one of which can go stale while another stays
-true: the candidate is retired, each part is stored as a candidate with its origin, scope, kind and source (not its
-keywords, which were chosen for the whole text), and the same run reviews the parts. A part is not split again in that
-run, and a split into fewer than two parts leaves the candidate in the queue. `vet.log` records the parts and their ids.
-The approved facts get the same rules after the queue: a live fact past its expiry is retired (search and the card
-already left it out), and so is installation state of an older memcue — a fact of no kind or of kind `environment`
-that says which version is installed, where a binary or a wrapper lies or what a config holds, and every version it
-names is older than the running release, such as `The memcue binaries on the build host are 0.8.0.` A fact that
-names an old version as a change of behaviour, or names any version that is not older, stays (#457). A dev build
-skips that rule. A live fact that records the moment of a process or a file — a restart time or PID, a line count
-such as `(419 lines)`, a file's mtime — is retired too, whatever it names and whatever its kind but a rule or a
-decision (#475). The candidate rule knows the same moments, and checks a pitfall with no source or written by the
-agent by its text, for a version or such a moment only; a pitfall extracted from the user's or a tool's words is
-left alone. `add -source agent` (the plugins' `memcue_add`) refuses installation state, since that fact is live at
-once and never meets vet.
-Everything else the judge cannot settle stays **provisional** by default when the model gave an explicit `unsure`
-answer: that answer becomes a provisional fact for the TTL, and `unsure` is still an entry in the report rather than
-an approval. A failed or empty answer does not: `vet` never turns a call that did not decide into a provisional fact,
-so the candidate waits for the next run. A provisional fact is found by search like an approved
-one, marked in the log, and expires after `MEMCUE_VET_TTL_DAYS` without a person. Set
-`MEMCUE_VET_POLICY=quarantine` or run `memcue vet -quarantine` to keep the old review queue, and `-no-model` keeps
-every candidate the rules cannot decide in that queue as well. Every verdict goes to `vet.log` in the state
-directory with the rule or model and its reason; the page, the `approve` command and the page's undo (`store.Reopen`)
-stay the manual way, unchanged.
+Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
+saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,
+the size of a base, a restart time or PID, a line count, an mtime. A command reads each of these, and the stored copy
+is stale after the next release or restart (#475); a fact in the user's words is stored as said.
 
-The review runs on the main model: `MEMCUE_API_URL` when it is set, otherwise `claude -p`, as the extraction does. The
-facts a session just stored are reviewed in the extraction process, after storing them
-(`MEMCUE_VET=0` turns that off; without an endpoint and without `claude` on `PATH` nothing is reviewed); that process is
-already detached from the session, so a turn never waits for the verdict. A run that finds another one busy is skipped
-rather than queued, and its failures go to `vet.log`, not to the extraction.
-
-Duplicates are the review's job too: it sees each candidate's nearest approved facts and drops a candidate that
-repeats one. A separate Jev pass over those neighbours ran before the review until #266; on the 41-candidate sample of
-#240, labelled by `claude -p`, the review alone retired 10 of the 11 drops and 1–2 of 29 facts worth keeping, and with
-the Jev pass 8–10 and 1–4, for about 420k more input tokens
-([docs/research/vet-neighbours-2026-10.md](docs/research/vet-neighbours-2026-10.md)).
+What goes stale later is handled in two places. A fact a newer one replaced meets it in the dream, which groups
+similar facts and lets the session's model retire or merge the old one ([Dream](#dream)); a fact found wrong in use is
+corrected or retired in the session. A fact the world made wrong without anyone saying so is not caught (#494).
+`memcue vet`, its rules, its review model and its check of suspect facts are removed with the extraction they served;
+the `vet.log`, `vet.checked`, `extract.log` and `extract.err` of an older release can be deleted.
 
 The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
 retired or expired. `card.log` records the ids it carried, so a rule shows as used even though no search found it.
@@ -651,8 +607,8 @@ machine that judges it. A correction keeps the expiry unless it names a new one.
 
 ### Dream
 
-Extraction never sees the base, so two sessions can store the same fact, or a fact and the one that disproved it. A
-dream tidies the facts the last dream did not see. memcue starts no model for it: the model of a session does it.
+A session writes a fact without reading every neighbour, so two sessions can store the same fact, or a fact and the
+one that replaced it. A dream tidies the facts the last dream did not see. memcue starts no model for it: the model of a session does it.
 
 1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
    the instructions, the fresh facts to split, the facts without search queries to expand, the facts without a
@@ -668,16 +624,17 @@ Who runs it:
   skill when the user's task allows. It never interrupts a turn. A dream is due once `MEMCUE_DREAM_EVERY` (default
   `1h`) has passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks the start, so
   the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them.
-- **Hermes.** The provider starts `memcue dream -run` after an extraction. memcue checks the same interval and
-  facts, and when a dream is due sends the packet to the extraction's endpoint (`MEMCUE_API_URL`) and applies the
-  answer; with nothing due it makes no call. Without `MEMCUE_API_URL`, `-run` refuses, so Claude Code keeps the
-  session's model ([plugins/hermes/README.md](plugins/hermes/README.md#dream), #401).
+- **Hermes.** When a dream is due, the card in the system prompt says so in one line (`session-card -dream-tools`),
+  and the model runs `memcue_dream_prepare` and `memcue_dream_apply` when the user's task allows (#494). Hermes builds
+  the system prompt once and again after a compression or a reset, so the line is as fresh as the last rebuild
+  ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
 - **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
   interval, and the merge sweep, which never runs out of groups, does not keep it going. It uses the endpoint when
   `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks) otherwise. It stops on
-  the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. On a
-  Claude Code machine that extracts through an endpoint, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all`
-  runs it on Opus (#405).
+  the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. With an
+  endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405). Without
+  `-all`, `-run` checks the interval and the facts the session start checks and makes no call when nothing is due
+  (#401); without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by surprise.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups, the facts to expand and the facts to translate each go in their own calls of
   one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
@@ -693,18 +650,17 @@ What the answer may do:
 
 - **Split** a compound fact: one part of it can go stale while another stays true. The fact is retired and its parts
   take its place, approved, with its origin, scope, kind, source and expiry (not its keywords, which were chosen for
-  the whole text). `vet` splits candidates the same way, so this mostly matters for facts stored before it.
+  the whole text).
 - **Expand** a fact without **search queries**: 6–10 short phrases a user would name the task with, the general name
   of what the fact is about, and how the problem or question sounds. The index searches them next to the fact's words
-  and keywords. Extraction writes them with every fact it stores, and `add` and `correct` ask for them in one call when
-  `MEMCUE_API_URL` is set. So the dream fills the facts written without an endpoint, those of `import`, and the parts
-  of a split. Facts stored before extraction wrote queries are never fresh again, so each packet also offers the
-  newest of them: a base upgraded from 0.4 fills over a few dreams. On the gold set of 180 prompts the queries added
+  and keywords. `add` and `correct` ask for them in one call when `MEMCUE_API_URL` is set, so the dream fills the
+  facts written without an endpoint, every fact the agent writes on such a machine among them, those of `import`, and
+  the parts of a split. An older fact without queries is never fresh again, so each packet also offers the newest of
+  them: a base upgraded from 0.4 fills over a few dreams. On the gold set of 180 prompts the queries added
   7–9 prompts that got a useful fact ([docs/research/one-model-2026-10.md](docs/research/one-model-2026-10.md)).
 - **Translate** a fact that has no translation among its queries: the whole text in the other language, Russian or
-  English, kept as the query that starts with `= ` (#395). Extraction writes it with every fact; the dream gives it
-  to the facts stored before #395 and to those a correction left without one, the newest first, so an old base is
-  translated over a few dozen dreams without a command of its own (#396). A fact another part of the packet may
+  English, kept as the query that starts with `= ` (#395). The dream gives it to every fact without one, the newest
+  first, so a base is translated over a few dozen dreams without a command of its own (#396). A fact another part of the packet may
   change — fresh, without queries, or in a group — waits for a later packet, and a fact changed since the packet is
   refused, since its translation would describe the old text.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
@@ -752,31 +708,27 @@ judge (#357); its measurements are in [docs/research/dream-triage-2026-10.md](do
 
 ## Configuration
 
-memcue calls one model, the main chat model, for extraction and review; search calls none, and the dream is done by the
-model of a session ([Dream](#dream)). The judge and
+memcue calls one model, the main chat model, for `migrate`, for the search queries `add` asks for and for
+`dream -run`; search calls none, and a dream is otherwise done by the model of a session ([Dream](#dream)). The judge and
 embeddings roles of [docs/models.md](docs/models.md) are removed (#250, #357). The table is the contract this release
 uses.
 
 | Variable | Meaning | Default |
 |---|---|---|
 | `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts.db`, else `~/.claude/memory/facts.db` |
-| `MEMCUE_STATE_DIR` | state directory for logs, locks, the dream schedule and session offsets; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
-| `MEMCUE_MODEL` | model of the extraction and review | `claude-opus-5-5` |
+| `MEMCUE_STATE_DIR` | state directory for logs, locks and the dream schedule; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
+| `MEMCUE_MODEL` | model of `migrate`, the queries of `add` and `dream -run` | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
-| `MEMCUE_EXTRACT` | `0` turns automatic extraction off in every host; it wins over the DSH `extract` setting and the Hermes `extract_url` | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the search tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |
 | `MEMCUE_NUMBER_TERMS` | versions, dates, ports and addresses are indexed as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)); `0` keeps the old word-only index, and a base indexed word-only is rebuilt on the first open without it | on |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_CARD_BUDGET` | most characters of the session card, the facts the user stated included; when they do not fit, the oldest user-stated fact goes first, and a last line counts what is left out (`memcue search -in global -kind rule` finds it). The Hermes provider sets it from `session_card_chars` | `3500` |
 | `MEMCUE_DREAM_EVERY` | how long after a dream the session start says the next one is due (a Go duration, at least `1m`) | `1h` |
-| `MEMCUE_VET` | `0` stops deciding the facts a session extracted; otherwise they are decided right after storing them, on `MEMCUE_API_URL` or `claude -p` | on |
-| `MEMCUE_VET_POLICY` | `provisional` (default) turns `unsure` into provisional facts; `quarantine` keeps the human queue | `provisional` |
-| `MEMCUE_VET_TTL_DAYS` | how long a provisional fact is recalled | `14` |
-| `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes: the mirror rule checks them, and the extraction reads them so it does not restate a note (#456) | unset: the rule is skipped, the extraction reads no notes |
-| `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/extract.log`, `memcue/vet.log`, `memcue/card.log` and per-session read offsets are kept | `~/.local/state` |
+| `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes `memcue notes` reads | `$CLAUDE_CONFIG_DIR/memory` |
+| `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/card.log` and `memcue/dream.log` are kept | `~/.local/state` |
 
 Search is the words alone: FTS5 over the query's terms, in BM25 order, with no threshold, because the agent reads
 what it asked for. The gates that kept noise out of the facts injected with a prompt went with that injection (#361);
@@ -793,31 +745,20 @@ no longer read. Opening a base deletes the vectors an older memcue stored and co
 With `MEMCUE_SEARCH_LOG=1`, `search.log` has one JSON line per search: the time, the session (when the host passes
 `-session`), the project, the host, the first 500 characters of the query and the ids of the facts it returned,
 searches that found nothing included. It stays on your machine and is what you judge the agent's searches by; it is off
-by default because it keeps the text of the queries. `extract.log` has one JSON line per extraction run: session, part of the transcript
-read, facts stored, and the cost Claude Code reports or the tokens the endpoint reports.
+by default because it keeps the text of the queries.
 
-`cost_usd` in `extract.log`, `vet.log` and `dream.log` holds only what a caller reports in dollars: `claude -p`. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
+`cost_usd` in `dream.log` holds only what a caller reports in dollars: `claude -p`. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is
 `tokens` (`input`, of which `cached` came from the prompt cache, and `output`) times the provider's price; memcue
 keeps no price table, since prices change and differ by account (#258).
 
-The extraction prompts (`internal/extract/*.md`) are written in Russian. Facts come out in the language of the
-session or note either way.
+The prompts of `migrate` and the dream (`internal/extract/*.md`) are written in Russian; a fact keeps the language of
+its note.
 
 ## Cost
 
-Extraction is the part that costs most. On ten recorded sessions it cost $0.18–1.33 per session on Opus,
-about $5 per million characters of transcript; tool output is the bulk of it. Sonnet was half the price but kept
-73 % of the facts worth keeping against 88 % for Opus, and nothing at all in two of the ten sessions. DeepSeek
-(`deepseek-flash` through `MEMCUE_API_URL`) cost $0.17 for all ten and kept 74 % against 87 % for Opus. Set
-`MEMCUE_EXTRACT=0` to keep search and turn extraction off in every host.
-
-A review is the second model call, and a much smaller one: twelve candidates with a few neighbours each per call, and
-no candidate at all on a session that taught nothing. `vet.log` records the tokens of every call, and the cost when
-`claude -p` reports one; a rules-only run (`-no-model`) costs nothing. The review uses `MEMCUE_MODEL` and
-`MEMCUE_API_URL`, or `claude -p` without it; there is no separate review model. On `api.deepseek.com` the review
-turns reasoning off: it agreed with a `claude -p` reference as often and used a quarter of the output, while
-extraction lost quality without it and keeps it
-([docs/research/reasoning-off-2026-10.md](docs/research/reasoning-off-2026-10.md)).
+Writing a fact costs no model call: the agent writes it as part of its work, and `add` asks for search queries in one
+short call only when `MEMCUE_API_URL` is set. Before #494 an extraction of every session cost $0.18–1.33 per session
+on Opus, about $5 per million characters of transcript, and a review followed it; both are gone.
 
 A dream costs no call of its own: it is part of the session that runs it. One packet is about 20,000–36,000
 characters on the author's two bases, instructions included; a dream with no fresh fact and nothing to expand prints
@@ -837,30 +778,20 @@ Measured while building memcue; details and method in [docs/evaluation.md](docs/
   that needed memory: lexical search misses prompts that share no rare words with the fact.
 - **End to end, 30 questions with answers in memory:** 30 of 30 correct with memcue against 27 of 30 without, one
   turn fewer per answer; one run per question, so a direction rather than a significant result.
-- **Session extraction on Opus:** no wrong facts in 102, 88 % of the durable facts of ten sessions kept.
+- **Session extraction on Opus (removed in #494):** no wrong facts in 102, 88 % of the durable facts of ten sessions
+  kept.
 - **Migration of 312 notes:** 2335 facts for $40; 2.5 % of facts carried the model's own conclusions after the
   prompt forbade them.
 
-## Review and vet
+## Candidates
 
-Facts written by extraction, and facts mirrored from Hermes' built-in memory, are **candidates**: they are stored and
-visible in `memcue candidates`, but recall ignores them until someone approves them. `memcue vet` applies the
-deterministic rules and the review model to the queue, `memcue approve ID...` takes candidates into recall, and
-`memcue retire ID` rejects one. A fact written by `memcue add` is active at
-once, and an explicit `correct` of an approved fact writes a new active version. A retired fact cannot be corrected:
-retirement is final, so a changed fact is added as a new fact, and `memcue reopen ID` is the way back from a
-rejection. The local review page (`memcue review`) is removed (#325): its template alone cost 2.3 MB of the binary. The full rules are in [Use](#use).
-
-`vet` also checks the approved facts that this binary finds suspect: a fact that names a `MEMCUE_*` variable or a
-`` `memcue X` `` verb it does not have, a memcue version older than its own (a release build only, either right after
-the word or a few words later behind "бинарь", "версия", "сборка", "релиз" or "тег"), or a reminder whose dates have all
-passed. Code can find such a fact but cannot tell a stale one from a record of history, so the main model reads each
-with what was found and retires those that describe a past state as current. The model is asked at temperature 0 and
-every retirement needs a second, independent answer that agrees with the first: a wrong retirement cannot be undone
-from the binary, and one bad sample must not take a true fact out of recall. A fact the two answers disagree about is
-kept and logged as such. Every fact asked about is remembered with its version and the binary's version in `vet.checked`
-in the state directory, so a kept fact is not asked about again until its text or the binary changes. `-no-model` only
-lists the suspects; `-dry-run` asks and changes nothing.
+A candidate is stored and listed by `memcue candidates`, but search ignores it until `memcue approve ID...` takes it
+in; `memcue retire ID` rejects one. `add -candidate` writes one, and so does `import` for a file that asks for review.
+A fact written by `memcue add` is active at once, and an explicit `correct` of an approved fact writes a new active
+version. A retired fact cannot be corrected: retirement is final, so a changed fact is added as a new fact, and
+`memcue reopen ID` is the way back from a rejection. The local review page (`memcue review`) is removed (#325): its
+template alone cost 2.3 MB of the binary. The automatic review, `memcue vet`, is removed with the extraction it
+reviewed (#494); a provisional fact it left in a base is still found after the approved ones until its expiry.
 
 ## Harness support
 
@@ -870,29 +801,29 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 |---|---|---|---|
 | Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool |
 | Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` in the system prompt, rebuilt after compression |
-| Session extraction | `PreCompact` / `SessionEnd` | `turn/end` / `session/disposed` | threshold, idle, pre-compress, session end |
+| Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
-| Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as candidates |
-| Candidate review and vet | binary | binary | binary |
+| Dream | `memcue-dream` skill on the session-start hint | none | dream tools on the system-prompt hint |
+| Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as live facts (#440) |
 
 State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
-`$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule or a vet lock. `MEMCUE_STATE_DIR` overrides the whole path. DSH keeps its extraction checkpoints in
-`$XDG_STATE_HOME/memcue/dsh`, and Hermes keeps its mirror, seen and pending files under `$HERMES_HOME/memcue`; the
-binary's logs, locks and dream schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
+`$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule. `MEMCUE_STATE_DIR`
+overrides the whole path. Hermes keeps its mirror file under `$HERMES_HOME/memcue`; the binary's logs, locks and dream
+schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
 (or `~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH
 unless `facts` is configured. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the
 same file.
 
 ## DeepSeek Harness
 
-memcue also works as a native DSH plugin: the session card, a search tool the model is told to use, extraction at turn
-end and on disposal, and three more fact tools. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
+memcue also works as a native DSH plugin: the session card, a search tool the model is told to use, and the fact
+tools it writes its memory with. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
 
 ## Hermes Agent
 
 memcue also works as a memory provider for Hermes Agent: the session card, a search tool the model is told to use,
-the built-in memory tool mirrored into the base, tools to fix facts, and optional extraction of sessions through an OpenAI-compatible endpoint. See
+the built-in memory tool mirrored into the base, the tools the model writes and fixes facts with, and the dream tools. See
 [plugins/hermes](plugins/hermes/README.md).
 
 ## License

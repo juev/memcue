@@ -9,36 +9,27 @@ fact base:
 - **At the first prompt and after every compaction** `memcue session-card` supplies the card of global rules and
   repository decisions as a user-role notice. The card is a view of the base, not a copy. A failed card is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
-- **When a turn ends** the messages it added go to `memcue extract-messages` in the background, once
-  `minNewChars` of new text has gathered. The checkpoint per session lives in `<stateDir>/<session>.json`: it holds
-  fingerprints of messages already extracted and a pending batch, written atomically before the model call. A failed
-  extraction keeps the batch and retries it on the next turn and when the plugin loads; a successful one acknowledges
-  its fingerprints, so a turn boundary does not send the same text twice. Extraction reads only direct human
-  messages: compaction summaries, cron and
-  goal notices, hook contexts and subagent sessions are left out, and a forked session starts at its inherited
-  prefix instead of re-extracting the parent's history. Tool calls travel with the assistant message and their
-  results follow as `RESULT`, the same pair Claude Code transcripts carry. When the session is disposed, the
-  listener awaits the remaining tail even if it is below `minNewChars`; that call lowers memcue's own 2000-character
-  transcript minimum, so a short final tail can still produce candidates, and a batch left behind by a crash is
-  retried when the plugin loads.
-- **A system-prompt section** says the memory is memcue, when to search it and which tools fix it; the built-in memory
-  files are not written.
+- **The model keeps its memory itself** (#494). The system-prompt section and `memcue_add` tell it to store a rule or
+  a correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it
+  learns it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the
+  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, the only
+  source that reaches the session card; `tool` is what a tool's output showed, `agent` anything else, and memcue
+  refuses installation state from either (#475).
+- **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
 - **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact),
   `memcue_correct` (a new version of a stored fact, with optional `keywords` and `expires`) and `memcue_retire` (stop
   finding a fact; the history keeps it). `memcue_search` runs `memcue search` with the session's working directory
   and id, so facts of this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the
   session.
 
-The binary owns the base, the extraction prompt and the model it uses. This plugin is only the seam between it and
-the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and
+The binary owns the base. This plugin is only the seam between it and the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and
 Hermes.
 
-## Review and vet
+## Candidates
 
-Session extraction writes **candidates**, not active facts: `memcue extract-messages` stores them, search ignores
-them, and `memcue vet` or `memcue approve ID...` decides. A fact written by `memcue_add` is active at
-once; `memcue_correct` of an approved fact is a deliberate correction, not a candidate. The shared rules are in
-[Review and vet](../../README.md#review-and-vet).
+A fact written by `memcue_add` is active at once; `memcue_correct` of an approved fact is a deliberate correction. A
+candidate comes only from `memcue add -candidate` or `memcue import`, and waits for `memcue approve ID...` (see
+[Candidates](../../README.md#candidates)).
 
 ## Supported dsh
 
@@ -46,7 +37,7 @@ The plugin asks `memcue version -json` when it loads. Without a configured `bina
 or one older than the plugin's release is replaced by that release, installed into
 `$XDG_DATA_HOME/memcue/<version>/` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base
 the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the session card
-and extraction off with one warning (search keeps working). A build from source reports a suffixed version and counts
+off with one warning (search keeps working). A build from source reports a suffixed version and counts
 as the current tree.
 
 Tested with `dsh 0.2.0-rc.2`. Both the repository bundle and the standalone package declare
@@ -89,32 +80,18 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
      config:
        binary: /Users/you/.local/bin/memcue
        facts: /Users/you/.claude/memory/facts.db
-       model: deepseek-flash
-       apiUrl: https://api.deepseek.com
-       apiKey: sk-...
    ```
 
    `binary` is worth setting explicitly: an application launched from Finder may not have `~/.local/bin` on `PATH`.
    `facts` may be omitted when the base is memcue's default (`~/.claude/memory/facts.db`).
 
-## Choosing the extraction model
+## Model of `add`
 
-`model` is the model memcue uses for the extraction. No `MEMCUE_*` environment variable needs to be exported: the
-plugin forwards the configured values to every memcue child process as `MEMCUE_MODEL`, `MEMCUE_API_URL` and
-`MEMCUE_API_KEY`.
-
-- **With `apiUrl`** memcue calls an OpenAI-compatible `/chat/completions` endpoint: `model: deepseek-flash`,
-  `apiUrl: https://api.deepseek.com`, `apiKey: sk-...`.
-- **Without `apiUrl`** memcue falls back to `claude -p --model <model>`: `model: claude-opus-5-5` uses the Claude
-  Code login already on the machine and needs no API key.
-
-A field left out falls back to the process environment, then to memcue's own default. A configured value wins over
-the ambient one, so a stale `MEMCUE_MODEL` in the launching environment does not override the profile patch. With
-neither set, memcue's default `claude-opus-5-5` runs through `claude -p`.
-
-`apiKey` is stored in the profile patch under the private `$DSH_HOME` directory, but it is still a secret in a
-configuration file: keep that file out of version control. To avoid storing it, omit `apiKey` and keep
-`MEMCUE_API_KEY` in the environment that launches dsh, or use the `claude -p` route with no key at all.
+`memcue add` asks a model for a fact's search queries in one short call when `MEMCUE_API_URL` is set; without it the
+dream fills them later. `model`, `apiUrl` and `apiKey` set that call: the plugin forwards them to every memcue child
+process as `MEMCUE_MODEL`, `MEMCUE_API_URL` and `MEMCUE_API_KEY`, and a configured value wins over the ambient one.
+Left out, nothing is called. `apiKey` is a secret in a configuration file: keep that file out of version control, or
+keep `MEMCUE_API_KEY` in the environment that launches dsh instead.
 
 ## Configuration
 
@@ -125,21 +102,14 @@ A configured field wins over the environment.
 - `facts` — the fact base; set as `MEMCUE_FACTS` for every child process (default: the binary's own default). A
   leading `~/` is expanded; a relative path is rejected at load, so the value cannot name a different file for each
   host.
-- `extract` — `false` turns session extraction off (default `true`). `MEMCUE_EXTRACT=0` in the environment turns it
-  off too and wins over this field.
-- `minNewChars` — new text a turn must add before extraction runs (default `2000`).
-- `stateDir` — where this plugin keeps per-session extraction checkpoints (default `$XDG_STATE_HOME/memcue/dsh`).
-  A checkpoint records the base it was written for; pointing `facts` at another base starts that session fresh and
-  says so, instead of hiding its messages or retrying a batch into the wrong base.
 - `searchLimit` — default for `memcue_search` (default `5`).
-- `maxToolResultChars` — how much of one tool result goes to extraction (default `1500`). Tool output is kept on
-  purpose: a fact sourced from a tool can only quote its evidence from a `RESULT` block, and memcue's write policy
-  drops such a fact when the quote is missing.
-- `model` — extraction model; forwarded as `MEMCUE_MODEL` (default: memcue's own, `claude-opus-5-5`).
-- `apiUrl` — OpenAI-compatible base URL; forwarded as `MEMCUE_API_URL` (default: unset, so `claude -p` runs).
+- `model` — model of the search queries `add` asks for; forwarded as `MEMCUE_MODEL` (default: memcue's own).
+- `apiUrl` — OpenAI-compatible base URL; forwarded as `MEMCUE_API_URL` (default: unset, so `add` calls no model).
 - `apiKey` — key for `apiUrl`; forwarded as `MEMCUE_API_KEY` (default: unset, so the ambient value or no key is used).
 
-Bad values are rejected at load time with the field name, so a typo does not silently fall back to a default.
+Bad values are rejected at load time with the field name, so a typo does not silently fall back to a default. The
+`extract`, `minNewChars`, `stateDir` and `maxToolResultChars` fields of the extraction are gone (#494); a profile that
+still sets them loads, and the fields are ignored.
 
 ## Testing
 
@@ -179,6 +149,5 @@ granular token without the 2FA bypass cannot run `npm publish`: use `npm stage p
   mirror. The write path is `memcue_add`, `memcue_correct` and `memcue_retire`.
 - The session card arrives as a durable message in the session log, so it replays with the session and survives a
   harness restart.
-- The Claude Code hooks bridge in dsh cannot do this: it runs `SessionStart`, but it ignores
-  `PreCompact`/`SessionEnd` and always sends an empty `transcript_path`, so extraction never starts and the base
-  never grows.
+- The Claude Code hooks bridge in dsh runs `SessionStart` but ignores `PreCompact` and `SessionEnd`; this plugin uses
+  dsh's own events, so the card comes again after a compaction.
