@@ -24,7 +24,8 @@ memcue fact base:
   global fact (source `memory`, origin `hermes-memory`; #440). When the agent edits that entry the fact gets a new
   version, when it removes it the fact is retired. The vet run after an extraction reads the notes of
   `$HERMES_HOME/memories` (`MEMCUE_MEMORY_DIR`, unless it is set already): it retires a mirror whose note is gone and
-  decides the mirrors queued as candidates before 0.16.0 (#458). Which fact an entry became is
+  decides the mirrors queued as candidates before 0.16.0 (#458). The extraction reads the same notes and leaves out
+  what they already say, so the card does not repeat the memory block in other words (#456). Which fact an entry became is
   kept in `$HERMES_HOME/memcue/written.json`. An explicit `memcue_correct` of an approved fact stays active: it is a
   correction, not a new candidate.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
