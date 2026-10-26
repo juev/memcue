@@ -18,12 +18,16 @@ when you learn it, not at the end of the session.
 - **Pitfalls** found by an error or a check: what happens, why, and the workaround: `-kind pitfall -source tool`.
 - **Environment outside the repository**: hosts and what runs there, services, where logs and data live, ids and
   addresses of external systems: `-kind environment -source tool` with `-scope host:<name>` or `-scope service:<name>`.
+- **Procedures the user asks to remember**: how something is installed, released or restarted, with the exact
+  commands: `-kind procedure`. Only on request; a procedure you merely ran is not stored.
+- **Events the next days need**: a release rolled out, an outage, a host taken down: `-kind event`. An event expires
+  after a week (`MEMCUE_EVENT_TTL_DAYS`) unless `-expires` gives a date.
 
 Rules and decisions take `-source user` (the default): they are the user's words, and only they reach the session
 card, which carries the global rules and the decisions of the repository even when a prompt shares no word with them.
 
 Do not store: the progress of the task, what the repository, its git history or a command shows, installation state
-(versions, paths of binaries, defaults of a config), multi-step procedures (they belong in a skill or the docs), and
+(versions, paths of binaries, defaults of a config), multi-step procedures the user did not ask to remember (they belong in a skill or the docs), and
 your own guesses nothing confirmed.
 
 ## Remember
