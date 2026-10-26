@@ -203,3 +203,32 @@ func TestRulesMirrorBeforeInstallationState(t *testing.T) {
 		t.Errorf("decided %+v, rest %+v", decided, rest)
 	}
 }
+
+// Installation state of an older memcue is outdated; a behaviour fact that names an old version, a fact of a knowledge
+// kind, a fact that also names a newer version, and any fact on a dev build are not (#457).
+func TestOutdatedInstall(t *testing.T) {
+	for _, c := range []struct {
+		name, kind, content, current, want string
+	}{
+		{"binaries of a host", "", "The memcue binaries on the build host and on mac are 0.8.0.", "0.16.0", "0.8.0"},
+		{"plugin from a tag", "environment", "В Hermes плагин memcue лежит в /opt/app/plugins/memcue из тега v0.5.1.",
+			"0.16.0", "0.5.1"},
+		{"the oldest of two", "", "memcue: бинарь 0.7.0 на хосте, обёртка с релиза 0.8.0.", "0.16.0", "0.7.0"},
+		{"behaviour since a version", "", "С memcue 0.15.0 карта пропускает строки, которые повторяет память.",
+			"0.16.0", ""},
+		{"a rule", "rule", "Бинарь memcue 0.8.0 не открывает базу schema 6: обновлять бинарь до плагина.", "0.16.0", ""},
+		{"another tool's newer version", "", "Hermes v0.40.1 в контейнере запускает бинарь memcue 0.8.0.", "0.16.0", ""},
+		{"the current release", "", "The memcue binaries on the build host are 0.16.0.", "0.16.0", ""},
+		{"a dev build", "", "The memcue binaries on the build host are 0.8.0.", "", ""},
+		{"no memcue", "", "Бинарь restic на хосте версии 0.8.0.", "0.16.0", ""},
+		{"an address", "", "memcue binary on 10.0.0.1 answers.", "0.16.0", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := fact("01x", c.content, "x 2026-10-20", "tool")
+			f.Kind = c.kind
+			if got := OutdatedInstall(f, c.current); got != c.want {
+				t.Errorf("OutdatedInstall(%q) = %q, want %q", c.content, got, c.want)
+			}
+		})
+	}
+}
