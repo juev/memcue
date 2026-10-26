@@ -266,6 +266,18 @@ def _load_plugin_config() -> dict[str, Any]:
     return dict(block) if isinstance(block, dict) else {}
 
 
+def _search_answer(out: str) -> tuple[list[Any], list[str]]:
+    """The facts and the hints of ``memcue search -json``: an object ``{"facts": [...], "hints": [...]}`` (#453), or
+    the bare array of facts an older binary prints. Anything else is not an answer and raises ValueError."""
+    answer = json.loads(out)
+    if isinstance(answer, list):
+        return answer, []
+    if isinstance(answer, dict) and isinstance(answer.get("facts"), list):
+        hints = answer.get("hints") or []
+        return answer["facts"], [h for h in hints if isinstance(h, str)] if isinstance(hints, list) else []
+    raise ValueError("not a search answer")
+
+
 def _same_text(words: set, entry: set) -> bool:
     """Whether two sets of words say the same thing: a third of both, or two fifths of the shorter one, and never on
     fewer than five shared words. Measured on a live card, the lines that copy a memory entry share 0.30-0.43 of both
@@ -681,10 +693,8 @@ class MemcueMemoryProvider(MemoryProvider):
         if not ok:
             return [], ""
         try:
-            more = json.loads(out)
+            more, _ = _search_answer(out)
         except ValueError:
-            return [], ""
-        if not isinstance(more, list):
             return [], ""
         known = {f.get("id") for f in facts if isinstance(f, dict)}
         held = [f for f in more if isinstance(f, dict) and f.get("id") not in known]
@@ -1262,11 +1272,12 @@ class MemcueMemoryProvider(MemoryProvider):
             ok, out = self._run(cmd + controls + ["--", arg("query")], timeout=_RECALL_TIMEOUT)
             if ok:
                 try:
-                    facts = json.loads(out)
-                    self._remember_found(self._session_id, facts if isinstance(facts, list) else [])
+                    facts, hints = _search_answer(out)
+                    self._remember_found(self._session_id, facts)
                     result = {"facts": facts}
-                    hints = [_CJK_HINT] if _CJK.search(arg("query")) else []
-                    if controls_ok and isinstance(facts, list) and len(facts) <= 1 and arg("min_score") not in ("0", "0.0"):
+                    if _CJK.search(arg("query")) and _CJK_HINT not in hints:  # an older binary names no hint
+                        hints.append(_CJK_HINT)
+                    if controls_ok and len(facts) <= 1 and arg("min_score") not in ("0", "0.0"):
                         held, floor_hint = self._below_floor(cmd, controls, facts, arg("query"))
                         if floor_hint:
                             hints.append(floor_hint)

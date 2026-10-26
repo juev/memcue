@@ -35,7 +35,10 @@ case "$1" in
     printf '{"hookSpecificOutput":{"hookEventName":"SessionCard","additionalContext":""}}\\n'
     ;;
   search)
-    printf '[{"id":"f1","content":"${FACT}","origin":"test 2026-10-20"}]\\n'
+    case "$*" in
+      *shelved*) printf '{"facts":[],"hints":["1 fact on the shelf matches: -in shelf:research"]}\\n' ;;
+      *) printf '[{"id":"f1","content":"${FACT}","origin":"test 2026-10-20"}]\\n' ;;
+    esac
     ;;
   extract-messages)
     payload=$(cat)
@@ -808,6 +811,16 @@ test('memcue_search passes a limit and a leading dash safely', async () => {
 	await tools.get('memcue_search').execute({ query: '-dash query', limit: 3 }, {})
 	const text = await waitForLog('arg: search ')
 	assert.match(text, new RegExp(`arg: search -json -n 3 -cwd ${process.cwd()} -- -dash query`))
+})
+
+test('memcue_search hands over the hints of the binary (#453)', async () => {
+	const { tools } = mount()
+	const search = tools.get('memcue_search')
+	const result = await search.execute({ query: 'shelved words' }, {})
+	assert.deepEqual(result.facts, [])
+	assert.equal(result.hint, '1 fact on the shelf matches: -in shelf:research')
+	const [part] = search.output.render({}, result)
+	assert.match(part.text, /-in shelf:research/)
 })
 
 test('memcue_search hints on a Chinese query (#410)', async () => {

@@ -310,22 +310,27 @@ function contextOf(stdout) {
 	}
 }
 
-/** Facts out of `memcue search -json`, whose answer is an array of fact objects. */
-function factsOf(stdout) {
+/**
+ * Facts and hints out of `memcue search -json`: an object `{facts, hints}` (#453), or the bare array of facts an older
+ * binary prints. Anything else is no facts and no hints.
+ */
+function searchAnswerOf(stdout) {
 	const trimmed = String(stdout ?? '').trim()
-	if (!trimmed) return []
+	if (!trimmed) return { facts: [], hints: [] }
 	try {
 		const parsed = JSON.parse(trimmed)
-		if (!Array.isArray(parsed)) return []
-		return parsed
+		const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.facts) ? parsed.facts : []
+		const hints = Array.isArray(parsed?.hints) ? parsed.hints.filter((hint) => typeof hint === 'string') : []
+		const facts = list
 			.filter((fact) => fact && typeof fact.id === 'string' && typeof fact.content === 'string')
 			.map((fact) => ({
 				id: fact.id,
 				content: fact.content,
 				origin: typeof fact.origin === 'string' ? fact.origin : '',
 			}))
+		return { facts, hints }
 	} catch {
-		return []
+		return { facts: [], hints: [] }
 	}
 }
 
@@ -821,9 +826,11 @@ export function apply(ctx, config) {
 			if (controls.length > 0 && !searchControls) throw new Error(`in, kind, since, expired, words and min_score need memcue ${SEARCH_CONTROLS} or later`)
 			const { code, out, err } = await runMemcue(settings, [...flags, ...controls, '--', String(args.query)], { timeoutMs: 15_000 })
 			if (code !== 0) throw new Error(`memcue search exited ${code}: ${err.trim().slice(0, 500)}`)
-			const facts = factsOf(out)
-			// Chinese, Japanese or Korean text finds facts only through the Latin names beside it (#410).
-			return CJK.test(String(args.query)) ? { facts, hint: CJK_HINT } : { facts }
+			const { facts, hints } = searchAnswerOf(out)
+			// Chinese, Japanese or Korean text finds facts only through the Latin names beside it (#410); an older
+			// binary does not say so itself.
+			if (CJK.test(String(args.query)) && !hints.includes(CJK_HINT)) hints.push(CJK_HINT)
+			return hints.length > 0 ? { facts, hint: hints.join(' ') } : { facts }
 		},
 	}))
 
