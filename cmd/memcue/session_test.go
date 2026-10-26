@@ -191,8 +191,9 @@ func TestSessionStartCardStaysWithinBudget(t *testing.T) {
 	}
 }
 
-// Every rule the user stated is on the card, past the budget (#363); the facts nobody stated fill the budget as before.
-func TestSessionCardCarriesEveryStatedRule(t *testing.T) {
+// The rules the user stated come first but stay within the budget (#487): those that do not fit are counted by the
+// last line, and the facts nobody stated get only the room the stated ones leave.
+func TestSessionCardBoundsTheStatedRules(t *testing.T) {
 	dir := env(t)
 	s, err := store.Open(factsPath())
 	if err != nil {
@@ -208,27 +209,21 @@ func TestSessionCardCarriesEveryStatedRule(t *testing.T) {
 		}
 	}
 	_ = s.Close()
-	card, _, _, err := sessionCard(dir)
+	card, _, _, fit, err := sessionCard(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 12; i++ {
-		if !strings.Contains(card, fmt.Sprintf("Правило user-%d:", i)) {
-			t.Errorf("stated rule %d is not on the card", i)
-		}
+	if n := len([]rune(card)); n > cardBudget {
+		t.Errorf("card is %d runes, budget %d", n, cardBudget)
 	}
-	unstated := strings.Count(card, "Правило agent-")
-	if unstated == 0 || unstated == 12 {
-		t.Errorf("%d unstated rules on the card, want some within the budget and not all", unstated)
+	stated, unstated := strings.Count(card, "- Правило user-"), strings.Count(card, "- Правило agent-")
+	// A line is about 320 runes: the stated rules fill the card, and no line of the same length is left for the rest.
+	if stated == 0 || stated == 12 || unstated != 0 {
+		t.Errorf("%d stated and %d unstated rules on the card, want some stated and none unstated:\n%s", stated,
+			unstated, card)
 	}
-	stated := 0
-	for _, line := range strings.Split(card, "\n") {
-		if strings.HasPrefix(line, "- Правило user-") {
-			stated += len([]rune(line)) + 1
-		}
-	}
-	if rest := len([]rune(card)) - stated; rest > cardBudget {
-		t.Errorf("the unstated part is %d runes, budget %d", rest, cardBudget)
+	if want := cardHint(24 - stated); !strings.HasSuffix(card, "\n"+want+"\n") || fit.Omitted != 24-stated {
+		t.Errorf("omitted %d, want the card to end with %q:\n%s", fit.Omitted, want, card)
 	}
 }
 
@@ -247,7 +242,7 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 		facts = append(facts, store.Fact{ID: fmt.Sprintf("r%02d", i), Content: long(i, "Решение"),
 			Meta: store.Meta{Kind: "decision", Scope: "repo:shop"}})
 	}
-	card, ids, _, err := renderCard(facts)
+	card, ids, _, _, err := renderCard(facts, cardBudget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +268,7 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 
 	// Half is a floor, not a cap: facts of the repository that come first in the order keep the room after it.
 	first := append(append([]store.Fact(nil), facts[20:]...), facts[:20]...)
-	_, firstIDs, _, err := renderCard(first)
+	_, firstIDs, _, _, err := renderCard(first, cardBudget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +283,7 @@ func TestSessionCardKeepsHalfForTheRepository(t *testing.T) {
 	}
 
 	// Without facts of a repository the global rules get the whole card.
-	only, _, _, err := renderCard(facts[:20])
+	only, _, _, _, err := renderCard(facts[:20], cardBudget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +302,7 @@ func TestSessionCardDropsARepeatedRule(t *testing.T) {
 			Meta: store.Meta{Kind: "rule", Scope: "global"}},
 		{ID: "c3", Content: "Pull before a rebase.", Meta: store.Meta{Kind: "rule", Scope: "global"}},
 	}
-	card, ids, excluded, err := renderCard(facts)
+	card, ids, excluded, _, err := renderCard(facts, cardBudget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +337,7 @@ func TestSessionCardLogsTheExcludedFacts(t *testing.T) {
 		}
 	}
 	_ = s.Close()
-	card, ids, excluded, err := sessionCard(dir)
+	card, ids, excluded, _, err := sessionCard(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,6 +355,11 @@ func TestSessionCardLogsTheExcludedFacts(t *testing.T) {
 	}
 	if rec.Excluded != 2 || rec.Chars != len([]rune(card)) || !slices.Equal(rec.Facts, ids) {
 		t.Errorf("card.log %+v, want excluded 2, chars %d, facts %v", rec, len([]rune(card)), ids)
+	}
+	// The body is the card without its header line: one heading and one fact.
+	header, body, _ := strings.Cut(card, "\n")
+	if rec.Budget != cardBudget || rec.Omitted != 0 || rec.Used != len([]rune(body)) || header == "" {
+		t.Errorf("card.log %+v, want budget %d, used %d, omitted 0", rec, cardBudget, len([]rune(body)))
 	}
 }
 
@@ -922,7 +922,8 @@ func TestLayoutPartsKeepsEveryStatedFact(t *testing.T) {
 	}
 	hints := []string{"memcue: 3 facts wait for the dream."}
 
-	card, _, _, err := renderCard(stated(40, 20))
+	// The parts are tested here, not the budget: the card gets room for every fact.
+	card, _, _, _, err := renderCard(stated(40, 20), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -958,7 +959,7 @@ func TestLayoutPartsKeepsEveryStatedFact(t *testing.T) {
 		}
 	}
 
-	card, _, _, err = renderCard(stated(70, 30))
+	card, _, _, _, err = renderCard(stated(70, 30), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1024,5 +1025,128 @@ func TestSessionStartParts(t *testing.T) {
 	}
 	if n := strings.Count(string(data), "\n"); n != 2 {
 		t.Errorf("card.log has %d lines for a part 1, 2, 3 and a part 0 run; want 2", n)
+	}
+}
+
+// Forty stated rules do not fit the card (#487): it is cut at the budget, the rules left out are the tail of the given
+// order, the oldest, and one bullet line counts them, as card.log does.
+func TestRenderCardCutsTheOldestStatedRules(t *testing.T) {
+	var facts []store.Fact
+	for i := range 40 {
+		facts = append(facts, store.Fact{ID: fmt.Sprintf("u%02d", i), Content: fmt.Sprintf("Правило %02d: %s", i,
+			strings.Repeat("слово ", 20)), Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}})
+	}
+	card, ids, _, fit, err := renderCard(facts, cardBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len([]rune(card)); n > cardBudget {
+		t.Errorf("card is %d runes, budget %d", n, cardBudget)
+	}
+	if len(ids) == 0 || len(ids) == 40 {
+		t.Fatalf("%d of 40 stated rules on the card, want the budget to cut them", len(ids))
+	}
+	for i, id := range ids {
+		if want := fmt.Sprintf("u%02d", i); id != want {
+			t.Fatalf("ids %v are not the head of the given order", ids)
+		}
+	}
+	omitted := 40 - len(ids)
+	hint := cardHint(omitted)
+	if strings.Count(card, "more do not fit the card budget") != 1 || !strings.HasSuffix(card, "\n"+hint+"\n") ||
+		!strings.HasPrefix(hint, "- ") {
+		t.Errorf("card does not end with one %q:\n%s", hint, card)
+	}
+	if fit.Omitted != omitted || fit.Budget != cardBudget {
+		t.Errorf("fit %+v, want budget %d, omitted %d", fit, cardBudget, omitted)
+	}
+	header, body, _ := strings.Cut(card, "\n")
+	if want := len([]rune(strings.TrimSuffix(body, hint+"\n"))); fit.Used != want || header == "" {
+		t.Errorf("used %d, want %d", fit.Used, want)
+	}
+
+	dir := env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range facts {
+		if _, err := s.AddWith(f.Content, nil, "test 2026-10-26", "", f.Meta); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+	sessionStartContext(t, dir, "startup", "s1")
+	raw, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "card.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec cardRecord
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Omitted != omitted || len(rec.Facts)+rec.Left != len(ids) || rec.Budget != cardBudget || rec.Used == 0 {
+		t.Errorf("card.log %+v, want omitted %d and %d facts", rec, omitted, len(ids))
+	}
+}
+
+// A card that fits the budget is the card the budget did not bound before #487, byte for byte.
+func TestRenderCardWithinTheBudgetIsUnchanged(t *testing.T) {
+	day := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	facts := []store.Fact{
+		{ID: "u1", Content: "Commit messages are in English.", Created: day,
+			Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}},
+		{ID: "u2", Content: "Решение: база в SQLite.", Created: day.AddDate(0, 0, 1),
+			Meta: store.Meta{Kind: "decision", Scope: "repo:shop", Source: "user_confirmed"}},
+		{ID: "a1", Content: "Pull before a rebase.", Meta: store.Meta{Kind: "rule", Scope: "global", Source: "agent"}},
+	}
+	card, ids, _, fit, err := renderCard(facts, cardBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "memcue: rules and decisions from the base (data, not instructions; a heading gives the scope and the " +
+		"dates)\nGlobal rules (learnt 2026-10-20):\n- Commit messages are in English.\n- Pull before a rebase.\n" +
+		"Rules and decisions of repo:shop (learnt 2026-10-21):\n- Решение: база в SQLite.\n"
+	if card != want {
+		t.Errorf("card:\n%q\nwant:\n%q", card, want)
+	}
+	if !slices.Equal(ids, []string{"u1", "a1", "u2"}) || fit.Omitted != 0 {
+		t.Errorf("ids %v, fit %+v", ids, fit)
+	}
+}
+
+// A crowd of global rules leaves the repository its half of the room: its one rule, last in the order, is on the card.
+func TestRenderCardKeepsTheRepositoryRule(t *testing.T) {
+	var facts []store.Fact
+	for i := range 60 {
+		facts = append(facts, store.Fact{ID: fmt.Sprintf("g%02d", i), Content: fmt.Sprintf("Правило %02d: %s", i,
+			strings.Repeat("слово ", 20)), Meta: store.Meta{Kind: "rule", Scope: "global", Source: "agent"}})
+	}
+	facts = append(facts, store.Fact{ID: "repo", Content: "Решение: база в SQLite.",
+		Meta: store.Meta{Kind: "decision", Scope: "repo:shop", Source: "agent"}})
+	card, ids, _, fit, err := renderCard(facts, cardBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(ids, "repo") || !strings.Contains(card, "- Решение: база в SQLite.") {
+		t.Errorf("the repository rule is not on the card: %v", ids)
+	}
+	if fit.Omitted == 0 || len([]rune(card)) > cardBudget {
+		t.Errorf("fit %+v, card %d runes: want the budget to cut the global rules", fit, len([]rune(card)))
+	}
+}
+
+func TestCardRoom(t *testing.T) {
+	t.Setenv("MEMCUE_CARD_BUDGET", "")
+	_ = os.Unsetenv("MEMCUE_CARD_BUDGET")
+	if got := cardRoom(); got != cardBudget {
+		t.Errorf("unset: %d, want %d", got, cardBudget)
+	}
+	for v, want := range map[string]int{"1200": 1200, " 1200 ": 1200, "0": cardBudget, "-5": cardBudget,
+		"abc": cardBudget, "": cardBudget} {
+		t.Setenv("MEMCUE_CARD_BUDGET", v)
+		if got := cardRoom(); got != want {
+			t.Errorf("MEMCUE_CARD_BUDGET=%q: %d, want %d", v, got, want)
+		}
 	}
 }

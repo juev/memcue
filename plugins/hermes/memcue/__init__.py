@@ -34,6 +34,8 @@ Config, all optional (``memory.memcue`` in config.yaml):
   host: name of this machine for fact scope and the search tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
   session_card: put the session card (global rules and repository decisions) in the system prompt (default true)
+  session_card_chars: most characters of the session card (passed as MEMCUE_CARD_BUDGET; default 0 keeps the
+          binary's 3500); the binary drops the oldest user-stated rule first and counts what it left out
   dream: run the dream through the extraction endpoint after an extraction, when one is due (default true; needs the
           extraction configured)
   facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
@@ -377,6 +379,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._dreaming: Optional[subprocess.Popen] = None  # the dream -run started after an extraction, if any
         self._dream_lock = threading.Lock()
         self._search_facts = _bounded_int(self._config.get("search_facts"), _SEARCH_FACTS, 1, 50)
+        self._card_chars = _bounded_int(self._config.get("session_card_chars"), 0, 0, 100_000)
         self._lock = threading.Lock()
         self._threshold = int(self._config.get("extract_threshold", _THRESHOLD))
         self._idle = float(self._config.get("extract_idle_minutes", _IDLE_MINUTES)) * 60
@@ -648,6 +651,8 @@ class MemcueMemoryProvider(MemoryProvider):
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_EXTRACT="0")
         if self._host:
             env["MEMCUE_HOST"] = self._host
+        if self._card_chars > 0:
+            env["MEMCUE_CARD_BUDGET"] = str(self._card_chars)
         try:
             r = subprocess.run([binary] + args, input=stdin, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=timeout, env=env, check=False)

@@ -123,6 +123,8 @@ environment:
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
+  MEMCUE_CARD_BUDGET  most characters of the session card (default 3500); the oldest user-stated rule is
+                  dropped first
   MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in
                   the state directory)
   MEMCUE_VET      0 stops deciding the facts a session extracted; on by default (MEMCUE_API_URL, or claude -p when

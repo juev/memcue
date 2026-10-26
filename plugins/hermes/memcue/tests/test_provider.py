@@ -22,6 +22,7 @@ import sys
 import tempfile
 import types
 import unittest
+import unittest.mock
 from collections import Counter
 from pathlib import Path
 
@@ -961,6 +962,24 @@ class ProviderTest(unittest.TestCase):
                                                    "extract_model": "m"})
         p.initialize("s1", hermes_home=self.home, agent_context="primary")
         self.assertEqual(p._extract_env()["MEMCUE_HOST"], "mac")
+
+    def test_session_card_chars_is_forwarded_to_memcue(self):
+        # The binary places the card's lines (#487): the plugin passes the budget on and cuts nothing itself.
+        script = Path(self.home) / "budget.sh"
+        script.write_text("#!/bin/sh\nprintf '%s' \"${MEMCUE_CARD_BUDGET-unset}\"\n", encoding="utf-8")
+        script.chmod(0o755)
+        env = dict(os.environ)
+        env.pop("MEMCUE_CARD_BUDGET", None)
+        with unittest.mock.patch.dict(os.environ, env, clear=True):
+            for value, want in [("1200", "1200"), (None, "unset"), ("0", "unset"), ("-5", "unset"), ("x", "unset")]:
+                config = {"binary": str(script)}
+                if value is not None:
+                    config["session_card_chars"] = value
+                p = memcue_provider.MemcueMemoryProvider(config)
+                p.initialize("s1", hermes_home=self.home, agent_context="primary")
+                ok, out = p._run([])
+                self.assertTrue(ok)
+                self.assertEqual(out, want, value)
 
     def test_missing_binary_is_unavailable(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": "/nonexistent/memcue"})
