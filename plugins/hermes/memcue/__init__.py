@@ -9,7 +9,9 @@ gets tools to fix facts too; a reply is checked for the identifiers of the facts
 ``usage.log`` keeps that score when ``usage_log`` is on. With an OpenAI-compatible endpoint configured, the new
 messages of a session go to ``memcue extract-messages`` in the background and the facts a model finds in them are
 added: once enough new text gathers, after a pause in the conversation, before the context is compressed and when the
-session ends. A chat of a messaging gateway can stay one session for days, so its end alone would come too late.
+session ends. A chat of a messaging gateway can stay one session for days, so its end alone would come too late. A
+cron run writes no facts of its own; its extraction runs with ``-shelf-only``, so only what it read from the outside
+world reaches the base, on the shelf (#476).
 After an extraction the provider starts ``memcue dream -run`` through the same endpoint: memcue runs the dream when one
 is due (an hour since the last, and some fact fresh or owed a translation) and makes no model call otherwise (#401).
 
@@ -92,6 +94,7 @@ _SEARCH_FACTS = 5  # the measured point (#372): ten facts double the characters 
 _DREAM_RUN = "0.13.0"  # dream -run appeared here (#401); an older binary leaves the dream to the agent's tools
 _SEARCH_CONTROLS = "0.14.0"  # search -in, -kind, -since, -expired, -all-words appeared here (#409)
 _SHELF = "0.16.0"  # extract-messages -shelf and add -shelf appeared here (#433)
+_SHELF_ONLY = "0.17.1"  # extract-messages -shelf-only appeared after 0.17.0 (#476)
 _DEFAULT_SHELF = "research"  # the one shelf a fact read from a page or a PDF goes to (#433)
 
 
@@ -502,7 +505,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._context = str(kwargs.get("agent_context") or "primary")
         # The dream is a cron job's work (#358): a cron run writes no facts, but it may tidy them.
         self._dreams = self._context in ("primary", "cron")
-        if self._writes:
+        if self._writes or self._context == "cron":
             # A batch that was in flight when the gateway stopped is still on disk: retry it on the next flush.
             if saved := self._saved_pending(session_id):
                 self._pending[session_id] = (saved, time.monotonic())
@@ -720,7 +723,8 @@ class MemcueMemoryProvider(MemoryProvider):
         url, model = str(self._config.get("extract_url") or ""), str(self._config.get("extract_model") or "")
         if os.environ.get("MEMCUE_EXTRACT") == "0":
             return None  # the global off switch wins over the provider config
-        if not (url and model and self._writes and self._binary_ok()):
+        if not (url and model and (self._writes or self._context == "cron") and self._binary_ok()
+                and (self._writes or self._shelf_run())):
             return None
         key = os.environ.get(str(self._config.get("extract_key_env") or ""), "")
         env = dict(os.environ, MEMCUE_FACTS=self._facts, MEMCUE_API_URL=url, MEMCUE_MODEL=model, MEMCUE_API_KEY=key)
@@ -731,6 +735,12 @@ class MemcueMemoryProvider(MemoryProvider):
             # directory it skips that rule, and a mirror whose note is gone would never be retired.
             env.setdefault("MEMCUE_MEMORY_DIR", str(Path(self._state).parent / "memories"))
         return env
+
+    def _shelf_run(self) -> bool:
+        """A cron run writes no facts of its own, but the pages it read are worth the shelf (#476): it extracts with
+        -shelf-only, so nothing but a fact quoted from an external tool is stored. An empty shelf or an older binary
+        keeps the cron run silent, as before."""
+        return self._context == "cron" and bool(self._shelf) and _version_at_least(self._version, _SHELF_ONLY)
 
     def _extract_command(self, binary: str, event: str, session: str) -> list[str]:
         """The command that extracts one batch. The session's repository names the origin, as it does for Claude
@@ -744,6 +754,8 @@ class MemcueMemoryProvider(MemoryProvider):
         if self._shelf and _version_at_least(self._version, _SHELF):
             # A fact quoted from a page or a document goes on the shelf; an older binary would refuse the flag.
             cmd += ["-shelf", self._shelf]
+            if not self._writes:
+                cmd.append("-shelf-only")
         return cmd
 
     def _extract_in_background(self, messages: list[dict[str, Any]], event: str, session: str = "",

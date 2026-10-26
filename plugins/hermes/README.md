@@ -36,7 +36,7 @@ memcue fact base:
   fit the query: a fact far below the best one is left out, so one fitting fact comes alone (#407). `search_facts`
   (default 5, 1–50) sets the most.
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
-  tools below.
+  tools below, and its extraction stores only what goes on the shelf (see below).
 - **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
   instructions and the facts to split, give search queries, translate and review in groups (`since: all` for the first dream
   on a base), the second takes the JSON answer and reports what memcue applied and refused. See [Dream](#dream).
@@ -53,7 +53,9 @@ memcue fact base:
   a tool can quote its evidence only from tool output, and the write policy drops such a fact without the quote. A fact
   quoted from a tool that reads the outside world (`web_extract`, a browser, a PDF) goes to `shelf:research`, which
   only a search naming it reads; the `shelf` option names another shelf and an empty value turns it off (see
-  [Projects](../../README.md#projects)). Each
+  [Projects](../../README.md#projects)). A cron run is extracted too, with `-shelf-only`: a research job that reads
+  pages keeps what it read on the shelf, and nothing else from the run reaches the base (#476); an empty `shelf` or a
+  binary older than the flag keeps cron runs out of extraction. Each
   run is a line in memcue's `extract.log`, in the binary's state directory: `$XDG_STATE_HOME/memcue/<hash>` for the
   Hermes base (a non-default base gets its own subdirectory), or `MEMCUE_STATE_DIR` when set.
 
