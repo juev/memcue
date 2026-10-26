@@ -36,7 +36,8 @@ func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 		t.Errorf("got %+v", resp)
 	}
 	// The agent searches itself (#361): the note tells it to, and no longer promises facts with the prompt.
-	if !strings.Contains(ctx, `memcue search "<words>"`) || strings.Contains(ctx, "stored facts") {
+	// The flags stand before the words in the note (#481), the order the agent copies.
+	if !strings.Contains(ctx, `memcue search [flags] "<words>"`) || strings.Contains(ctx, "stored facts") {
 		t.Errorf("note does not ask the agent to search: %q", ctx)
 	}
 }
