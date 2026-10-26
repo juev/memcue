@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -209,13 +208,29 @@ func TestSearchHintsAtTheShelf(t *testing.T) {
 	}
 }
 
+// -json carries the shelf hint beside the facts: the hosts parse -json, and the hint is their only way to the shelf
+// (#453).
+func TestSearchJSONHintsAtTheShelf(t *testing.T) {
+	env(t)
+	if _, err := addShelfFact(t, "-kind", "environment", "-shelf", "research"); err != nil {
+		t.Fatal(err)
+	}
+	got := searchOutput(t, "-json", "-in", "all", "Example", "API")
+	if want := `{"facts":[],"hints":["1 fact on the shelf matches: -in shelf:research"]}` + "\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if got := searchOutput(t, "-json", "-in", "all", "nothing", "here"); got != `{"facts":[]}`+"\n" {
+		t.Errorf("no hint: %q", got)
+	}
+}
+
 func TestSearchJSONCarriesScope(t *testing.T) {
 	env(t)
 	if _, err := addShelfFact(t, "-kind", "environment", "-shelf", "research"); err != nil {
 		t.Fatal(err)
 	}
 	var hits []map[string]any
-	if err := json.Unmarshal([]byte(searchOutput(t, "-json", "-in", "shelf", "Example", "API")), &hits); err != nil {
+	if err := unmarshalFacts([]byte(searchOutput(t, "-json", "-in", "shelf", "Example", "API")), &hits); err != nil {
 		t.Fatal(err)
 	}
 	if len(hits) != 1 || hits[0]["scope"] != "shelf:research" {

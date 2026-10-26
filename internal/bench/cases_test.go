@@ -328,13 +328,13 @@ var cases = []benchCase{
 	},
 	{
 		id: "empty-base-answers-quietly", stratum: characterization,
-		note: "Records what a search of an empty base does: exit 0, nothing on stderr, `[]` with -json, and a " +
+		note: "Records what a search of an empty base does: exit 0, nothing on stderr, `{\"facts\":[]}` with -json, and a " +
 			"one-line message on stdout without it. The message is on stdout, not stderr: a host shows it to the " +
 			"agent as the answer.",
 		action: one("релиз виджета", searchOpts{}),
 		expect: expect{none: true, also: func(t *testing.T, w *world, a answer) {
-			if strings.TrimSpace(a.stdout) != "[]" || a.stderr != "" {
-				t.Errorf("-json stdout %q, stderr %q; want [] and nothing", a.stdout, a.stderr)
+			if strings.TrimSpace(a.stdout) != `{"facts":[]}` || a.stderr != "" {
+				t.Errorf("-json stdout %q, stderr %q; want no facts, no hints and nothing on stderr", a.stdout, a.stderr)
 			}
 			stdout, stderr := w.b.run(t, "", "search", "релиз виджета")
 			if strings.TrimSpace(stdout) == "" || stderr != "" {
@@ -344,9 +344,9 @@ var cases = []benchCase{
 	},
 	{
 		id: "no-match-gives-hint", stratum: characterization,
-		note: "Records that a query nothing fits returns no fact: `[]` with -json, and without it a hint on stdout " +
-			"that holds no fact. Inside a repository the hint names `-in all`; only that it is there is asserted, " +
-			"not its wording.",
+		note: "Records that a query nothing fits returns no fact, and a hint that holds no fact: on stdout without " +
+			"-json, in `hints` with it (#453). Inside a repository the hint names `-in all`; only that it is there " +
+			"is asserted, not its wording.",
 		setup: func(t *testing.T, w *world) {
 			w.add(t, "own", queueFact, addOpts{cwd: w.repo(t, "widget").dir})
 		},
@@ -355,6 +355,24 @@ var cases = []benchCase{
 			stdout, _ := w.b.run(t, w.repo(t, "widget").dir, "search", "кофеварка")
 			if strings.TrimSpace(stdout) == "" || strings.Contains(stdout, w.id(t, "own")) {
 				t.Errorf("stdout %q; want a hint and no fact", stdout)
+			}
+			if len(a.hints) != 1 || !strings.Contains(a.hints[0], "-in all") {
+				t.Errorf("-json hints %q, want the one that names -in all", a.hints)
+			}
+		}},
+	},
+	{
+		id: "no-match-shelf-json", stratum: rule,
+		note: "README (#433): a search that finds nothing while its words fit a shelved fact says so. #453: the " +
+			"hosts parse -json, so the hint is in `hints` there too, and the fact itself stays on the shelf.",
+		setup: func(t *testing.T, w *world) {
+			w.add(t, "shelved", "Векторный поиск: bge-m3 на 255 фактах даёт AUC 0.91 для склейки дублей.",
+				addOpts{scope: "shelf:research"})
+		},
+		action: one("bge-m3 AUC склейки дублей", searchOpts{}),
+		expect: expect{none: true, also: func(t *testing.T, w *world, a answer) {
+			if len(a.hints) != 1 || !strings.Contains(a.hints[0], "-in shelf:research") {
+				t.Errorf("-json hints %q, want the shelf named", a.hints)
 			}
 		}},
 	},

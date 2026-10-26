@@ -134,7 +134,7 @@ func TestSearchJSONCarriesIDAndContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	var facts []searchFact
-	if err := json.Unmarshal(out.Bytes(), &facts); err != nil {
+	if err := unmarshalFacts(out.Bytes(), &facts); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
 	if len(facts) != 1 || len(facts[0].ID) != 26 || !strings.Contains(facts[0].Content, "openjdk@21") {
@@ -366,4 +366,15 @@ func TestAddEmptyCwdHasNoProject(t *testing.T) {
 	if err := runAdd([]string{"-cwd", "", "-scope", "repo", "--", "без проекта"}, &bytes.Buffer{}); err == nil {
 		t.Error("add -cwd \"\" -scope repo succeeded")
 	}
+}
+
+// unmarshalFacts reads the facts of a search -json answer, {"facts": [...], "hints": [...]} (#453), into facts.
+func unmarshalFacts(data []byte, facts any) error {
+	var a struct {
+		Facts json.RawMessage `json:"facts"`
+	}
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	return json.Unmarshal(a.Facts, facts)
 }

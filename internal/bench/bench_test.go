@@ -271,9 +271,10 @@ type hit struct {
 	Raw      map[string]json.RawMessage `json:"-"`
 }
 
-// answer is what one search printed: the facts and the raw streams.
+// answer is what one search printed: the facts, the hints that came with them, and the raw streams.
 type answer struct {
 	hits   []hit
+	hints  []string
 	stdout string
 	stderr string
 }
@@ -291,12 +292,15 @@ func search(t *testing.T, b *base, query string, o searchOpts) answer {
 	t.Helper()
 	args := append(append([]string{"search", "-json"}, o.args()...), "--", query)
 	stdout, stderr := b.run(t, o.cwd, args...)
-	var raws []map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(stdout), &raws); err != nil {
-		t.Fatalf("search -json %q printed %q: %v", query, stdout, err)
+	var obj struct {
+		Facts []map[string]json.RawMessage `json:"facts"`
+		Hints []string                     `json:"hints"`
 	}
-	a := answer{stdout: stdout, stderr: stderr}
-	for _, raw := range raws {
+	if err := json.Unmarshal([]byte(stdout), &obj); err != nil || obj.Facts == nil {
+		t.Fatalf("search -json %q printed %q, want {\"facts\": [...]}: %v", query, stdout, err)
+	}
+	a := answer{stdout: stdout, stderr: stderr, hints: obj.Hints}
+	for _, raw := range obj.Facts {
 		obj, _ := json.Marshal(raw)
 		var h hit
 		if err := json.Unmarshal(obj, &h); err != nil {

@@ -114,7 +114,7 @@ func TestSearchHandsOverFiveByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	var hits []json.RawMessage
-	if err := json.Unmarshal(out.Bytes(), &hits); err != nil {
+	if err := unmarshalFacts(out.Bytes(), &hits); err != nil {
 		t.Fatal(err)
 	}
 	if len(hits) != 5 {
@@ -124,7 +124,7 @@ func TestSearchHandsOverFiveByDefault(t *testing.T) {
 	if err := runSearch([]string{"-json", "-n", "7", "gradle make"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(out.Bytes(), &hits); err != nil {
+	if err := unmarshalFacts(out.Bytes(), &hits); err != nil {
 		t.Fatal(err)
 	}
 	if len(hits) != 7 {
