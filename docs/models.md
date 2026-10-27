@@ -1,7 +1,8 @@
 # Three models: main, judge, embeddings
 
-Status: **accepted 2026-10-21 and implemented in 0.4.0.** The old opt-in endpoint names are removed;
-this document is the contract the code and the README follow.
+Status: **accepted 2026-10-21 and implemented in 0.4.0; superseded.** The old opt-in endpoint names are removed.
+The dated notes below say what the code does now; the sections after them record the decision as it was made, and
+the README is the current contract.
 Implementation: [#62](https://github.com/juev/memcue/issues/62).
 
 **2026-10-26:** the main chat model no longer extracts or reviews: the agent writes its facts itself, and the

@@ -262,7 +262,7 @@ both it and the bare array of an older binary.
   comes back without a reopen.
 - **Breaking: the schema is 6.** Opening a version-5 base rebuilds the search index once and writes no fact row. memcue
   0.20.0 and older refuse a version-6 base with `fact base has schema 6, this memcue knows 5: update memcue`, for
-  every command, `memcue dump` (the git textconv) and the merge driver included.
+  every command that opens the base, `memcue dump` (the git textconv) and the merge driver included.
 - **Upgrade with no older memcue running.** A memcue 0.20.0 process that opened the base before the upgrade keeps
   working on it: its searches still leave the candidates out, and its index rebuild takes them out of the shared index.
   The next open by the new memcue notices this and rebuilds the index, but a process of the new memcue that is already
