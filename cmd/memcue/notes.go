@@ -39,7 +39,7 @@ type notesReport struct {
 // a §.
 var noteSeparator = regexp.MustCompile(`\n\s*\n|§`)
 
-// noteWord is a word of the text comparison: the letters and digits the plugin's _tokens matches.
+// noteWord is a word of the text comparison: a run of Latin or Cyrillic letters and digits.
 var noteWord = regexp.MustCompile(`[0-9A-Za-zА-Яа-яЁё]+`)
 
 // runNotes reports which entries of the built-in memory note files are already facts of the base (#489): the mirror
@@ -188,8 +188,8 @@ func liveFacts(path string) ([]store.Fact, error) {
 	return live, nil
 }
 
-// noteTokens are the words two texts are compared by, exactly the Hermes plugin's _tokens: lower-cased, words of more
-// than three letters, each cut to five, which folds the endings of a Russian word together.
+// noteTokens are the words two texts are compared by: lower-cased, words of more than three letters, each cut to five,
+// which folds the endings of a Russian word together.
 func noteTokens(text string) map[string]bool {
 	words := map[string]bool{}
 	for _, w := range noteWord.FindAllString(strings.ToLower(text), -1) {
@@ -210,10 +210,9 @@ func sharedWords(a, b map[string]bool) int {
 	return n
 }
 
-// sameText says whether two sets of words say the same thing. It mirrors _same_text of the Hermes plugin
-// (plugins/hermes/memcue/__init__.py), so the plugin and this report agree on what a copy is: at least five shared
-// words, and the shared ones a share of both of at least 0.30 or of the shorter one of at least 0.40. A minShare above
-// zero takes the place of both shares.
+// sameText says whether two sets of words say the same thing: at least five shared words, and the shared ones a share
+// of both of at least 0.30 or of the shorter one of at least 0.40, the thresholds the Hermes plugin's card filter
+// measured until #456 removed it. A minShare above zero takes the place of both shares.
 func sameText(a, b map[string]bool, minShare float64) bool {
 	shared := sharedWords(a, b)
 	if shared < 5 {

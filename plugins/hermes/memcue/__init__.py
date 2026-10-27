@@ -266,17 +266,6 @@ def _search_answer(out: str) -> tuple[list[Any], list[str]]:
     raise ValueError("not a search answer")
 
 
-def _same_text(words: set, entry: set) -> bool:
-    """Whether two sets of words say the same thing: a third of both, or two fifths of the shorter one, and never on
-    fewer than five shared words. Measured on a live card, the lines that copy a memory entry share 0.30-0.43 of both
-    and 0.40-0.75 of the shorter one, and the lines that do not stay under 0.27 and 0.29; a line dropped here is a
-    line the model never sees, so the rule stays on the conservative side of that gap."""
-    shared = len(words & entry)
-    if shared < 5:
-        return False
-    return shared / len(words | entry) >= 0.30 or shared / min(len(words), len(entry)) >= 0.40
-
-
 def _schema(name: str, description: str, props: dict[str, str], required: list[str]) -> dict:
     return {"name": name, "description": description, "parameters": {
         "type": "object", "properties": {k: {"type": "string", "description": v} for k, v in props.items()},
@@ -530,8 +519,9 @@ class MemcueMemoryProvider(MemoryProvider):
     def system_prompt_block(self) -> str:
         """The memory note and the session card. Hermes caches the system prompt and asks again only when it rebuilds
         it, after a compression or a reset, so the card is built here and needs no redelivery of its own (#363). The
-        card leaves out what the memory block right next to it already says (#424)."""
-        card = self._without_memory_copies(self._card_text())
+        card goes in as memcue renders it: a line that repeats the memory block next to it stays, since a text rule
+        that drops copies also drops another rule in the same words (#456)."""
+        card = self._card_text()
         return ("# Long-term memory (memcue)\n"
                 "Before you answer a question that may depend on earlier sessions (past decisions, how a host, "
                 "service or repository is set up, how something was done before, what did not work), search the base "
@@ -561,48 +551,6 @@ class MemcueMemoryProvider(MemoryProvider):
                 continue
             entries += [e.strip() for e in re.split(r"\n\s*\n|§", text) if e.strip()]
         return entries
-
-    def _without_memory_copies(self, card: str) -> str:
-        """Drop the lines of the card that an entry of the built-in memory already states (#424): the memory block is
-        injected whole at every turn and cannot be removed, so a card line saying the same thing is a second copy of
-        it, paid at every session start and after every compaction. A line is dropped when it and an entry hold
-        nearly the same words — a paraphrase in other words is beyond a text rule, and the card keeps it."""
-        if not card:
-            return ""
-        entries = [self._tokens(e) for e in self._memory_notes()]
-        entries = [e for e in entries if e]
-        if not entries:
-            return card
-        lines = card.splitlines()
-        kept = lines[:1]  # the header
-        dropped = 0
-        for line in lines[1:]:
-            words = self._tokens(line)
-            if words and any(_same_text(words, entry) for entry in entries):
-                dropped += 1
-                continue
-            kept.append(line)
-        # A heading stays only while a fact line follows it: the card groups its lines by scope, and a group whose
-        # facts were all copies must not leave an empty heading behind (#437).
-        body = kept[1:]
-        trimmed = []
-        for i, line in enumerate(body):
-            if line.startswith("- "):
-                trimmed.append(line)
-                continue
-            if i + 1 < len(body) and body[i + 1].startswith("- "):
-                trimmed.append(line)
-        if dropped:
-            logger.info("memcue card: %d of %d lines left out as copies of the memory notes", dropped, len(lines) - 1)
-        if not any(line.startswith("- ") for line in trimmed):
-            return ""
-        return "\n".join([kept[0]] + trimmed)
-
-    @staticmethod
-    def _tokens(text: str) -> set:
-        """The words a line and a memory entry are compared by: lower-cased, cut to five letters, which folds the
-        endings of a Russian word together, and short words, which say nothing about the subject, left out."""
-        return {w[:5] for w in re.findall(r"[0-9A-Za-zА-Яа-яЁё]+", text.lower()) if len(w) > 3}
 
     def _card_text(self) -> str:
         """The session card: global rules, the rules the user stated and the decisions of the current repository. A

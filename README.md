@@ -141,8 +141,9 @@ memcue notes -dir ~/.hermes/memories -json
 ```
 
 It reads every `*.md` directly inside `-dir` (default `MEMCUE_MEMORY_DIR`, else `~/.claude/memory`), splits the files
-into entries at a blank line or a `§`, and compares each entry with the live facts by the same word rule the Hermes
-plugin uses to keep the card from repeating the notes; `-min-share` makes that rule stricter or looser. It writes
+into entries at a blank line or a `§`, and compares each entry with the live facts by a word rule: at least five
+shared words, making up at least 0.30 of the words of both or 0.40 of the shorter one; `-min-share` replaces both
+shares with one, which makes the rule stricter or looser. It writes
 nothing and calls no model. An entry marked `ok` can leave the file; a `new` one moves with
 `memcue add -kind K -scope S -- "TEXT"` first.
 
@@ -248,7 +249,8 @@ both it and the bare array of an older binary.
 - **Turn the host's built-in memory off yourself**: `"autoMemoryEnabled": false` in Claude Code's settings, and
   `memory.memory_enabled: false` and `memory.user_profile_enabled: false` in Hermes's config. memcue does not change
   them; it says so while they are on, and a Hermes note file the memory no longer injects stops filtering the card
-  (#502).
+  (#502). #456 later removed that filter: the Hermes provider no longer drops a card line that shares enough words
+  with `MEMORY.md` or `USER.md`, and puts the card in as the binary renders it.
 - `memcue_add` of Hermes and DSH takes a `source`: a rule or decision is the user's by default, so it reaches the
   session card, which the `agent` source these tools always wrote never did.
 - `add` refuses installation state written with `-source tool` as well as `-source agent` (#475).
@@ -356,7 +358,8 @@ both it and the bare array of an older binary.
 - **The session card leaves out what the memory block already says** (#424): a mirror of a built-in memory note, a
   line whose opening repeats one already on the card, and a line the memory notes state are dropped; `card.log` gains
   `excluded`. On the live card 16 lines and 3 181 characters became 11 and 1 995, at every session start and after
-  every compaction ([card-memory-copies-424-2026-10](docs/research/card-memory-copies-424-2026-10.md)).
+  every compaction ([card-memory-copies-424-2026-10](docs/research/card-memory-copies-424-2026-10.md)). #456 later
+  removed the third rule, the plugin's filter against the built-in memory notes; the binary's filters are unchanged.
 - **Five facts stay the search default** (#425): the higher limit adds the tail — 40 facts on twenty prompts, one of
   them useful — for 62 % more characters, so the schema says when to raise it instead
   ([limit-default-425-2026-10](docs/research/limit-default-425-2026-10.md)).
