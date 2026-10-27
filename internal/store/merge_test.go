@@ -133,29 +133,42 @@ func TestMergeOfIdenticalCopiesChangesNothing(t *testing.T) {
 	_ = s.Close()
 }
 
-func TestMergeCarriesMetaAndCandidates(t *testing.T) {
-	b, _ := base(t)
-	c := clone(t, b)
-	sc := openAt(t, c, "loffe", t0.Add(time.Minute))
-	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "exit 1", Review: Candidate}
-	f, err := sc.AddWith("Кандидат с loffe про db1.", nil, "x 2026-10-20", "", m)
+// olderCopy turns the base at path into one an older memcue wrote: schema 5, with rows such a memcue stored.
+func olderCopy(t *testing.T, path string, rows ...Fact) {
+	t.Helper()
+	s, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = sc.Close()
+	legacyRows(t, s, rows...)
+	if _, err := s.db.Exec(`PRAGMA user_version = 5`); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+}
+
+// A candidate synced from a machine that still runs an older memcue keeps its row and its meta, and is found here
+// (#514).
+func TestMergeCarriesMetaAndCandidates(t *testing.T) {
+	b, _ := base(t)
+	c := clone(t, b)
+	m := Meta{Kind: "pitfall", Scope: "host:db1", Source: "tool", Evidence: "exit 1", Review: Candidate}
+	f := Fact{ID: "01JLEGACYCANDIDATE00000010", Version: 1, Content: "Кандидат с builder про db1.",
+		Origin: "x 2026-10-20", Author: "builder", Created: t0.Add(time.Minute), Meta: m}
+	olderCopy(t, c, f)
 	s := openAt(t, b, "mac", t0.Add(2*time.Minute))
 	if _, err := s.Merge(c); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.Get(f.ID)
-	if err != nil || got.Meta != m {
+	if err != nil || got.Meta != m || got.Version != 1 {
 		t.Errorf("merged %+v %v", got, err)
 	}
 	if !strings.Contains(dump(t, s), "kind=pitfall scope=host:db1 source=tool review=candidate") {
 		t.Errorf("dump lacks meta: %s", dump(t, s))
 	}
-	if _, ok := ids(t, s, "кандидат loffe db1")[f.ID]; ok {
-		t.Error("a merged candidate is recalled")
+	if _, ok := ids(t, s, "кандидат builder db1")[f.ID]; !ok {
+		t.Error("a merged candidate is not recalled")
 	}
 	_ = s.Close()
 }
@@ -175,39 +188,34 @@ func TestDumpOneLinePerVersion(t *testing.T) {
 	_ = s.Close()
 }
 
-// One machine approves a candidate while another corrects it: the merge keeps both versions, and the latest decides,
-// as for any two changes made apart. The approval is not lost; it carries the text its machine saw, so the correction
-// made elsewhere stays in the history, not in the current version.
-func TestMergeOfApprovalAndCorrection(t *testing.T) {
+// A machine on an older memcue corrects a candidate while this one retires it later: the merge keeps both versions,
+// the retire is the latest, and the candidate state of the older machine does not bring the fact back.
+func TestMergeOfAnOlderCorrectionAndARetire(t *testing.T) {
 	b := filepath.Join(t.TempDir(), "facts.db")
-	s0 := openAt(t, b, "mac", t0)
-	f, err := s0.AddWith("Кандидат про db1.", []string{"db1"}, "x", "", Meta{Review: Candidate})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = s0.Close()
+	m := Meta{Kind: "environment", Review: Candidate}
+	v1 := Fact{ID: "01JLEGACYCANDIDATE00000011", Version: 1, Content: "Кандидат про db1.", Keywords: []string{"db1"},
+		Origin: "x", Author: "mac", Created: t0, Meta: m}
+	olderCopy(t, b, v1)
 	c := clone(t, b)
-	sc := openAt(t, c, "loffe", t0.Add(time.Minute))
-	if _, err := sc.Correct(f.ID, "Кандидат про db1, уточнён.", nil); err != nil {
-		t.Fatal(err)
-	}
-	_ = sc.Close()
+	v2 := v1
+	v2.Version, v2.Content, v2.Author, v2.Created = 2, "Кандидат про db1, уточнён.", "builder", t0.Add(time.Minute)
+	olderCopy(t, c, v2)
 	s := openAt(t, b, "mac", t0.Add(2*time.Minute))
-	if _, err := s.Approve(f.ID); err != nil {
+	if _, err := s.Retire(v1.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Merge(c); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.Get(f.ID)
-	if err != nil || got.Review != "" || got.Version != 3 || got.Content != "Кандидат про db1." {
+	got, err := s.Get(v1.ID)
+	if err != nil || got.Status != Retired || got.Version != 3 {
 		t.Errorf("merged %+v %v", got, err)
 	}
-	if h, _ := s.History(f.ID); len(h) != 3 || h[1].Content != "Кандидат про db1, уточнён." {
+	if h, _ := s.History(v1.ID); len(h) != 3 || h[1].Content != "Кандидат про db1, уточнён." || h[1].Review != Candidate {
 		t.Errorf("history %+v", h)
 	}
-	if _, ok := ids(t, s, "кандидат db1")[f.ID]; !ok {
-		t.Error("the approved fact is not recalled after the merge")
+	if _, ok := ids(t, s, "кандидат db1")[v1.ID]; ok {
+		t.Error("a retired candidate is recalled after the merge")
 	}
 	_ = s.Close()
 }

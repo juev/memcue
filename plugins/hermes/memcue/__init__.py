@@ -792,9 +792,9 @@ class MemcueMemoryProvider(MemoryProvider):
                         metadata: Optional[dict[str, Any]] = None) -> None:
         """Keep the base in step with the built-in memory. Which fact an entry became is remembered in
         $HERMES_HOME/memcue/written.json, so a later replace or remove of that entry reaches the same fact. The mirror
-        is approved at the write, not queued as a candidate (#440): the note is the user's own words, and a candidate
-        has no index row, so the memory would stay unsearchable. A remove retires the mirror; a note edited outside the
-        memory tool leaves its mirror behind until a dream or the model retires it."""
+        is searchable from the write (#440), like every fact since #514: the note is the user's own words. A remove
+        retires the mirror; a note edited outside the memory tool leaves its mirror behind until a dream or the model
+        retires it."""
         if not self._writes or not self._state:
             return
         previous = str((metadata or {}).get("previous_content") or "")

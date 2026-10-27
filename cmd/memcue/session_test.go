@@ -119,7 +119,6 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	add("Решение чужого репозитория.", "decision", "repo:other", "user", "")
 	add("Глобальное решение.", "decision", "global", "user", "")
 	add("Ловушка в shop.", "pitfall", "repo:example.com/team/shop", "tool", "")
-	add("Кандидат-правило.", "rule", "global", "user", store.Candidate)
 	newest := add("Правило: не пушить в main.", "rule", "global", "user", "")
 	_ = s.Close()
 
@@ -134,8 +133,7 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 			t.Errorf("card lacks %q: %q", want, ctx)
 		}
 	}
-	for _, unwanted := range []string{"только на маке", "чужого репозитория", "Глобальное решение", "Ловушка в shop",
-		"Кандидат-правило"} {
+	for _, unwanted := range []string{"только на маке", "чужого репозитория", "Глобальное решение", "Ловушка в shop"} {
 		if strings.Contains(ctx, unwanted) {
 			t.Errorf("card carries %q: %q", unwanted, ctx)
 		}

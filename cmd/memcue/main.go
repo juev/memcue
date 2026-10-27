@@ -92,9 +92,7 @@ commands:
   session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
   session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
-  add       store a fact: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-candidate] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
-  candidates list the facts that wait for approval: memcue candidates [-json]
-  approve   take candidates into recall: memcue approve ID...
+  add       store a fact, indexed at once: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
   retire    take a fact out of recall: memcue retire ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
@@ -159,10 +157,8 @@ func main() {
 		err = runAdd(os.Args[2:], os.Stdout)
 	case "correct":
 		err = runCorrect(os.Args[2:], os.Stdout)
-	case "candidates":
-		err = runCandidates(os.Args[2:], os.Stdout)
-	case "approve":
-		err = runApprove(os.Args[2:], os.Stdout)
+	case "candidates", "approve":
+		err = errNoApproval(os.Args[1])
 	case "retire":
 		err = runRetire(os.Args[2:], os.Stdout)
 	case "reopen":

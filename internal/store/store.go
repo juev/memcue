@@ -30,6 +30,10 @@ import (
 )
 
 // Bump when the schema or the way facts become stems changes; Open migrates or rebuilds the derived index.
+// Version 6 ends the quarantine (#514): a fact is live whatever its review column says, so a candidate a base still
+// holds is indexed and found. The rows stay as they were written; opening a version-5 base only rebuilds the index. An
+// older memcue must refuse such a base: it would hide those facts again, and its index check would take them out of
+// the index that this one put them in, on every sync between the two.
 // Version 5 adds the search queries of a fact (queries) to what the index holds. An older memcue must refuse such a
 // base: its merge and its writes would drop the queries, and its rebuild would leave them out of the index.
 // Version 4 adds fact_vectors: the optional vectors of the active facts, one per model tag, kept next to the facts
@@ -40,7 +44,7 @@ import (
 // derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,
 // scope, source, evidence, review, prompt_version); an older memcue refuses a newer base instead of reading
 // candidates as active facts.
-const schemaVersion = 5
+const schemaVersion = 6
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
@@ -95,11 +99,16 @@ const (
 	Retired = "retired"
 )
 
-// Candidate is the review state of an active fact that waits for the user's approval: it is stored but not indexed,
-// so recall never gives it.
+// Review states a base may still hold. Nothing writes them any more: a fact is live from the write (#514). A fact in
+// either state is as live as any other while it is active and not expired, and a retired one stays retired. A version
+// this memcue writes stores it as approved (see approved), with its expiry, so the base converges without a write of
+// its own on upgrade.
 const (
-	Candidate   = "candidate"   // extracted, waits for a decision, not recalled
-	Provisional = "provisional" // auto-approved for a TTL, recalled after approved facts
+	// Candidate is the state of a fact that waited for the user's approval before #514.
+	Candidate = "candidate"
+	// Provisional was auto-approved by the removed vet for a TTL, stored as its expiry. Recall still ranks such a row
+	// after the approved facts.
+	Provisional = "provisional"
 )
 
 // Fact is one version of a fact.
@@ -125,7 +134,7 @@ type Meta struct {
 	Scope         string // where it holds: global, host:<name>, repo:<name>
 	Source        string // who said it: user, user_confirmed, tool, agent, note, memory
 	Evidence      string // the words of the source the fact rests on, verbatim
-	Review        string // Candidate while it waits, Provisional for the auto TTL, empty when approved
+	Review        string // empty for a fact written now; Candidate or Provisional in rows written before #514
 	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
 }
 
@@ -142,14 +151,8 @@ type FactInput struct {
 // ErrNotFound: no fact with that id.
 var ErrNotFound = errors.New("fact not found")
 
-// ErrNotCandidate: the fact is not waiting for approval (it is active already, or retired).
-var ErrNotCandidate = errors.New("fact is not a candidate")
-
 // ErrRetired: the fact was retired; a correction cannot bring it back.
 var ErrRetired = errors.New("fact is retired")
-
-// ErrAlreadyCandidate: a step meant for an approved fact met one that still waits for review.
-var ErrAlreadyCandidate = errors.New("fact is already a candidate")
 
 // ErrChanged is returned when a fact got a new version after the caller read it.
 var ErrChanged = errors.New("fact changed since it was read")
@@ -377,6 +380,11 @@ func (s *Store) ensureIndexes() error {
 	return err
 }
 
+// indexStamp names the stamp of the index check. memcue 0.20.0 and older stamp "index" with the index they build, which
+// leaves the candidates out; a process of such a memcue that opened the base before an upgrade can still rebuild it and
+// stamp the result (#514). This memcue reads only its own name, so that stamp makes it check the index, not trust it.
+const indexStampName = "live-index"
+
 // ensureIndex repairs an index that no longer matches the active facts. The index is derived and the only thing
 // Search reads, so a base whose index row was lost must get it back before a prompt is answered.
 //
@@ -390,7 +398,7 @@ func (s *Store) ensureIndex() error {
 		return err
 	}
 	var saved string
-	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = 'index'`).Scan(&saved); err != nil &&
+	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = ?`, indexStampName).Scan(&saved); err != nil &&
 		!errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -398,8 +406,7 @@ func (s *Store) ensureIndex() error {
 		return s.restamp()
 	}
 	const active = `SELECT count(*) FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
-			AND f.review IN ('', 'provisional') `
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? `
 	var facts, indexed, fts, missing, stale int
 	if err := s.db.QueryRow(active, Active).Scan(&facts); err != nil {
 		return err
@@ -417,12 +424,12 @@ func (s *Store) ensureIndex() error {
 		}
 		if err := s.db.QueryRow(`SELECT count(*) FROM fact_index i WHERE NOT EXISTS (
 			SELECT 1 FROM facts f WHERE f.id = i.id AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
-			AND f.status = ? AND f.review IN ('', 'provisional'))`, Active).Scan(&stale); err != nil {
+			AND f.status = ?)`, Active).Scan(&stale); err != nil {
 			return err
 		}
 		if missing == 0 && stale == 0 {
 			// The stamp only saves the next open this check: a base locked by a long write must still open.
-			_ = saveStamp(s.db, "index", stamp)
+			_ = saveStamp(s.db, indexStampName, stamp)
 			return s.restamp()
 		}
 	}
@@ -499,12 +506,12 @@ func (s *Store) restamp() error {
 // a fact whose text has a digit, a separator and a digit can give one, so SQL cuts the set to those before the
 // lexer runs: opening a base does not stem every fact.
 func (s *Store) unnumbered() (int, error) {
-	kw, q, review := s.col("f", "keywords"), s.col("f", "queries"), s.col("f", "review")
+	kw, q := s.col("f", "keywords"), s.col("f", "queries")
 	// The latest version per id is a grouped join, not a correlated max(): the same rows in half the time.
 	rows, err := s.db.Query(`SELECT f.content, `+kw+`, `+q+`, coalesce(i.stems, '') FROM facts f
 		JOIN (SELECT id, max(version) mv FROM facts GROUP BY id) m ON f.id = m.id AND f.version = m.mv
 		LEFT JOIN fact_index i ON i.id = f.id
-		WHERE f.status = ? AND `+review+` IN ('', 'provisional')
+		WHERE f.status = ?
 			AND (f.content || char(10) || `+kw+` || char(10) || `+q+`) GLOB '*[0-9][-.:/][0-9]*'`, Active)
 	if err != nil {
 		return 0, err
@@ -529,7 +536,7 @@ func hasNumberTerm(terms []string) bool {
 
 // IndexStats is the state of the index against the live facts: what `memcue reindex` reports.
 type IndexStats struct {
-	Live       int // live facts: active and approved or provisional, the ones Search reads
+	Live       int // live facts: the latest version of each is active, the ones Search reads
 	Rows       int // rows of fact_index
 	Numbered   int // rows carrying a numeric term
 	Unnumbered int // live facts whose text gives a numeric term while their row has none
@@ -540,8 +547,7 @@ type IndexStats struct {
 func (s *Store) IndexStats() (IndexStats, error) {
 	var st IndexStats
 	if err := s.db.QueryRow(`SELECT count(*) FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
-			AND `+s.col("f", "review")+` IN ('', 'provisional')`, Active).Scan(&st.Live); err != nil {
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?`, Active).Scan(&st.Live); err != nil {
 		return st, err
 	}
 	rows, err := s.db.Query(`SELECT stems FROM fact_index`)
@@ -594,8 +600,7 @@ func (s *Store) migrate() error {
 	return err
 }
 
-// AddWith stores a new fact as version 1 with what it is and what it rests on. A fact with Review Candidate is not
-// recalled until it is approved.
+// AddWith stores a new fact as version 1 with what it is and what it rests on. It is found from the write.
 func (s *Store) AddWith(content string, keywords []string, origin, expires string, m Meta) (Fact, error) {
 	facts, err := s.AddBatch([]FactInput{{
 		Content: content, Keywords: keywords, Origin: origin, Expires: expires, Meta: m,
@@ -630,7 +635,7 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 		}
 		facts = append(facts, Fact{ID: id.String(), Version: 1, Content: content, Keywords: in.Keywords,
 			Origin: in.Origin, Created: s.now().UTC(), Status: Active, Author: s.author, Expires: in.Expires,
-			Queries: in.Queries, Meta: in.Meta})
+			Queries: in.Queries, Meta: approved(in.Meta)})
 	}
 	if len(facts) == 0 {
 		return facts, nil
@@ -686,7 +691,7 @@ func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *
 		}
 		f.Expires = *expires
 	}
-	return f, s.write(f)
+	return s.write(f)
 }
 
 // ValidExpiry accepts "" (never expires) or a "YYYY-MM-DD" date.
@@ -713,49 +718,12 @@ func Today() string { return TodayAt(time.Now()) }
 // TodayAt returns the calendar date of t in t's own location. It is split from Today for tests that pin a time zone.
 func TodayAt(t time.Time) string { return t.Format(time.DateOnly) }
 
-// Approve adds a version that takes a candidate or provisional fact into recall. A fact that is neither is left
-// alone: approving an active fact again, or bringing a retired one back, is not what an approval means.
-func (s *Store) Approve(id string) (Fact, error) {
-	return s.ApproveExpiring(id, "")
-}
-
-// ApproveExpiring is Approve with a last day the fact is worth recalling, decided at approval time; an empty expires
-// keeps the candidate's own, while approving a provisional fact clears its TTL. It writes one version, not an approval
-// followed by a correction.
-func (s *Store) ApproveExpiring(id, expires string) (Fact, error) {
-	cur, err := s.Get(id)
-	if err != nil {
-		return Fact{}, err
-	}
-	if cur.Status != Active || (cur.Review != Candidate && cur.Review != Provisional) {
-		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotCandidate, id, state(cur))
-	}
-	if err := ValidExpiry(expires); err != nil {
-		return Fact{}, err
-	}
-	f := cur
-	if expires != "" {
-		f.Expires = expires
-	} else if cur.Review == Provisional {
-		f.Expires = "" // the TTL belonged to the provisional state, not to a human approval
-	}
-	f.Version, f.Created, f.Author, f.Review = cur.Version+1, s.now().UTC(), s.author, ""
-	return f, s.write(f)
-}
-
-func state(f Fact) string {
-	if f.Status == Active && f.Review != "" {
-		return f.Review
-	}
-	return f.Status
-}
-
-// Candidates returns the latest version of every fact that waits for approval, newest first. Created comes first
-// because a base written before the monotonic ids can hold same-millisecond facts in random id order.
-func (s *Store) Candidates() ([]Fact, error) {
-	return s.query(`SELECT `+s.cols("f")+` FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ?
-		ORDER BY f.created DESC, f.id DESC`, Active, Candidate)
+// approved is m as a version written now stores it: a fact no longer waits for approval (#514), so neither state of an
+// older row is carried into a new version. The expiry is a field of its own and stays: a provisional fact keeps the
+// last day its TTL gave it until a correction changes that day.
+func approved(m Meta) Meta {
+	m.Review = ""
+	return m
 }
 
 // CardFacts returns the facts a session-start card carries: global rules and the rules and decisions whose scope is
@@ -825,7 +793,7 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	}
 	f := cur
 	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
-	return f, s.write(f)
+	return s.write(f)
 }
 
 // Retag adds a version of a fact with a new origin and scope; the content and everything else stay, the creation time
@@ -845,10 +813,10 @@ func (s *Store) Retag(id string, version int, origin, scope string) (Fact, error
 	}
 	f := cur
 	f.Version, f.Author, f.Origin, f.Scope = cur.Version+1, s.author, origin, scope
-	return f, s.write(f)
+	return s.write(f)
 }
 
-// Current returns the latest version of every fact that is not retired, candidates and provisional facts included.
+// Current returns the latest version of every fact that is not retired, whatever its review state.
 func (s *Store) Current() ([]Fact, error) {
 	return s.query(`SELECT `+s.cols("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? ORDER BY f.id`, Active)
@@ -887,26 +855,26 @@ func (s *Store) SetQueries(id string, version int, queries []string) (Fact, erro
 	}
 	f := cur
 	f.Version, f.Author, f.Queries = cur.Version+1, s.author, queries
-	return f, s.write(f)
+	return s.write(f)
 }
 
 // ErrNotRetired is returned when a fact to restore is not retired.
 var ErrNotRetired = errors.New("fact is not retired")
 
-// Restore adds a version that brings a retired fact back with the review state it had: an approved fact is recalled
-// again, a rejected candidate waits for review again. The content and labels stay; it is the undo of a retire made by
-// a person, a vet verdict or a dream.
+// Restore adds a version that brings a retired fact back into recall. The content, labels and expiry stay, and a
+// candidate or provisional fact retired before #514 comes back approved; it is the undo of a retire made by a person,
+// a vet verdict or a dream.
 func (s *Store) Restore(id string) (Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
 		return Fact{}, err
 	}
 	if cur.Status != Retired {
-		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotRetired, id, state(cur))
+		return Fact{}, fmt.Errorf("%w: %s is %s", ErrNotRetired, id, cur.Status)
 	}
 	f := cur
 	f.Version, f.Created, f.Author, f.Status = cur.Version+1, s.now().UTC(), s.author, Active
-	return f, s.write(f)
+	return s.write(f)
 }
 
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.
@@ -917,13 +885,12 @@ func (s *Store) Retire(id string) (Fact, error) {
 	}
 	f := cur
 	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
-	return f, s.write(f)
+	return s.write(f)
 }
 
-// SplitFact does for a fact in recall what SplitCandidate does for a candidate: the parts take its place with its
-// origin, expiry and meta, so an approved fact gives approved parts and a provisional one provisional parts. It refuses
-// a fact that got a new version since the caller read it (ErrChanged), a retired fact and a candidate, which vet
-// splits.
+// SplitFact replaces a fact in recall with its parts: they take its place with its origin, expiry and meta, stored
+// approved like every version this memcue writes. It refuses a fact that got a new version
+// since the caller read it (ErrChanged) and a retired fact.
 func (s *Store) SplitFact(id string, version int, parts []string) ([]Fact, error) {
 	cur, err := s.Get(id)
 	if err != nil {
@@ -934,8 +901,6 @@ func (s *Store) SplitFact(id string, version int, parts []string) ([]Fact, error
 		return nil, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
 	case cur.Status != Active:
 		return nil, fmt.Errorf("%w: %s", ErrRetired, id)
-	case cur.Review == Candidate:
-		return nil, fmt.Errorf("%w: %s", ErrAlreadyCandidate, id)
 	}
 	return s.split(cur, parts)
 }
@@ -958,7 +923,7 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 			return nil, err
 		}
 		out = append(out, Fact{ID: pid.String(), Version: 1, Content: content, Origin: cur.Origin,
-			Created: s.now().UTC(), Status: Active, Author: s.author, Expires: cur.Expires, Meta: cur.Meta})
+			Created: s.now().UTC(), Status: Active, Author: s.author, Expires: cur.Expires, Meta: approved(cur.Meta)})
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -979,19 +944,24 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 	return out, nil
 }
 
-func (s *Store) write(f Fact) error {
+// write stores a new version of a fact as this memcue writes it, and returns the version as stored.
+func (s *Store) write(f Fact) (Fact, error) {
+	f.Meta = approved(f.Meta)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return Fact{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 	if err := insert(tx, f); err != nil {
-		return err
+		return Fact{}, err
 	}
 	if err := reindex(tx, f.ID); err != nil {
-		return err
+		return Fact{}, err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return Fact{}, err
+	}
+	return f, nil
 }
 
 // insert writes one version as it is.
@@ -1002,8 +972,8 @@ func insert(tx *sql.Tx, f Fact) error {
 	return err
 }
 
-// reindex puts the latest version of id into the FTS index, or takes it out when that version is retired or a
-// candidate.
+// reindex puts the latest version of id into the FTS index, or takes it out when that version is retired. The review
+// state does not matter: a candidate of an older base is live (#514).
 func reindex(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec(`INSERT INTO fact_fts(fact_fts, rowid, stems) SELECT 'delete', rid, stems FROM fact_index
 		WHERE id = ?`, id); err != nil {
@@ -1012,10 +982,10 @@ func reindex(tx *sql.Tx, id string) error {
 	if _, err := tx.Exec(`DELETE FROM fact_index WHERE id = ?`, id); err != nil {
 		return err
 	}
-	var content, keywords, queries, status, review string
-	err := tx.QueryRow(`SELECT content, keywords, queries, status, review FROM facts WHERE id = ? ORDER BY version DESC
-		LIMIT 1`, id).Scan(&content, &keywords, &queries, &status, &review)
-	if errors.Is(err, sql.ErrNoRows) || status == Retired || review == Candidate {
+	var content, keywords, queries, status string
+	err := tx.QueryRow(`SELECT content, keywords, queries, status FROM facts WHERE id = ? ORDER BY version DESC
+		LIMIT 1`, id).Scan(&content, &keywords, &queries, &status)
+	if errors.Is(err, sql.ErrNoRows) || status == Retired {
 		return nil
 	}
 	if err != nil {
@@ -1076,7 +1046,7 @@ func (s *Store) Rebuild() error {
 	if err != nil {
 		return err
 	}
-	if err := saveStamp(tx, "index", stamp); err != nil {
+	if err := saveStamp(tx, indexStampName, stamp); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -1120,17 +1090,15 @@ func (s *Store) Rows() ([]Fact, error) {
 	return s.query(`SELECT ` + s.cols("") + ` FROM facts ORDER BY id, version`)
 }
 
-// Active returns the latest version of every approved fact: not retired, not a candidate and not provisional. It
-// reads the facts, not the index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs
-// the index.
+// Active returns the latest version of every fact that is not retired, expired facts and the candidate and provisional
+// facts of an older base included (#514): it is Current, under the name its readers use. It reads the facts, not the
+// index: a lost index row must not hide a fact from facts, an audit or a card. Open repairs the index.
 func (s *Store) Active() ([]Fact, error) {
-	return s.query(`SELECT `+s.cols("f")+` FROM facts f
-		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND f.review = ''
-		ORDER BY f.id`, Active)
+	return s.Current()
 }
 
 // RepoScopes returns the repository scopes the live facts carry — "repo:<key>" of the latest version of every fact
-// that is active and not a candidate — sorted and without duplicates. It is how a caller names a repository key it
+// that is active — sorted and without duplicates. It is how a caller names a repository key it
 // does not know exactly.
 func (s *Store) RepoScopes() ([]string, error) {
 	scope := s.col("f", "scope")
@@ -1143,13 +1111,12 @@ func (s *Store) OriginTiers() ([]string, error) {
 	return s.liveStrings("substr(f.origin, 1, instr(f.origin, ' ') - 1)", "instr(f.origin, ' ') > 1")
 }
 
-// liveStrings returns the distinct values of expr over the latest version of every fact that is active and not a
-// candidate and that meets cond, sorted.
+// liveStrings returns the distinct values of expr over the latest version of every fact that is active and that
+// meets cond, sorted.
 func (s *Store) liveStrings(expr, cond string) ([]string, error) {
-	review := s.col("f", "review")
 	rows, err := s.db.Query(`SELECT DISTINCT `+expr+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ?
-		AND `+review+` IN ('', ?) AND `+cond+` ORDER BY 1`, Active, Provisional)
+		AND `+cond+` ORDER BY 1`, Active)
 	if err != nil {
 		return nil, err
 	}

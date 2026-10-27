@@ -1,6 +1,7 @@
 package recall
 
 import (
+	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -35,26 +36,37 @@ func setup(t *testing.T) *store.Store {
 
 // A provisional fact is available only after the approved facts, and an expired one is not recalled at all.
 func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
-	s, err := store.Open(filepath.Join(t.TempDir(), "facts.db"))
+	path := filepath.Join(t.TempDir(), "facts.db")
+	s, err := store.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = s.Close() })
 	approved, err := s.AddWith("Caddy config.", nil, "x", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Nothing makes a fact provisional any more (#494), but a live base still holds such facts from the vet.
-	until := time.Now().AddDate(0, 0, 7).Format(time.DateOnly)
-	if _, err := s.AddWith("Caddy reload path for the public config.", nil, "x", until,
-		store.Meta{Review: store.Provisional}); err != nil {
-		t.Fatal(err)
-	}
-	expired, err := s.AddWith("Caddy reload path from an old note.", nil, "x",
-		time.Now().AddDate(0, 0, -1).Format(time.DateOnly), store.Meta{Review: store.Provisional})
+	_ = s.Close()
+	// Nothing writes a provisional fact any more (#494, #514), but a live base still holds such rows from the vet; the
+	// next open indexes them.
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	const expiredID = "01JRECALLPROVISIONAL000002"
+	for _, r := range [][3]string{
+		{"01JRECALLPROVISIONAL000001", "Caddy reload path for the public config.", time.Now().AddDate(0, 0, 7).Format(time.DateOnly)},
+		{expiredID, "Caddy reload path from an old note.", time.Now().AddDate(0, 0, -1).Format(time.DateOnly)},
+	} {
+		if _, err := db.Exec(`INSERT INTO facts(id, version, content, origin, created, status, expires, review)
+			VALUES (?, 1, ?, 'x', '2026-10-20T12:00:00Z', 'active', ?, 'provisional')`, r[0], r[1], r[2]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = db.Close()
+	if s, err = store.Open(path); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
 	p := Params{Candidates: 10, MinTerms: 1, MinMatched: 1, MinCoverage: 0.1, MaxFacts: 3}
 	hits, err := Recall(s, "caddy reload path", p)
 	if err != nil {
@@ -64,7 +76,7 @@ func TestProvisionalComesAfterApprovedAndExpires(t *testing.T) {
 		t.Fatalf("hits = %+v, want approved first and provisional second", hits)
 	}
 	for _, h := range hits {
-		if h.ID == expired.ID {
+		if h.ID == expiredID {
 			t.Fatalf("expired provisional fact was recalled: %+v", h)
 		}
 	}

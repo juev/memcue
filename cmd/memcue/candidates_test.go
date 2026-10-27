@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/memcue/internal/store"
 )
@@ -23,45 +24,120 @@ func searched(t *testing.T, query string) string {
 	return out.String()
 }
 
-// An explicit add is active at once and says the user stated it; a candidate is not searched until it is approved.
-func TestAddCandidateApprove(t *testing.T) {
+// legacyCandidate writes a fact the way memcue 0.20.0 and older stored a candidate: a row with review=candidate and
+// no index row. The next open finds the row missing from the index and indexes it (#514).
+func legacyCandidate(t *testing.T, id, content, kind, scope, source string) {
+	t.Helper()
+	legacyRow(t, id, content, kind, scope, source, store.Candidate, "")
+}
+
+// legacyRow writes version 1 of a fact as an older memcue left it, with its review state and expiry, past the store:
+// this memcue never writes a review state.
+func legacyRow(t *testing.T, id, content, kind, scope, source, review, expires string) {
+	t.Helper()
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	db, err := sql.Open("sqlite", factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if _, err := db.Exec(`INSERT INTO facts(id, version, content, keywords, origin, created, status, author, kind,
+		scope, source, review, expires) VALUES (?, 1, ?, '', 'hermes 2026-10-20', '2026-10-20T12:00:00Z', 'active', 'old',
+		?, ?, ?, ?, ?)`, id, content, kind, scope, source, review, expires); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The dream reads every active fact, expired ones included, as it always read an expired approved fact: a legacy
+// candidate or provisional fact is read on the same terms whatever its review state, and a correction, which drops
+// that state, changes nothing about whether the dream reads it (#514).
+func TestDreamReadsExpiredFactsWhateverTheirReview(t *testing.T) {
+	env(t)
+	past := time.Now().AddDate(0, -1, 0).Format(time.DateOnly)
+	future := time.Now().AddDate(0, 1, 0).Format(time.DateOnly)
+	const (
+		liveCand    = "01JDREAMLEGACY000000000001"
+		expiredCand = "01JDREAMLEGACY000000000002"
+		liveProv    = "01JDREAMLEGACY000000000003"
+		expiredProv = "01JDREAMLEGACY000000000004"
+	)
+	legacyRow(t, liveCand, "Кандидат про порт nginx 8080.", "environment", "", "tool", store.Candidate, future)
+	legacyRow(t, expiredCand, "Кандидат про порт redis 6380.", "environment", "", "tool", store.Candidate, past)
+	legacyRow(t, liveProv, "Provisional про порт webforge 3000.", "environment", "", "tool", store.Provisional, future)
+	legacyRow(t, expiredProv, "Provisional про порт minio 9000.", "environment", "", "tool", store.Provisional, past)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	expiredApproved, err := s.AddWith("Одобренный факт про порт grafana 3001.", nil, "x 2026-10-19", past, store.Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	all := []string{liveCand, expiredCand, liveProv, expiredProv, expiredApproved.ID}
+	read := func(when string) {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runDream([]string{"-prepare", "-all"}, &out); err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range all {
+			if !strings.Contains(out.String(), id) {
+				t.Errorf("%s: the dream lacks %s:\n%s", when, id, out.String())
+			}
+		}
+		if n, err := owedTranslations(); err != nil || n != len(all) {
+			t.Errorf("%s: owed translations %d %v, want %d", when, n, err, len(all))
+		}
+	}
+	read("before a correction")
+
+	s, err = store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := s.Correct(expiredCand, "Кандидат про порт redis 6381.", nil)
+	_ = s.Close()
+	if err != nil || f.Review != "" || f.Expires != past {
+		t.Fatalf("corrected %+v %v", f, err)
+	}
+	read("after a correction")
+}
+
+// A fact add writes is searchable at once, whatever its source (#514); add has no -candidate any more, and the
+// commands of the approval workflow say they are gone.
+func TestAddIsSearchableAtOnce(t *testing.T) {
 	env(t)
 	var out bytes.Buffer
-	if err := runAdd([]string{"-candidate", "-source", "memory", "-kind", "environment", "-keywords", "gradle,jdk",
-		gradleFact}, &out); err != nil {
+	if err := runAdd([]string{"-source", "memory", "-kind", "environment", "-keywords", "gradle,jdk", gradleFact},
+		&out); err != nil {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out.String())
-	if ctx := searched(t, gradlePrompt); strings.Contains(ctx, "openjdk@21") {
-		t.Fatalf("a candidate was found: %q", ctx)
-	}
-	out.Reset()
-	if err := runCandidates([]string{"-json"}, &out); err != nil {
-		t.Fatal(err)
-	}
-	var cs []candidateFact
-	if err := json.Unmarshal(out.Bytes(), &cs); err != nil || len(cs) != 1 || cs[0].ID != id ||
-		cs[0].Source != "memory" || cs[0].Kind != "environment" {
-		t.Fatalf("candidates %q: %v", out.String(), err)
-	}
-	out.Reset()
-	if err := runApprove([]string{id}, &out); err != nil || !strings.HasPrefix(out.String(), id+" v2") {
-		t.Fatalf("approve %q: %v", out.String(), err)
-	}
 	if ctx := searched(t, gradlePrompt); !strings.Contains(ctx, "openjdk@21") {
-		t.Errorf("an approved fact is not found: %q", ctx)
+		t.Fatalf("a new fact is not found at once: %q", ctx)
 	}
-	if err := runApprove([]string{id}, &bytes.Buffer{}); err == nil {
-		t.Error("approving an active fact again succeeded")
+	if f := storedFact(t, id); f.Review != "" || f.Source != "memory" || f.Kind != "environment" {
+		t.Errorf("stored %+v", f)
+	}
+	if err := runAdd([]string{"-candidate", "Кандидат."}, &bytes.Buffer{}); err == nil {
+		t.Error("add accepted -candidate")
+	}
+	for _, cmd := range []string{"candidates", "approve"} {
+		if err := errNoApproval(cmd); !strings.Contains(err.Error(), cmd+" is removed (#514)") {
+			t.Errorf("%s: %v", cmd, err)
+		}
 	}
 
 	out.Reset()
 	if err := runAdd([]string{"Пользователь пишет коммиты по-английски."}, &out); err != nil {
 		t.Fatal(err)
 	}
-	s, _ := store.Open(factsPath())
-	defer func() { _ = s.Close() }()
-	if f, _ := s.Get(strings.TrimSpace(out.String())); f.Review != "" || f.Source != "user" {
+	if f := storedFact(t, strings.TrimSpace(out.String())); f.Review != "" || f.Source != "user" {
 		t.Errorf("explicit add %+v", f)
 	}
 	if err := runAdd([]string{"-source", "boss", "x"}, &bytes.Buffer{}); err == nil {
@@ -69,60 +145,100 @@ func TestAddCandidateApprove(t *testing.T) {
 	}
 }
 
-// The facts of extract -dry-run go through review when imported; the facts of a note migration do not.
-func TestImportOfSessionFactsMakesCandidates(t *testing.T) {
-	dir := env(t)
-	path := filepath.Join(dir, "x.json")
-	body := `{"note":"n","origin":"app 2026-10-20","facts":[` +
-		`{"content":"Факт сессии про db1.","keywords":["db1"],"kind":"environment","scope":"host:db1","source":"tool","evidence":"db1"},` +
-		`{"content":"Факт заметки про db2.","keywords":["db2"]}]}`
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+// A candidate an older memcue left is found by search, listed by facts and carried by the card (#514).
+func TestLegacyCandidateIsSearchedListedAndCarried(t *testing.T) {
+	env(t)
+	legacyCandidate(t, "01JLEGACYCMD00000000000001", gradleFact, "environment", "", "tool")
+	legacyCandidate(t, "01JLEGACYCMD00000000000002", "Правило-кандидат: отвечать коротко.", "rule", "global", "user")
+	if ctx := searched(t, gradlePrompt); !strings.Contains(ctx, "openjdk@21") {
+		t.Errorf("a legacy candidate is not found: %q", ctx)
+	}
+	var out bytes.Buffer
+	if err := runFacts(&out); err != nil {
 		t.Fatal(err)
 	}
-	if err := runImport([]string{path}, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
+	if !strings.Contains(out.String(), "01JLEGACYCMD00000000000001") || !strings.Contains(out.String(), "01JLEGACYCMD00000000000002") {
+		t.Errorf("facts %q", out.String())
 	}
-	s, _ := store.Open(factsPath())
-	defer func() { _ = s.Close() }()
-	cs, _ := s.Candidates()
-	act, _ := s.Active()
-	if len(cs) != 1 || !strings.Contains(cs[0].Content, "сессии") || len(act) != 1 || !strings.Contains(act[0].Content, "заметки") {
-		t.Errorf("candidates %+v active %+v", cs, act)
+	if f := storedFact(t, "01JLEGACYCMD00000000000001"); f.Review != store.Candidate || f.Version != 1 {
+		t.Errorf("the legacy row changed: %+v", f)
+	}
+	if ctx := sessionStartContext(t, t.TempDir(), "startup", "s1"); !strings.Contains(ctx, "отвечать коротко") {
+		t.Errorf("the card lacks a legacy candidate rule: %q", ctx)
 	}
 }
 
-// The dry-run record says whether its facts go through review; the kind test is only a fallback for old files.
-func TestImportUsesTheReviewFlag(t *testing.T) {
+// A provisional fact the removed vet left is found by search, listed by facts and, for a global rule, carried by the
+// card, with its expiry, until that expiry passes (#514).
+func TestLegacyProvisionalIsSearchedListedAndCarried(t *testing.T) {
+	env(t)
+	day := future()
+	legacyRow(t, "01JLEGACYCMD00000000000011", "Provisional правило: писать тесты первыми quebec.", "rule", "global",
+		"tool", store.Provisional, day)
+	legacyRow(t, "01JLEGACYCMD00000000000012", "Provisional правило: просроченное romeo.", "rule", "global",
+		"tool", store.Provisional, time.Now().AddDate(0, -1, 0).Format(time.DateOnly))
+	if ctx := searched(t, "тесты первыми quebec"); !strings.Contains(ctx, "01JLEGACYCMD00000000000011") {
+		t.Errorf("a legacy provisional fact is not found: %q", ctx)
+	}
+	if ctx := searched(t, "просроченное romeo"); strings.Contains(ctx, "01JLEGACYCMD00000000000012") {
+		t.Errorf("an expired provisional fact is found: %q", ctx)
+	}
+	var out bytes.Buffer
+	if err := runFacts(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "01JLEGACYCMD00000000000011 v1 hermes 2026-10-20 [] expires="+day) {
+		t.Errorf("facts %q", out.String())
+	}
+	ctx := sessionStartContext(t, t.TempDir(), "startup", "s1")
+	if !strings.Contains(ctx, "писать тесты первыми") || strings.Contains(ctx, "просроченное") {
+		t.Errorf("the card: %q", ctx)
+	}
+}
+
+// Every imported fact is live, whatever its record says about review: the field made candidates before #514. What the
+// fact is and rests on is kept.
+func TestImportStoresEveryFactLive(t *testing.T) {
 	dir := env(t)
 	path := filepath.Join(dir, "x.json")
-	body := `{"note":"note","origin":"app 2026-10-20","review":false,"facts":[{"content":"Факт заметки.","keywords":["note"],"kind":"environment"}]}` + "\n" +
+	body := `{"note":"note","origin":"app 2026-10-20","prompt_version":3,"review":false,"facts":[{"content":"Факт заметки.","keywords":["note"],"kind":"environment"}]}` + "\n" +
 		`{"note":"session","origin":"app 2026-10-20","review":true,"facts":[{"content":"Факт сессии без kind.","keywords":["session"]}]}` + "\n" +
-		`{"note":"old","origin":"app 2026-10-20","facts":[{"content":"Старый файл с kind.","keywords":["old"],"kind":"environment"}]}` + "\n"
+		`{"note":"old","origin":"app 2026-10-20","facts":[{"content":"Старый файл с kind.","keywords":["old"],"kind":"environment","scope":"host:db1","source":"tool","evidence":"db1"}]}` + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := runImport([]string{path}, &bytes.Buffer{}); err != nil {
-		t.Fatal(err)
+	var out bytes.Buffer
+	if err := runImport([]string{path}, &out); err != nil || out.String() != "imported 3 facts\n" {
+		t.Fatalf("import %q: %v", out.String(), err)
 	}
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	active, _ := s.Active()
-	candidates, _ := s.Candidates()
-	if len(active) != 1 || !strings.Contains(active[0].Content, "заметки") {
-		t.Errorf("active %+v", active)
+	active, err := s.Active()
+	if err != nil || len(active) != 3 {
+		t.Fatalf("active %+v %v", active, err)
 	}
-	if len(candidates) != 2 {
-		t.Fatalf("candidates %+v", candidates)
+	got := map[string]store.Fact{}
+	for _, f := range active {
+		if f.Review != "" || f.Origin != "app 2026-10-20" {
+			t.Errorf("imported %+v", f)
+		}
+		got[f.Content] = f
 	}
-	got := map[string]bool{}
-	for _, f := range candidates {
-		got[f.Content] = true
+	if f := got["Старый файл с kind."]; f.Kind != "environment" || f.Scope != "host:db1" || f.Source != "tool" ||
+		f.Evidence != "db1" {
+		t.Errorf("labels lost: %+v", f)
 	}
-	if !got["Факт сессии без kind."] || !got["Старый файл с kind."] {
-		t.Errorf("candidates %+v", candidates)
+	if f := got["Факт заметки."]; f.PromptVersion != 3 {
+		t.Errorf("prompt version lost: %+v", f)
+	}
+	for _, q := range []string{"note", "session", "old"} {
+		hits, err := s.Search([]string{q}, 5)
+		if err != nil || len(hits) != 1 {
+			t.Errorf("search %q: %+v %v", q, hits, err)
+		}
 	}
 }
 

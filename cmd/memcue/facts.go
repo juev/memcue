@@ -120,7 +120,6 @@ func runAdd(args []string, out io.Writer) error {
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory, empty outside a repository)")
 	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory; an empty value is no project)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
-	candidate := fs.Bool("candidate", false, "store it for review: not recalled until approved")
 	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
 	kind := fs.String("kind", "", "rule, decision, pitfall, environment, procedure or event (an event expires, see MEMCUE_EVENT_TTL_DAYS)")
 	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>, shelf:<slug> (read only by a search that names it)")
@@ -164,15 +163,12 @@ func runAdd(args []string, out io.Writer) error {
 		}
 	}
 	m := store.Meta{Kind: *kind, Scope: defaultScope(*scope, *origin), Source: *source}
-	if *candidate {
-		m.Review = store.Candidate
-	}
 	return withStore(func(s *store.Store) error {
 		f, err := s.AddWith(content, keywordsList, *origin, eventExpires(*kind, *expires), m)
 		if err != nil {
 			return err
 		}
-		if !*candidate && extract.API.URL != "" {
+		if extract.API.URL != "" {
 			f = expandStored(s, f)
 		}
 		_, err = fmt.Fprintln(out, f.ID)
@@ -194,9 +190,8 @@ var expandOneFn = func(input string) (extract.ExpandResult, error) {
 
 // expandStored gives a fact add or correct just stored its search queries, so it is found by the words a user asks with
 // from the first prompt (#288, #297), and returns the fact as it stands afterwards. Only with an API endpoint:
-// claude -p takes seconds to start. A candidate is left alone, since the Hermes mirror adds them on the turn's path,
-// and the dream expands it once approved. Any failure leaves the fact without queries for the dream to expand; the fact
-// is stored either way.
+// claude -p takes seconds to start. Any failure leaves the fact without queries for the dream to expand; the fact is
+// stored either way.
 func expandStored(s *store.Store, f store.Fact) store.Fact {
 	input, err := renderSplitInput([]store.Fact{f})
 	if err != nil {
@@ -221,48 +216,11 @@ func expandStored(s *store.Store, f store.Fact) store.Fact {
 var sources = map[string]bool{"user": true, "user_confirmed": true, "tool": true, "agent": true, "note": true,
 	"memory": true}
 
-// runCandidates lists the facts that wait for approval: memcue candidates [-json].
-func runCandidates(args []string, out io.Writer) error {
-	fs := flag.NewFlagSet("candidates", flag.ContinueOnError)
-	asJSON := fs.Bool("json", false, "print a JSON array")
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	return withStore(func(s *store.Store) error {
-		cs, err := s.Candidates()
-		if err != nil {
-			return err
-		}
-		if *asJSON {
-			return writeFactsJSON(out, cs)
-		}
-		for _, f := range cs {
-			if _, err := fmt.Fprintf(out, "%s %s kind=%s scope=%s source=%s | %s\n", f.ID, f.Origin, f.Kind, f.Scope,
-				f.Source, strings.Join(strings.Fields(f.Content), " ")); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// runApprove takes candidates into recall: memcue approve ID...
-func runApprove(args []string, out io.Writer) error {
-	if len(args) == 0 {
-		return errors.New("usage: memcue approve ID [ID ...]")
-	}
-	return withStore(func(s *store.Store) error {
-		for _, id := range args {
-			f, err := s.Approve(id)
-			if err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintf(out, "%s v%d\n", f.ID, f.Version); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+// errNoApproval answers the commands of the approval workflow, removed with it (#514): a script or a habit that still
+// calls them learns why instead of reading the usage.
+func errNoApproval(cmd string) error {
+	return fmt.Errorf("%s is removed (#514): every fact is indexed at the write and nothing waits for approval; "+
+		"a candidate an older memcue left is live too, and memcue retire ID takes a fact out", cmd)
 }
 
 // defaultOriginAt names the repository of dir and today, the way every fact of a session is named. An empty dir means
@@ -430,8 +388,8 @@ func runCorrect(args []string, out io.Writer) error {
 			return err
 		}
 		// The text changed, so the queries have to be asked for again: the words the fact was found by no longer
-		// describe it (#297). A candidate is left to the dream, as add leaves it.
-		if f.Review == "" && extract.API.URL != "" {
+		// describe it (#297).
+		if extract.API.URL != "" {
 			f = expandStored(s, f)
 		}
 		_, err = fmt.Fprintf(out, "%s v%d\n", f.ID, f.Version)
@@ -470,11 +428,7 @@ func runReopen(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		state := "active"
-		if f.Review != "" {
-			state = f.Review
-		}
-		_, err = fmt.Fprintf(out, "%s v%d %s\n", f.ID, f.Version, state)
+		_, err = fmt.Fprintf(out, "%s v%d %s\n", f.ID, f.Version, f.Status)
 		return err
 	})
 }
@@ -794,28 +748,6 @@ func searchJSON(hits []store.Hit) []searchFact {
 			Created: h.Created.UTC().Format(time.RFC3339), Expires: h.Expires})
 	}
 	return out
-}
-
-// candidateFact is one candidate as candidates -json prints it: what a review needs to judge it.
-type candidateFact struct {
-	searchFact
-	Kind     string `json:"kind,omitempty"`
-	Scope    string `json:"scope,omitempty"`
-	Source   string `json:"source,omitempty"`
-	Evidence string `json:"evidence,omitempty"`
-	Author   string `json:"author,omitempty"`
-}
-
-func writeFactsJSON(out io.Writer, fs []store.Fact) error {
-	list := make([]candidateFact, 0, len(fs))
-	for _, f := range fs {
-		list = append(list, candidateFact{searchFact: searchFact{ID: f.ID, Content: f.Content, Keywords: f.Keywords,
-			Origin: f.Origin, Created: f.Created.UTC().Format(time.RFC3339), Expires: f.Expires}, Kind: f.Kind,
-			Scope: f.Scope, Source: f.Source, Evidence: f.Evidence, Author: f.Author})
-	}
-	enc := json.NewEncoder(out)
-	enc.SetEscapeHTML(false)
-	return enc.Encode(list)
 }
 
 // runMerge is git's merge driver: memcue merge %O %A %B. The result goes into %A; a non-zero exit tells git the

@@ -65,13 +65,11 @@ func TestAddKeepsTheFactWhenExpansionFails(t *testing.T) {
 	}
 }
 
-// A candidate (the Hermes mirror writes them on the turn's path) and an add without an API endpoint call no model.
-func TestAddCallsNoModelForCandidatesOrWithoutAPI(t *testing.T) {
+// An add without an API endpoint calls no model.
+func TestAddCallsNoModelWithoutAPI(t *testing.T) {
 	env(t)
 	calls := fakeExpandOnce(t, nil)
 	addFactForTest(t, "-origin", "x 2026-10-22", "Без endpoint запрос не идёт.")
-	withAPI(t, "https://api.example.test")
-	addFactForTest(t, "-candidate", "-origin", "x 2026-10-22", "Кандидат ждёт vet.")
 	if *calls != 0 {
 		t.Fatalf("calls %d, want none", *calls)
 	}

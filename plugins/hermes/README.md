@@ -52,9 +52,10 @@ memcue fact base:
   on a base), the second takes the JSON answer and reports what memcue applied and refused. See [Dream](#dream).
 ## Candidates
 
-A mirrored memory write and a fact written by `memcue_add` are active at once; `memcue_correct` of an approved fact is
-a deliberate correction. A candidate comes only from `memcue add -candidate` or `memcue import`, and waits for
-`memcue approve ID...` (see [Candidates](../../README.md#candidates)).
+A mirrored memory write and a fact written by `memcue_add` are indexed at once, and `memcue_correct` writes a new
+version. Nothing waits for approval: `memcue add -candidate`, `memcue candidates` and `memcue approve` are removed
+(#514). A candidate or provisional fact an older memcue left in the base is live too, unless it is retired or expired
+(see [Candidates](../../README.md#candidates)).
 
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
 …). The built-in `MEMORY.md`/`USER.md` is not a provider and stays on until `memory.memory_enabled` and
