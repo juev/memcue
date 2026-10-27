@@ -278,6 +278,12 @@ both it and the bare array of an older binary.
   an unexpected error, with a short query naming the system and the problem, checking the result against the current
   state. Text only: no search runs on its own, and the binary, DSH and Claude Code are unchanged. Whether the text
   changes what the model does has not been measured.
+- **The Claude Code session-start note covers searching during work** (#522). A new line of the `session-start` note
+  lets the model search, when it decides it may help, on starting with a specific host, service or repository and
+  before it diagnoses an unexpected error or result, with a short query naming the system and the problem; a fact
+  found this way is a lead to check against the current state. The note grows by about 350 characters and still fits
+  both the one-block text and part 1 of the split start. Text only: no search runs on its own, and `session-card`,
+  Hermes and DSH are unchanged. Whether the text changes what the model does has not been measured.
 
 ### 0.20.0: add writes procedure and event facts (#505)
 
