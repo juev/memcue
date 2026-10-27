@@ -1,0 +1,21 @@
+{
+ "card_equal": true,
+ "conflict_markers_refused": true,
+ "export_ms": 138,
+ "import_and_index_ms": 1444,
+ "index_live": 3751,
+ "index_stats_equal": true,
+ "jsonl_bytes": 13175073,
+ "jsonl_bytes_equal": true,
+ "memcue_dump_bytes": 9458329,
+ "memcue_dump_equal": true,
+ "memcue_dump_has_evidence": "0/1078",
+ "reopened_versions": 168,
+ "rows": 18997,
+ "rows_equal": true,
+ "rows_with_author": 18997,
+ "rows_with_evidence": 1078,
+ "rows_with_subsecond_created": 18996,
+ "search_same_results": "300/300",
+ "truncated_refused": true
+}

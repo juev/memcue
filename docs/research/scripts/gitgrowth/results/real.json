@@ -1,0 +1,992 @@
+{
+ "git": "git version 2.47.3",
+ "sqlite": "3.53.1",
+ "date": "2026-10-27",
+ "source": {
+  "commits_touching": 123,
+  "merge_commits": 1,
+  "days": 8,
+  "max_commits_per_day": 20,
+  "all_commits": 1095,
+  "distinct_blobs": 122
+ },
+ "source_store": {
+  "blobs": 122,
+  "logical_bytes": 2262368256,
+  "disk_bytes": 634874030,
+  "with_delta_base": 0,
+  "min_bytes": 3399680,
+  "max_bytes": 36814848,
+  "count_objects": {
+   "count": 852,
+   "size": 627408,
+   "in-pack": 7016,
+   "packs": 1,
+   "size-pack": 4552,
+   "prune-packable": 0,
+   "garbage": 0,
+   "size-garbage": 0
+  }
+ },
+ "per_blob": {
+  "file_bytes": {
+   "first": 3399680,
+   "last": 36814848,
+   "min": 3399680,
+   "median": 16719872,
+   "p90": 36802560,
+   "max": 36814848,
+   "sum": 2262368256
+  },
+  "vacuum_bytes": {
+   "first": 3272704,
+   "last": 31506432,
+   "min": 3272704,
+   "median": 15646720,
+   "p90": 32129024,
+   "max": 32292864,
+   "sum": 2044887040
+  },
+  "text_bytes": {
+   "first": 2004350,
+   "last": 17809693,
+   "min": 2004350,
+   "median": 7622706,
+   "p90": 17792657,
+   "max": 17809693,
+   "sum": 1081539685
+  },
+  "page_count": {
+   "first": 830,
+   "last": 8988,
+   "min": 830,
+   "median": 4082,
+   "p90": 8985,
+   "max": 8988,
+   "sum": 552336
+  },
+  "freelist": {
+   "first": 22,
+   "last": 307,
+   "min": 0,
+   "median": 3,
+   "p90": 194,
+   "max": 319,
+   "sum": 5826
+  },
+  "rows": {
+   "first": 2435,
+   "last": 18996,
+   "min": 2435,
+   "median": 8472,
+   "p90": 18978,
+   "max": 18996,
+   "sum": 1179776
+  },
+  "ids": {
+   "first": 2403,
+   "last": 4696,
+   "min": 2403,
+   "median": 2880,
+   "p90": 4680,
+   "max": 4696,
+   "sum": 407024
+  },
+  "rows_added": {
+   "first": 2435,
+   "last": 0,
+   "min": -2,
+   "median": 6,
+   "p90": 71,
+   "max": 3628,
+   "sum": 18996
+  },
+  "pages_changed_at_offset": {
+   "first": 18,
+   "last": 2,
+   "min": 2,
+   "median": 29,
+   "p90": 825,
+   "max": 4318,
+   "sum": 35718
+  },
+  "pages_new_anywhere": {
+   "first": 18,
+   "last": 2,
+   "min": 2,
+   "median": 28,
+   "p90": 825,
+   "max": 4305,
+   "sum": 34134
+  },
+  "facts_table_bytes": {
+   "first": 1863680,
+   "last": 30732288,
+   "min": 1863680,
+   "median": 9105408,
+   "p90": 30707712,
+   "max": 30732288,
+   "sum": 1646661632
+  },
+  "facts_table_unused": {
+   "first": 308472,
+   "last": 16245001,
+   "min": 307357,
+   "median": 2944453,
+   "p90": 16233185,
+   "max": 16245001,
+   "sum": 773448976
+  },
+  "share_pages_changed_at_offset": {
+   "median": 0.014,
+   "p90": 0.167,
+   "min": 0.0,
+   "max": 1.0
+  },
+  "share_pages_new_anywhere": {
+   "median": 0.014,
+   "p90": 0.161,
+   "min": 0.0,
+   "max": 0.77
+  }
+ },
+ "build_seconds": {
+  "sqlite-every": 36.97,
+  "sqlite-batch5": 7.81,
+  "sqlite-daily": 2.37,
+  "sqlite-vacuum": 29.74,
+  "text-single": 14.8,
+  "text-perfact": 7.73
+ },
+ "variants": {
+  "sqlite-every": {
+   "commits": 122,
+   "loose": {
+    "store": {
+     "loose_files": 488,
+     "loose_bytes": 634905147,
+     "loose_alloc": 636616704,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 634905147,
+     "total_alloc": 636616704
+    },
+    "objects": {
+     "blob": {
+      "count": 122,
+      "logical": 2262368256,
+      "disk": 634874030,
+      "deltas": 0
+     },
+     "tree": {
+      "count": 244,
+      "logical": 8418,
+      "disk": 12332,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 122,
+      "logical": 26562,
+      "disk": 18785,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 122,
+     "bytes_total": 24564290,
+     "bytes_first": 1230669,
+     "bytes_after_first": 23333621,
+     "bytes_median": 9732,
+     "bytes_max": 10967609,
+     "seconds": 36.39,
+     "peak_rss_kib": 150452
+    },
+    "full_pack": {
+     "bytes": 67835915,
+     "seconds": 25.75,
+     "peak_rss_kib": 2620804
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 29.53,
+     "peak_rss_kib": 2252232,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 66751678,
+      "pack_alloc": 66756608,
+      "total_bytes": 66751678,
+      "total_alloc": 66756608
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 18189,
+       "deltas": 0
+      },
+      "tree": {
+       "count": 244,
+       "logical": 8418,
+       "disk": 10868,
+       "deltas": 0
+      },
+      "blob": {
+       "count": 122,
+       "logical": 2262368256,
+       "disk": 66705849,
+       "deltas": 114
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 24564290,
+      "bytes_first": 1230669,
+      "bytes_after_first": 23333621,
+      "bytes_median": 9732,
+      "bytes_max": 10967609,
+      "seconds": 29.94,
+      "peak_rss_kib": 244680
+     },
+     "full_pack": {
+      "bytes": 66734938,
+      "seconds": 0.23,
+      "peak_rss_kib": 70540
+     }
+    },
+    "gc-aggressive": {
+     "command": "git gc -q --aggressive --prune=now",
+     "exit": 0,
+     "seconds": 76.65,
+     "peak_rss_kib": 4226904,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 26331456,
+      "pack_alloc": 26337280,
+      "total_bytes": 26331456,
+      "total_alloc": 26337280
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 18189,
+       "deltas": 0
+      },
+      "tree": {
+       "count": 244,
+       "logical": 8418,
+       "disk": 10868,
+       "deltas": 0
+      },
+      "blob": {
+       "count": 122,
+       "logical": 2262368256,
+       "disk": 26285627,
+       "deltas": 120
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 24564290,
+      "bytes_first": 1230669,
+      "bytes_after_first": 23333621,
+      "bytes_median": 9732,
+      "bytes_max": 10967609,
+      "seconds": 34.52,
+      "peak_rss_kib": 280800
+     },
+     "full_pack": {
+      "bytes": 26314716,
+      "seconds": 0.1,
+      "peak_rss_kib": 31040
+     }
+    }
+   },
+   "sync": {
+    "pushes": 122,
+    "fetch_pack_bytes": 24564290,
+    "push_seconds": 75.6,
+    "fetch_seconds": 74.64,
+    "peak_rss_kib": 152108,
+    "remote_store": {
+     "loose_files": 488,
+     "loose_bytes": 634905147,
+     "loose_alloc": 636616704,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 634905147,
+     "total_alloc": 636616704
+    },
+    "peer_store": {
+     "loose_files": 488,
+     "loose_bytes": 634905147,
+     "loose_alloc": 636616704,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 634905147,
+     "total_alloc": 636616704
+    }
+   }
+  },
+  "sqlite-batch5": {
+   "commits": 25,
+   "loose": {
+    "store": {
+     "loose_files": 100,
+     "loose_bytes": 142013930,
+     "loose_alloc": 142368768,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 142013930,
+     "total_alloc": 142368768
+    },
+    "objects": {
+     "tree": {
+      "count": 50,
+      "logical": 1725,
+      "disk": 2527,
+      "deltas": 0
+     },
+     "blob": {
+      "count": 25,
+      "logical": 496418816,
+      "disk": 142007580,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 25,
+      "logical": 5393,
+      "disk": 3823,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 25,
+     "bytes_total": 21459948,
+     "bytes_first": 1229314,
+     "bytes_after_first": 20230634,
+     "bytes_median": 63048,
+     "bytes_max": 10967608,
+     "seconds": 10.49,
+     "peak_rss_kib": 151564
+    },
+    "full_pack": {
+     "bytes": 36434773,
+     "seconds": 14.96,
+     "peak_rss_kib": 681896
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 14.48,
+     "peak_rss_kib": 683232,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 36439097,
+      "pack_alloc": 36446208,
+      "total_bytes": 36439097,
+      "total_alloc": 36446208
+     },
+     "objects": {
+      "commit": {
+       "count": 25,
+       "logical": 5393,
+       "disk": 3693,
+       "deltas": 0
+      },
+      "tree": {
+       "count": 50,
+       "logical": 1725,
+       "disk": 2227,
+       "deltas": 0
+      },
+      "blob": {
+       "count": 25,
+       "logical": 496418816,
+       "disk": 36428821,
+       "deltas": 22
+      }
+     },
+     "incremental": {
+      "commits": 25,
+      "bytes_total": 21459948,
+      "bytes_first": 1229314,
+      "bytes_after_first": 20230634,
+      "bytes_median": 63048,
+      "bytes_max": 10967608,
+      "seconds": 10.0,
+      "peak_rss_kib": 232188
+     },
+     "full_pack": {
+      "bytes": 36434773,
+      "seconds": 0.15,
+      "peak_rss_kib": 40880
+     }
+    }
+   }
+  },
+  "sqlite-daily": {
+   "commits": 8,
+   "loose": {
+    "store": {
+     "loose_files": 32,
+     "loose_bytes": 42110637,
+     "loose_alloc": 42221568,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 42110637,
+     "total_alloc": 42221568
+    },
+    "objects": {
+     "blob": {
+      "count": 8,
+      "logical": 156405760,
+      "disk": 42108626,
+      "deltas": 0
+     },
+     "tree": {
+      "count": 16,
+      "logical": 552,
+      "disk": 811,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 8,
+      "logical": 1688,
+      "disk": 1200,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 8,
+     "bytes_total": 21095488,
+     "bytes_first": 1233641,
+     "bytes_after_first": 19861847,
+     "bytes_median": 1012351,
+     "bytes_max": 11018518,
+     "seconds": 4.29,
+     "peak_rss_kib": 151468
+    },
+    "full_pack": {
+     "bytes": 20068603,
+     "seconds": 4.9,
+     "peak_rss_kib": 303316
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 4.78,
+     "peak_rss_kib": 302984,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 20070751,
+      "pack_alloc": 20078592,
+      "total_bytes": 20070751,
+      "total_alloc": 20078592
+     },
+     "objects": {
+      "commit": {
+       "count": 8,
+       "logical": 1688,
+       "disk": 1161,
+       "deltas": 0
+      },
+      "tree": {
+       "count": 16,
+       "logical": 552,
+       "disk": 715,
+       "deltas": 0
+      },
+      "blob": {
+       "count": 8,
+       "logical": 156405760,
+       "disk": 20066695,
+       "deltas": 6
+      }
+     },
+     "incremental": {
+      "commits": 8,
+      "bytes_total": 21095488,
+      "bytes_first": 1233641,
+      "bytes_after_first": 19861847,
+      "bytes_median": 1012351,
+      "bytes_max": 11018518,
+      "seconds": 3.1,
+      "peak_rss_kib": 230404
+     },
+     "full_pack": {
+      "bytes": 20068603,
+      "seconds": 0.09,
+      "peak_rss_kib": 24756
+     }
+    }
+   },
+   "sync": {
+    "pushes": 8,
+    "fetch_pack_bytes": 21095488,
+    "push_seconds": 6.64,
+    "fetch_seconds": 6.56,
+    "peak_rss_kib": 150360,
+    "remote_store": {
+     "loose_files": 32,
+     "loose_bytes": 42110637,
+     "loose_alloc": 42221568,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 42110637,
+     "total_alloc": 42221568
+    },
+    "peer_store": {
+     "loose_files": 32,
+     "loose_bytes": 42110637,
+     "loose_alloc": 42221568,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 42110637,
+     "total_alloc": 42221568
+    }
+   }
+  },
+  "sqlite-vacuum": {
+   "commits": 122,
+   "loose": {
+    "store": {
+     "loose_files": 479,
+     "loose_bytes": 483267642,
+     "loose_alloc": 484950016,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 483267642,
+     "total_alloc": 484950016
+    },
+    "objects": {
+     "tree": {
+      "count": 238,
+      "logical": 8211,
+      "disk": 12025,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 122,
+      "logical": 26562,
+      "disk": 18782,
+      "deltas": 0
+     },
+     "blob": {
+      "count": 119,
+      "logical": 1966379008,
+      "disk": 483236835,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 122,
+     "bytes_total": 23095498,
+     "bytes_first": 1104654,
+     "bytes_after_first": 21990844,
+     "bytes_median": 14335,
+     "bytes_max": 10634127,
+     "seconds": 29.56,
+     "peak_rss_kib": 126328
+    },
+    "full_pack": {
+     "bytes": 47848427,
+     "seconds": 24.05,
+     "peak_rss_kib": 2147992
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 23.68,
+     "peak_rss_kib": 2043600,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 49506750,
+      "pack_alloc": 49512448,
+      "total_bytes": 49506750,
+      "total_alloc": 49512448
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 18003,
+       "deltas": 3
+      },
+      "tree": {
+       "count": 238,
+       "logical": 8211,
+       "disk": 10597,
+       "deltas": 0
+      },
+      "blob": {
+       "count": 119,
+       "logical": 1966379008,
+       "disk": 49461666,
+       "deltas": 110
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 23095498,
+      "bytes_first": 1104654,
+      "bytes_after_first": 21990844,
+      "bytes_median": 14335,
+      "bytes_max": 10634127,
+      "seconds": 23.58,
+      "peak_rss_kib": 275336
+     },
+     "full_pack": {
+      "bytes": 49490298,
+      "seconds": 0.19,
+      "peak_rss_kib": 53712
+     }
+    }
+   }
+  },
+  "text-single": {
+   "commits": 122,
+   "loose": {
+    "store": {
+     "loose_files": 348,
+     "loose_bytes": 133081523,
+     "loose_alloc": 134250496,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 133081523,
+     "total_alloc": 134250496
+    },
+    "objects": {
+     "tree": {
+      "count": 113,
+      "logical": 4407,
+      "disk": 6319,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 122,
+      "logical": 26562,
+      "disk": 18780,
+      "deltas": 0
+     },
+     "blob": {
+      "count": 113,
+      "logical": 960605258,
+      "disk": 133056424,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 122,
+     "bytes_total": 1767778,
+     "bytes_first": 480126,
+     "bytes_after_first": 1287652,
+     "bytes_median": 2182,
+     "bytes_max": 480126,
+     "seconds": 11.17,
+     "peak_rss_kib": 87872
+    },
+    "full_pack": {
+     "bytes": 7385579,
+     "seconds": 4.45,
+     "peak_rss_kib": 1404732
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 4.31,
+     "peak_rss_kib": 1445012,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 7074592,
+      "pack_alloc": 7081984,
+      "total_bytes": 7074592,
+      "total_alloc": 7081984
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 17647,
+       "deltas": 9
+      },
+      "blob": {
+       "count": 113,
+       "logical": 960605258,
+       "disk": 7039012,
+       "deltas": 107
+      },
+      "tree": {
+       "count": 113,
+       "logical": 4407,
+       "disk": 5641,
+       "deltas": 0
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 1767778,
+      "bytes_first": 480126,
+      "bytes_after_first": 1287652,
+      "bytes_median": 2182,
+      "bytes_max": 480126,
+      "seconds": 9.42,
+      "peak_rss_kib": 180056
+     },
+     "full_pack": {
+      "bytes": 7062332,
+      "seconds": 0.03,
+      "peak_rss_kib": 12300
+     }
+    },
+    "gc-aggressive": {
+     "command": "git gc -q --aggressive --prune=now",
+     "exit": 0,
+     "seconds": 12.28,
+     "peak_rss_kib": 1971068,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 1903536,
+      "pack_alloc": 1908736,
+      "total_bytes": 1903536,
+      "total_alloc": 1908736
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 17647,
+       "deltas": 9
+      },
+      "blob": {
+       "count": 113,
+       "logical": 960605258,
+       "disk": 1867956,
+       "deltas": 112
+      },
+      "tree": {
+       "count": 113,
+       "logical": 4407,
+       "disk": 5641,
+       "deltas": 0
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 1767778,
+      "bytes_first": 480126,
+      "bytes_after_first": 1287652,
+      "bytes_median": 2182,
+      "bytes_max": 480126,
+      "seconds": 13.34,
+      "peak_rss_kib": 187832
+     },
+     "full_pack": {
+      "bytes": 1891276,
+      "seconds": 0.01,
+      "peak_rss_kib": 7252
+     }
+    }
+   },
+   "sync": {
+    "pushes": 122,
+    "fetch_pack_bytes": 1767778,
+    "push_seconds": 25.74,
+    "fetch_seconds": 25.73,
+    "peak_rss_kib": 87956,
+    "remote_store": {
+     "loose_files": 348,
+     "loose_bytes": 133081523,
+     "loose_alloc": 134250496,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 133081523,
+     "total_alloc": 134250496
+    },
+    "peer_store": {
+     "loose_files": 348,
+     "loose_bytes": 133081523,
+     "loose_alloc": 134250496,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 133081523,
+     "total_alloc": 134250496
+    }
+   }
+  },
+  "text-perfact": {
+   "commits": 122,
+   "loose": {
+    "store": {
+     "loose_files": 24329,
+     "loose_bytes": 15008496,
+     "loose_alloc": 101965824,
+     "packs": 0,
+     "pack_bytes": 0,
+     "pack_alloc": 0,
+     "total_bytes": 15008496,
+     "total_alloc": 101965824
+    },
+    "objects": {
+     "tree": {
+      "count": 7682,
+      "logical": 4788561,
+      "disk": 4014751,
+      "deltas": 0
+     },
+     "blob": {
+      "count": 16525,
+      "logical": 42506965,
+      "disk": 10974945,
+      "deltas": 0
+     },
+     "commit": {
+      "count": 122,
+      "logical": 26562,
+      "disk": 18800,
+      "deltas": 0
+     }
+    },
+    "incremental": {
+     "commits": 122,
+     "bytes_total": 7077983,
+     "bytes_first": 1452594,
+     "bytes_after_first": 5625389,
+     "bytes_median": 4001,
+     "bytes_max": 1635294,
+     "seconds": 3.75,
+     "peak_rss_kib": 8684
+    },
+    "full_pack": {
+     "bytes": 4650193,
+     "seconds": 1.9,
+     "peak_rss_kib": 13028
+    }
+   },
+   "repacked": {
+    "gc": {
+     "command": "git gc -q --prune=now",
+     "exit": 0,
+     "seconds": 2.26,
+     "peak_rss_kib": 16192,
+     "store": {
+      "loose_files": 0,
+      "loose_bytes": 0,
+      "loose_alloc": 0,
+      "packs": 1,
+      "pack_bytes": 5429919,
+      "pack_alloc": 5435392,
+      "total_bytes": 5429919,
+      "total_alloc": 5435392
+     },
+     "objects": {
+      "commit": {
+       "count": 122,
+       "logical": 26562,
+       "disk": 17651,
+       "deltas": 9
+      },
+      "blob": {
+       "count": 16525,
+       "logical": 42506965,
+       "disk": 3602226,
+       "deltas": 11851
+      },
+      "tree": {
+       "count": 7682,
+       "logical": 4788561,
+       "disk": 1030358,
+       "deltas": 3688
+      }
+     },
+     "incremental": {
+      "commits": 122,
+      "bytes_total": 7083891,
+      "bytes_first": 1452594,
+      "bytes_after_first": 5631297,
+      "bytes_median": 4154,
+      "bytes_max": 1635294,
+      "seconds": 1.79,
+      "peak_rss_kib": 27492
+     },
+     "full_pack": {
+      "bytes": 4650193,
+      "seconds": 0.09,
+      "peak_rss_kib": 18600
+     }
+    }
+   },
+   "sync": {
+    "pushes": 122,
+    "fetch_pack_bytes": 7073891,
+    "push_seconds": 7.57,
+    "fetch_seconds": 4.82,
+    "peak_rss_kib": 15796,
+    "remote_store": {
+     "loose_files": 1567,
+     "loose_bytes": 2748872,
+     "loose_alloc": 8384512,
+     "packs": 17,
+     "pack_bytes": 13900893,
+     "pack_alloc": 14020608,
+     "total_bytes": 16649765,
+     "total_alloc": 22405120
+    },
+    "peer_store": {
+     "loose_files": 1567,
+     "loose_bytes": 2748872,
+     "loose_alloc": 8384512,
+     "packs": 17,
+     "pack_bytes": 13897983,
+     "pack_alloc": 14020608,
+     "total_bytes": 16646855,
+     "total_alloc": 22405120
+    }
+   }
+  }
+ },
+ "elapsed_seconds": 872.0
+}
