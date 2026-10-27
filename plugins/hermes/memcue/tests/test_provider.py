@@ -1,7 +1,9 @@
 """Offline tests of the memcue provider against the real memcue binary.
 
 Run: python3 plugins/hermes/memcue/tests/test_provider.py (MEMCUE_BIN=/path/to/memcue, default: memcue on PATH).
-Inside Hermes the real agent modules are used; elsewhere they are stubbed.
+Inside Hermes the real agent modules are used; elsewhere they are stubbed. MEMCUE_REQUIRE_HERMES=1 turns the stubs off:
+the suite then fails to load without Hermes. The suite needs only this plugin directory, so it runs in an installed copy
+as well as in the checkout.
 """
 
 import contextlib
@@ -34,7 +36,8 @@ def _stub_hermes():
         import tools.registry  # noqa: F401
         return
     except ImportError:
-        pass
+        if os.environ.get("MEMCUE_REQUIRE_HERMES") == "1":
+            raise
     agent = types.ModuleType("agent")
     mp = types.ModuleType("agent.memory_provider")
 
@@ -377,17 +380,6 @@ class ProviderTest(unittest.TestCase):
         self.assertNotIn("search", called)
         p.handle_tool_call("memcue_search", {"query": "vega-3 ssh"})  # the model's own call is the one that searches
         self.assertIn("search", calls.read_text(encoding="utf-8").split())
-
-    def test_other_hosts_keep_their_text(self):
-        """#521 is the Hermes provider's instruction only: the DSH and Claude Code plugins do not carry it."""
-        root = HERE.parent.parent.parent
-        for path in (root / "plugins" / "deepseek-harness" / "src" / "index.mjs",
-                     root / "plugins" / "claude-code" / "skills" / "memcue" / "SKILL.md"):
-            with self.subTest(path=path.name):
-                text = path.read_text(encoding="utf-8")
-                self.assertIn("memcue", text)
-                self.assertNotIn("During work", text)
-                self.assertNotIn("unexpected error", text)
 
     def _notes_and_rules(self) -> list:
         """Memory notes and the card rules of #456 next to them: copies of a note, and rules in the same words that
@@ -736,11 +728,23 @@ class ProviderTest(unittest.TestCase):
         """memcue searches only the workspace's repository by default; a Hermes chat is not about one (#409)."""
         other = self.memcue("add", "-origin", "example.com/them/lib 2026-10-25", "-scope", "repo:example.com/them/lib",
                             "-keywords", "caddy", "Caddy на server3 держит конфиг в /etc/caddy.")[0].split()[0]
-        self.p._workspace = str(Path(__file__).resolve().parents[4])  # this repository's checkout
+        # A repository of its own, not the checkout the test may run in: an installed plugin lies in none (#526). Git
+        # config outside it is off, so an insteadOf of the host cannot rewrite its remote; setUp restores the environment.
+        os.environ.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+        repo = Path(self.home) / "app"
+        (repo / ".git").mkdir(parents=True)
+        (repo / ".git" / "config").write_text('[remote "origin"]\n\turl = https://example.com/us/app.git\n',
+                                              encoding="utf-8")
+        self.p._workspace = str(repo)
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3"}))
         self.assertEqual([f["id"] for f in found["facts"]], [other])
         narrow = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
         self.assertEqual(narrow["facts"], [])
+        # The workspace is a project to memcue: the narrow search finds a fact of this repository.
+        own = self.memcue("add", "-origin", "example.com/us/app 2026-10-27", "-scope", "repo:example.com/us/app",
+                          "-keywords", "nginx", "Nginx на server3 слушает порт 8443.")[0].split()[0]
+        mine = json.loads(self.p.handle_tool_call("memcue_search", {"query": "nginx server3", "in": "project"}))
+        self.assertEqual([f["id"] for f in mine["facts"]], [own])
 
     def test_search_answer_reads_both_shapes(self):
         """search -json is an object with facts and hints (#453); an older binary prints a bare array."""

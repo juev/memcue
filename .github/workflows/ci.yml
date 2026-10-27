@@ -70,5 +70,18 @@ jobs:
           python3 -m venv /tmp/hermes-venv
           /tmp/hermes-venv/bin/python -m pip install --disable-pip-version-check 'hermes-agent==0.15.2'
 
+      # MEMCUE_REQUIRE_HERMES fails the run when Hermes does not import, instead of falling back to the stubs.
       - name: test against real Hermes
-        run: MEMCUE_BIN="$PWD/bin/memcue" /tmp/hermes-venv/bin/python plugins/hermes/memcue/tests/test_provider.py
+        run: |
+          MEMCUE_REQUIRE_HERMES=1 MEMCUE_BIN="$PWD/bin/memcue" \
+            /tmp/hermes-venv/bin/python plugins/hermes/memcue/tests/test_provider.py
+
+      # An installed plugin is a copy of plugins/hermes/memcue alone, without the rest of the checkout (#526).
+      - name: test an installed copy against real Hermes
+        run: |
+          home="$(mktemp -d)"
+          mkdir -p "$home/plugins"
+          cp -r plugins/hermes/memcue "$home/plugins/memcue"
+          cd "$home"
+          HERMES_HOME="$home" MEMCUE_REQUIRE_HERMES=1 MEMCUE_BIN="$GITHUB_WORKSPACE/bin/memcue" \
+            /tmp/hermes-venv/bin/python "$home/plugins/memcue/tests/test_provider.py"
