@@ -332,6 +332,63 @@ class ProviderTest(unittest.TestCase):
         self.p.on_pre_compress([])
         self.assertIn("Всегда отвечай", self.p.system_prompt_block())
 
+    def test_the_note_and_the_schema_let_the_model_search_during_work(self):
+        """#521: the model may search for a prior pitfall during work on a system and before it diagnoses an
+        unexpected error, by its own choice; the guidance for questions about earlier sessions stays."""
+        search = memcue_provider.SEARCH_SCHEMA["description"]
+        for text in (self.p.system_prompt_block(), search):
+            with self.subTest(text=text[:40]):
+                self.assertIn("During work", text)
+                self.assertIn("specific host, service or repository", text)
+                self.assertIn("unexpected error", text)
+                self.assertIn("short query naming the system and the problem", text)
+                self.assertIn("against the current state", text)
+                self.assertIn("before answering" if text is search else "Before you answer", text)
+                self.assertIn("earlier sessions", text)
+                for word in ("must", "always", "every tool"):
+                    self.assertNotIn(word, text.lower())
+        block = self.p.system_prompt_block()
+        self.assertIn("several times with synonyms, the system name and both languages", block)
+        self.assertIn("when you decide it may help", block)
+        self.assertIn("when you decide it helps", search)
+        # The note is deterministic: two builds give the same text. That alone does not show that Hermes reuses
+        # its prompt cache.
+        self.assertEqual(block, self.p.system_prompt_block())
+
+    def test_no_search_runs_without_the_model(self):
+        """#521 adds words only: no hook of the provider runs a search, a turn with an error included."""
+        calls = Path(self.home, "calls")
+        stub = Path(self.home, "logging-memcue")
+        stub.write_text(f'#!/bin/sh\necho "$1" >> {shlex.quote(str(calls))}\nexec {shlex.quote(BIN)} "$@"\n',
+                        encoding="utf-8")
+        stub.chmod(0o755)
+        p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
+        p.initialize("s1", hermes_home=self.home, agent_context="primary")
+        self.memcue("add", "-kind", "pitfall", "--", "Хост vega-3: sshd слушает порт 2222, а не 22.")
+        error = "ssh vega-3: connection refused on port 22, unexpected error"
+        p.system_prompt_block()
+        self.assertEqual(p.prefetch(error, session_id="s1"), "")
+        p.sync_turn(error, "The command failed: " + error, session_id="s1",
+                    messages=[{"role": "tool", "content": error}])
+        p.on_pre_compress([{"role": "tool", "content": error}])
+        p.system_prompt_block()
+        called = calls.read_text(encoding="utf-8").split() if calls.exists() else []
+        self.assertIn("session-card", called)  # the log sees the provider's calls
+        self.assertNotIn("search", called)
+        p.handle_tool_call("memcue_search", {"query": "vega-3 ssh"})  # the model's own call is the one that searches
+        self.assertIn("search", calls.read_text(encoding="utf-8").split())
+
+    def test_other_hosts_keep_their_text(self):
+        """#521 is the Hermes provider's instruction only: the DSH and Claude Code plugins do not carry it."""
+        root = HERE.parent.parent.parent
+        for path in (root / "plugins" / "deepseek-harness" / "src" / "index.mjs",
+                     root / "plugins" / "claude-code" / "skills" / "memcue" / "SKILL.md"):
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("memcue", text)
+                self.assertNotIn("During work", text)
+                self.assertNotIn("unexpected error", text)
+
     def _notes_and_rules(self) -> list:
         """Memory notes and the card rules of #456 next to them: copies of a note, and rules in the same words that
         negate a note or add a condition to it. Returns the rules."""
