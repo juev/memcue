@@ -43,11 +43,13 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.20.0`; the fact-base schema is 5 (see [Upgrade](#upgrade)). The three plugin manifests carry the same
-version, and a release bumps all of them together.
+This release is `1.0.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+or older, so stop every older memcue and back the base up before the first open. The three plugin manifests carry the
+same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 1.0.0 | 6 | 1.0.0 | 1.0.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 1.0.0 (`hermes-agent` 0.15.2) |
 | 0.20.0 | 5 | 0.20.0 | 0.20.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.20.0 (`hermes-agent` 0.15.2) |
 | 0.19.0 | 5 | 0.19.0 | 0.19.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.19.0 (`hermes-agent` 0.15.2) |
 | 0.18.1 | 5 | 0.18.1 | 0.18.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.18.1 (`hermes-agent` 0.15.2) |
@@ -226,7 +228,7 @@ both it and the bare array of an older binary.
 
 ## Upgrade
 
-### Unreleased: no fact waits for approval; schema 6 (#514)
+### 1.0.0: no fact waits for approval; schema 6 (#514, #456)
 
 - **Breaking: no fact waits for approval.** `memcue add -candidate`, `memcue candidates` and `memcue approve` are
   removed: `add` rejects the flag, and the two commands exit 1 and say why. A fact written with `add`, `memcue_add` or
@@ -273,6 +275,9 @@ both it and the bare array of an older binary.
 - **Rollback is the backup.** No in-place downgrade is provided or tested. To go back, stop memcue as above, install
   0.20.0 and put `facts.db.pre-schema-6` back on every machine. Every fact written or changed since the copy is lost,
   and candidates are hidden again. Before restoring, save what to keep with `memcue facts` or `memcue dump`.
+- **The Hermes card keeps lines that repeat the notes** (#456). The provider no longer drops a card line that shares
+  enough words with `MEMORY.md` or `USER.md`: it puts the card in as the binary renders it. No flag or schema change
+  comes with this.
 
 ### 0.20.0: add writes procedure and event facts (#505)
 
