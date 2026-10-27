@@ -270,3 +270,10 @@ dollars — is [search_stand.py](research/scripts/search_stand.py), with a first
 [pull-hermes-2026-10.md](research/pull-hermes-2026-10.md) and the run at 0.10.0 a day later in
 [pull-hermes-010-2026-10.md](research/pull-hermes-010-2026-10.md). `memcue extract -dry-run TRANSCRIPT.jsonl` prints what a
 session would add, with tokens or cost, without storing it.
+
+`search_stand.py --cases` (#510) runs the search alone over labelled synthetic cases
+([search_stand/synthetic.json](research/scripts/search_stand/synthetic.json)): a new base per arm, short agent
+queries, paraphrases and full prompts reported apart, a baseline and candidate flags or builds compared per query. It
+runs memcue with a scratch environment but no sandbox, and does not measure whether an agent stores or uses a fact;
+that is #511. The first run and its limits
+are in [search-synthetic-510-2026-10.md](research/search-synthetic-510-2026-10.md).
