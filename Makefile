@@ -9,6 +9,7 @@ build:
 test: build
 	go test -race ./...
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I plugins/hermes/memcue/tests/test_provider.py
+	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I docs/research/scripts/test_search_stand.py
 	$(MAKE) test-plugins
 
 # The bench drives a built binary through search -json (#451). make test already runs it under go test ./...; this
