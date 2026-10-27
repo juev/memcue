@@ -1,0 +1,64 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R2",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 12.2,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Brindle Quarrel queue\"; memcue search -in shelf:research \"Brindle Quarrel queue ordering\"; memcue search -in shelf:research \"Brindle\"; memcue search -in shelf:research \"Quarrel\"; ls -R | head -50",
+    "description": "Search memory and research shelf, list repo"
+   },
+   "result": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0 example.com/acme/tandem 2026-10-27 | Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\n01M5Z7Q89T054M6K7RTFY4C809 example.com/acme/tandem 2026-09-30 | Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q89T054M6K7RTFY4C809 example.com/acme/tandem 2026-09-30 | Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference.\n.:\nREADME.md\ndata.csv"
+  }
+ ],
+ "final": {
+  "result": "I recommend **Quarrel**, as long as it's configured for strict ordering.\n\n- **Brindle is ruled out.** Brindle 3.2 keeps messages in order per queue. But once a consumer holds 10,000 unacknowledged messages (`max_unacked`, which can go up to 50,000), it silently drops the oldest one. The only sign is the `brindle_dropped_total` counter. That breaks your \"no silent drops\" requirement.\n- **Quarrel 1.4 doesn't drop messages.** When a partition's buffer is full, it makes the publisher wait instead.\n- **Ordering in Quarrel needs setup.** Quarrel only keeps order within a partition, and a queue has 64 partitions by default. For strict ordering across a whole queue, set the order queues to 1 partition, or give every message in a queue the same `partition_key` so they all land in one partition. Either way, you lose Quarrel's parallelism for that queue.\n- **Consumers must handle duplicates.** Quarrel delivers each message at least once, so processing the same order message twice must be safe.\n- **The speed figures aren't reliable.** Quarrel's vendor benchmark (3.1M vs 1.0M messages/s) was a single unverified run, so I didn't weigh it.\n\nThese details come from research notes in memory dated 2026-09-30, not from today's docs. Check them against the versions you'd actually deploy. Tandem's queue settings go in `config/queue.toml`.",
+  "total_cost_usd": 0.06936300000000001,
+  "duration_ms": 10649,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 6224,
+   "cache_read_input_tokens": 17875,
+   "output_tokens": 799
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:54:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue\",\"facts\":[\"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\"],\"ms\":0.909}\n{\"time\":\"2026-10-27T17:54:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue ordering\",\"facts\":[\"01M5Z7Q89T054M6K7RTFY4C809\",\"01M5Z7Q8A314MS161S5Z7R2N50\",\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\"],\"ms\":0.657}\n{\"time\":\"2026-10-27T17:54:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle\",\"facts\":[\"01M5Z7Q89T054M6K7RTFY4C809\",\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\"],\"ms\":0.746}\n{\"time\":\"2026-10-27T17:54:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8A314MS161S5Z7R2N50\"],\"ms\":0.735}\n"
+}

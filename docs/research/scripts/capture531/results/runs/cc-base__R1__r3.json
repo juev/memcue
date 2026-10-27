@@ -1,0 +1,72 @@
+{
+ "arm": "cc-base",
+ "scenario": "R1",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 18.6,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Brindle Quarrel\"; memcue search -in all \"Brindle Quarrel message queue ordering\"; memcue search -in all \"очередь сообщений Brindle Quarrel\"",
+    "description": "Search memory for Brindle vs Quarrel findings"
+   },
+   "result": "No facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M5Z7Q88Q7ZYNP9KV1CNEWHT0 example.com/acme/tandem 2026-10-27 | Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\n01M5Z7Q87SYE7NH0SGJZ2CHVS1 | Brindle consumer metrics of the Tandem project are on the Grafana dashboard 'tandem-queues'.\n01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\n01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Brindle Quarrel\"; memcue search -in shelf:research -min-score 0 \"ordering message loss\"; memcue search -in all -kind decision,pitfall \"Brindle\"; memcue search -in all -kind decision,pitfall \"Quarrel\"",
+    "description": "Search research shelf and pitfalls"
+   },
+   "result": "01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q89T054M6K7RTFY4C809 example.com/acme/tandem 2026-09-30 | Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\nNo stored facts match.\nNo stored facts match."
+  }
+ ],
+ "final": {
+  "result": "**Quarrel.** It meets both requirements once configured; Brindle can't meet the no-loss one. This comes from our research notes from 2026-09-30 (Brindle 3.2 and Quarrel 1.4 docs), so check it against the current versions.\n\n- **Brindle 3.2:** It keeps strict order per queue. But once a consumer holds 10,000 unacknowledged messages (`max_unacked`, which goes up to 50,000), it drops the oldest one. The only sign is the `brindle_dropped_total` counter. Raising the limit only delays the drops, so it breaks \"no silent loss.\"\n- **Quarrel 1.4:** It never drops. When a partition's buffer fills, it blocks the publisher. The catch is that order holds only within a partition, and a queue has 64 by default.\n  - **For strict order across the whole queue,** use one partition per queue, or send everything with a single `partition_key`.\n  - **If order only matters within each order,** use the order ID as the key and keep the parallelism.\n  - **Delivery is at least once,** so consumers must be idempotent to handle duplicates.\n\nDon't use the vendor benchmark to decide (Quarrel 3.1M vs Brindle 1.0M messages/s). It was a single run with default settings on the vendor's own machines, nobody has verified it, and throughput with a single partition will be lower anyway.",
+  "total_cost_usd": 0.0721576,
+  "duration_ms": 16609,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5874,
+   "cache_read_input_tokens": 29108,
+   "output_tokens": 966
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:57:49Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel\",\"ms\":0.696}\n{\"time\":\"2026-10-27T17:57:49Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel message queue ordering\",\"facts\":[\"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\",\"01M5Z7Q87SYE7NH0SGJZ2CHVS1\",\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.803}\n{\"time\":\"2026-10-27T17:57:49Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"очередь сообщений Brindle Quarrel\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.659}\n{\"time\":\"2026-10-27T17:57:53Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\"],\"ms\":0.545}\n{\"time\":\"2026-10-27T17:57:53Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"ordering message loss\",\"facts\":[\"01M5Z7Q89T054M6K7RTFY4C809\",\"01M5Z7Q8A314MS161S5Z7R2N50\",\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\"],\"ms\":0.821}\n{\"time\":\"2026-10-27T17:57:53Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle\",\"ms\":0.432}\n{\"time\":\"2026-10-27T17:57:53Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel\",\"ms\":0.653}\n"
+}

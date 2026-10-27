@@ -1,0 +1,64 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R8",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 9.0,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Larkspur HTTP/3\"; memcue search -in shelf:research \"Larkspur QUIC\"; memcue search -in all \"Larkspur HTTP/3\"",
+    "description": "Search memory for Larkspur HTTP/3 research"
+   },
+   "result": "01M5Z7Q8B3TD7YTYEGBQVJCFD9 example.com/acme/edgeproxy 2025-10-05 | Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).\n01M5Z7Q8B3TD7YTYEGBQVJCFD9 example.com/acme/edgeproxy 2025-10-05 | Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly."
+  }
+ ],
+ "final": {
+  "result": "As of our last check, no. A note saved from earlier research says **Larkspur 1.8 does not support HTTP/3**. The source was the Larkspur 1.8.0 changelog (2025-10-02), and the note was recorded on 2025-10-05 for the `edgeproxy` project.\n\nThat was about a year ago and covers version 1.8 only. Newer releases may have added it, so check the current changelog before relying on this.",
+  "total_cost_usd": 0.0527446,
+  "duration_ms": 7396,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5329,
+   "cache_read_input_tokens": 17783,
+   "output_tokens": 327
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.502}\n{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur QUIC\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.766}\n{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.538}\n"
+}

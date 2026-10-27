@@ -1,0 +1,63 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R8",
+ "rep": 11,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 10.0,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Larkspur HTTP/3\"; memcue search -in shelf:research \"Larkspur HTTP/3 QUIC\""
+   },
+   "result": "01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8B3TD7YTYEGBQVJCFD9 example.com/acme/edgeproxy 2025-10-05 | Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02)."
+  }
+ ],
+ "final": {
+  "result": "Per our stored research: **no, as of Larkspur 1.8** (changelog 1.8.0, 2025-10-02). That note is over a year old, so newer releases may have changed it. I haven't re-checked.",
+  "total_cost_usd": 0.023475000000000003,
+  "duration_ms": 4784,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5010,
+   "cache_read_input_tokens": 17870,
+   "output_tokens": 164
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:10Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.898}\n{\"time\":\"2026-10-27T17:59:10Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 QUIC\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.772}\n"
+}

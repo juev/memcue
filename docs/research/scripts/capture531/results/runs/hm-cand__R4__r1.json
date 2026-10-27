@@ -1,0 +1,108 @@
+{
+ "arm": "hm-cand",
+ "scenario": "R4",
+ "rep": 1,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 14.8,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "git ls-files && grep -ril -e larkspur -e http/3 -e quic . --exclude-dir=.git | head"
+   },
+   "result": "go.mod\nsources/CHANGELOG.md\n./go.mod\n./sources/CHANGELOG.md"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Larkspur HTTP/3",
+    "in": "shelf:research"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q8B3TD7YTYEGBQVJCFD9\", \"content\": \"Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).\", \"keywords\": [\"Larkspur\", \"HTTP/3\", \"h3\", \"QUIC\", \"support\"], \"origin\": \"example.com/acme/edgeproxy 2025-10-05\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cat go.mod sources/CHANGELOG.md"
+   },
+   "result": "module example.com/edgeproxy\n\ngo 1.27\n\nrequire example.com/larkspur v2.0.1\n# Larkspur changelog\n\n## 2.0.0 (2026-08-14)\n\n- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n- Dropped Go 1.25.\n\n## 1.8.0 (2025-10-02)\n\n- HTTP/2 server push removed.\n- HTTP/3 is not supported."
+  },
+  {
+   "name": "mcp__memcue__memcue_correct",
+   "input": {
+    "id": "01M5Z7Q8B3TD7YTYEGBQVJCFD9",
+    "content": "Larkspur 1.8 does not support HTTP/3 (changelog 1.8.0, 2025-10-02). Larkspur 2.0.0 (2026-08-14) added HTTP/3 support, experimental and off by default; enabled with the `--h3` flag or `Client{H3: true}`. 2.0.0 also dropped Go 1.25. Source: Larkspur CHANGELOG.md.",
+    "keywords": "Larkspur, HTTP/3, h3, QUIC, support, experimental, 2.0.0"
+   },
+   "result": "{\"result\": \"01M5Z7Q8B3TD7YTYEGBQVJCFD9 v2\"}"
+  }
+ ],
+ "final": {
+  "result": "Yes. The edge proxy requires `example.com/larkspur v2.0.1` (see `go.mod`), and Larkspur's changelog (`sources/CHANGELOG.md`) says HTTP/3 support was added in 2.0.0. Two caveats:\n\n- **It's experimental.**\n- **It's off by default.** You turn it on with the `--h3` flag or `Client{H3: true}`.\n\nMy saved notes said Larkspur doesn't support HTTP/3, but that was about version 1.8. I've updated the note to cover 2.0.",
+  "total_cost_usd": 0.0424268,
+  "duration_ms": 12793,
+  "num_turns": 5,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 2235,
+   "cache_read_input_tokens": 39574,
+   "output_tokens": 830
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [
+  {
+   "change": "changed",
+   "id": "01M5Z7Q8B3TD7YTYEGBQVJCFD9",
+   "status": "active",
+   "version": 2,
+   "before": "Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).",
+   "content": "Larkspur 1.8 does not support HTTP/3 (changelog 1.8.0, 2025-10-02). Larkspur 2.0.0 (2026-08-14) added HTTP/3 support, experimental and off by default; enabled with the `--h3` flag or `Client{H3: true}`. 2.0.0 also dropped Go 1.25. Source: Larkspur CHANGELOG.md.",
+   "scope": "shelf:research"
+  }
+ ],
+ "search_log": "{\"time\":\"2026-10-27T17:52:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.795}\n{\"time\":\"2026-10-27T17:52:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.732}\n"
+}

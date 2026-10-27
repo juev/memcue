@@ -1,0 +1,67 @@
+{
+ "arm": "cc-base",
+ "scenario": "C2",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 12.3,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/C2/r2/ws; ls -la; ls -la sources; cat telemetry-archives.md",
+    "description": "List files and read telemetry doc"
+   },
+   "result": "total 20\ndrwxr-xr-x 4 hermes hermes 4096 Oct 27 20:53 .\ndrwxr-xr-x 6 hermes hermes 4096 Oct 27 20:53 ..\ndrwxr-xr-x 8 hermes hermes 4096 Oct 27 20:53 .git\ndrwxr-xr-x 2 hermes hermes 4096 Oct 27 20:43 sources\n-rw-r--r-- 1 hermes hermes  112 Oct 27 20:43 telemetry-archives.md\ntotal 16\ndrwxr-xr-x 2 hermes hermes 4096 Oct 27 20:43 .\ndrwxr-xr-x 4 hermes hermes 4096 Oct 27 20:53 ..\n-rw-r--r-- 1 hermes hermes  366 Oct 27 20:43 ostrich-benchmark-2026.md\n-rw-r--r-- 1 hermes hermes  167 Oct 27 20:43 ostrich-readme.md\n# Telemetry archives\n\nNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/C2/r2/ws/sources; for f in *; do echo \"== $f\"; cat \"$f\"; echo; done; memcue search \"Ostrich compression telemetry\" 2>&1 | head -30",
+    "description": "Read sources and search memory"
+   },
+   "result": "== ostrich-benchmark-2026.md\n# Ostrich 0.9 compression benchmark (project wiki, March 2026)\n\nOstrich compressed our sample of application text logs 4.1 times on average (zstd level 3: 3.2 times), at 410 MB/s\non one core.\n\nScope: the sample held 2,000 text log files, each under 1 MB. Binary payloads, files over 1 MB and multi-core runs\nwere not tested, so these numbers say nothing about them.\n\n== ostrich-readme.md\n# Ostrich\n\nOstrich is a dictionary compressor for small text records. It trains a dictionary per stream (`ostrich train`) and\nneeds the same dictionary to decompress.\n\nNo facts of this repository, this host or global match; -in all searches every repository."
+  }
+ ],
+ "final": {
+  "result": "**Probably not, and nothing in `./sources` shows that it is.**\n\n- **What Ostrich is built for:** the README says it's \"a dictionary compressor for small text records\". Your archives are protobuf binary frames, 40–300 MB per file. That's the wrong kind of data and far larger files.\n- **The benchmark doesn't apply:** its 4.1× (vs zstd's 3.2×) and 410 MB/s come from text logs under 1 MB each. It states that binary payloads, files over 1 MB and multi-core runs \"were not tested, so these numbers say nothing about them.\"\n- **It adds work to run:** you have to train a dictionary for each stream and keep that same dictionary to decompress. For long-lived archives, losing the dictionary means losing the data.\n\nIf you still want to consider it, run a quick test on a few real nightly files against zstd (try a high level and `--long`). Until then, zstd is the safer default.",
+  "total_cost_usd": 0.0632178,
+  "duration_ms": 10772,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5612,
+   "cache_read_input_tokens": 28989,
+   "output_tokens": 625
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:53:22Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression telemetry\",\"ms\":0.524}\n"
+}

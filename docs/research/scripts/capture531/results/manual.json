@@ -1,0 +1,748 @@
+{
+ "cc-base__C1__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C1__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C1__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C1w__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C1w__r11": {
+  "answer": "correct"
+ },
+ "cc-base__C1w__r12": {
+  "answer": "correct"
+ },
+ "cc-base__C1w__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C1w__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C2__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C2__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C2__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C2w__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C2w__r11": {
+  "answer": "correct"
+ },
+ "cc-base__C2w__r12": {
+  "answer": "correct"
+ },
+ "cc-base__C2w__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C2w__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C3__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C3__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C3__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C4__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C4__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C4__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C5__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C5__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C5__r3": {
+  "answer": "correct"
+ },
+ "cc-base__C6__r1": {
+  "answer": "correct"
+ },
+ "cc-base__C6__r2": {
+  "answer": "correct"
+ },
+ "cc-base__C6__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R1__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R1__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R1__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R2__r1": {
+  "answer": "unresolved",
+  "note": "no shelf search; says nothing compares the two"
+ },
+ "cc-base__R2__r11": {
+  "answer": "unresolved",
+  "note": "no shelf search; declines to choose"
+ },
+ "cc-base__R2__r12": {
+  "answer": "unresolved",
+  "note": "no shelf search; declines to choose"
+ },
+ "cc-base__R2__r2": {
+  "answer": "unresolved",
+  "note": "no shelf search; declines to choose"
+ },
+ "cc-base__R2__r3": {
+  "answer": "unresolved",
+  "note": "no shelf search; declines to choose"
+ },
+ "cc-base__R2chain__r1": {
+  "answer": "unresolved",
+  "note": "the C1w run of this arm stored nothing, so there was nothing to find; declines to choose"
+ },
+ "cc-base__R2chain__r2": {
+  "answer": "unresolved",
+  "note": "the C1w run of this arm stored nothing, so there was nothing to find; declines to choose"
+ },
+ "cc-base__R2chain__r3": {
+  "answer": "unresolved",
+  "note": "the C1w run of this arm stored nothing, so there was nothing to find; declines to choose"
+ },
+ "cc-base__R3__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R3__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R3__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R4__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R4__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R4__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R5__r1": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-base__R5__r2": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-base__R5__r3": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-base__R6__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R6__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R6__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R7__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R7__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R7__r3": {
+  "answer": "correct"
+ },
+ "cc-base__R8__r1": {
+  "answer": "unresolved",
+  "note": "no shelf search; reports nothing found"
+ },
+ "cc-base__R8__r11": {
+  "answer": "unresolved",
+  "note": "no shelf search; reports nothing found"
+ },
+ "cc-base__R8__r12": {
+  "answer": "unresolved",
+  "note": "no shelf search; reports nothing found"
+ },
+ "cc-base__R8__r2": {
+  "answer": "unresolved",
+  "note": "no shelf search; reports nothing found"
+ },
+ "cc-base__R8__r3": {
+  "answer": "unresolved",
+  "note": "no shelf search; reports nothing found"
+ },
+ "cc-base__R9__r1": {
+  "answer": "correct"
+ },
+ "cc-base__R9__r2": {
+  "answer": "correct"
+ },
+ "cc-base__R9__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C1__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C1__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C1__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C1w__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C1w__r11": {
+  "answer": "correct"
+ },
+ "cc-cand__C1w__r12": {
+  "answer": "correct"
+ },
+ "cc-cand__C1w__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C1w__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C2__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C2__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C2__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C2w__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C2w__r11": {
+  "answer": "correct"
+ },
+ "cc-cand__C2w__r12": {
+  "answer": "correct"
+ },
+ "cc-cand__C2w__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C2w__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C3__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C3__r2": {
+  "answer": "correct",
+  "cov": {
+   "H_misplaced": true
+  },
+  "note": "the Vellum pitfall (from VELLUM-NOTES.md in the repository, confirmed by the failing script) went to shelf:research, where ordinary search does not find it"
+ },
+ "cc-cand__C3__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C4__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C4__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C4__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C5__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C5__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C5__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__C6__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__C6__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__C6__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R1__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R1__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R1__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R2__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R2__r11": {
+  "answer": "correct"
+ },
+ "cc-cand__R2__r12": {
+  "answer": "correct"
+ },
+ "cc-cand__R2__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R2__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R2chain__r1": {
+  "answer": "correct",
+  "note": "found its own shelf facts and answered from them"
+ },
+ "cc-cand__R2chain__r2": {
+  "answer": "correct",
+  "note": "found its own shelf facts and answered from them"
+ },
+ "cc-cand__R2chain__r3": {
+  "answer": "correct",
+  "note": "found its own shelf facts and answered from them"
+ },
+ "cc-cand__R3__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R3__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R3__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R4__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R4__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R4__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R5__r1": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-cand__R5__r2": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-cand__R5__r3": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "cc-cand__R6__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R6__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R6__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R7__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R7__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R7__r3": {
+  "answer": "correct"
+ },
+ "cc-cand__R8__r1": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "cc-cand__R8__r11": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "cc-cand__R8__r12": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "cc-cand__R8__r2": {
+  "answer": "correct",
+  "note": "reports the 1.8 finding and points out that go.mod pins v2.0.1, so it says nothing about the version in use"
+ },
+ "cc-cand__R8__r3": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "cc-cand__R9__r1": {
+  "answer": "correct"
+ },
+ "cc-cand__R9__r2": {
+  "answer": "correct"
+ },
+ "cc-cand__R9__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C1__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C1__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C1__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C1w__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C1w__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C1w__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C2__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C2__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C2__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C2w__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C2w__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C2w__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C3__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C3__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C3__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C4__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C4__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C4__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C5__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C5__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C5__r3": {
+  "answer": "correct"
+ },
+ "hm-base__C6__r1": {
+  "answer": "correct"
+ },
+ "hm-base__C6__r2": {
+  "answer": "correct"
+ },
+ "hm-base__C6__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R1__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R1__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R1__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R2__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R2__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R2__r3": {
+  "answer": "unresolved",
+  "note": "searched with the default (all), got the two unrelated ordinary facts and no hint; no shelf search; declines to choose"
+ },
+ "hm-base__R2chain__r1": {
+  "answer": "unresolved",
+  "note": "the C1w run stored one shelf fact; this session searched three times with the default (all) and never named the shelf; declines to choose"
+ },
+ "hm-base__R2chain__r2": {
+  "answer": "unresolved",
+  "note": "the C1w run stored one shelf fact; this session searched three times with the default (all) and never named the shelf; declines to choose"
+ },
+ "hm-base__R2chain__r3": {
+  "answer": "unresolved",
+  "note": "the C1w run stored one shelf fact; this session searched three times with the default (all) and never named the shelf; declines to choose"
+ },
+ "hm-base__R3__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R3__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R3__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R4__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R4__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R4__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R5__r1": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-base__R5__r2": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-base__R5__r3": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-base__R6__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R6__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R6__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R7__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R7__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R7__r3": {
+  "answer": "correct"
+ },
+ "hm-base__R8__r1": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1) in the workspace"
+ },
+ "hm-base__R8__r2": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "hm-base__R8__r3": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "hm-base__R9__r1": {
+  "answer": "correct"
+ },
+ "hm-base__R9__r2": {
+  "answer": "correct"
+ },
+ "hm-base__R9__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C1__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C1__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C1__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C1w__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C1w__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C1w__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C2__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C2__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C2__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C2w__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C2w__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C2w__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C3__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C3__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C3__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C4__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C4__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C4__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C5__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C5__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C5__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__C6__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__C6__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__C6__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R1__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R1__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R1__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R2__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R2__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R2__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R2chain__r1": {
+  "answer": "partial",
+  "note": "searched the shelf; the Quarrel 1.4 reference fact it had stored sat below the default 0.6 score floor (returned with min_score 0, checked) and no hint said so, so it called Quarrel unknown; invented nothing"
+ },
+ "hm-cand__R2chain__r2": {
+  "answer": "correct",
+  "note": "found its own shelf facts and answered from them"
+ },
+ "hm-cand__R2chain__r3": {
+  "answer": "correct",
+  "note": "found its own shelf facts and answered from them"
+ },
+ "hm-cand__R3__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R3__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R3__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R4__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R4__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R4__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R5__r1": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-cand__R5__r2": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-cand__R5__r3": {
+  "answer": "correct",
+  "note": "says the value is not known; no number invented"
+ },
+ "hm-cand__R6__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R6__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R6__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R7__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R7__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R7__r3": {
+  "answer": "correct"
+ },
+ "hm-cand__R8__r1": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1) in the workspace"
+ },
+ "hm-cand__R8__r2": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "hm-cand__R8__r3": {
+  "answer": "partial",
+  "note": "reports the 1.8 finding with a general age caveat; did not check go.mod (v2.0.1)"
+ },
+ "hm-cand__R9__r1": {
+  "answer": "correct"
+ },
+ "hm-cand__R9__r2": {
+  "answer": "correct"
+ },
+ "hm-cand__R9__r3": {
+  "answer": "correct"
+ }
+}

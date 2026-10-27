@@ -1,0 +1,64 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R3",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 9.0,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-cand/R3/r3/ws; ls; cat telemetry-archives.md; memcue search \"Ostrich\"; memcue search -in shelf:research \"Ostrich compression\"; memcue search -in all \"Ostrich\"",
+    "description": "Read doc and search memory for Ostrich"
+   },
+   "result": "telemetry-archives.md\n# Telemetry archives\n\nNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file.\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M5Z7Q8AQF8394DB6ZYDARA77 example.com/acme/telemetry 2026-03-20 | The Ostrich 0.9 benchmark (4.1x on text logs, March 2026) covered only text log files under 1 MB on one core; binary payloads and files over 1 MB were not tested. Source: project wiki, Ostrich benchmark.\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research"
+  }
+ ],
+ "final": {
+  "result": "Probably not, or at least we don't have evidence that it is.\n\n- **Your archives:** nightly protobuf-encoded binary frames, 40–300 MB per file (`telemetry-archives.md`).\n- **What we found before** (research note from 2026-03-20, project wiki, Ostrich 0.9 benchmark): the 4.1x ratio was measured only on text log files under 1 MB, on one core. That benchmark never tested binary payloads or files over 1 MB.\n\nSo the 4.1x number doesn't apply to your data. Binary protobuf usually compresses much less than text logs. Before choosing Ostrich, benchmark it on a few real archive files against zstd as a baseline, and record the ratio, speed and memory use. That note is from March, so also check whether a newer Ostrich version has published results for binary or large files.",
+  "total_cost_usd": 0.056301199999999996,
+  "duration_ms": 7465,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5368,
+   "cache_read_input_tokens": 17806,
+   "output_tokens": 489
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:58:21Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich\",\"ms\":0.606}\n{\"time\":\"2026-10-27T17:58:21Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"facts\":[\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.757}\n{\"time\":\"2026-10-27T17:58:21Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich\",\"ms\":0.405}\n"
+}

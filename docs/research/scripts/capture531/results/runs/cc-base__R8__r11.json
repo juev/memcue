@@ -1,0 +1,72 @@
+{
+ "arm": "cc-base",
+ "scenario": "R8",
+ "rep": 11,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 20.1,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Larkspur HTTP/3\"; memcue search \"Larkspur QUIC\"; memcue search -in all \"Larkspur HTTP/3 support\""
+   },
+   "result": "01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly."
+  },
+  {
+   "name": "Grep",
+   "input": {
+    "pattern": "HTTP/3|http3|quic",
+    "-i": true,
+    "output_mode": "files_with_matches"
+   },
+   "result": "No files found"
+  }
+ ],
+ "final": {
+  "result": "I can't confirm either way. Memory has no fact about Larkspur and HTTP/3. The only Larkspur entry is an unrelated one: its HTTP client's connection pool ignores `HTTP_PROXY`, so you have to set `Client{Proxy: ...}` explicitly. A search of this repo for \"HTTP/3\", \"http3\" and \"quic\" also found nothing.\n\nIf you want a real answer, I can check Larkspur's docs or source. Tell me where they are, or I can look up the upstream project.",
+  "total_cost_usd": 0.026436,
+  "duration_ms": 14860,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 4854,
+   "cache_read_input_tokens": 28780,
+   "output_tokens": 413
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:00Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.807}\n{\"time\":\"2026-10-27T17:59:00Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur QUIC\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.556}\n{\"time\":\"2026-10-27T17:59:00Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 support\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.565}\n"
+}

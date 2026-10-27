@@ -277,3 +277,11 @@ queries, paraphrases and full prompts reported apart, a baseline and candidate f
 runs memcue with a scratch environment but no sandbox, and does not measure whether an agent stores or uses a fact;
 that is #511. The first run and its limits
 are in [search-synthetic-510-2026-10.md](research/search-synthetic-510-2026-10.md).
+
+Whether an agent stores what it reads in outside sources on the research shelf and finds it again later (#531) was
+explored with agent runs over synthetic scenarios, Claude Code and an emulation of Hermes, current text against a
+candidate: [research-shelf-531-2026-10.md](research/research-shelf-531-2026-10.md). It is exploratory research, not a
+harness. The runs were not sandboxed, so the scripts that made them were removed; what is kept are the anonymized run
+records and a read-only grader, which recomputes the report's counts from them, names what it cannot, and cannot
+repeat the runs. Its `claims` check compares those counts with expected values hard-coded from the report; it does
+not parse the report itself.

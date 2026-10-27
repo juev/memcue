@@ -1,0 +1,85 @@
+{
+ "arm": "hm-cand",
+ "scenario": "R1",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 11.2,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Brindle Quarrel ordering message loss",
+    "in": "shelf:research",
+    "limit": "10",
+    "min_score": "0"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q89T054M6K7RTFY4C809\", \"content\": \"Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\", \"keywords\": [\"Brindle\", \"unacknowledged\", \"max_unacked\", \"flow control\", \"drop\", \"ordering\", \"очередь\"], \"origin\": \"example.com/acme/tandem 2026-09-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q8ADGWHVN0CQAR4A8MHC\", \"content\": \"The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\", \"keywords\": [\"Quarrel\", \"Brindle\", \"benchmark\", \"throughput\", \"vendor\", \"бенчмарк\"], \"origin\": \"example.com/acme/tandem 2026-09-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q8A314MS161S5Z7R2N50\", \"content\": \"Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference.\", \"keywords\": [\"Quarrel\", \"ordering\", \"partition\", \"at least once\", \"partition_key\", \"порядок\"], \"origin\": \"example.com/acme/tandem 2026-09-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Brindle Quarrel queue Tandem",
+    "limit": "10"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q87SYE7NH0SGJZ2CHVS1\", \"content\": \"Brindle consumer metrics of the Tandem project are on the Grafana dashboard 'tandem-queues'.\", \"keywords\": [\"Brindle\", \"metrics\", \"Grafana\", \"dashboard\", \"consumer\", \"метрики\"], \"scope\": \"service:grafana\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q87D6EKD16P6AH8PM6KY\", \"content\": \"Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\", \"keywords\": [\"Quarrel\", \"staging\", \"restart\", \"mq-02\", \"очередь\"], \"scope\": \"host:mq-02\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\", \"content\": \"Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\", \"keywords\": [\"queue\", \"config\", \"queue.toml\", \"настройки очереди\"], \"origin\": \"example.com/acme/tandem 2026-10-27\", \"scope\": \"repo:example.com/acme/tandem\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  }
+ ],
+ "final": {
+  "result": "**Go with Quarrel.** Brindle fails your \"no silent loss\" requirement.\n\n- **Brindle 3.2:** It keeps publish order per queue. But once a consumer holds 10,000 unacknowledged messages, it silently drops the oldest one. You can raise that limit (`max_unacked`) to 50,000 but not remove it. The only sign of a drop is the `brindle_dropped_total` counter. That rules it out for an order pipeline.\n- **Quarrel 1.4:** It doesn't lose messages. When a partition's buffer fills, the publisher is blocked instead of anything being dropped, and delivery is at least once. The catch is that order is only kept within a partition, and a queue has 64 by default. To keep the whole queue in order, send everything to one partition: use one partition per queue, or a constant `partition_key`. That means one ordered stream per queue, so less parallelism. Because messages can arrive more than once, consumers need to handle duplicates safely.\n- **Throughput:** Ignore Quarrel's claim of 3.1M vs 1.0M messages/s. It's a single vendor run on their own hardware, not independently checked.\n\nThese points come from notes taken on 2026-09-30 from the Brindle 3.2 docs and the Quarrel 1.4 reference. Check them against the versions you'd actually deploy. The settings would go in `config/queue.toml`.",
+  "total_cost_usd": 0.0414474,
+  "duration_ms": 9693,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 2572,
+   "cache_read_input_tokens": 18777,
+   "output_tokens": 855
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:57:55Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel ordering message loss\",\"facts\":[\"01M5Z7Q89T054M6K7RTFY4C809\",\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8A314MS161S5Z7R2N50\"],\"ms\":1.133}\n{\"time\":\"2026-10-27T17:57:56Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue Tandem\",\"facts\":[\"01M5Z7Q87SYE7NH0SGJZ2CHVS1\",\"01M5Z7Q87D6EKD16P6AH8PM6KY\",\"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\"],\"ms\":0.958}\n"
+}

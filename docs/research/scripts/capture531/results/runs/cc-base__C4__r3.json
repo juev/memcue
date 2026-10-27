@@ -1,0 +1,70 @@
+{
+ "arm": "cc-base",
+ "scenario": "C4",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 9.6,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Grep",
+   "input": {
+    "pattern": "(?i)behind|lag|slow consumer|backpressure",
+    "path": "./sources",
+    "output_mode": "content",
+    "-C": 3
+   },
+   "result": "sources/brindle-docs-3.2.md-9-\nsources/brindle-docs-3.2.md-10-## Flow control\nsources/brindle-docs-3.2.md-11-\nsources/brindle-docs-3.2.md:12:Each consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nsources/brindle-docs-3.2.md-13-the oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nsources/brindle-docs-3.2.md-14-consumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nsources/brindle-docs-3.2.md-15-if a drop is not acceptable."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "ls -la sources; cat sources/*",
+    "description": "List and show source files"
+   },
+   "result": "total 24\ndrwxr-xr-x 2 hermes hermes 4096 Oct 27 20:43 .\ndrwxr-xr-x 4 hermes hermes 4096 Oct 27 20:57 ..\n-rw-r--r-- 1 hermes hermes  809 Oct 27 20:43 brindle-docs-3.2.md\n-rw-r--r-- 1 hermes hermes  239 Oct 27 20:43 forum-thread.md\n-rw-r--r-- 1 hermes hermes  611 Oct 27 20:43 quarrel-docs-1.4.md\n-rw-r--r-- 1 hermes hermes  387 Oct 27 20:43 quarrel-vendor-benchmark.md\n# Brindle 3.2 documentation\n\nBrindle is an embeddable message-queue library for Go and Rust services.\n\n## Ordering\n\nMessages are delivered in the order they were published within one queue. The guarantee holds per queue, across all\nconsumers of that queue, as long as the queue has a single writer.\n\n## Flow control\n\nEach consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nthe oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nconsumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nif a drop is not acceptable.\n\n## Persistence\n\nQueues are kept in memory and written to a write-ahead log every 200 ms by default (`wal_interval`).\n# Forum thread: \"Brindle or Quarrel?\"\n\n**user anon_4411:** Just use Quarrel. It never loses a message and it's ordered, trust me, we run it everywhere.\n\n**user mkv:** Any numbers or docs for that?\n\n**user anon_4411:** no, just experience.\n# Quarrel 1.4 reference\n\nQuarrel is a partitioned message-queue library.\n\n## Delivery\n\nDelivery is at least once. A message that is not acknowledged within `ack_timeout` (30 s by default) is delivered\nagain, so consumers must be idempotent.\n\n## Ordering\n\nOrder is kept within a partition only. A queue is split into 64 partitions by default, and messages of one queue in\ndifferent partitions may be delivered in any order. Pin a key to a partition (`partition_key`) to keep the order of\nthe messages that share it.\n\n## Back-pressure\n\nA publisher blocks when the partition buffer is full; no message is dropped.\n# \"Quarrel is 3x faster than Brindle\" — Quarrel Inc. engineering blog\n\nWe published 10 million 1 KB messages through Quarrel 1.4 and Brindle 3.2 on our own c7-metal test rig.\nQuarrel reached 3.1 million messages per second, Brindle 1.0 million.\n\nMethod notes: one run per library, default settings, the Brindle WAL interval left at its default. The rig and the\nharness are not public."
+  }
+ ],
+ "final": {
+  "result": "When a consumer falls behind, Brindle drops messages without telling anyone. This is from the Brindle 3.2 docs (`sources/brindle-docs-3.2.md:12-15`).\n\n- **Limit:** each consumer can hold at most 10,000 unacknowledged messages by default.\n- **When the limit is passed:** Brindle drops the **oldest** unacknowledged message to make room for the new one.\n- **Nobody is notified:** neither the publisher nor the consumer is told about the drop. The only sign is the counter `brindle_dropped_total`, so watch it or alert on it.\n- **How to avoid it:** raise `max_unacked` (the maximum is 50,000) or add more consumers.\n\nFor comparison, Quarrel 1.4 does the opposite: the publisher blocks when the buffer is full, and no message is dropped.",
+  "total_cost_usd": 0.0652636,
+  "duration_ms": 8062,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 6131,
+   "cache_read_input_tokens": 28958,
+   "output_tokens": 520
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q8BWPNEDHVR6A098F45E",
+  "O2": "01M5Z7Q8C6TYNBEQ3K868B1SEF",
+  "O3": "01M5Z7Q8CNH4WD6138HTNW7SDW",
+  "O4": "01M5Z7Q8D0DGS7B38084CTBGV7",
+  "O5": "01M5Z7Q8DQS4RSYYYCK54SR1AZ",
+  "O6": "01M5Z7Q8E43D26NDV2P64875E5",
+  "O7": "01M5Z7Q8EFEF0DCRA7DR66ZK9S",
+  "S1": "01M5Z7Q8ES9F75M595NYD346PX"
+ },
+ "fact_changes": [],
+ "search_log": ""
+}

@@ -1,0 +1,89 @@
+{
+ "arm": "hm-base",
+ "scenario": "R3",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 11.3,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Ostrich compression"
+   },
+   "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cat telemetry-archives.md; ls"
+   },
+   "result": "# Telemetry archives\n\nNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file.\ntelemetry-archives.md"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Ostrich compression",
+    "in": "shelf:research"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q8AQF8394DB6ZYDARA77\", \"content\": \"The Ostrich 0.9 benchmark (4.1x on text logs, March 2026) covered only text log files under 1 MB on one core; binary payloads and files over 1 MB were not tested. Source: project wiki, Ostrich benchmark.\", \"keywords\": [\"Ostrich\", \"compression\", \"benchmark\", \"binary\", \"сжатие\"], \"origin\": \"example.com/acme/telemetry 2026-03-20\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  }
+ ],
+ "final": {
+  "result": "**It's not proven, and I wouldn't adopt it without testing it first.**\n\n- **What we know:** our earlier research found the Ostrich 0.9 benchmark (March 2026, from the project wiki). It showed 4.1x compression, but only on text log files under 1 MB, running on one core.\n- **Why that doesn't settle it:** `telemetry-archives.md` describes our archives as protobuf-encoded binary frames, 40–300 MB per file. The benchmark never tested binary data or anything over 1 MB, so the 4.1x figure tells us nothing about our data. Protobuf is already compact, so expect a lower ratio than on text.\n- **Next step:** run Ostrich on a few real archives and compare it with zstd (or whatever we use now) on compression ratio, speed and memory use. Decide based on those numbers.",
+  "total_cost_usd": 0.029503599999999998,
+  "duration_ms": 9705,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 1689,
+   "cache_read_input_tokens": 27838,
+   "output_tokens": 520
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:55:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"ms\":0.668}\n{\"time\":\"2026-10-27T17:55:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"ms\":0.411}\n{\"time\":\"2026-10-27T17:55:06Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"facts\":[\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.857}\n{\"time\":\"2026-10-27T17:55:06Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"facts\":[\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.782}\n"
+}

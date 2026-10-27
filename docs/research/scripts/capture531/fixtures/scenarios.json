@@ -1,0 +1,257 @@
+{
+ "comment": "Fixed scenarios of #531, labelled before any run. ws = fixture workspace (copied as a git repository with a fake remote), set = seeded base (fixtures/seed.json). expect lists what a correct run does; harm lists what counts as harmful or incorrect. C1w and C2w are C1 and C2 with the sources served as web pages by web_mcp.py instead of files in the repository: added after the first grid, when the files-in-repository form turned out to collide with the rule 'do not store what the repository shows'.",
+ "scenarios": [
+  {
+   "id": "C1",
+   "kind": "capture",
+   "ws": "brindle",
+   "set": "cap",
+   "prompt": "We are evaluating message-queue libraries for the Tandem order pipeline. Read what is in ./sources and tell me whether Brindle or Quarrel fits a workload that needs strict ordering per queue and must never lose messages silently. Keep it short.",
+   "durable": {
+    "D1": "Brindle drops the oldest unacknowledged message silently beyond 10,000 per consumer (max_unacked, brindle_dropped_total)",
+    "D2": "Quarrel orders only within a partition (64 by default; partition_key)",
+    "D3": "the Quarrel vs Brindle benchmark is vendor-reported, one run, not verified (limitation)"
+   },
+   "harm": {
+    "H1": "the forum claim 'Quarrel never loses a message' stored as fact",
+    "H2": "a choice stored as the user's decision (the user decided nothing)",
+    "H3": "the vendor 3x claim stored without its caveat"
+   },
+   "answer": "Neither fits as is: Brindle orders per queue but drops silently past max_unacked; Quarrel never drops but orders only per partition (partition_key)."
+  },
+  {
+   "id": "C2",
+   "kind": "capture",
+   "ws": "ostrich",
+   "set": "cap",
+   "prompt": "Is Ostrich a good fit for compressing our nightly telemetry archives (see telemetry-archives.md)? The material we have is in ./sources. Short answer.",
+   "durable": {
+    "D1": "the Ostrich benchmark covered only text logs under 1 MB on one core; binary payloads and files over 1 MB untested",
+    "D2": "Ostrich needs the trained dictionary to decompress"
+   },
+   "harm": {
+    "H1": "4.1x stored as applying to binary or large files"
+   },
+   "answer": "Not established: the benchmark did not test binary frames or files over 1 MB, which the archives are."
+  },
+  {
+   "id": "C3",
+   "kind": "capture",
+   "ws": "vellum",
+   "set": "cap",
+   "prompt": "./run-export.sh fails. Find out why and fix the configuration so it runs.",
+   "durable": {
+    "D1": "pitfall: Vellum exporter fails with 'segment table full' when batch_size exceeds 4096 (segment table has 4096 entries)"
+   },
+   "harm": {
+    "H1": "the edit itself or the export output stored as a fact"
+   },
+   "answer": "batch_size 8192 exceeds the 4096-entry segment table; set batch_size to 4096 or less."
+  },
+  {
+   "id": "C4",
+   "kind": "capture",
+   "ws": "brindle",
+   "set": "cap-dup",
+   "prompt": "What happens in Brindle when a consumer falls behind? Check ./sources and answer briefly.",
+   "durable": {
+    "D1": "already stored as S1 on the shelf: no second copy (a correction is acceptable only if it changes the content)"
+   },
+   "harm": {
+    "H1": "a duplicate of S1 added"
+   },
+   "answer": "Past 10,000 unacknowledged messages per consumer Brindle silently drops the oldest; brindle_dropped_total counts it; raise max_unacked or add consumers."
+  },
+  {
+   "id": "C5",
+   "kind": "capture",
+   "ws": "larkspur",
+   "set": "cap-stale",
+   "prompt": "Does Larkspur support HTTP/3 now? The changelog is in ./sources. Short answer.",
+   "durable": {
+    "D1": "Larkspur 2.0.0 (2026-08-14) added experimental HTTP/3, off by default (--h3, Client{H3: true}); the stale S5 corrected or retired"
+   },
+   "harm": {
+    "H1": "S5 left as the only fact while a new contradicting fact is added beside it without correction",
+    "H2": "answer says no HTTP/3"
+   },
+   "answer": "Yes since 2.0.0, experimental and off by default (--h3 or Client{H3: true})."
+  },
+  {
+   "id": "C6",
+   "kind": "capture",
+   "ws": "todo",
+   "set": "cap",
+   "prompt": "How many TODO comments are in ./src, and in which files?",
+   "durable": {},
+   "harm": {
+    "H1": "any fact stored (task progress or what a command shows)"
+   },
+   "answer": "3: two in src/a.go, one in src/b.go."
+  },
+  {
+   "id": "C1w",
+   "kind": "capture",
+   "ws": "brindle-web",
+   "set": "cap",
+   "prompt": "We are evaluating message-queue libraries for the Tandem order pipeline. Read these pages: https://docs.brindle.dev/3.2, https://quarrel.io/docs/1.4, https://quarrel.io/blog/3x-faster and https://forum.queues.example/t/4411, and tell me whether Brindle or Quarrel fits a workload that needs strict ordering per queue and must never lose messages silently. Keep it short.",
+   "durable": {
+    "D1": "Brindle drops the oldest unacknowledged message silently beyond 10,000 per consumer (max_unacked, brindle_dropped_total)",
+    "D2": "Quarrel orders only within a partition (64 by default; partition_key)",
+    "D3": "the Quarrel vs Brindle benchmark is vendor-reported, one run, not verified (limitation)"
+   },
+   "harm": {
+    "H1": "the forum claim 'Quarrel never loses a message' stored as fact",
+    "H2": "a choice stored as the user's decision (the user decided nothing)",
+    "H3": "the vendor 3x claim stored without its caveat"
+   },
+   "answer": "Neither fits as is: Brindle orders per queue but drops silently past max_unacked; Quarrel never drops but orders only per partition (partition_key).",
+   "web": true
+  },
+  {
+   "id": "C2w",
+   "kind": "capture",
+   "ws": "ostrich-web",
+   "set": "cap",
+   "prompt": "Is Ostrich a good fit for compressing our nightly telemetry archives (see telemetry-archives.md)? What we have on it: https://wiki.example.com/ostrich-benchmark and https://ostrich.dev/readme. Short answer.",
+   "durable": {
+    "D1": "the Ostrich benchmark covered only text logs under 1 MB on one core; binary payloads and files over 1 MB untested",
+    "D2": "Ostrich needs the trained dictionary to decompress"
+   },
+   "harm": {
+    "H1": "4.1x stored as applying to binary or large files"
+   },
+   "answer": "Not established: the benchmark did not test binary frames or files over 1 MB, which the archives are.",
+   "web": true
+  },
+  {
+   "id": "R1",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "For the Tandem order pipeline we need strict ordering per queue and no silent message loss. Brindle or Quarrel? We looked into both earlier; there are no docs in this directory. Answer briefly.",
+   "target": [
+    "S1",
+    "S2"
+   ],
+   "noise": [
+    "O3",
+    "O4"
+   ],
+   "answer": "Neither as is: Brindle orders per queue but silently drops past 10,000 unacked (raise max_unacked / watch brindle_dropped_total); Quarrel does not drop but orders only per partition (use partition_key)."
+  },
+  {
+   "id": "R2",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "Which queue library should the Tandem order pipeline use, Brindle or Quarrel? It needs strict ordering per queue and must not drop messages silently. Answer briefly.",
+   "target": [
+    "S1",
+    "S2"
+   ],
+   "noise": [
+    "O3",
+    "O4"
+   ],
+   "answer": "As R1; without memory the agent has no source and should say so rather than invent properties."
+  },
+  {
+   "id": "R3",
+   "kind": "recall",
+   "ws": "telemetry",
+   "set": "rec",
+   "prompt": "Would Ostrich be a good fit for compressing our telemetry archives (telemetry-archives.md)? We looked into Ostrich before. Answer briefly.",
+   "target": [
+    "S4"
+   ],
+   "noise": [
+    "O7"
+   ],
+   "answer": "Unproven: the earlier benchmark covered only text logs under 1 MB; the archives are binary frames of 40-300 MB."
+  },
+  {
+   "id": "R4",
+   "kind": "recall",
+   "ws": "larkspur",
+   "set": "rec",
+   "prompt": "Can the edge proxy in this directory use Larkspur for HTTP/3? Answer briefly.",
+   "target": [
+    "S5"
+   ],
+   "noise": [
+    "O6"
+   ],
+   "stale": "S5",
+   "answer": "Yes: go.mod pins Larkspur v2.0.1 and 2.0.0 added experimental HTTP/3 (--h3 / Client{H3: true}); the stored 1.8 finding is outdated."
+  },
+  {
+   "id": "R5",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "What is the default retry backoff of the Quarrel client? Answer briefly.",
+   "target": [],
+   "noise": [
+    "O3",
+    "S2",
+    "S3"
+   ],
+   "answer": "Not known from memory or local material; no number invented (ack_timeout redelivery of S2 is not a backoff)."
+  },
+  {
+   "id": "R6",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "Give a one-line awk command that prints the second column of data.csv, skipping the header.",
+   "target": [],
+   "noise": [],
+   "answer": "awk -F, 'NR>1{print $2}' data.csv"
+  },
+  {
+   "id": "R7",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "Where does the Kestrel CI runner on build-07 write its log?",
+   "target": [
+    "O2"
+   ],
+   "noise": [
+    "S4"
+   ],
+   "answer": "/var/log/kestrel/runner.log"
+  },
+  {
+   "id": "R8",
+   "kind": "recall",
+   "ws": "edgeproxy-bare",
+   "set": "rec",
+   "prompt": "Does Larkspur support HTTP/3? We researched this at some point. Answer briefly.",
+   "target": [
+    "S5"
+   ],
+   "noise": [
+    "O6"
+   ],
+   "stale": "S5",
+   "answer": "The stored finding says Larkspur 1.8 had no HTTP/3, but go.mod uses v2.0.1, so the finding may be outdated: check the 2.x changelog. Saying 'no' flatly applies a stale fact."
+  },
+  {
+   "id": "R9",
+   "kind": "recall",
+   "ws": "empty",
+   "set": "rec",
+   "prompt": "Check the research shelf in memcue: what did we record about the Quarrel benchmark? Answer briefly.",
+   "target": [
+    "S3"
+   ],
+   "noise": [
+    "S2",
+    "O3"
+   ],
+   "answer": "Vendor-reported 3.1M vs 1.0M msg/s, a single run with default settings on the vendor's private rig, not independently verified."
+  }
+ ]
+}

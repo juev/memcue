@@ -1,0 +1,135 @@
+{
+ "arm": "cc-cand",
+ "scenario": "C1w",
+ "rep": 11,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 26.1,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "web",
+    "connected"
+   ]
+  ],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://docs.brindle.dev/3.2"
+   },
+   "result": "# Brindle 3.2 documentation\n\nBrindle is an embeddable message-queue library for Go and Rust services.\n\n## Ordering\n\nMessages are delivered in the order they were published within one queue. The guarantee holds per queue, across all\nconsumers of that queue, as long as the queue has a single writer.\n\n## Flow control\n\nEach consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nthe oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nconsumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nif a drop is not acceptable.\n\n## Persistence\n\nQueues are kept in memory and written to a write-ahead log every 200 ms by default (`wal_interval`).\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://quarrel.io/docs/1.4"
+   },
+   "result": "# Quarrel 1.4 reference\n\nQuarrel is a partitioned message-queue library.\n\n## Delivery\n\nDelivery is at least once. A message that is not acknowledged within `ack_timeout` (30 s by default) is delivered\nagain, so consumers must be idempotent.\n\n## Ordering\n\nOrder is kept within a partition only. A queue is split into 64 partitions by default, and messages of one queue in\ndifferent partitions may be delivered in any order. Pin a key to a partition (`partition_key`) to keep the order of\nthe messages that share it.\n\n## Back-pressure\n\nA publisher blocks when the partition buffer is full; no message is dropped.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://quarrel.io/blog/3x-faster"
+   },
+   "result": "# \"Quarrel is 3x faster than Brindle\" — Quarrel Inc. engineering blog\n\nWe published 10 million 1 KB messages through Quarrel 1.4 and Brindle 3.2 on our own c7-metal test rig.\nQuarrel reached 3.1 million messages per second, Brindle 1.0 million.\n\nMethod notes: one run per library, default settings, the Brindle WAL interval left at its default. The rig and the\nharness are not public.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://forum.queues.example/t/4411"
+   },
+   "result": "# Forum thread: \"Brindle or Quarrel?\"\n\n**user anon_4411:** Just use Quarrel. It never loses a message and it's ordered, trust me, we run it everywhere.\n\n**user mkv:** Any numbers or docs for that?\n\n**user anon_4411:** no, just experience.\n"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Brindle Quarrel queue ordering message loss\""
+   },
+   "result": "No stored facts match."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue add -shelf research -source tool -keywords \"Brindle 3.2 flow control silent drop max_unacked brindle_dropped_total\" -- \"Brindle 3.2: each consumer holds at most 10,000 unacked messages (max_unacked, up to 50,000); beyond that the oldest unacked message is dropped without notice to publisher or consumer, only counter brindle_dropped_total. Source: docs.brindle.dev/3.2.\" \nmemcue add -shelf research -source tool -keywords \"Brindle 3.2 ordering WAL wal_interval persistence single writer\" -- \"Brindle 3.2: order is kept per queue across all consumers only if the queue has a single writer; queues live in memory with a WAL write every 200 ms by default (wal_interval). Source: docs.brindle.dev/3.2.\"\nmemcue add -shelf research -source tool -keywords \"Quarrel 1.4 ordering partition at-least-once ack_timeout back-pressure partition_key\" -- \"Quarrel 1.4: at-least-once delivery (redelivery after ack_timeout, 30 s default, consumers must be idempotent); order only within a partition (64 per queue by default; pin with partition_key); publisher blocks when partition buffer is full, no drops. Source: quarrel.io/docs/1.4.\"\nmemcue add -shelf research -source tool -keywords \"Quarrel Brindle benchmark 3x faster vendor claim\" -- \"Vendor claim only: Quarrel Inc. blog reports Quarrel 1.4 at 3.1M msg/s vs Brindle 3.2 at 1.0M msg/s; single run, default settings, non-public rig and harness. Source: quarrel.io/blog/3x-faster.\""
+   },
+   "result": "01M5Z86RKX4P2PJ1E57ZVJ18V5\n01M5Z86RM8663S45S4EE7HZ05E\n01M5Z86RMH76SDJDECMT2K2FQ9\n01M5Z86RMTH199GT7TPGXVJ23B"
+  }
+ ],
+ "final": {
+  "result": "**Quarrel is the better fit, with one configuration requirement.**\n\n- **Never lose messages silently:**\n  - **Brindle fails this.** Once a consumer is 10,000 messages behind, it drops the oldest unacked message. Neither the publisher nor the consumer is told. The only trace is the `brindle_dropped_total` counter. Raising `max_unacked` (up to 50,000) only moves the limit. It also keeps queues in memory and writes the WAL every 200 ms by default, so a crash can lose recent messages.\n  - **Quarrel passes.** Delivery is at-least-once, and a publisher blocks when the buffer is full instead of dropping. Consumers must be idempotent, because unacked messages are redelivered after 30 s.\n- **Strict ordering per queue:**\n  - **Brindle** guarantees it per queue, but only with a single writer.\n  - **Quarrel** orders only within a partition, and a queue is split into 64 partitions by default. To get strict per-queue order, pin everything to one partition with `partition_key`, or use one key per ordering domain, such as per order ID. Pinning everything to one partition limits throughput.\n- **Ignore these two sources:**\n  - The \"3x faster\" blog post is a vendor claim from a single run on a non-public rig.\n  - The forum post is anecdote with no docs or numbers behind it.\n\nBrindle could still work if you can tolerate its silent drops, for example by alerting on `brindle_dropped_total`. For \"never lose silently\", Quarrel is the safer choice.\n\nI saved these findings to the research shelf in memory.",
+  "total_cost_usd": 0.0747771,
+  "duration_ms": 21370,
+  "num_turns": 7,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 13786,
+   "cache_read_input_tokens": 24471,
+   "output_tokens": 1717
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [
+  {
+   "change": "new",
+   "id": "01M5Z86RKX4P2PJ1E57ZVJ18V5",
+   "scope": "shelf:research",
+   "kind": "",
+   "source": "tool",
+   "keywords": "Brindle 3.2 flow control silent drop max_unacked brindle_dropped_total",
+   "content": "Brindle 3.2: each consumer holds at most 10,000 unacked messages (max_unacked, up to 50,000); beyond that the oldest unacked message is dropped without notice to publisher or consumer, only counter brindle_dropped_total. Source: docs.brindle.dev/3.2."
+  },
+  {
+   "change": "new",
+   "id": "01M5Z86RM8663S45S4EE7HZ05E",
+   "scope": "shelf:research",
+   "kind": "",
+   "source": "tool",
+   "keywords": "Brindle 3.2 ordering WAL wal_interval persistence single writer",
+   "content": "Brindle 3.2: order is kept per queue across all consumers only if the queue has a single writer; queues live in memory with a WAL write every 200 ms by default (wal_interval). Source: docs.brindle.dev/3.2."
+  },
+  {
+   "change": "new",
+   "id": "01M5Z86RMH76SDJDECMT2K2FQ9",
+   "scope": "shelf:research",
+   "kind": "",
+   "source": "tool",
+   "keywords": "Quarrel 1.4 ordering partition at-least-once ack_timeout back-pressure partition_key",
+   "content": "Quarrel 1.4: at-least-once delivery (redelivery after ack_timeout, 30 s default, consumers must be idempotent); order only within a partition (64 per queue by default; pin with partition_key); publisher blocks when partition buffer is full, no drops. Source: quarrel.io/docs/1.4."
+  },
+  {
+   "change": "new",
+   "id": "01M5Z86RMTH199GT7TPGXVJ23B",
+   "scope": "shelf:research",
+   "kind": "",
+   "source": "tool",
+   "keywords": "Quarrel Brindle benchmark 3x faster vendor claim",
+   "content": "Vendor claim only: Quarrel Inc. blog reports Quarrel 1.4 at 3.1M msg/s vs Brindle 3.2 at 1.0M msg/s; single run, default settings, non-public rig and harness. Source: quarrel.io/blog/3x-faster."
+  }
+ ],
+ "search_log": "{\"time\":\"2026-10-27T17:58:13Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue ordering message loss\",\"ms\":0.864}\n"
+}

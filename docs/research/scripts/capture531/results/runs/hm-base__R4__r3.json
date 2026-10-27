@@ -1,0 +1,88 @@
+{
+ "arm": "hm-base",
+ "scenario": "R4",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 14.1,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "git ls-files && grep -ril -e larkspur -e http3 -e quic . --exclude-dir=.git | head"
+   },
+   "result": "go.mod\nsources/CHANGELOG.md\n./go.mod\n./sources/CHANGELOG.md"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Larkspur HTTP/3 edge proxy"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q8956GD5J189S633ZDYT\", \"content\": \"The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\", \"keywords\": [\"Larkspur\", \"proxy\", \"HTTP_PROXY\", \"connection pool\", \"прокси\"], \"scope\": \"global\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cat go.mod && cat sources/CHANGELOG.md"
+   },
+   "result": "module example.com/edgeproxy\n\ngo 1.27\n\nrequire example.com/larkspur v2.0.1\n# Larkspur changelog\n\n## 2.0.0 (2026-08-14)\n\n- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n- Dropped Go 1.25.\n\n## 1.8.0 (2025-10-02)\n\n- HTTP/2 server push removed.\n- HTTP/3 is not supported."
+  }
+ ],
+ "final": {
+  "result": "Yes. `go.mod` pins `example.com/larkspur v2.0.1`, and according to `sources/CHANGELOG.md` HTTP/3 support arrived in 2.0.0. The project is on Go 1.27, so the Go 1.25 drop in 2.0.0 doesn't affect it.\n\nHTTP/3 is still experimental in Larkspur and off by default. You turn it on with the `--h3` flag or `Client{H3: true}`. I didn't find any H3 setting in this directory, which only has `go.mod` and the changelog.\n\nOne more thing from my notes, not from these files: Larkspur's connection pool ignores `HTTP_PROXY`. If the proxy needs an upstream proxy, set `Client{Proxy: ...}` explicitly.",
+  "total_cost_usd": 0.0331098,
+  "duration_ms": 12273,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 1804,
+   "cache_read_input_tokens": 27969,
+   "output_tokens": 653
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:58:36Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 edge proxy\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.663}\n{\"time\":\"2026-10-27T17:58:36Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 edge proxy\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.694}\n"
+}

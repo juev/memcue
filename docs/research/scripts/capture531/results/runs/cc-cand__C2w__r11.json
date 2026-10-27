@@ -1,0 +1,101 @@
+{
+ "arm": "cc-cand",
+ "scenario": "C2w",
+ "rep": 11,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 15.9,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "web",
+    "connected"
+   ]
+  ],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Read",
+   "input": {
+    "file_path": "<STAND>/runs/cc-cand/C2w/r11/ws/telemetry-archives.md"
+   },
+   "result": "1\t# Telemetry archives\n2\t\n3\tNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file.\n4\t"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://wiki.example.com/ostrich-benchmark"
+   },
+   "result": "# Ostrich 0.9 compression benchmark (project wiki, March 2026)\n\nOstrich compressed our sample of application text logs 4.1 times on average (zstd level 3: 3.2 times), at 410 MB/s\non one core.\n\nScope: the sample held 2,000 text log files, each under 1 MB. Binary payloads, files over 1 MB and multi-core runs\nwere not tested, so these numbers say nothing about them.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://ostrich.dev/readme"
+   },
+   "result": "# Ostrich\n\nOstrich is a dictionary compressor for small text records. It trains a dictionary per stream (`ostrich train`) and\nneeds the same dictionary to decompress.\n"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"ostrich compression\""
+   },
+   "result": "No stored facts match."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue add -shelf research -source tool -keywords \"ostrich compression benchmark limitations dictionary\" -- \"Ostrich 0.9 benchmark (wiki, March 2026): 4.1x vs zstd-3 3.2x at 410 MB/s single core, but only on 2,000 text logs under 1 MB each; binary payloads, files over 1 MB, multi-core untested. Ostrich README: dictionary compressor for small text records; trains a per-stream dictionary (ostrich train) and needs the same dictionary to decompress. Source: wiki.example.com/ostrich-benchmark and ostrich.dev/readme, read 2026-10-27.\""
+   },
+   "result": "01M5Z87CMEMHN8Z7JD0V8631ZE"
+  }
+ ],
+ "final": {
+  "result": "**Probably not, and nothing you have shows that it is.**\n\n- **Different data:** The benchmark used small text logs, each under 1 MB. Your archives are protobuf binary files of 40–300 MB. The wiki says binary payloads, files over 1 MB and multi-core runs weren't tested, so the 4.1× ratio and 410 MB/s don't apply to your case.\n- **Different design:** The README describes Ostrich as a dictionary compressor for small text records. It also needs the same trained dictionary to decompress. That adds operational risk for long-lived archives, because losing or changing a dictionary makes old files unreadable.\n\nzstd is the safer default for large binary files. If you still want to evaluate Ostrich, run it on a few real nightly files and compare ratio, speed and restore handling against zstd.\n\nI saved these caveats to the research shelf for later sessions.",
+  "total_cost_usd": 0.0345298,
+  "duration_ms": 11105,
+  "num_turns": 6,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5771,
+   "cache_read_input_tokens": 30238,
+   "output_tokens": 841
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [
+  {
+   "change": "new",
+   "id": "01M5Z87CMEMHN8Z7JD0V8631ZE",
+   "scope": "shelf:research",
+   "kind": "",
+   "source": "tool",
+   "keywords": "ostrich compression benchmark limitations dictionary",
+   "content": "Ostrich 0.9 benchmark (wiki, March 2026): 4.1x vs zstd-3 3.2x at 410 MB/s single core, but only on 2,000 text logs under 1 MB each; binary payloads, files over 1 MB, multi-core untested. Ostrich README: dictionary compressor for small text records; trains a per-stream dictionary (ostrich train) and needs the same dictionary to decompress. Source: wiki.example.com/ostrich-benchmark and ostrich.dev/readme, read 2026-10-27."
+  }
+ ],
+ "search_log": "{\"time\":\"2026-10-27T17:58:39Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"ostrich compression\",\"ms\":0.546}\n"
+}

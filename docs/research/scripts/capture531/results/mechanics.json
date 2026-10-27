@@ -1,0 +1,399 @@
+{
+ "ids": {
+  "O1": "01M5Z7H22WK4A7GAYE19AY1JGA",
+  "O2": "01M5Z7H236SCH49X3P6K6PV4X3",
+  "O3": "01M5Z7H23H8T9NKXGGT9MT7BQV",
+  "O4": "01M5Z7H23SX16AYP18RZ13PKG3",
+  "O5": "01M5Z7H24BTQ8G6VGZF4AKM1S8",
+  "O6": "01M5Z7H24MB56SRWQBBVEXXPV9",
+  "O7": "01M5Z7H24XYP3JDXSHZQFPKKQ5",
+  "S1": "01M5Z7H256V57CGB9HXMD9152Z",
+  "S2": "01M5Z7H25FP6TXB5JJZ8SQZNXD",
+  "S3": "01M5Z7H25R39RH8QJ50J8QXCNT",
+  "S4": "01M5Z7H260W02DKCEHE6QAEWE3",
+  "S5": "01M5Z7H2677NRC5DKN54CWEXBT"
+ },
+ "rows": [
+  {
+   "id": "q1",
+   "query": "Brindle Quarrel ordering",
+   "why": "ordinary noise (O3, O4) and three shelf facts share the words",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "3 facts on the shelf match: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [
+     "O4",
+     "O3"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O4",
+     "O3"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S1",
+     "S2",
+     "S3"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S1",
+     "S2",
+     "S3"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q2",
+   "query": "Ostrich benchmark binary payloads",
+   "why": "only a shelf fact has the words",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [],
+    "hints": [
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "hermes": {
+    "facts": [],
+    "hint": "1 fact on the shelf matches: -in shelf:research",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hint": "1 more facts hold the words but sit below the score floor; run the same search with min_score 0 to read them (limit still caps the answer).",
+    "error": null
+   }
+  },
+  {
+   "id": "q3",
+   "query": "Larkspur HTTP/3",
+   "why": "an ordinary Larkspur pitfall (O6) and the stale shelf fact S5",
+   "cli_repo": {
+    "facts": [
+     "O6"
+    ],
+    "hints": []
+   },
+   "cli_norepo": {
+    "facts": [
+     "O6"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O6"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S5"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S5"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q4",
+   "query": "Quarrel retry backoff",
+   "why": "nothing answers it; ordinary O3 and shelf S2, S3 share 'Quarrel'",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "2 facts on the shelf match: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [
+     "O3"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O3"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S3",
+     "S2"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S3",
+     "S2"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q5",
+   "query": "Kestrel runner log build-07",
+   "why": "ordinary control, no shelf fact",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [
+     "O2"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O2"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q6",
+   "query": "message queue drops unacknowledged messages",
+   "why": "paraphrase without the system's name",
+   "cli_repo": {
+    "facts": [
+     "O5"
+    ],
+    "hints": []
+   },
+   "cli_norepo": {
+    "facts": [
+     "O5"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O5"
+    ],
+    "hint": "1 more facts hold the words but sit below the score floor; run the same search with min_score 0 to read them (limit still caps the answer).",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S1"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S1"
+    ],
+    "hint": "2 more facts hold the words but sit below the score floor; run the same search with min_score 0 to read them (limit still caps the answer).",
+    "error": null
+   }
+  },
+  {
+   "id": "q7",
+   "query": "Brindle max_unacked",
+   "why": "a term only the shelf fact holds, next to ordinary 'Brindle'",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [
+     "O4"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O4"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S1"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S1"
+    ],
+    "hint": "1 more facts hold the words but sit below the score floor; run the same search with min_score 0 to read them (limit still caps the answer).",
+    "error": null
+   }
+  },
+  {
+   "id": "q8",
+   "query": "HTTP/3 support",
+   "why": "no system name; S5 holds it",
+   "cli_repo": {
+    "facts": [
+     "O6"
+    ],
+    "hints": []
+   },
+   "cli_norepo": {
+    "facts": [
+     "O6"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O6"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S5"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S5"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q9",
+   "query": "Ostrich",
+   "why": "the bare system name of a shelf-only subject",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [],
+    "hints": [
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "hermes": {
+    "facts": [],
+    "hint": "1 fact on the shelf matches: -in shelf:research",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hint": "",
+    "error": null
+   }
+  },
+  {
+   "id": "q10",
+   "query": "telemetry compression",
+   "why": "ordinary O7 shares 'telemetry'; S4 has 'compression' only in keywords",
+   "cli_repo": {
+    "facts": [],
+    "hints": [
+     "No facts of this repository, this host or global match; -in all searches every repository.",
+     "1 fact on the shelf matches: -in shelf:research"
+    ]
+   },
+   "cli_norepo": {
+    "facts": [
+     "O7"
+    ],
+    "hints": []
+   },
+   "hermes": {
+    "facts": [
+     "O7"
+    ],
+    "hint": "",
+    "error": null
+   },
+   "cli_repo_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hints": []
+   },
+   "hermes_shelf": {
+    "facts": [
+     "S4"
+    ],
+    "hint": "",
+    "error": null
+   }
+  }
+ ]
+}

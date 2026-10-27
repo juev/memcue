@@ -1,0 +1,64 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R9",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 12.2,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Quarrel benchmark\"; echo ---; memcue search -in shelf:research -min-score 0 \"Quarrel\"",
+    "description": "Search research shelf for Quarrel benchmark"
+   },
+   "result": "01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8AQF8394DB6ZYDARA77 example.com/acme/telemetry 2026-03-20 | The Ostrich 0.9 benchmark (4.1x on text logs, March 2026) covered only text log files under 1 MB on one core; binary payloads and files over 1 MB were not tested. Source: project wiki, Ostrich benchmark.\n---\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference."
+  }
+ ],
+ "final": {
+  "result": "The research shelf has one fact about the Quarrel benchmark, stored 2026-09-30 under the tandem repo:\n\n- **The headline numbers come from the vendor:** Quarrel did 3.1M messages/s and Brindle 1.0M messages/s. It was a single run with default settings on the vendor's private rig, and nobody else has verified it. Source: Quarrel Inc. engineering blog.\n\nA second fact from the same day, from the Quarrel 1.4 reference, isn't about the benchmark but may matter for comparing them. Quarrel keeps message order only within a partition (64 per queue by default). Delivery is at least once. When a partition's buffer is full, the publisher blocks rather than messages being dropped.",
+  "total_cost_usd": 0.0571588,
+  "duration_ms": 9904,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5639,
+   "cache_read_input_tokens": 17854,
+   "output_tokens": 423
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:33Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel benchmark\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.781}\n{\"time\":\"2026-10-27T17:59:33Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8A314MS161S5Z7R2N50\"],\"ms\":0.472}\n"
+}

@@ -1,0 +1,104 @@
+{
+ "arm": "hm-cand",
+ "scenario": "C5",
+ "rep": 1,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 15.5,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Larkspur HTTP/3",
+    "in": "shelf:research"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q8J7MV3BM5H6A21WC8HS\", \"content\": \"Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).\", \"keywords\": [\"Larkspur\", \"HTTP/3\", \"h3\", \"QUIC\", \"support\"], \"origin\": \"example.com/acme/edgeproxy 2025-10-05\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:54Z\"}]}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "ls -la sources; grep -rniE \"http/?3|quic\" sources | head -50"
+   },
+   "result": "total 12\ndrwxr-xr-x 2 hermes hermes 4096 Oct 27 20:43 .\ndrwxr-xr-x 4 hermes hermes 4096 Oct 27 20:51 ..\n-rw-r--r-- 1 hermes hermes  262 Oct 27 20:43 CHANGELOG.md\nsources/CHANGELOG.md:5:- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\nsources/CHANGELOG.md:11:- HTTP/3 is not supported."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cat sources/CHANGELOG.md"
+   },
+   "result": "# Larkspur changelog\n\n## 2.0.0 (2026-08-14)\n\n- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n- Dropped Go 1.25.\n\n## 1.8.0 (2025-10-02)\n\n- HTTP/2 server push removed.\n- HTTP/3 is not supported."
+  },
+  {
+   "name": "mcp__memcue__memcue_correct",
+   "input": {
+    "id": "01M5Z7Q8J7MV3BM5H6A21WC8HS",
+    "content": "Larkspur 2.0.0 (2026-08-14) added HTTP/3 support, experimental and off by default; enable with the `--h3` flag or `Client{H3: true}`. Larkspur 1.8 did not support HTTP/3. Source: Larkspur CHANGELOG.md, 2.0.0 and 1.8.0 entries.",
+    "keywords": "Larkspur, HTTP/3, h3, QUIC, support, experimental, --h3, Client H3"
+   },
+   "result": "{\"result\": \"01M5Z7Q8J7MV3BM5H6A21WC8HS v2\"}"
+  }
+ ],
+ "final": {
+  "result": "Yes, starting with Larkspur 2.0.0 (2026-08-14). It's experimental and turned off by default. To enable it, use the `--h3` flag or `Client{H3: true}`. Version 1.8 didn't support it.\n\nMy saved note said \"no HTTP/3\", which was based only on the 1.8 changelog. I've updated it.",
+  "total_cost_usd": 0.0380352,
+  "duration_ms": 13702,
+  "num_turns": 5,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 2217,
+   "cache_read_input_tokens": 39736,
+   "output_tokens": 616
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q8FMR29H7W9M5VEFG9VT",
+  "O2": "01M5Z7Q8FY63THV46MMG8EB9XJ",
+  "O3": "01M5Z7Q8G9HSJXNYWPDQETGMBX",
+  "O4": "01M5Z7Q8GKYJB1V6WS23K970Y3",
+  "O5": "01M5Z7Q8H7RBRE100EN3RNB6EX",
+  "O6": "01M5Z7Q8HJN8686TRQFQBDFY8P",
+  "O7": "01M5Z7Q8HXJ8ZQ1KTY7MJX658V",
+  "S5": "01M5Z7Q8J7MV3BM5H6A21WC8HS"
+ },
+ "fact_changes": [
+  {
+   "change": "changed",
+   "id": "01M5Z7Q8J7MV3BM5H6A21WC8HS",
+   "status": "active",
+   "version": 2,
+   "before": "Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).",
+   "content": "Larkspur 2.0.0 (2026-08-14) added HTTP/3 support, experimental and off by default; enable with the `--h3` flag or `Client{H3: true}`. Larkspur 1.8 did not support HTTP/3. Source: Larkspur CHANGELOG.md, 2.0.0 and 1.8.0 entries.",
+   "scope": "shelf:research"
+  }
+ ],
+ "search_log": "{\"time\":\"2026-10-27T17:51:05Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8J7MV3BM5H6A21WC8HS\"],\"ms\":0.664}\n{\"time\":\"2026-10-27T17:51:05Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8J7MV3BM5H6A21WC8HS\"],\"ms\":0.651}\n"
+}

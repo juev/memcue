@@ -1,0 +1,72 @@
+{
+ "arm": "cc-base",
+ "scenario": "R4",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 12.2,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/R4/r2/ws; ls -la; git ls-files | head -50; grep -ri -n \"larkspur\\|http/3\\|http3\\|quic\" . --exclude-dir=.git | head -30; memcue search \"Larkspur HTTP/3 edge proxy\"",
+    "description": "Inspect repo and search memory"
+   },
+   "result": "total 20\ndrwxr-xr-x 4 hermes hermes 4096 Oct 27 20:55 .\ndrwxr-xr-x 6 hermes hermes 4096 Oct 27 20:55 ..\ndrwxr-xr-x 8 hermes hermes 4096 Oct 27 20:55 .git\n-rw-r--r-- 1 hermes hermes   75 Oct 27 20:43 go.mod\ndrwxr-xr-x 2 hermes hermes 4096 Oct 27 20:43 sources\ngo.mod\nsources/CHANGELOG.md\n./go.mod:5:require example.com/larkspur v2.0.1\n./sources/CHANGELOG.md:1:# Larkspur changelog\n./sources/CHANGELOG.md:5:- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n./sources/CHANGELOG.md:11:- HTTP/3 is not supported.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/R4/r2/ws; cat go.mod sources/CHANGELOG.md",
+    "description": "Read go.mod and changelog"
+   },
+   "result": "module example.com/edgeproxy\n\ngo 1.27\n\nrequire example.com/larkspur v2.0.1\n# Larkspur changelog\n\n## 2.0.0 (2026-08-14)\n\n- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n- Dropped Go 1.25.\n\n## 1.8.0 (2025-10-02)\n\n- HTTP/2 server push removed.\n- HTTP/3 is not supported."
+  }
+ ],
+ "final": {
+  "result": "Yes, but it's experimental and turned off by default.\n\n- `go.mod` requires `example.com/larkspur v2.0.1`.\n- According to `sources/CHANGELOG.md`, Larkspur added HTTP/3 in 2.0.0, so this version has it. Versions 1.8.0 and earlier don't support it.\n- To turn it on, use the `--h3` flag or set `Client{H3: true}`.\n\nOne thing to check: a v2 Go module path normally ends in `/v2`, so it would be `example.com/larkspur/v2 v2.0.1`. As written, this `require` line may not resolve to 2.x. Run `go build` to confirm it actually picks up 2.0.1.",
+  "total_cost_usd": 0.06348039999999999,
+  "duration_ms": 10449,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5454,
+   "cache_read_input_tokens": 29022,
+   "output_tokens": 701
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:55:11Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 edge proxy\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.72}\n"
+}
