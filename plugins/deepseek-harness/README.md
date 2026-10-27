@@ -27,8 +27,9 @@ Hermes.
 
 ## Candidates
 
-A fact written by `memcue_add` is active at once; `memcue_correct` of an approved fact is a deliberate correction. A
-candidate comes only from `memcue add -candidate` or `memcue import`, and waits for `memcue approve ID...` (see
+A fact written by `memcue_add` is indexed at once, and `memcue_correct` writes a new version of it. Nothing waits
+for approval: `memcue add -candidate`, `memcue candidates` and `memcue approve` are removed (#514). A candidate or provisional
+fact an older memcue left in the base is live too, unless it is retired or expired (see
 [Candidates](../../README.md#candidates)).
 
 ## Supported dsh

@@ -96,43 +96,6 @@ func TestAddBatchIDsIncrease(t *testing.T) {
 	}
 }
 
-// A base written before the monotonic ids can hold same-millisecond facts whose ids are in random order. Candidates
-// must still come newest first by created, not by the accidental id order.
-func TestCandidatesOrderByCreatedNotID(t *testing.T) {
-	s, _ := open(t)
-	facts, err := s.AddBatch([]FactInput{
-		{Content: "Первый кандидат.", Meta: Meta{Review: Candidate}},
-		{Content: "Второй кандидат.", Meta: Meta{Review: Candidate}},
-		{Content: "Третий кандидат.", Meta: Meta{Review: Candidate}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The smallest id gets the newest created time, the largest id the oldest: an id-only ORDER BY would reverse this.
-	created := []string{
-		"2026-10-21T12:00:00Z",
-		"2026-10-20T12:00:00Z",
-		"2026-10-19T12:00:00Z",
-	}
-	for i, f := range facts {
-		if _, err := s.db.Exec(`UPDATE facts SET created = ? WHERE id = ?`, created[i], f.ID); err != nil {
-			t.Fatal(err)
-		}
-	}
-	cands, err := s.Candidates()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cands) != 3 {
-		t.Fatalf("candidates = %d, want 3", len(cands))
-	}
-	for i, want := range []string{facts[0].ID, facts[1].ID, facts[2].ID} {
-		if cands[i].ID != want {
-			t.Fatalf("candidate %d = %s, want %s (order: %v)", i, cands[i].ID, want, cands)
-		}
-	}
-}
-
 func TestAddBatchIsAllOrNothing(t *testing.T) {
 	s, _ := open(t)
 	if _, err := s.AddBatch([]FactInput{
@@ -488,91 +451,89 @@ func TestMetaIsStoredAndKeptByCorrection(t *testing.T) {
 	}
 }
 
-func TestCandidateIsNotRecalled(t *testing.T) {
-	s, _ := open(t)
-	f, err := s.AddWith("Кандидат про порт gitea 3000 ждёт одобрения.", []string{"gitea"}, "", "",
-		Meta{Kind: "environment", Review: Candidate})
+// legacyRows writes versions as memcue 0.20.0 and older wrote them, review state included, without touching the
+// index: a candidate had no index row there, and AddBatch no longer writes the Candidate state.
+func legacyRows(t *testing.T, s *Store, rows ...Fact) {
+	t.Helper()
+	tx, err := s.db.Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
-		t.Error("a candidate was found by search")
-	}
-	act, err := s.Active()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, a := range act {
-		if a.ID == f.ID {
-			t.Error("a candidate is listed as active")
+	defer func() { _ = tx.Rollback() }()
+	for _, f := range rows {
+		if f.Created.IsZero() {
+			f.Created = time.Date(2026, 10, 20, 12, 0, f.Version, 0, time.UTC)
 		}
+		if f.Status == "" {
+			f.Status = Active
+		}
+		if err := insert(tx, f); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A candidate an older memcue left is live (#514): search, Active and a rebuild take it, and its row stays as it was.
+func TestLegacyCandidateIsLive(t *testing.T) {
+	s, _ := open(t)
+	m := Meta{Kind: "environment", Scope: "host:builder", Source: "tool", Evidence: "ss -ltn", Review: Candidate}
+	f := Fact{ID: "01JLEGACYCANDIDATE00000001", Version: 1, Content: "Кандидат про порт webforge 3000 ждал одобрения.",
+		Keywords: []string{"webforge"}, Origin: "hermes 2026-10-20", Author: "old", Meta: m}
+	legacyRows(t, s, f)
+	if _, ok := ids(t, s, "порт webforge")[f.ID]; ok {
+		t.Fatal("setup: the legacy row is indexed before a rebuild")
 	}
 	if err := s.Rebuild(); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
-		t.Error("a rebuild indexed a candidate")
+	if _, ok := ids(t, s, "порт webforge")[f.ID]; !ok {
+		t.Error("a legacy candidate is not found after a rebuild")
 	}
-	if got, err := s.Get(f.ID); err != nil || got.Review != Candidate {
-		t.Errorf("candidate not kept: %+v %v", got, err)
+	act, err := s.Active()
+	if err != nil || !slices.ContainsFunc(act, func(a Fact) bool { return a.ID == f.ID }) {
+		t.Errorf("a legacy candidate is not active: %+v %v", act, err)
+	}
+	if got, err := s.Get(f.ID); err != nil || got.Version != 1 || got.Meta != m || got.Origin != f.Origin {
+		t.Errorf("the legacy row changed: %+v %v", got, err)
 	}
 }
 
-func TestApproveTakesACandidateIntoRecall(t *testing.T) {
+// A fact is searchable from the write: AddWith does not store the Candidate state even when a caller passes it.
+func TestAddNeverStoresACandidate(t *testing.T) {
 	s, _ := open(t)
-	f, err := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "x", "", Meta{Kind: "environment",
-		Source: "tool", Review: Candidate})
+	f, err := s.AddWith("Порт webforge на builder 3000.", []string{"webforge"}, "", "", Meta{Kind: "environment", Review: Candidate})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := s.Candidates()
-	if err != nil || len(c) != 1 || c[0].ID != f.ID {
-		t.Fatalf("candidates %+v %v", c, err)
+	if got, _ := s.Get(f.ID); got.Review != "" || got.Kind != "environment" {
+		t.Errorf("stored %+v", got)
 	}
-	a, err := s.Approve(f.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.Version != 2 || a.Review != "" || a.Kind != "environment" || a.Source != "tool" {
-		t.Errorf("approved %+v", a)
-	}
-	if _, ok := ids(t, s, "порт gitea")[f.ID]; !ok {
-		t.Error("an approved fact is not found")
-	}
-	if c, _ := s.Candidates(); len(c) != 0 {
-		t.Errorf("still a candidate: %+v", c)
+	if _, ok := ids(t, s, "порт webforge")[f.ID]; !ok {
+		t.Error("a new fact is not found at once")
 	}
 }
 
-func TestApproveRefusesWhatIsNotACandidate(t *testing.T) {
+// A new version of a legacy candidate is stored approved, with its labels, and the old versions stay in the history.
+func TestCorrectingALegacyCandidateApprovesIt(t *testing.T) {
 	s, _ := open(t)
-	act, _ := s.Add("Активный факт.", nil, "")
-	ret, _ := s.AddWith("Снятый кандидат.", nil, "", "", Meta{Review: Candidate})
-	if _, err := s.Retire(ret.ID); err != nil {
-		t.Fatal(err)
-	}
-	for name, id := range map[string]string{"active": act.ID, "retired": ret.ID} {
-		if _, err := s.Approve(id); !errors.Is(err, ErrNotCandidate) {
-			t.Errorf("%s: err %v", name, err)
-		}
-	}
-	if _, err := s.Approve("01NOPE"); !errors.Is(err, ErrNotFound) {
-		t.Errorf("unknown: err %v", err)
-	}
-	if got, _ := s.Get(ret.ID); got.Status != Retired || got.Version != 2 {
-		t.Errorf("a refused approval wrote a version: %+v", got)
-	}
-}
-
-func TestCorrectingACandidateKeepsItACandidate(t *testing.T) {
-	s, _ := open(t)
-	f, _ := s.AddWith("Кандидат про порт gitea 3000.", []string{"gitea"}, "", "", Meta{Review: Candidate})
-	c, err := s.Correct(f.ID, "Кандидат про порт gitea 3001.", nil)
-	if err != nil || c.Review != Candidate {
+	m := Meta{Kind: "environment", Scope: "host:builder", Source: "tool", Evidence: "ss", Review: Candidate}
+	legacyRows(t, s,
+		Fact{ID: "01JLEGACYCANDIDATE00000002", Version: 1, Content: "Кандидат про порт webforge 3000.", Meta: m},
+		Fact{ID: "01JLEGACYCANDIDATE00000002", Version: 2, Content: "Кандидат про порт webforge 3000, уточнён.", Meta: m})
+	c, err := s.Correct("01JLEGACYCANDIDATE00000002", "Порт webforge 3001.", nil)
+	if err != nil || c.Version != 3 || c.Review != "" || c.Kind != "environment" || c.Scope != "host:builder" ||
+		c.Source != "tool" || c.Evidence != "ss" {
 		t.Fatalf("corrected %+v %v", c, err)
 	}
-	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
-		t.Error("a correction took a candidate into recall")
+	if _, ok := ids(t, s, "порт webforge 3001")[c.ID]; !ok {
+		t.Error("a corrected legacy candidate is not found")
+	}
+	h, err := s.History(c.ID)
+	if err != nil || len(h) != 3 || h[0].Review != Candidate || h[1].Review != Candidate {
+		t.Errorf("history %+v %v", h, err)
 	}
 }
 
@@ -598,30 +559,6 @@ func TestCorrectingARetiredFactIsRefused(t *testing.T) {
 	}
 	if _, ok := ids(t, s, "порт gitea")[f.ID]; ok {
 		t.Error("a refused correction put a retired fact back into the index")
-	}
-}
-
-// Candidates come newest first, so a day's batch does not start with yesterday's leftovers.
-func TestCandidatesAreNewestFirst(t *testing.T) {
-	s, _ := open(t)
-	now := time.Unix(1_700_000_000, 0)
-	s.now = func() time.Time { return now }
-	var first, second Fact
-	for i, content := range []string{"Первый кандидат про gitea.", "Второй кандидат про gitea."} {
-		now = now.Add(time.Second)
-		f, err := s.AddWith(content, []string{"gitea"}, "", "", Meta{Review: Candidate})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if i == 0 {
-			first = f
-		} else {
-			second = f
-		}
-	}
-	cs, err := s.Candidates()
-	if err != nil || len(cs) != 2 || cs[0].ID != second.ID || cs[1].ID != first.ID {
-		t.Fatalf("candidates %+v %v", cs, err)
 	}
 }
 
@@ -848,7 +785,7 @@ func TestMergeLeavesACurrentStamp(t *testing.T) {
 		t.Fatal(err)
 	}
 	var saved string
-	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = 'index'`).Scan(&saved); err != nil || saved != want {
+	if err := s.db.QueryRow(`SELECT value FROM stamps WHERE name = ?`, indexStampName).Scan(&saved); err != nil || saved != want {
 		t.Errorf("stamp after merge %q, want %q (%v)", saved, want, err)
 	}
 	s = reopen(t, s, path)
@@ -1240,16 +1177,27 @@ func TestRestoreUndoesARetire(t *testing.T) {
 		t.Error("a restored fact is not found by search")
 	}
 
-	c, _ := s.AddWith("Кандидат про порт forgejo 3000.", []string{"forgejo"}, "", "", Meta{Review: Candidate})
-	if _, err := s.Retire(c.ID); err != nil {
+	// A candidate rejected before #514 comes back by an explicit reopen only, and then as a live fact.
+	cm := Meta{Kind: "environment", Source: "tool", Review: Candidate}
+	legacyRows(t, s,
+		Fact{ID: "01JLEGACYCANDIDATE00000003", Version: 1, Content: "Кандидат про порт forgejo 3000.", Meta: cm},
+		Fact{ID: "01JLEGACYCANDIDATE00000003", Version: 2, Content: "Кандидат про порт forgejo 3000.", Status: Retired,
+			Meta: cm})
+	if err := s.Rebuild(); err != nil {
 		t.Fatal(err)
 	}
-	got, err = s.Restore(c.ID)
+	if _, ok := ids(t, s, "порт forgejo")["01JLEGACYCANDIDATE00000003"]; ok {
+		t.Fatal("a retired legacy candidate is found before a reopen")
+	}
+	got, err = s.Restore("01JLEGACYCANDIDATE00000003")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != Active || got.Review != Candidate {
-		t.Errorf("a rejected candidate came back as %+v, want a candidate", got)
+	if got.Version != 3 || got.Status != Active || got.Review != "" || got.Kind != "environment" || got.Source != "tool" {
+		t.Errorf("a rejected candidate came back as %+v, want a live fact", got)
+	}
+	if _, ok := ids(t, s, "порт forgejo")[got.ID]; !ok {
+		t.Error("a reopened legacy candidate is not found")
 	}
 }
 
@@ -1278,17 +1226,31 @@ func TestSplitFact(t *testing.T) {
 	if err != nil || len(hits) != 1 || hits[0].ID != parts[1].ID {
 		t.Errorf("search for a part %+v %v", hits, err)
 	}
-	prov, _ := s.AddWith("Временный факт про порт 3000 и путь /srv.", nil, "", "2026-11-01", Meta{Review: Provisional})
-	pparts, err := s.SplitFact(prov.ID, prov.Version, []string{"Порт 3000.", "Путь /srv."})
+	// A provisional fact of an older base gives approved parts that keep its expiry (#514).
+	legacyRows(t, s, Fact{ID: "01JLEGACYPROVISIONAL000003", Version: 1, Content: "Временный факт про порт 3000 и путь /srv.",
+		Expires: "2026-11-01", Meta: Meta{Review: Provisional}})
+	pparts, err := s.SplitFact("01JLEGACYPROVISIONAL000003", 1, []string{"Порт 3000.", "Путь /srv."})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := s.Get(pparts[0].ID); got.Review != Provisional || got.Expires != "2026-11-01" {
+	if got, _ := s.Get(pparts[0].ID); got.Review != "" || got.Expires != "2026-11-01" {
 		t.Errorf("provisional part %+v", got)
+	}
+	legacyRows(t, s, Fact{ID: "01JLEGACYCANDIDATE00000004", Version: 1, Content: "Кандидат про порт 4000 и путь /var.",
+		Origin: "hermes 2026-10-20", Meta: Meta{Kind: "environment", Scope: "host:builder", Review: Candidate}})
+	cparts, err := s.SplitFact("01JLEGACYCANDIDATE00000004", 1, []string{"Порт 4000.", "Путь /var."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range cparts {
+		if got, _ := s.Get(p.ID); got.Review != "" || got.Kind != "environment" || got.Scope != "host:builder" ||
+			got.Origin != "hermes 2026-10-20" {
+			t.Errorf("part of a legacy candidate %+v", got)
+		}
 	}
 }
 
-// SplitFact refuses a fact that changed since it was read, a retired fact and a candidate, and writes nothing then.
+// SplitFact refuses a fact that changed since it was read and a retired fact, and writes nothing then.
 func TestSplitFactRefuses(t *testing.T) {
 	s, _ := open(t)
 	parts := []string{"Порт 3000.", "Путь /srv."}
@@ -1306,12 +1268,8 @@ func TestSplitFactRefuses(t *testing.T) {
 	if _, err := s.SplitFact(gone.ID, 2, parts); !errors.Is(err, ErrRetired) {
 		t.Errorf("a retired fact: %v", err)
 	}
-	cand, _ := s.AddWith("Кандидат про порт 3000 и путь /srv.", nil, "", "", Meta{Review: Candidate})
-	if _, err := s.SplitFact(cand.ID, 1, parts); !errors.Is(err, ErrAlreadyCandidate) {
-		t.Errorf("a candidate: %v", err)
-	}
 	rows, err := s.Rows()
-	if err != nil || len(rows) != 5 {
+	if err != nil || len(rows) != 4 {
 		t.Errorf("a refused split wrote to the base: %d rows %v", len(rows), err)
 	}
 }
@@ -1483,8 +1441,8 @@ func TestCardFactsTakeEveryScopeOfTheProject(t *testing.T) {
 	}
 }
 
-// RepoScopes names the repository scopes of the live facts, sorted and once each: a retired fact, a candidate and a
-// scope of another kind are not among them, and a provisional fact is.
+// RepoScopes names the repository scopes of the live facts, sorted and once each: a retired fact and a scope of another
+// kind are not among them, and a provisional fact and a candidate an older memcue left are (#514).
 func TestRepoScopes(t *testing.T) {
 	s, _ := open(t)
 	add := func(scope, review string) Fact {
@@ -1500,7 +1458,8 @@ func TestRepoScopes(t *testing.T) {
 	add("repo:example.com/a/zeta", "")
 	add("host:loffe", "")
 	add("global", "")
-	add("repo:example.com/a/candidate", Candidate)
+	legacyRows(t, s, Fact{ID: "01JLEGACYCANDIDATE00000005", Version: 1, Content: "legacy candidate",
+		Origin: "x 2026-10-26", Meta: Meta{Scope: "repo:example.com/a/candidate", Review: Candidate}})
 	retired := add("repo:example.com/a/retired", "")
 	if _, err := s.Retire(retired.ID); err != nil {
 		t.Fatal(err)
@@ -1510,14 +1469,15 @@ func TestRepoScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"repo:example.com/a/provisional", "repo:example.com/a/zeta", "repo:github.com/me/memcue"}
+	want := []string{"repo:example.com/a/candidate", "repo:example.com/a/provisional", "repo:example.com/a/zeta",
+		"repo:github.com/me/memcue"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
-// OriginTiers names the tiers of the live facts' origins, sorted and once each; a retired fact, a candidate and an
-// origin without a date are not among them (#459).
+// OriginTiers names the tiers of the live facts' origins, sorted and once each; a retired fact and an origin without a
+// date are not among them (#459), and a candidate an older memcue left is (#514).
 func TestOriginTiers(t *testing.T) {
 	s, _ := open(t)
 	add := func(origin, review string) Fact {
@@ -1532,7 +1492,8 @@ func TestOriginTiers(t *testing.T) {
 	add("widget-notes 2026-10-02", "")
 	add("_global 2026-10-03", "")
 	add("bare", "")
-	add("candidate-tier 2026-10-04", Candidate)
+	legacyRows(t, s, Fact{ID: "01JLEGACYCANDIDATE00000006", Version: 1, Content: "legacy candidate",
+		Origin: "candidate-tier 2026-10-04", Meta: Meta{Review: Candidate}})
 	retired := add("retired-tier 2026-10-05", "")
 	if _, err := s.Retire(retired.ID); err != nil {
 		t.Fatal(err)
@@ -1541,7 +1502,7 @@ func TestOriginTiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"_global", "widget-notes"}; !slices.Equal(got, want) {
+	if want := []string{"_global", "candidate-tier", "widget-notes"}; !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }

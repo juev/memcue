@@ -56,15 +56,15 @@ func TestCorrectKeepsTheFactWithoutExpansion(t *testing.T) {
 	}
 }
 
-// A candidate waits for the vet: the approval expands it, so correct makes no call.
-func TestCorrectCallsNoModelForACandidate(t *testing.T) {
+// A candidate an older memcue left is live (#514), so its correction is expanded like that of any fact.
+func TestCorrectExpandsALegacyCandidate(t *testing.T) {
 	env(t)
 	withAPI(t, "https://api.example.test")
 	calls := fakeExpandOnce(t, nil)
-	id := addFactForTest(t, "-candidate", "-origin", "x 2026-10-22", "Кандидат на проверке у vet.")
-	correctForTest(t, id, "Кандидат на проверке у vet, текст поправлен.")
-	if *calls != 0 {
-		t.Fatalf("calls %d, want none", *calls)
+	legacyCandidate(t, "01JLEGACYCMD00000000000003", "Кандидат на проверке у vet.", "environment", "", "tool")
+	correctForTest(t, "01JLEGACYCMD00000000000003", "Кандидат на проверке у vet, текст поправлен.")
+	if f := storedFact(t, "01JLEGACYCMD00000000000003"); *calls != 1 || f.Review != "" || len(f.Queries) == 0 {
+		t.Fatalf("calls %d, fact %+v", *calls, f)
 	}
 }
 

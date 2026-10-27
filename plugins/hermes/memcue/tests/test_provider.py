@@ -85,10 +85,6 @@ class ProviderTest(unittest.TestCase):
     def facts(self):
         return self.memcue("facts")
 
-    def pending(self):
-        """Facts that wait for review: what the mirror and the extraction write."""
-        return self.memcue("candidates")
-
     def memcue(self, *args):
         out = subprocess.run([BIN, *args], env=dict(os.environ, MEMCUE_FACTS=self.p._facts),
                              capture_output=True, text=True, check=True).stdout
@@ -177,10 +173,12 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(Path(self.p._facts).exists())
 
     def test_a_mirror_is_approved_at_the_write_and_searchable(self):
-        """A built-in memory note is mirrored as an approved fact with its own origin (#440): a candidate has no index
-        row, so the note would stay unsearchable until the next vet run, and the note is the user's own words."""
+        """A built-in memory note is mirrored as a live fact with its own origin (#440, #514): nothing waits for an
+        approval, and the note is the user's own words."""
         self.p.on_memory_write("add", "memory", "Проект demo: база PostgreSQL 18 слушает порт 55432.")
-        self.assertEqual(self.pending(), [])
+        listed = self.facts()
+        self.assertEqual(len(listed), 1)
+        self.assertIn("55432", listed[0])
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
         self.assertIn("55432", found["facts"][0]["content"])
         self.assertIn("hermes-memory", "\n".join(self.memcue("dump", self.p._facts)))
@@ -203,7 +201,7 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("55433", dump)
         self.assertIn(f"{fact_id} v2 active", "\n".join(self.memcue("dump", self.p._facts)))
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
-        self.assertEqual(self.pending(), [])
+        self.assertEqual(self.facts(), [])
 
     def test_replace_of_a_retired_mirror_adds_a_new_fact(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
@@ -247,7 +245,7 @@ class ProviderTest(unittest.TestCase):
 
         # The memory entry still says old, so a later remove reaches the fact through the kept mapping.
         self.p.on_memory_write("remove", "memory", "", {"previous_content": old})
-        self.assertEqual(self.pending(), [])
+        self.assertEqual(self.facts(), [])
         self.assertEqual(self.written(), {})
 
     def test_failed_remove_keeps_the_mapping(self):

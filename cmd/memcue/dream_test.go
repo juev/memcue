@@ -26,6 +26,12 @@ func fakeDream(t *testing.T, answer func(groups string) []extract.Action) *[]str
 	return &calls
 }
 
+// provisionalID names the provisional fact of an older base the dream tests write with legacyRow.
+const provisionalID = "01JDREAMPROVISIONAL0000001"
+
+// future is a day a month from now: an expiry that has not passed.
+func future() string { return time.Now().AddDate(0, 1, 0).Format(time.DateOnly) }
+
 // dreamBase stores an old fact and two later copies of the nightly-sync fact from two sessions, plus an unrelated one.
 // b is written a few milliseconds before a, so its id is the smaller one: a dream keeps b and retires a.
 func dreamBase(t *testing.T) (old, a, b, other string) {
@@ -93,9 +99,12 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	}
 }
 
-// A provisional fact is recalled as a neighbour, so it must enter the group with its own data, not as a zero fact.
+// A provisional fact of an older base is an active fact like any other (#514), so it enters the group with its own
+// data, not as a zero fact.
 func TestDreamGroupKeepsAProvisionalNeighbour(t *testing.T) {
 	env(t)
+	legacyRow(t, provisionalID, "Postgres демо-базы на db1 держит порт 5432.", "environment", "host:db1", "tool",
+		store.Provisional, future())
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
@@ -105,14 +114,12 @@ func TestDreamGroupKeepsAProvisionalNeighbour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provisional, err := s.AddWith("Postgres демо-базы на db1 держит порт 5432.", []string{"postgres", "порт"},
-		"x 2026-10-19", "2026-12-01", store.Meta{Review: store.Provisional, Kind: "environment", Scope: "host:db1",
-			Source: "tool", Evidence: "port 5432"})
-	if err != nil {
-		t.Fatal(err)
+	provisional, err := s.Get(provisionalID)
+	if err != nil || provisional.Review != store.Provisional {
+		t.Fatalf("legacy row %+v %v", provisional, err)
 	}
 	active, err := s.Active()
-	if err != nil || len(active) != 1 {
+	if err != nil || len(active) != 2 {
 		t.Fatalf("active %+v %v", active, err)
 	}
 	groups, err := groupFacts(s, active, active)
@@ -135,17 +142,13 @@ func TestDreamGroupKeepsAProvisionalNeighbour(t *testing.T) {
 // The list view must not print an empty entry for a provisional neighbour either.
 func TestDreamListShowsAProvisionalNeighbour(t *testing.T) {
 	env(t)
+	legacyRow(t, provisionalID, "Postgres демо-базы на db1 держит порт 5432.", "environment", "host:db1", "tool",
+		store.Provisional, future())
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
 	}
 	approved, err := s.AddWith("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"}, "x 2026-10-19", "", store.Meta{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	provisional, err := s.AddWith("Postgres демо-базы на db1 держит порт 5432.", []string{"postgres", "порт"},
-		"x 2026-10-19", "2026-12-01", store.Meta{Review: store.Provisional, Kind: "environment", Scope: "host:db1",
-			Source: "tool", Evidence: "port 5432"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +158,7 @@ func TestDreamListShowsAProvisionalNeighbour(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := out.String()
-	if !strings.Contains(text, approved.ID) || !strings.Contains(text, provisional.ID) {
+	if !strings.Contains(text, approved.ID) || !strings.Contains(text, provisionalID) {
 		t.Fatalf("group misses a fact:\n%s", text)
 	}
 	if strings.Contains(text, "- id  (origin") {
@@ -606,14 +609,15 @@ func TestDreamSeenFile(t *testing.T) {
 	}
 }
 
-// A clean plan whose group holds a provisional neighbour applies: the staleness check must see the provisional fact,
-// which store.Active leaves out, or the whole group is refused without any change since the packet.
+// A clean plan whose group holds a provisional neighbour of an older base applies: the staleness check must see the
+// provisional fact, or the whole group is refused without any change since the packet.
 func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 	dir := env(t)
 	state := filepath.Join(dir, "state", "memcue")
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	legacyRow(t, provisionalID, "Демо-база Postgres на db1 слушает порт 5432.", "", "", "", store.Provisional, "")
 	s, err := store.Open(factsPath())
 	if err != nil {
 		t.Fatal(err)
@@ -623,8 +627,7 @@ func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prov, err := s.AddWith("Демо-база Postgres на db1 слушает порт 5432.", []string{"postgres", "порт"},
-		"x 2026-10-19", "", store.Meta{Review: store.Provisional})
+	prov, err := s.Get(provisionalID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -226,6 +226,54 @@ both it and the bare array of an older binary.
 
 ## Upgrade
 
+### Unreleased: no fact waits for approval; schema 6 (#514)
+
+- **Breaking: no fact waits for approval.** `memcue add -candidate`, `memcue candidates` and `memcue approve` are
+  removed: `add` rejects the flag, and the two commands exit 1 and say why. A fact written with `add`, `memcue_add` or
+  a Hermes memory mirror, and every fact `import` stores, goes into the search index in the same transaction. A
+  search returns it only when it fits the search: see [Use](#use) for the places a search reads, the shelves, expiry
+  and the `-n` limit.
+- **Breaking: `import` ignores `"review"`.** A record with `"review": true`, or an older file whose facts carry a kind,
+  no longer makes candidates: the facts are stored live with their kind, scope, source, evidence and prompt version.
+  `migrate -dry-run` still writes `"review": false`, so an older memcue imports its output as live facts too.
+- **Candidates and provisional facts already in a base are live.** A fact whose latest version is active is indexed,
+  listed by `memcue facts` and read by the dream, whatever its review state. Its rows are not rewritten: it keeps its
+  versions, origin, kind, scope, source, evidence and expiry, and `memcue dump` still shows `review=candidate` or
+  `review=provisional`. The session card takes it on the same terms as any fact (see [Use](#use)). The next version
+  memcue writes for it (`correct`, `reopen`, a dream, a split) drops the state and keeps the expiry; `correct
+  -no-expires` clears the expiry as for any fact. Recall still ranks a row that is provisional after the approved ones.
+- **The upgrade brings back nothing retired or expired.** It writes no fact row, so a fact whose latest version is
+  retired stays retired until `memcue reopen ID`. A candidate or provisional fact past its expiry is handled as any
+  expired fact, whatever its review state and before or after a `correct`: search, recall and the card leave it out;
+  `search -expired` finds it within the scope the search reads (`-in`, see [Use](#use)); `memcue facts` lists it. The
+  dream reads it as it reads an expired approved fact: the packet may ask to split it, expand its queries or translate
+  it, but it never joins a group as another fact's neighbour, because the dream finds neighbours by recall.
+- **The merge is unchanged: the latest version wins.** When two machines change a fact apart, the merge keeps the
+  versions of both and the one created last is current, whatever the review state. So a retire on one machine and a
+  correction on another resolve by their times: a correction created after the retire brings the fact back, active
+  and searchable, with the correction's text; one created before it leaves the fact retired. A correction written by
+  0.20.0 or older may keep `review=candidate` or `review=provisional`; the new memcue indexes that active fact all the
+  same, and `memcue dump` shows the state. Both stay in the history,
+  and `memcue retire ID` or `memcue reopen ID` settles it again. A retire carries the text its machine saw, so a
+  reopen after such a merge brings that text back, not the correction. This is how a merge resolved any two
+  concurrent changes before #514 too; a merged-in correction of a fact retired elsewhere is the one way a retired fact
+  comes back without a reopen.
+- **Breaking: the schema is 6.** Opening a version-5 base rebuilds the search index once and writes no fact row. memcue
+  0.20.0 and older refuse a version-6 base with `fact base has schema 6, this memcue knows 5: update memcue`, for
+  every command, `memcue dump` (the git textconv) and the merge driver included.
+- **Upgrade with no older memcue running.** A memcue 0.20.0 process that opened the base before the upgrade keeps
+  working on it: its searches still leave the candidates out, and its index rebuild takes them out of the shared index.
+  The next open by the new memcue notices this and rebuilds the index, but a process of the new memcue that is already
+  open searches the damaged index until then. On every machine that shares the base:
+  1. Stop what runs memcue: the Hermes gateway, cron jobs and running dreams, and agent sessions.
+  2. Check that no process has the base open: `fuser -v ~/.claude/memory/facts.db` (or `lsof` on macOS) prints nothing.
+  3. Copy the base outside the synced directory: `cp ~/.claude/memory/facts.db ~/facts.db.pre-schema-6`. Use the path
+     of `MEMCUE_FACTS` if it is set.
+  4. Install the new binary and the plugins of the same release, then start the services again.
+- **Rollback is the backup.** No in-place downgrade is provided or tested. To go back, stop memcue as above, install
+  0.20.0 and put `facts.db.pre-schema-6` back on every machine. Every fact written or changed since the copy is lost,
+  and candidates are hidden again. Before restoring, save what to keep with `memcue facts` or `memcue dump`.
+
 ### 0.20.0: add writes procedure and event facts (#505)
 
 - `memcue add -kind procedure` stores steps the user asked to remember; `search -kind procedure` finds them. Until now
@@ -245,7 +293,8 @@ both it and the bare array of an older binary.
 - **Breaking: `memcue vet` and `memcue extract` are removed**, and `MEMCUE_EXTRACT`, `MEMCUE_VET`, `MEMCUE_VET_POLICY`
   and `MEMCUE_VET_TTL_DAYS` are no longer read. `hook-extract`, `extract-session` and `extract-messages` stay as
   commands that read their input and exit 0, so an older plugin logs no failure. Candidates the extraction left wait
-  for `memcue approve` or `memcue retire`; a provisional fact is found until its expiry.
+  for `memcue approve` or `memcue retire`; a provisional fact is found until its expiry. #514 later removed the
+  approval: those candidates are live unless retired or expired.
 - **Turn the host's built-in memory off yourself**: `"autoMemoryEnabled": false` in Claude Code's settings, and
   `memory.memory_enabled: false` and `memory.user_profile_enabled: false` in Hermes's config. memcue does not change
   them; it says so while they are on, and a Hermes note file the memory no longer injects stops filtering the card
@@ -497,6 +546,7 @@ both it and the bare array of an older binary.
 - Recall uses the words alone unless `MEMCUE_RERANK=judge` asks for Jev (#331): a configured Jev endpoint no longer
   turns the judge on. A setup that relied on that needs `MEMCUE_RERANK=judge`.
 - `memcue review`, the local review page, is removed (#325); `memcue candidates`, `approve`, `retire` and `vet` stay.
+  #494 later removed `vet`, and #514 `candidates` and `approve`.
 - `MEMCUE_RERANK=local` is gone with the tree reader (#324) and now keeps the words.
 - Run the project-key migration below once on every machine that writes to the base.
 
@@ -558,9 +608,13 @@ stems, which keep the word of a versioned name such as `PostgreSQL-16`.
 ## Use
 
 Nothing to do in a session: the agent searches the base when it needs to and stores what it learns. A fact written
-with `memcue add` is active at once. `add -candidate`, and `import` for a file that asks for review, store a
-**candidate** instead: search finds it only after `memcue approve ID` (`memcue retire ID` rejects one). An explicit
-`correct` of an approved fact writes a new active version. By hand (`add` without `-origin` names the project of the working directory and
+with `memcue add` or stored by `memcue import` is indexed at once; nothing waits for approval (see
+[Candidates](#candidates)). A search returns it when it fits: by default a search in a repository reads that
+repository's, this host's and the global facts, and one outside a repository reads every fact; a shelf is read only
+by a search that names it; an expired fact only with `-expired`; and at most `-n` facts (5 by default) above the
+`-min-score` floor come back. The session card carries a fact only if it is active and unexpired, a global `rule`, or
+a `rule` or `decision` scoped to the session's repository, and its source is not `memory`; it fits the card budget
+(`MEMCUE_CARD_BUDGET`). `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs:
@@ -577,9 +631,7 @@ memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue retire ID                     # no longer recalled; history keeps it
-memcue reopen ID                     # undo a retire: back as it was before, approved or waiting for review
-memcue candidates                    # facts waiting for approval, newest first (-json for a JSON array)
-memcue approve ID [ID ...]           # take candidates into recall
+memcue reopen ID                     # undo a retire: the fact is searchable again
 memcue facts                         # every active fact, with expires= when it has one
 memcue notes                         # which entries of the built-in memory note files are already facts
 memcue reindex -dry-run              # index rows against the live facts, and how many lack their number term
@@ -824,13 +876,16 @@ Measured while building memcue; details and method in [docs/evaluation.md](docs/
 
 ## Candidates
 
-A candidate is stored and listed by `memcue candidates`, but search ignores it until `memcue approve ID...` takes it
-in; `memcue retire ID` rejects one. `add -candidate` writes one, and so does `import` for a file that asks for review.
-A fact written by `memcue add` is active at once, and an explicit `correct` of an approved fact writes a new active
-version. A retired fact cannot be corrected: retirement is final, so a changed fact is added as a new fact, and
-`memcue reopen ID` is the way back from a rejection. The local review page (`memcue review`) is removed (#325): its
-template alone cost 2.3 MB of the binary. The automatic review, `memcue vet`, is removed with the extraction it
-reviewed (#494); a provisional fact it left in a base is still found after the approved ones until its expiry.
+There are none any more (#514). The model decides what is worth storing: a fact written with `memcue add`,
+`memcue_add` or a Hermes memory mirror, and every fact `memcue import` stores, is indexed at once and found by a search
+it fits (see [Use](#use)). `memcue retire ID` takes a fact out, and `memcue correct ID TEXT` writes a new version. A
+retired fact cannot be corrected: retirement is final, so a changed fact is added as a new fact, and `memcue reopen
+ID` is the way back.
+
+A base written by memcue 0.20.0 or older may hold candidates, facts that waited for `memcue approve`, and provisional
+facts the removed `memcue vet` left with an expiry. From schema 6 an active one is live as it is, its rows unchanged;
+a retired one stays retired, and an expired one is handled as any expired fact (see [Upgrade](#upgrade)).
+The local review page (`memcue review`) went in #325, `vet` in #494, `candidates` and `approve` in #514.
 
 ## Harness support
 

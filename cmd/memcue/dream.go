@@ -772,9 +772,8 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 			return rec, err
 		}
 	}
-	// The snapshot must name every fact of the plan, including provisional and retired ones: store.Active leaves
-	// provisional facts out, and a group with a provisional neighbour would otherwise look changed and be refused
-	// although nothing happened since the packet.
+	// The snapshot must name every fact of the plan, including retired ones, read one by one: a group whose fact is
+	// missing from the snapshot would look changed and be refused although nothing happened since the packet.
 	now := make(map[string]int)
 	for _, g := range plan.Groups {
 		for id := range g.Facts {
@@ -1011,13 +1010,8 @@ func (g *grouper) add(s *store.Store, f store.Fact) error {
 		return err
 	}
 	for _, h := range hits {
-		// Recall returns provisional facts too: they are indexed and active, but store.Active leaves them out.
-		// Take the hit's own fact, so a provisional neighbour is a real group member rather than a zero fact.
 		if _, ok := g.byID[h.ID]; !ok {
-			if h.Review != store.Provisional {
-				continue
-			}
-			g.byID[h.ID] = h.Fact
+			continue
 		}
 		g.union(f.ID, h.ID)
 	}
