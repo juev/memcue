@@ -1,0 +1,85 @@
+{
+ "arm": "hm-cand",
+ "scenario": "C4",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 14.3,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Brindle consumer falls behind lag",
+    "in": "shelf:research"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q8ES9F75M595NYD346PX\", \"content\": \"Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\", \"keywords\": [\"Brindle\", \"unacknowledged\", \"max_unacked\", \"flow control\", \"drop\", \"ordering\", \"очередь\"], \"origin\": \"example.com/acme/tandem 2026-09-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-27T17:49:54Z\"}]}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "ls -R ./sources; grep -ril brindle ./sources"
+   },
+   "result": "./sources:\nbrindle-docs-3.2.md\nforum-thread.md\nquarrel-docs-1.4.md\nquarrel-vendor-benchmark.md\n./sources/brindle-docs-3.2.md\n./sources/forum-thread.md\n./sources/quarrel-vendor-benchmark.md"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd sources; cat brindle-docs-3.2.md; echo ----; cat forum-thread.md; echo ----; grep -i -n brindle quarrel-vendor-benchmark.md"
+   },
+   "result": "# Brindle 3.2 documentation\n\nBrindle is an embeddable message-queue library for Go and Rust services.\n\n## Ordering\n\nMessages are delivered in the order they were published within one queue. The guarantee holds per queue, across all\nconsumers of that queue, as long as the queue has a single writer.\n\n## Flow control\n\nEach consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nthe oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nconsumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nif a drop is not acceptable.\n\n## Persistence\n\nQueues are kept in memory and written to a write-ahead log every 200 ms by default (`wal_interval`).\n----\n# Forum thread: \"Brindle or Quarrel?\"\n\n**user anon_4411:** Just use Quarrel. It never loses a message and it's ordered, trust me, we run it everywhere.\n\n**user mkv:** Any numbers or docs for that?\n\n**user anon_4411:** no, just experience.\n----\n1:# \"Quarrel is 3x faster than Brindle\" — Quarrel Inc. engineering blog\n3:We published 10 million 1 KB messages through Quarrel 1.4 and Brindle 3.2 on our own c7-metal test rig.\n4:Quarrel reached 3.1 million messages per second, Brindle 1.0 million.\n6:Method notes: one run per library, default settings, the Brindle WAL interval left at its default. The rig and the"
+  }
+ ],
+ "final": {
+  "result": "A Brindle consumer can hold at most 10,000 unacknowledged messages (Brindle 3.2 docs, \"Flow control\"). Once it falls further behind than that, Brindle **silently drops the oldest unacknowledged message** to make room for each new one.\n\n- Neither the publisher nor the consumer is told about the drop. The only sign is the `brindle_dropped_total` counter, so watch or alert on it.\n- To avoid drops, raise `max_unacked` (the maximum is 50,000) or add more consumers.\n\nThe forum thread and the Quarrel benchmark don't say anything about this. The note I had saved from an earlier reading matches the docs, so I didn't change it.",
+  "total_cost_usd": 0.0354326,
+  "duration_ms": 11761,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 2398,
+   "cache_read_input_tokens": 29223,
+   "output_tokens": 519
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q8BWPNEDHVR6A098F45E",
+  "O2": "01M5Z7Q8C6TYNBEQ3K868B1SEF",
+  "O3": "01M5Z7Q8CNH4WD6138HTNW7SDW",
+  "O4": "01M5Z7Q8D0DGS7B38084CTBGV7",
+  "O5": "01M5Z7Q8DQS4RSYYYCK54SR1AZ",
+  "O6": "01M5Z7Q8E43D26NDV2P64875E5",
+  "O7": "01M5Z7Q8EFEF0DCRA7DR66ZK9S",
+  "S1": "01M5Z7Q8ES9F75M595NYD346PX"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:54:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle consumer falls behind lag\",\"facts\":[\"01M5Z7Q8ES9F75M595NYD346PX\"],\"ms\":0.571}\n{\"time\":\"2026-10-27T17:54:04Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle consumer falls behind lag\",\"facts\":[\"01M5Z7Q8ES9F75M595NYD346PX\"],\"ms\":0.917}\n"
+}

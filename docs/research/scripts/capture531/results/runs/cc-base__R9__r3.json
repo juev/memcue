@@ -1,0 +1,80 @@
+{
+ "arm": "cc-base",
+ "scenario": "R9",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 16.7,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in all \"Quarrel benchmark\"; memcue search -in all \"research shelf Quarrel\"",
+    "description": "Search memory for Quarrel benchmark"
+   },
+   "result": "01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\n01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in all -min-score 0 \"Quarrel\"; memcue search -in all \"benchmark results\"; memcue search -in all \"бенчмарк Quarrel\"; memcue search -in all -expired \"Quarrel benchmark\"; memcue --help 2>&1 | head -40",
+    "description": "Broaden memory search for Quarrel"
+   },
+   "result": "01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\nNo stored facts match.\n2 facts on the shelf match: -in shelf:research\n01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\n01M5Z7Q87D6EKD16P6AH8PM6KY | Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\nusage: memcue <command>\n\ncommands:\n  session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)\n  session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]\n  search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT\n  add       store a fact, indexed at once: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT\n  correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT\n  retire    take a fact out of recall: memcue retire ID\n  reopen    bring a retired fact back as it was before the retire: memcue reopen ID\n  facts     list the active facts\n  reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]\n  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all] [-j N]\n  notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]\n  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]\n  import    store the facts of migrate -dry-run output: memcue import FILE.json...\n  merge     git merge driver: memcue merge BASE OURS THEIRS\n  dump      git textconv: memcue dump FILE\n  install   set up the git repository of the base for sync: memcue install [-repo DIR]\n  version   print the version: memcue version [-json] [-minimum X.Y.Z]\n\nenvironment:\n  MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)\n  MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base\n  MEMCUE_MODEL    model of migrate, dream -run and the search queries add asks for (default claude-opus-5-5)\n  MEMCUE_API_URL  OpenAI-compatible endpoint for those calls instead of claude -p (with MEMCUE_API_KEY); add asks\n                  for search queries only when it is set\n  MEMCUE_API_KEY  key for MEMCUE_API_URL\n  MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)\n  MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off\n  MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)\n  MEMCUE_CARD_BUDGET  most characters of the session card (default 3500); the oldest user-stated rule is\n                  dropped first\n  MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in\n                  the state directory)\n  MEMCUE_MEMORY_DIR  directory of the built-in memory notes memcue notes reads by default"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Quarrel benchmark\"; memcue search -in shelf:research -min-score 0 \"бенчмарк Quarrel\"",
+    "description": "Search research shelf for Quarrel"
+   },
+   "result": "01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8AQF8394DB6ZYDARA77 example.com/acme/telemetry 2026-03-20 | The Ostrich 0.9 benchmark (4.1x on text logs, March 2026) covered only text log files under 1 MB on one core; binary payloads and files over 1 MB were not tested. Source: project wiki, Ostrich benchmark.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference."
+  }
+ ],
+ "final": {
+  "result": "The research shelf has one fact about the Quarrel benchmark, recorded for the Tandem project on 2026-09-30:\n\n- **Claim:** Quarrel handles 3.1M messages/s and Brindle 1.0M messages/s.\n- **Caveats:** It was a single run with default settings, on the vendor's own private rig, and nobody has checked it independently.\n- **Source:** the Quarrel Inc. engineering blog.\n\nSo it's the vendor's own number and shouldn't be relied on as settled.",
+  "total_cost_usd": 0.07974520000000002,
+  "duration_ms": 12682,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 7321,
+   "cache_read_input_tokens": 41926,
+   "output_tokens": 638
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:32Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel benchmark\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.707}\n{\"time\":\"2026-10-27T17:59:32Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"research shelf Quarrel\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.76}\n{\"time\":\"2026-10-27T17:59:35Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.638}\n{\"time\":\"2026-10-27T17:59:35Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"benchmark results\",\"ms\":0.766}\n{\"time\":\"2026-10-27T17:59:35Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"бенчмарк Quarrel\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.985}\n{\"time\":\"2026-10-27T17:59:35Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel benchmark\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.974}\n{\"time\":\"2026-10-27T17:59:37Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel benchmark\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.547}\n{\"time\":\"2026-10-27T17:59:37Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"бенчмарк Quarrel\",\"facts\":[\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\",\"01M5Z7Q8A314MS161S5Z7R2N50\"],\"ms\":1.008}\n"
+}

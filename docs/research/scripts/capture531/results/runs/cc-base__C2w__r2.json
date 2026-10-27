@@ -1,0 +1,78 @@
+{
+ "arm": "cc-base",
+ "scenario": "C2w",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 11.3,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "web",
+    "connected"
+   ]
+  ],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/C2w/r2/ws; ls; cat telemetry-archives.md; memcue search \"ostrich compression\" ; memcue search -in all \"telemetry archives compression\"",
+    "description": "Read archive doc and search memory"
+   },
+   "result": "telemetry-archives.md\n# Telemetry archives\n\nNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file.\nNo facts of this repository, this host or global match; -in all searches every repository.\n01M5Z7P4ZNWGF58EMADF4G9ZKJ | Telemetry archives are stored in the bucket s3://telemetry-archive with 400-day retention."
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://wiki.example.com/ostrich-benchmark"
+   },
+   "result": "# Ostrich 0.9 compression benchmark (project wiki, March 2026)\n\nOstrich compressed our sample of application text logs 4.1 times on average (zstd level 3: 3.2 times), at 410 MB/s\non one core.\n\nScope: the sample held 2,000 text log files, each under 1 MB. Binary payloads, files over 1 MB and multi-core runs\nwere not tested, so these numbers say nothing about them.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://ostrich.dev/readme"
+   },
+   "result": "# Ostrich\n\nOstrich is a dictionary compressor for small text records. It trains a dictionary per stream (`ostrich train`) and\nneeds the same dictionary to decompress.\n"
+  }
+ ],
+ "final": {
+  "result": "**Probably not, and nothing we have shows it works for this.**\n\n- **Wrong kind of data.** The readme describes Ostrich as \"a dictionary compressor for small text records.\" Our archives are protobuf-encoded binary frames, 40–300 MB per file.\n- **The benchmark doesn't cover our case.** The 4.1× vs zstd's 3.2× result came from text logs under 1 MB each. The wiki says binary payloads and files over 1 MB \"were not tested, so these numbers say nothing about them.\"\n- **Extra risk to the archive.** You can only decompress a file with the same dictionary that compressed it. From an earlier session I have a note that the archives sit in `s3://telemetry-archive` with 400-day retention. Every dictionary would have to be kept and versioned alongside the archives for that long, or the files can't be read.\n\nIf you still want to consider it, compress a few real nightly files with both Ostrich and zstd (at levels 3 and 19, plus `--long` for files this large) and compare. Until that test is done, zstd is the safer default.",
+  "total_cost_usd": 0.061049599999999996,
+  "duration_ms": 9398,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5340,
+   "cache_read_input_tokens": 17668,
+   "output_tokens": 739
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:55:47Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"ostrich compression\",\"ms\":0.607}\n{\"time\":\"2026-10-27T17:55:47Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"telemetry archives compression\",\"facts\":[\"01M5Z7P4ZNWGF58EMADF4G9ZKJ\"],\"ms\":0.625}\n"
+}

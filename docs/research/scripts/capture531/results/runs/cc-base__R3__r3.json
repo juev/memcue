@@ -1,0 +1,72 @@
+{
+ "arm": "cc-base",
+ "scenario": "R3",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 11.0,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-base/R3/r3/ws; ls; cat telemetry-archives.md; memcue search \"Ostrich compression\"; memcue search -in all \"Ostrich\"",
+    "description": "Read doc and search memory for Ostrich"
+   },
+   "result": "telemetry-archives.md\n# Telemetry archives\n\nNightly archives of device telemetry: protobuf-encoded binary frames, 40-300 MB per file.\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in shelf:research \"Ostrich\"",
+    "description": "Search research shelf for Ostrich"
+   },
+   "result": "01M5Z7Q8AQF8394DB6ZYDARA77 example.com/acme/telemetry 2026-03-20 | The Ostrich 0.9 benchmark (4.1x on text logs, March 2026) covered only text log files under 1 MB on one core; binary payloads and files over 1 MB were not tested. Source: project wiki, Ostrich benchmark."
+  }
+ ],
+ "final": {
+  "result": "**Probably not, or at least we can't tell yet.** The earlier evaluation doesn't cover data like ours.\n\n- **What we tested before:** a memory note from the telemetry project (2026-03-20, from the project wiki) records that the Ostrich 0.9 benchmark got 4.1x compression. That was only on text log files under 1 MB, using one core.\n- **Our archives:** protobuf-encoded binary frames, 40–300 MB per file. Binary data and files over 1 MB were both left out of that benchmark.\n\nSo the 4.1x figure doesn't carry over. Binary protobuf usually compresses much less than text logs. Before deciding, I'd run Ostrich on a few real nightly archives and compare its compression ratio and speed, on more than one core, against zstd or xz.",
+  "total_cost_usd": 0.057805,
+  "duration_ms": 9250,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5089,
+   "cache_read_input_tokens": 28745,
+   "output_tokens": 566
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:58:12Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich compression\",\"ms\":0.472}\n{\"time\":\"2026-10-27T17:58:12Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich\",\"ms\":0.377}\n{\"time\":\"2026-10-27T17:58:14Z\",\"tier\":\"example.com/acme/telemetry\",\"host\":\"stand-host\",\"query\":\"Ostrich\",\"facts\":[\"01M5Z7Q8AQF8394DB6ZYDARA77\"],\"ms\":0.626}\n"
+}

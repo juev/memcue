@@ -1,0 +1,84 @@
+{
+ "arm": "cc-base",
+ "scenario": "C1w",
+ "rep": 12,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 23.9,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "web",
+    "connected"
+   ]
+  ],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://docs.brindle.dev/3.2"
+   },
+   "result": "# Brindle 3.2 documentation\n\nBrindle is an embeddable message-queue library for Go and Rust services.\n\n## Ordering\n\nMessages are delivered in the order they were published within one queue. The guarantee holds per queue, across all\nconsumers of that queue, as long as the queue has a single writer.\n\n## Flow control\n\nEach consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nthe oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nconsumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nif a drop is not acceptable.\n\n## Persistence\n\nQueues are kept in memory and written to a write-ahead log every 200 ms by default (`wal_interval`).\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://quarrel.io/docs/1.4"
+   },
+   "result": "# Quarrel 1.4 reference\n\nQuarrel is a partitioned message-queue library.\n\n## Delivery\n\nDelivery is at least once. A message that is not acknowledged within `ack_timeout` (30 s by default) is delivered\nagain, so consumers must be idempotent.\n\n## Ordering\n\nOrder is kept within a partition only. A queue is split into 64 partitions by default, and messages of one queue in\ndifferent partitions may be delivered in any order. Pin a key to a partition (`partition_key`) to keep the order of\nthe messages that share it.\n\n## Back-pressure\n\nA publisher blocks when the partition buffer is full; no message is dropped.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://quarrel.io/blog/3x-faster"
+   },
+   "result": "# \"Quarrel is 3x faster than Brindle\" — Quarrel Inc. engineering blog\n\nWe published 10 million 1 KB messages through Quarrel 1.4 and Brindle 3.2 on our own c7-metal test rig.\nQuarrel reached 3.1 million messages per second, Brindle 1.0 million.\n\nMethod notes: one run per library, default settings, the Brindle WAL interval left at its default. The rig and the\nharness are not public.\n"
+  },
+  {
+   "name": "mcp__web__web_fetch",
+   "input": {
+    "url": "https://forum.queues.example/t/4411"
+   },
+   "result": "# Forum thread: \"Brindle or Quarrel?\"\n\n**user anon_4411:** Just use Quarrel. It never loses a message and it's ordered, trust me, we run it everywhere.\n\n**user mkv:** Any numbers or docs for that?\n\n**user anon_4411:** no, just experience.\n"
+  }
+ ],
+ "final": {
+  "result": "**Quarrel fits better, with configuration. Brindle doesn't fit as documented.**\n\n**Brindle 3.2**\n- Ordering is per queue, but only if the queue has a single writer.\n- It silently drops the oldest unacked message when a consumer has more than 10,000 unacked. Neither the publisher nor the consumer is told, and the only trace is the `brindle_dropped_total` counter. That breaks \"never lose messages silently\". You could raise `max_unacked` to 50,000 and alert on the counter, but the drop behavior stays.\n- The WAL is flushed every 200 ms by default, so a crash could lose recent messages. The docs don't say what happens to them. You'd need to tune `wal_interval` and test it.\n\n**Quarrel 1.4**\n- Back-pressure blocks the publisher when the buffer is full, and nothing is dropped.\n- Delivery is at-least-once, so consumers must be idempotent because redelivery after `ack_timeout` produces duplicates.\n- Ordering holds only within a partition, and a queue defaults to 64 partitions. For strict per-queue order, use one partition per queue or pin a `partition_key`. That limits parallelism.\n- The docs don't say whether a redelivery can arrive out of order relative to later messages. Check that before you commit.\n\n**Sources to discount**\n- The \"3x faster\" post is vendor-run, with one run on a private rig and default settings. That includes Brindle's default WAL interval. It doesn't bear on your requirements.\n- The forum post is an anecdote with no evidence.\n\n**Recommendation:** Go with Quarrel, using pinned partition keys and idempotent consumers. Test redelivery ordering and crash durability before you commit. Per the repo's memory, Tandem keeps queue settings in `config/queue.toml`, so that's where `partition_key` and `ack_timeout` would go.",
+  "total_cost_usd": 0.0360861,
+  "duration_ms": 19170,
+  "num_turns": 5,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5719,
+   "cache_read_input_tokens": 17881,
+   "output_tokens": 1141
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [],
+ "search_log": ""
+}

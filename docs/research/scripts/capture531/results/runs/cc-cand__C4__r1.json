@@ -1,0 +1,68 @@
+{
+ "arm": "cc-cand",
+ "scenario": "C4",
+ "rep": 1,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 10.5,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-cand/C4/r1/ws; ls -R sources | head -50; memcue search -in shelf:research \"Brindle consumer lag falls behind\"; memcue search \"Brindle consumer\"",
+    "description": "List sources and search memory"
+   },
+   "result": "sources:\nbrindle-docs-3.2.md\nforum-thread.md\nquarrel-docs-1.4.md\nquarrel-vendor-benchmark.md\n01M5Z7Q8ES9F75M595NYD346PX example.com/acme/tandem 2026-09-30 | Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-cand/C4/r1/ws/sources; cat brindle-docs-3.2.md; grep -n -i brindle forum-thread.md",
+    "description": "Read Brindle docs and forum mentions"
+   },
+   "result": "# Brindle 3.2 documentation\n\nBrindle is an embeddable message-queue library for Go and Rust services.\n\n## Ordering\n\nMessages are delivered in the order they were published within one queue. The guarantee holds per queue, across all\nconsumers of that queue, as long as the queue has a single writer.\n\n## Flow control\n\nEach consumer may hold at most 10,000 unacknowledged messages. When a consumer falls further behind, Brindle drops\nthe oldest unacknowledged message to make room for the new one. The drop is not reported to the publisher or the\nconsumer; the only trace is the counter `brindle_dropped_total`. Raise `max_unacked` (up to 50,000) or add consumers\nif a drop is not acceptable.\n\n## Persistence\n\nQueues are kept in memory and written to a write-ahead log every 200 ms by default (`wal_interval`).\n1:# Forum thread: \"Brindle or Quarrel?\""
+  }
+ ],
+ "final": {
+  "result": "Brindle drops messages silently when a consumer falls behind (from `sources/brindle-docs-3.2.md`, \"Flow control\" section):\n\n- **Limit:** each consumer can hold at most 10,000 unacknowledged messages.\n- **What happens past it:** Brindle drops the oldest unacknowledged message to make room for the new one.\n- **No notice:** neither the publisher nor the consumer is told. The only sign is the `brindle_dropped_total` counter, so you need to monitor it.\n- **How to avoid it:** raise `max_unacked` (up to 50,000) or add more consumers.\n\nA note saved in memory from an earlier reading of the same docs says the same thing, so I didn't add a new one.",
+  "total_cost_usd": 0.06566159999999999,
+  "duration_ms": 8894,
+  "num_turns": 3,
+  "usage": {
+   "input_tokens": 6,
+   "cache_creation_input_tokens": 5960,
+   "cache_read_input_tokens": 29688,
+   "output_tokens": 601
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q8BWPNEDHVR6A098F45E",
+  "O2": "01M5Z7Q8C6TYNBEQ3K868B1SEF",
+  "O3": "01M5Z7Q8CNH4WD6138HTNW7SDW",
+  "O4": "01M5Z7Q8D0DGS7B38084CTBGV7",
+  "O5": "01M5Z7Q8DQS4RSYYYCK54SR1AZ",
+  "O6": "01M5Z7Q8E43D26NDV2P64875E5",
+  "O7": "01M5Z7Q8EFEF0DCRA7DR66ZK9S",
+  "S1": "01M5Z7Q8ES9F75M595NYD346PX"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:50:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle consumer lag falls behind\",\"facts\":[\"01M5Z7Q8ES9F75M595NYD346PX\"],\"ms\":0.935}\n{\"time\":\"2026-10-27T17:50:44Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle consumer\",\"ms\":0.667}\n"
+}

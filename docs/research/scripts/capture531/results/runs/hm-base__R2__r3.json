@@ -1,0 +1,107 @@
+{
+ "arm": "hm-base",
+ "scenario": "R2",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 23.2,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [
+   [
+    "memcue",
+    "connected"
+   ]
+  ],
+  "memcue_skill": false,
+  "memcue_tools": [
+   "mcp__memcue__memcue_add",
+   "mcp__memcue__memcue_correct",
+   "mcp__memcue__memcue_dream_apply",
+   "mcp__memcue__memcue_dream_prepare",
+   "mcp__memcue__memcue_retire",
+   "mcp__memcue__memcue_search"
+  ]
+ },
+ "hooks": {
+  "responses": 0,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Brindle Quarrel queue library ordering"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q87SYE7NH0SGJZ2CHVS1\", \"content\": \"Brindle consumer metrics of the Tandem project are on the Grafana dashboard 'tandem-queues'.\", \"keywords\": [\"Brindle\", \"metrics\", \"Grafana\", \"dashboard\", \"consumer\", \"метрики\"], \"scope\": \"service:grafana\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q87D6EKD16P6AH8PM6KY\", \"content\": \"Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\", \"keywords\": [\"Quarrel\", \"staging\", \"restart\", \"mq-02\", \"очередь\"], \"scope\": \"host:mq-02\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "git ls-files | head -50 && grep -ril -e brindle -e quarrel . --exclude-dir=.git | head"
+   },
+   "result": "README.md\ndata.csv"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cat README.md; head -20 data.csv"
+   },
+   "result": "# Tandem order pipeline\n\nServices that take orders from the shop front and pass them to fulfilment.\nid,name,score\n1,ann,10\n2,bob,7"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Tandem queue drops messages ordering pitfall decision",
+    "min_score": "0",
+    "limit": "10"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\", \"content\": \"Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\", \"keywords\": [\"queue\", \"config\", \"queue.toml\", \"настройки очереди\"], \"origin\": \"example.com/acme/tandem 2026-10-27\", \"scope\": \"repo:example.com/acme/tandem\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q87SYE7NH0SGJZ2CHVS1\", \"content\": \"Brindle consumer metrics of the Tandem project are on the Grafana dashboard 'tandem-queues'.\", \"keywords\": [\"Brindle\", \"metrics\", \"Grafana\", \"dashboard\", \"consumer\", \"метрики\"], \"scope\": \"service:grafana\", \"created\": \"2026-10-27T17:49:53Z\"}, {\"id\": \"01M5Z7Q87D6EKD16P6AH8PM6KY\", \"content\": \"Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\", \"keywords\": [\"Quarrel\", \"staging\", \"restart\", \"mq-02\", \"очередь\"], \"scope\": \"host:mq-02\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  },
+  {
+   "name": "mcp__memcue__memcue_search",
+   "input": {
+    "query": "Брindle Quarrel порядок сообщений потеря",
+    "min_score": "0",
+    "limit": "10",
+    "expired": "true"
+   },
+   "result": "{\"facts\": [{\"id\": \"01M5Z7Q87D6EKD16P6AH8PM6KY\", \"content\": \"Host mq-02 runs the Quarrel staging cluster of the Tandem project; it restarts nightly at 03:00 UTC.\", \"keywords\": [\"Quarrel\", \"staging\", \"restart\", \"mq-02\", \"очередь\"], \"scope\": \"host:mq-02\", \"created\": \"2026-10-27T17:49:53Z\"}]}"
+  }
+ ],
+ "final": {
+  "result": "I can't tell you which one to pick. Nothing I have says how Brindle or Quarrel handle message order or dropped messages.\n\n- **Memory:** I have two facts, and neither is about those guarantees. Brindle consumer metrics are on the Grafana dashboard `tandem-queues`. Quarrel's staging cluster runs on `mq-02` and restarts every night at 03:00 UTC. Queue settings are in `config/queue.toml`, but that file isn't in this workspace.\n- **Repo:** It has only `README.md` and `data.csv`, and neither mentions either library.\n\nI don't recognise either name as a well-known library, so I won't guess. To decide, check each library's docs or a small test for two things:\n1. **Strict order within one queue:** whether order still holds when there are several consumers, retries and redeliveries, or not only within a partition.\n2. **No silent loss:** whether messages are acknowledged and redelivered, or sent to a dead-letter queue when they fail, and whether messages are lost when the queue overflows or the broker restarts. Quarrel's nightly restart on `mq-02` is an easy place to test that.\n\nIf you send me the docs or tell me what you already know about them, I'll compare the two against your requirements.",
+  "total_cost_usd": 0.0502196,
+  "duration_ms": 20937,
+  "num_turns": 6,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 2780,
+   "cache_read_input_tokens": 39338,
+   "output_tokens": 1004
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:58:09Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue library ordering\",\"facts\":[\"01M5Z7Q87SYE7NH0SGJZ2CHVS1\",\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":1.037}\n{\"time\":\"2026-10-27T17:58:12Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Tandem queue drops messages ordering pitfall decision\",\"facts\":[\"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\",\"01M5Z7Q87SYE7NH0SGJZ2CHVS1\",\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.766}\n{\"time\":\"2026-10-27T17:58:15Z\",\"session\":\"emu\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Брindle Quarrel порядок сообщений потеря\",\"facts\":[\"01M5Z7Q87D6EKD16P6AH8PM6KY\"],\"ms\":0.631}\n"
+}

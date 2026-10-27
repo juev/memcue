@@ -1,0 +1,60 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R2chain",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 12.7,
+ "chain_from": "C1w",
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Brindle Quarrel queue\"; memcue search -in shelf:research \"Brindle Quarrel ordering drop messages\"; memcue search -in shelf:research \"Brindle\"; memcue search -in shelf:research \"Quarrel\"; ls -R | head -50; cat config/queue.toml 2>/dev/null",
+    "description": "Search memory and research shelf, list repo"
+   },
+   "result": "Exit code 1\n01M5Z7P4Z1M04C6GQ40CWKYMYB example.com/acme/tandem 2026-10-27 | Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\n01M5Z81NVW1G95HSRFJTSBP3S5 example.com/acme/tandem 2026-10-27 | Quarrel 1.4 blocks the publisher when a partition buffer is full; no message is dropped. Source: quarrel.io/docs/1.4.\n01M5Z81NTNKKPYRVT8YW8EYJQW example.com/acme/tandem 2026-10-27 | Brindle 3.2 silently drops the oldest unacknowledged message when a consumer exceeds max_unacked (default 10,000, max 50,000); not reported to publisher or consumer, only counter brindle_dropped_total. Source: docs.brindle.dev/3.2.\n01M5Z81NTCFTAM3PJ2TC2M9EY2 example.com/acme/tandem 2026-10-27 | Brindle 3.2 delivers messages in publish order per queue, across all consumers, only while the queue has a single writer. Source: docs.brindle.dev/3.2.\n01M5Z81NVKPNM1N2ES21KTC49K example.com/acme/tandem 2026-10-27 | Quarrel 1.4 orders only within a partition; a queue has 64 partitions by default, so cross-partition order is not kept; partition_key pins a key to one partition. Source: quarrel.io/docs/1.4.\n01M5Z81NTZY01BEC0ZDSTQAA27 example.com/acme/tandem 2026-10-27 | Brindle 3.2 keeps queues in memory and writes a WAL every 200 ms by default (wal_interval). Source: docs.brindle.dev/3.2.\n01M5Z81NTNKKPYRVT8YW8EYJQW example.com/acme/tandem 2026-10-27 | Brindle 3.2 silently drops the oldest unacknowledged message when a consumer exceeds max_unacked (default 10,000, max 50,000); not reported to publisher or consumer, only counter brindle_dropped_total. Source: docs.brindle.dev/3.2.\n01M5Z81NTCFTAM3PJ2TC2M9EY2 example.com/acme/tandem 2026-10-27 | Brindle 3.2 delivers messages in publish order per queue, across all consumers, only while the queue has a single writer. Source: docs.brindle.dev/3.2.\n01M5Z81NW55YYE2DYEND6R1VMG example.com/acme/tandem 2026-10-27 | Vendor claim (Quarrel Inc. blog): Quarrel 1.4 3.1M msg/s vs Brindle 3.2 1.0M msg/s, 10M 1KB messages; one run each, default settings, non-public rig and harness. Source: quarrel.io/blog/3x-faster.\n01M5Z81NVW1G95HSRFJTSBP3S5 example.com/acme/tandem 2026-10-27 | Quarrel 1.4 blocks the publisher when a partition buffer is full; no message is dropped. Source: quarrel.io/docs/1.4.\n01M5Z81NW55YYE2DYEND6R1VMG example.com/acme/tandem 2026-10-27 | Vendor claim (Quarrel Inc. blog): Quarrel 1.4 3.1M msg/s vs Brindle 3.2 1.0M msg/s, 10M 1KB messages; one run each, default settings, non-public rig and harness. Source: quarrel.io/blog/3x-faster.\n01M5Z81NV92FEC5PHFQ4BN3J6G example.com/acme/tandem 2026-10-27 | Quarrel 1.4 is at-least-once: unacked messages are redelivered after ack_timeout (30 s default); consumers must be idempotent. Source: quarrel.io/docs/1.4.\n01M5Z81NVKPNM1N2ES21KTC49K example.com/acme/tandem 2026-10-27 | Quarrel 1.4 orders only within a partition; a queue has 64 partitions by default, so cross-partition order is not kept; partition_key pins a key to one partition. Source: quarrel.io/docs/1.4.\n.:\nREADME.md\ndata.csv"
+  }
+ ],
+ "final": {
+  "result": "I'd go with **Quarrel**. This comes from notes saved when the Brindle 3.2 and Quarrel 1.4 docs were read earlier; I haven't re-checked the docs myself.\n\n- **Brindle fails the no-silent-drops rule.** If a consumer has more than `max_unacked` messages waiting for acknowledgement (10,000 by default, 50,000 at most), Brindle throws away the oldest one. Neither the sender nor the receiver is told. The only trace is the `brindle_dropped_total` counter. It also keeps strict order only while each queue has a single writer.\n- **Quarrel never drops.** When its buffer is full, it makes the sender wait instead.\n\nThings to set up with Quarrel:\n- **Ordering:** Quarrel keeps order only within a partition, and a queue has 64 partitions by default. For strict order across a whole queue, set it to 1 partition. If order only matters within each order, use `partition_key` = order ID.\n- **Duplicates:** a message that isn't acknowledged within 30 seconds is sent again, so order consumers must handle the same message twice safely.\n- **Senders can stall:** when the buffer fills, senders wait, so watch for that.\n\nQuarrel's claim of being 3× faster comes from its own blog post (one run, test setup not published), so it shouldn't weigh on the choice.",
+  "total_cost_usd": 0.0736556,
+  "duration_ms": 10924,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 6733,
+   "cache_read_input_tokens": 17878,
+   "output_tokens": 810
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7P4XHXFRQJMK4FWV32NGR",
+  "O2": "01M5Z7P4XX8667X1N1RPK772G6",
+  "O3": "01M5Z7P4Y6EJQMSSCF4SRZVYA9",
+  "O4": "01M5Z7P4YEWKHWTMTZV18VTYVT",
+  "O5": "01M5Z7P4Z1M04C6GQ40CWKYMYB",
+  "O6": "01M5Z7P4ZC6PWF33H7QC216WQ8",
+  "O7": "01M5Z7P4ZNWGF58EMADF4G9ZKJ"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T18:03:28Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue\",\"facts\":[\"01M5Z7P4Z1M04C6GQ40CWKYMYB\"],\"ms\":0.794}\n{\"time\":\"2026-10-27T18:03:28Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel ordering drop messages\",\"facts\":[\"01M5Z81NVW1G95HSRFJTSBP3S5\",\"01M5Z81NTNKKPYRVT8YW8EYJQW\",\"01M5Z81NTCFTAM3PJ2TC2M9EY2\",\"01M5Z81NVKPNM1N2ES21KTC49K\"],\"ms\":0.775}\n{\"time\":\"2026-10-27T18:03:28Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle\",\"facts\":[\"01M5Z81NTZY01BEC0ZDSTQAA27\",\"01M5Z81NTNKKPYRVT8YW8EYJQW\",\"01M5Z81NTCFTAM3PJ2TC2M9EY2\",\"01M5Z81NW55YYE2DYEND6R1VMG\"],\"ms\":0.695}\n{\"time\":\"2026-10-27T18:03:28Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Quarrel\",\"facts\":[\"01M5Z81NVW1G95HSRFJTSBP3S5\",\"01M5Z81NW55YYE2DYEND6R1VMG\",\"01M5Z81NV92FEC5PHFQ4BN3J6G\",\"01M5Z81NVKPNM1N2ES21KTC49K\"],\"ms\":0.511}\n"
+}

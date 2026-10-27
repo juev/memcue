@@ -1,0 +1,80 @@
+{
+ "arm": "cc-base",
+ "scenario": "R8",
+ "rep": 3,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 19.8,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 3,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Larkspur HTTP/3\"; memcue search -in all \"Larkspur HTTP/3 QUIC\"",
+    "description": "Search memory for Larkspur HTTP/3 research"
+   },
+   "result": "01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search -in all -min-score 0 \"Larkspur QUIC\"; memcue search -in all \"Larkspur HTTP3 поддержка\"; memcue search -in all -expired \"Larkspur HTTP/3\"",
+    "description": "Search memory with synonyms and expired facts"
+   },
+   "result": "01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "ls && grep -rniE \"http/?3|quic\" . --exclude-dir=.git | head",
+    "description": "Check repository for HTTP/3 mentions"
+   },
+   "result": "go.mod\nmain.go"
+  }
+ ],
+ "final": {
+  "result": "I couldn't find any record of that research. I searched memory several ways (HTTP/3, QUIC, Russian wording, every repository, expired facts too) and found nothing about Larkspur and HTTP/3. The only Larkspur fact stored is unrelated: its HTTP client's connection pool ignores `HTTP_PROXY`, so you have to set `Client{Proxy: ...}` explicitly. This repo (`go.mod`, `main.go`) doesn't mention HTTP/3 or QUIC either.\n\nIf you remember what you found, or point me to the notes, I can save it to memory.",
+  "total_cost_usd": 0.0644992,
+  "duration_ms": 17899,
+  "num_turns": 4,
+  "usage": {
+   "input_tokens": 8,
+   "cache_creation_input_tokens": 5390,
+   "cache_read_input_tokens": 40336,
+   "output_tokens": 664
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:59:16Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.577}\n{\"time\":\"2026-10-27T17:59:16Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 QUIC\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.625}\n{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur QUIC\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.727}\n{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP3 поддержка\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.607}\n{\"time\":\"2026-10-27T17:59:20Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.584}\n"
+}

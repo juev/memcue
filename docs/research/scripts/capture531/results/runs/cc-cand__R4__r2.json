@@ -1,0 +1,98 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R4",
+ "rep": 2,
+ "model": "opus",
+ "exit": 0,
+ "wall_s": 17.1,
+ "init": {
+  "model": "claude-opus-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-cand/R4/r2/ws; git ls-files | head -50; memcue search \"Larkspur HTTP/3\"; memcue search -in shelf:research \"Larkspur HTTP/3 QUIC\"",
+    "description": "List repo files and search memory for Larkspur"
+   },
+   "result": "go.mod\nsources/CHANGELOG.md\n01M5Z7Q8956GD5J189S633ZDYT | The Larkspur HTTP client's connection pool ignores HTTP_PROXY; set Client{Proxy: ...} explicitly.\n01M5Z7Q8B3TD7YTYEGBQVJCFD9 example.com/acme/edgeproxy 2025-10-05 | Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02)."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "cd <STAND>/runs/cc-cand/R4/r2/ws; cat go.mod; cat sources/CHANGELOG.md",
+    "description": "Show go.mod and the Larkspur changelog"
+   },
+   "result": "module example.com/edgeproxy\n\ngo 1.27\n\nrequire example.com/larkspur v2.0.1\n# Larkspur changelog\n\n## 2.0.0 (2026-08-14)\n\n- Added HTTP/3 support. It is experimental and off by default; enable it with the `--h3` flag or `Client{H3: true}`.\n- Dropped Go 1.25.\n\n## 1.8.0 (2025-10-02)\n\n- HTTP/2 server push removed.\n- HTTP/3 is not supported."
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue correct --help 2>&1 | head -30",
+    "description": "Show memcue correct usage"
+   },
+   "result": "Usage of correct:\n  -expires string\n    \tnew last day the fact is worth recalling, YYYY-MM-DD; empty keeps the current one\n  -force\n    \tstore it even when it looks like a secret\n  -keywords string\n    \tcomma-separated; empty keeps the current ones\n  -no-expires\n    \tdrop the expiry: the fact is recalled from now on without end\nmemcue: flag: help requested"
+  },
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue correct -keywords \"Larkspur,HTTP/3,h3,QUIC\" 01M5Z7Q8B3TD7YTYEGBQVJCFD9 -- \"Larkspur 2.0.0 added HTTP/3 support, experimental and off by default; enable with the --h3 flag or Client{H3: true}. Larkspur 1.8 did not support HTTP/3. Source: Larkspur changelog 2.0.0 (2026-08-14).\" 2>&1",
+    "description": "Update outdated Larkspur HTTP/3 research fact"
+   },
+   "result": "01M5Z7Q8B3TD7YTYEGBQVJCFD9 v2"
+  }
+ ],
+ "final": {
+  "result": "Yes. The proxy's `go.mod` requires `example.com/larkspur v2.0.1`, and the changelog says HTTP/3 support was added in 2.0.0 (`sources/CHANGELOG.md`).\n\n- **It's experimental and off by default.** Turn it on with the `--h3` flag or `Client{H3: true}`.\n- **No code turns it on yet.** This repo has only `go.mod` and the changelog, so nothing enables it today.\n- **It needs Go 1.26 or later.** 2.0.0 dropped Go 1.25; the module already declares `go 1.27`.\n\nMy notes from an earlier session said Larkspur doesn't support HTTP/3. That was true for 1.8 and is out of date now, so I've updated the note.",
+  "total_cost_usd": 0.08089479999999999,
+  "duration_ms": 15479,
+  "num_turns": 5,
+  "usage": {
+   "input_tokens": 10,
+   "cache_creation_input_tokens": 6177,
+   "cache_read_input_tokens": 53894,
+   "output_tokens": 1033
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [
+  {
+   "change": "changed",
+   "id": "01M5Z7Q8B3TD7YTYEGBQVJCFD9",
+   "status": "active",
+   "version": 2,
+   "before": "Larkspur 1.8 does not support HTTP/3. Source: Larkspur changelog 1.8.0 (2025-10-02).",
+   "content": "-- Larkspur 2.0.0 added HTTP/3 support, experimental and off by default; enable with the --h3 flag or Client{H3: true}. Larkspur 1.8 did not support HTTP/3. Source: Larkspur changelog 2.0.0 (2026-08-14).",
+   "scope": "shelf:research"
+  }
+ ],
+ "search_log": "{\"time\":\"2026-10-27T17:55:12Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3\",\"facts\":[\"01M5Z7Q8956GD5J189S633ZDYT\"],\"ms\":0.719}\n{\"time\":\"2026-10-27T17:55:12Z\",\"tier\":\"example.com/acme/edgeproxy\",\"host\":\"stand-host\",\"query\":\"Larkspur HTTP/3 QUIC\",\"facts\":[\"01M5Z7Q8B3TD7YTYEGBQVJCFD9\"],\"ms\":0.926}\n"
+}

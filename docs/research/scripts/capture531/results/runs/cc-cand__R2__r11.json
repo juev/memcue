@@ -1,0 +1,63 @@
+{
+ "arm": "cc-cand",
+ "scenario": "R2",
+ "rep": 11,
+ "model": "sonnet",
+ "exit": 0,
+ "wall_s": 15.2,
+ "init": {
+  "model": "claude-sonnet-5-5",
+  "plugins": [
+   "memcue",
+   "cc-plugin-agents-md",
+   "cc-plugin-telemetry",
+   "cc-plugin-plugin-authoring"
+  ],
+  "mcp_servers": [],
+  "memcue_skill": true,
+  "memcue_tools": []
+ },
+ "hooks": {
+  "responses": 4,
+  "failed": 0
+ },
+ "tools": [
+  {
+   "name": "Bash",
+   "input": {
+    "command": "memcue search \"Brindle Quarrel queue\"; memcue search -in shelf:research \"Brindle Quarrel queue ordering\"; cat config/queue.toml 2>/dev/null; grep -ril \"brindle\\|quarrel\" . 2>/dev/null | head"
+   },
+   "result": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0 example.com/acme/tandem 2026-10-27 | Tandem keeps its message-queue settings in config/queue.toml, not in environment variables.\n01M5Z7Q89T054M6K7RTFY4C809 example.com/acme/tandem 2026-09-30 | Brindle 3.2 keeps publish order per queue (single writer) and silently drops the oldest unacknowledged message once a consumer holds 10,000 (max_unacked, up to 50,000); only the counter brindle_dropped_total shows it. Source: Brindle 3.2 docs, Flow control.\n01M5Z7Q8A314MS161S5Z7R2N50 example.com/acme/tandem 2026-09-30 | Quarrel 1.4 keeps order only within a partition (64 partitions per queue by default; partition_key pins a key to one); delivery is at least once, and a full partition buffer blocks the publisher instead of dropping. Source: Quarrel 1.4 reference.\n01M5Z7Q8ADGWHVN0CQAR4A8MHC example.com/acme/tandem 2026-09-30 | The Quarrel vendor benchmark (Quarrel 3.1M vs Brindle 1.0M messages/s) is a single run with default settings on the vendor's private rig, not independently verified. Source: Quarrel Inc. engineering blog."
+  }
+ ],
+ "final": {
+  "result": "**Quarrel**, configured with a single partition per queue.\n\n- **Brindle 3.2** keeps order, but it silently drops the oldest unacknowledged message once a consumer holds `max_unacked` (default 10,000). Only the `brindle_dropped_total` counter shows it. That breaks your no-silent-drops requirement.\n- **Quarrel 1.4** only guarantees order within a partition. It has 64 partitions per queue by default, so strict per-queue order needs one partition per queue, or every message pinned to one `partition_key`. Delivery is at-least-once, so consumers must tolerate duplicates. A full partition buffer blocks the publisher instead of dropping messages.\n\nUsing one partition per queue limits each queue's throughput. Ignore the vendor's Quarrel-vs-Brindle benchmark, because it's a single unverified run on the vendor's own rig.\n\nThese facts come from the Brindle 3.2 docs and the Quarrel 1.4 reference, as recorded in memory on 2026-09-30. I didn't re-check them against the current docs. Put the queue settings in `config/queue.toml`, which is where Tandem keeps them.",
+  "total_cost_usd": 0.029744399999999997,
+  "duration_ms": 10678,
+  "num_turns": 2,
+  "usage": {
+   "input_tokens": 4,
+   "cache_creation_input_tokens": 5525,
+   "cache_read_input_tokens": 17964,
+   "output_tokens": 584
+  },
+  "is_error": false,
+  "subtype": "success"
+ },
+ "seed_ids": {
+  "O1": "01M5Z7Q86ST9P4DB173GMZFA75",
+  "O2": "01M5Z7Q8736PAR92W55NMKTSVD",
+  "O3": "01M5Z7Q87D6EKD16P6AH8PM6KY",
+  "O4": "01M5Z7Q87SYE7NH0SGJZ2CHVS1",
+  "O5": "01M5Z7Q88Q7ZYNP9KV1CNEWHT0",
+  "O6": "01M5Z7Q8956GD5J189S633ZDYT",
+  "O7": "01M5Z7Q89GJYR0AFF92HR2ZPTM",
+  "S1": "01M5Z7Q89T054M6K7RTFY4C809",
+  "S2": "01M5Z7Q8A314MS161S5Z7R2N50",
+  "S3": "01M5Z7Q8ADGWHVN0CQAR4A8MHC",
+  "S4": "01M5Z7Q8AQF8394DB6ZYDARA77",
+  "S5": "01M5Z7Q8B3TD7YTYEGBQVJCFD9"
+ },
+ "fact_changes": [],
+ "search_log": "{\"time\":\"2026-10-27T17:58:56Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue\",\"facts\":[\"01M5Z7Q88Q7ZYNP9KV1CNEWHT0\"],\"ms\":0.934}\n{\"time\":\"2026-10-27T17:58:56Z\",\"tier\":\"example.com/acme/tandem\",\"host\":\"stand-host\",\"query\":\"Brindle Quarrel queue ordering\",\"facts\":[\"01M5Z7Q89T054M6K7RTFY4C809\",\"01M5Z7Q8A314MS161S5Z7R2N50\",\"01M5Z7Q8ADGWHVN0CQAR4A8MHC\"],\"ms\":0.941}\n"
+}
