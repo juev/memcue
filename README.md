@@ -273,6 +273,11 @@ both it and the bare array of an older binary.
 - **Rollback is the backup.** No in-place downgrade is provided or tested. To go back, stop memcue as above, install
   0.20.0 and put `facts.db.pre-schema-6` back on every machine. Every fact written or changed since the copy is lost,
   and candidates are hidden again. Before restoring, save what to keep with `memcue facts` or `memcue dump`.
+- **The Hermes note covers searching during work** (#521). The note and the `memcue_search` description let the model
+  search, when it decides it may help, on starting with a specific host, service or repository and before it diagnoses
+  an unexpected error, with a short query naming the system and the problem, checking the result against the current
+  state. Text only: no search runs on its own, and the binary, DSH and Claude Code are unchanged. Whether the text
+  changes what the model does has not been measured.
 
 ### 0.20.0: add writes procedure and event facts (#505)
 
