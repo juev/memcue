@@ -314,25 +314,61 @@ class ProviderTest(unittest.TestCase):
         self.p.on_pre_compress([])
         self.assertIn("Всегда отвечай", self.p.system_prompt_block())
 
-    def test_the_card_leaves_out_what_the_memory_notes_say(self):
-        """The built-in memory block is injected at every turn and cannot be removed, so a card line that states the
-        same thing is a second copy of it (#424). A line the notes do not carry stays on the card."""
+    def _notes_and_rules(self) -> list:
+        """Memory notes and the card rules of #456 next to them: copies of a note, and rules in the same words that
+        negate a note or add a condition to it. Returns the rules."""
         memories = Path(self.home) / "memories"
         memories.mkdir()
         (memories / "MEMORY.md").write_text(
-            "- Требует, чтобы навыки содержали только процедуры: состояние среды — в памяти, замеры — в docs/research.\n",
-            encoding="utf-8")
+            "Изменения скиллов агента пушить напрямую в ветку main репозитория скиллов, без отдельных веток и ревью.\n§\n"
+            "Перед каждым коммитом гонять полный набор тестов проекта.\n", encoding="utf-8")
+        (memories / "USER.md").write_text(
+            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
+        rules = ["Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.",
+                 "Перед каждым коммитом гонять полный набор тестов проекта.",
+                 "Изменения скиллов агента никогда не пушить напрямую в ветку main репозитория скиллов: только через "
+                 "отдельную ветку и ревью.",
+                 "Полный набор тестов гонять перед коммитом, только если правка задевает пакет store.",
+                 "Сначала вся работа заводится задачами (issue), и только потом выполняется."]
+        for content in rules:
+            self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--", content)
+        return rules
+
+    def test_the_card_keeps_what_the_memory_notes_say(self):
+        """The plugin drops no card line (#456): a copy of a memory note, a rule in the same words that negates a note
+        or adds a condition to it, and a rule the notes do not carry all reach the prompt, whether Hermes injects its
+        memory or not. The block is the memory note, a blank line and the card exactly as memcue renders it."""
+        rules = self._notes_and_rules()
+        card = self.p._card_text()
+        self.assertEqual(sum(line.startswith("- ") for line in card.splitlines()), len(rules))
+        blocks = []
+        for flags in ((True, True), (True, False), (False, True), (False, False)):
+            with self.subTest(flags=flags), \
+                    unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
+                block = self.p.system_prompt_block()
+                self.assertTrue(block.startswith("# Long-term memory (memcue)\n"))
+                self.assertTrue(block.endswith("\n\n" + card))
+                self.assertEqual(block.count("memcue: rules and decisions"), 1)
+                for content in rules:
+                    self.assertIn(content, block)
+                blocks.append(block)
+        self.assertEqual(len(set(blocks)), 1)
+
+    def test_a_card_of_copies_only_is_a_card(self):
+        """A card whose every line repeats a memory note still goes in whole (#456)."""
+        memories = Path(self.home) / "memories"
+        memories.mkdir()
+        (memories / "USER.md").write_text(
+            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Пользователь требует, чтобы в навыках были только процедуры, а состояние среды лежало в памяти.")
-        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Мержить PR сразу после зелёных проверок.")
+                    "Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.")
         block = self.p.system_prompt_block()
-        self.assertNotIn("в навыках были только процедуры", block)
-        self.assertIn("Мержить PR сразу", block)
+        self.assertIn("memcue: rules and decisions", block)
+        self.assertIn("Пользователь мержит PR сразу после зелёных проверок", block)
 
     def test_a_memory_hermes_turned_off_is_no_note(self):
         """memory.memory_enabled and memory.user_profile_enabled turn the built-in memory off and leave its files (#494):
-        a file Hermes no longer injects neither takes lines off the card nor is warned about."""
+        a file Hermes no longer injects is not warned about. The card is the same either way (#456)."""
         memories = Path(self.home) / "memories"
         memories.mkdir()
         (memories / "MEMORY.md").write_text(
@@ -343,7 +379,7 @@ class ProviderTest(unittest.TestCase):
         for flags, injected in (((True, True), True), ((False, True), False)):
             with self.subTest(flags=flags), \
                     unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
-                self.assertEqual("в навыках были только процедуры" not in self.p.system_prompt_block(), injected)
+                self.assertIn("в навыках были только процедуры", self.p.system_prompt_block())
                 p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
                 if injected:
                     with self.assertLogs("memcue_provider", level="WARNING"):
@@ -351,16 +387,6 @@ class ProviderTest(unittest.TestCase):
                 else:
                     with self.assertNoLogs("memcue_provider", level="WARNING"):
                         p.initialize("s1", hermes_home=self.home)
-
-    def test_a_card_of_copies_only_is_no_card(self):
-        memories = Path(self.home) / "memories"
-        memories.mkdir()
-        (memories / "USER.md").write_text(
-            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
-        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.")
-        block = self.p.system_prompt_block()
-        self.assertNotIn("memcue: rules and decisions", block)
 
     def test_a_cron_run_gets_no_card(self):
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",

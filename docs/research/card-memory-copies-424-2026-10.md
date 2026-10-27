@@ -20,9 +20,11 @@ Three rules, in the order they run:
    opening, so this rule changed nothing either.
 3. **A line the memory notes already state is left out** (`_without_memory_copies` in the Hermes plugin, which is
    where both texts meet). A line and a memory entry are compared as sets of words cut to five letters; a line is
-   dropped when it shares a third of both or two fifths of the shorter one, and never on fewer than five words.
+   dropped when it shares 0.30 of both or 0.40 of the shorter one, and never on fewer than five words.
    Measured on the live card, the lines that copy an entry score 0.30–0.43 of both and 0.40–0.75 of the shorter one;
-   the lines that do not stay under 0.27 and 0.29.
+   the lines that do not stay under 0.27 and 0.29. **Removed in #456**: the same words also cover an opposite rule
+   or one with a condition, and the rule dropped those too
+   ([card-no-plugin-filter-456](card-no-plugin-filter-456-2026-10.md)).
 
 Result on the live card of this installation:
 

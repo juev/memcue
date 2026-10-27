@@ -12,7 +12,10 @@ memcue fact base:
   gets none, and `session_card: false` turns it off. `session_card_chars` (passed as `MEMCUE_CARD_BUDGET`; default 0
   keeps the binary's 3500) bounds the card, stated rules included: the binary drops the oldest user-stated rule first
   and ends the card with a line that counts what it left out (#487). A failed card leaves the memory note without it
-  until the next rebuild and is reported to the log at most every ten minutes.
+  until the next rebuild and is reported to the log at most every ten minutes. The provider puts the card in as the
+  binary renders it and drops no line of it, even one that repeats `MEMORY.md` or `USER.md`: a word rule that drops
+  copies drops another rule in the same words too, the opposite one or one with a condition. A copy costs a few
+  lines, and nothing in the provider removes it (#456).
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's
   `cwd`), named by its remote as in Claude Code: it names the origin of the facts a session learns, the `repo`
   scope, the card's decisions and the search tie-break. A session Hermes gives no `cwd` (a one-shot `hermes -z` or a
@@ -34,7 +37,7 @@ memcue fact base:
   model writes to memcue, with `hermes config set memory.memory_enabled false` and
   `hermes config set memory.user_profile_enabled false`. memcue does not change Hermes's settings. While Hermes still
   injects `MEMORY.md` or `USER.md` and the file holds entries, the provider logs one warning per start; a file Hermes
-  no longer injects is no note for it, so its lines neither leave the card nor raise the warning.
+  no longer injects is no note for it and raises no warning.
 - **Tools** `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` let the model find and fix facts.
   `memcue_search` takes an optional `limit` and runs `memcue search` with the session's workspace and id, so facts of
   this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the session; `memcue_correct`
