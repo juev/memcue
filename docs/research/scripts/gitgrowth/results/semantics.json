@@ -1,0 +1,263 @@
+{
+ "rounds": [
+  {
+   "scenario": "independent-adds",
+   "round": "adds",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": true,
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "ok"
+  },
+  {
+   "scenario": "concurrent-correct",
+   "round": "correct-both",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f1",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 3
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 5: duplicate version <id>/2"
+  },
+  {
+   "scenario": "retire-then-correct",
+   "round": "a-retires-b-corrects-later",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f2",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 3
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 6: duplicate version <id>/2"
+  },
+  {
+   "scenario": "correct-then-retire",
+   "round": "b-corrects-a-retires-later",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f2",
+    "last_author": "machine-a",
+    "status": "retired",
+    "versions": 3
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 6: duplicate version <id>/2"
+  },
+  {
+   "scenario": "reopen-vs-retire",
+   "round": "a-reopens-b-retires-later",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f3",
+    "last_author": "machine-b",
+    "status": "retired",
+    "versions": 4
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 8: duplicate version <id>/3"
+  },
+  {
+   "scenario": "retire-vs-reopen",
+   "round": "b-retires-a-reopens-later",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f3",
+    "last_author": "machine-a",
+    "status": "active",
+    "versions": 4
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 8: duplicate version <id>/3"
+  },
+  {
+   "scenario": "relabel-vs-queries",
+   "round": "same-version",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f5",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 3
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 10: duplicate version <id>/2"
+  },
+  {
+   "scenario": "relabel-revert",
+   "round": "a-relabels-and-back",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f6",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 4
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 12: duplicate version <id>/2"
+  },
+  {
+   "scenario": "repeated",
+   "round": "1-correct-both",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f7",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 3
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 12: duplicate version <id>/2"
+  },
+  {
+   "scenario": "repeated",
+   "round": "2-a-retires-b-corrects-later",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": false,
+   "remerge_extra_rows": 1,
+   "watched_fact": {
+    "fact": "f7",
+    "last_author": "machine-b",
+    "status": "active",
+    "versions": 5
+   },
+   "text_single_line_merge_conflicts": 1,
+   "text_single_union_merge": "refused: jsonl line 14: duplicate version <id>/4"
+  },
+  {
+   "scenario": "repeated",
+   "round": "3-a-retires-again-b-adds",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": true,
+   "watched_fact": {
+    "fact": "f7",
+    "last_author": "machine-a",
+    "status": "retired",
+    "versions": 6
+   },
+   "text_single_line_merge_conflicts": 0,
+   "text_single_union_merge": "ok"
+  },
+  {
+   "scenario": "repeated",
+   "round": "4-no-writes",
+   "sqlite_both_orders_equal": true,
+   "events_both_orders_equal": true,
+   "sqlite_equals_events": true,
+   "sqlite_no_lost_or_invented_versions": true,
+   "events_no_lost_or_invented_versions": true,
+   "versions_contiguous": true,
+   "index_matches_live_facts": true,
+   "remerge_changes_nothing": true,
+   "watched_fact": {
+    "fact": "f7",
+    "last_author": "machine-a",
+    "status": "retired",
+    "versions": 6
+   },
+   "text_single_line_merge_conflicts": 0,
+   "text_single_union_merge": "ok"
+  }
+ ],
+ "stale": {
+  "scenario": "stale-side-writes-again",
+  "rows_expected": 17,
+  "sqlite_rows": 18,
+  "sqlite_duplicate_versions": 1,
+  "sqlite_no_lost_or_invented_versions": false,
+  "events_rows": 17,
+  "events_no_lost_or_invented_versions": true,
+  "watched_fact_status": "active",
+  "watched_fact_history": [
+   "v1 active by machine-a",
+   "v2 active by machine-a",
+   "v3 active by machine-b",
+   "v4 active by machine-b"
+  ]
+ }
+}

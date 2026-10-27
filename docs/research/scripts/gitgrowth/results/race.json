@@ -1,0 +1,11 @@
+{
+ "journal_present_at_copy": 127,
+ "raw_copies": 128,
+ "raw_copy_malformed": 46,
+ "raw_copy_ok": 82,
+ "raw_copy_other_error": 0,
+ "seconds": 30,
+ "snapshot_exports": 128,
+ "snapshot_exports_ok": 128,
+ "writes": 7501
+}
