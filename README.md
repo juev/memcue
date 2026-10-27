@@ -43,12 +43,13 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.21.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.21.1`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.21.1 | 6 | 0.21.1 | 0.21.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.1 (`hermes-agent` 0.15.2) |
 | 0.21.0 | 6 | 0.21.0 | 0.21.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.0 (`hermes-agent` 0.15.2) |
 | 0.20.0 | 5 | 0.20.0 | 0.20.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.20.0 (`hermes-agent` 0.15.2) |
 | 0.19.0 | 5 | 0.19.0 | 0.19.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.19.0 (`hermes-agent` 0.15.2) |
@@ -228,6 +229,19 @@ both it and the bare array of an older binary.
 
 ## Upgrade
 
+### 0.21.1: the Hermes provider tests run in a standalone install (#526)
+
+- Only tests and this README changed. `tests/test_provider.py` of the Hermes plugin no longer reads the DSH and Claude
+  Code plugin sources, so it runs in an installed `plugins/hermes/memcue` on its own; `plugins/test_cross_harness.py`
+  keeps that check in the full repository. The binary and the plugins behave as in 0.21.0.
+- **The backup and the rollback of 0.21.0 are a checklist now** (#527). The 0.21.0 text copied the base with `cp`
+  and restored that copy, which is not safe; see [0.21.0](#0210-no-fact-waits-for-approval-schema-6-514-456-521-522).
+  A copy made that way may lack committed writes or hold half of one: check its integrity and schema before relying
+  on it.
+- No schema or flag changed, and no new migration comes: the schema stays 6. From 0.20.0 or older, stop every older
+  memcue, back the base up and upgrade as [0.21.0](#0210-no-fact-waits-for-approval-schema-6-514-456-521-522) says;
+  its rollback applies too. From 0.21.0, replace the binary and the plugins.
+
 ### 0.21.0: no fact waits for approval; schema 6 (#514, #456, #521, #522)
 
 - **Breaking: no fact waits for approval.** `memcue add -candidate`, `memcue candidates` and `memcue approve` are
@@ -266,15 +280,43 @@ both it and the bare array of an older binary.
 - **Upgrade with no older memcue running.** A memcue 0.20.0 process that opened the base before the upgrade keeps
   working on it: its searches still leave the candidates out, and its index rebuild takes them out of the shared index.
   The next open by the new memcue notices this and rebuilds the index, but a process of the new memcue that is already
-  open searches the damaged index until then. On every machine that shares the base:
-  1. Stop what runs memcue: the Hermes gateway, cron jobs and running dreams, and agent sessions.
-  2. Check that no process has the base open: `fuser -v ~/.claude/memory/facts.db` (or `lsof` on macOS) prints nothing.
-  3. Copy the base outside the synced directory: `cp ~/.claude/memory/facts.db ~/facts.db.pre-schema-6`. Use the path
-     of `MEMCUE_FACTS` if it is set.
-  4. Install the new binary and the plugins of the same release, then start the services again.
-- **Rollback is the backup.** No in-place downgrade is provided or tested. To go back, stop memcue as above, install
-  0.20.0 and put `facts.db.pre-schema-6` back on every machine. Every fact written or changed since the copy is lost,
-  and candidates are hidden again. Before restoring, save what to keep with `memcue facts` or `memcue dump`.
+  open searches the damaged index until then. This README gives a checklist, not commands: no backup or restore
+  procedure is shipped or tested, so adapt each item to your environment and tools. The migration needs a global
+  barrier: do not let any memcue open any copy of the base until steps 1 and 2 are done on every machine that shares it.
+  1. On every machine, stop every client of the base (the Hermes gateway, cron jobs and running dreams, agent
+     sessions) and pause its synchronization (a git cron job, Syncthing and the like).
+  2. On every machine, determine the exact database file from the configuration the services use, and the target if
+     it is a symlink. The defaults differ: the CLI opens `MEMCUE_FACTS`, else `$CLAUDE_CONFIG_DIR/memory/facts.db`
+     (`~/.claude/memory/facts.db`), and the DSH plugin falls back to it after its `facts` setting; the Hermes plugin
+     opens its `facts` setting, else `MEMCUE_FACTS`, else `$HERMES_HOME/memcue/facts.db`. Check that no process has
+     the file open.
+  3. Back it up with a trusted SQLite-aware tool, one that takes in committed WAL content and recovers an interrupted
+     write left in a hot journal. Run `PRAGMA integrity_check` on the snapshot and read its schema with
+     `PRAGMA user_version`. Expect 5 only from 0.20.0 back to 0.5.0; an older release may have an earlier schema (see
+     [Compatibility](#compatibility)). Record the schema and the release that wrote the base: a rollback needs both.
+  4. Store the backup apart from the synchronization: outside the git repository of the base and every synced
+     directory.
+  5. Only when every machine has passed steps 1 to 4, install the new binary and the plugins of the same release,
+     then resume the synchronization and start the services again.
+
+  Copying `facts.db` alone is not a backup: with a `-wal` or `-journal` file next to it, the copy may lack committed
+  writes or hold half of one.
+- **Rollback is the backup.** No in-place downgrade is provided or tested, and 0.20.0 or older cannot open a schema-6
+  base. Every fact written or changed after the backup is absent once you roll back, and candidates are hidden again.
+  The rollback needs the same global barrier: every client and the synchronization stopped on every machine before
+  any copy is touched.
+  1. On every machine, keep a separate backup of the current schema-6 base, made and verified as above but with
+     schema 6.
+  2. If you want the newer facts, export them with the 0.21 binary before the older one is installed:
+     `MEMCUE_FACTS=<path> memcue facts`, or `memcue dump <path>`, where `<path>` is the exact file from step 2 above.
+  3. Move the base and its `-journal`, `-wal` and `-shm` files aside; do not delete them. SQLite applies a sidecar
+     left in place to the restored file.
+  4. Install the release that wrote the backup, the one whose schema matches it, and restore that verified backup to
+     the exact path the services open. Before restarting the services, check that path and that no memcue process
+     runs.
+  5. Only when every machine has restored the same backup, resume the synchronization and start the services again.
+
+  Restoring a copied `facts.db`, deleting the sidecars or just restarting on the old binary is not a safe rollback.
 - **The Hermes card keeps lines that repeat the notes** (#456). The provider no longer drops a card line that shares
   enough words with `MEMORY.md` or `USER.md`: it puts the card in as the binary renders it. No flag or schema change
   comes with this.
