@@ -4,6 +4,7 @@ Run: python3 plugins/hermes/memcue/tests/test_provider.py (MEMCUE_BIN=/path/to/m
 Inside Hermes the real agent modules are used; elsewhere they are stubbed.
 """
 
+import contextlib
 import datetime
 import hashlib
 import http.server
@@ -61,26 +62,45 @@ def _shell_memcue_vars() -> list:
     return [k for k in os.environ if k.startswith("MEMCUE_") and k != "MEMCUE_BIN"]
 
 
+_BUILTIN_MEMORY_FLAGS = memcue_provider._builtin_memory_flags  # the real reader, for its own test
+
+
+def _pin_builtin_memory(test: unittest.TestCase) -> None:
+    """Whether Hermes injects MEMORY.md and USER.md is read from the config of the host Hermes (#504): left to it, a
+    test is green where the built-in memory is on and red where it is off. A test pins Hermes's default, both on, and
+    patches another combination itself."""
+    patcher = unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=(True, True))
+    patcher.start()
+    test.addCleanup(patcher.stop)
+
+
+def _builtin_memory_warnings(logs, home) -> int:
+    """How many times the captured logs hold the warning about the built-in memory of this home, word for word: any
+    other warning, a version or a mirror failure, is not it (#504)."""
+    want = (f"WARNING:memcue_provider:memcue: the built-in memory notes ({Path(home) / 'memories'}) are still in the "
+            "system prompt next to memcue; the model keeps its memory in memcue, so turn the built-in memory off in Hermes")
+    return logs.output.count(want)
+
+
 @unittest.skipUnless(BIN, "memcue binary not found (set MEMCUE_BIN)")
 class ProviderTest(unittest.TestCase):
     def setUp(self):
+        # Every cleanup is registered before what it undoes, so a setUp that fails halfway leaves nothing behind: the
+        # environment comes back as it was, a variable that was missing included (#504), and the home goes.
+        env = unittest.mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
         self.home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.home, True)
         os.environ["XDG_STATE_HOME"] = str(Path(self.home) / "state")  # memcue's extract.log
         # The suite must never touch a live base: an inherited MEMCUE_FACTS wins over HERMES_HOME and let an earlier
         # run write test facts into a real base and migrate it to another schema. MEMCUE_USAGE_LOG from the container
         # would turn the usage log on behind the tests that assert it is off, and a recall setting changes what is served.
-        self._kept_env = {k: os.environ.pop(k, None) for k in _shell_memcue_vars()}
-        self.addCleanup(self._restore_facts_env)
+        for key in _shell_memcue_vars():
+            del os.environ[key]
+        _pin_builtin_memory(self)
         self.p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         self.p.initialize("s1", hermes_home=self.home, agent_context="primary")
-
-    def _restore_facts_env(self):
-        for key, value in self._kept_env.items():
-            if value is not None:
-                os.environ[key] = value
-
-    def tearDown(self):
-        shutil.rmtree(self.home, ignore_errors=True)
 
     def facts(self):
         return self.memcue("facts")
@@ -380,8 +400,9 @@ class ProviderTest(unittest.TestCase):
                 self.assertIn("в навыках были только процедуры", self.p.system_prompt_block())
                 p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
                 if injected:
-                    with self.assertLogs("memcue_provider", level="WARNING"):
+                    with self.assertLogs("memcue_provider", level="WARNING") as logs:
                         p.initialize("s1", hermes_home=self.home)
+                    self.assertEqual(_builtin_memory_warnings(logs, self.home), 1)
                 else:
                     with self.assertNoLogs("memcue_provider", level="WARNING"):
                         p.initialize("s1", hermes_home=self.home)
@@ -542,7 +563,30 @@ class ProviderTest(unittest.TestCase):
         with self.assertLogs("memcue_provider", level="WARNING") as logs:
             p.initialize("s1", hermes_home=self.home)
             p.initialize("s1", hermes_home=self.home)
-        self.assertEqual(sum("built-in memory" in m for m in logs.output), 1)
+        self.assertEqual(_builtin_memory_warnings(logs, self.home), 1)
+
+    def test_each_flag_turns_its_own_file_off(self):
+        """memory.memory_enabled turns MEMORY.md off and memory.user_profile_enabled turns USER.md off (#494): the
+        notes are those of the files Hermes injects, and the warning comes while any of them is there."""
+        Path(self.home, "memories").mkdir()
+        Path(self.home, "memories", "MEMORY.md").write_text("Заметка встроенной памяти.\n", encoding="utf-8")
+        Path(self.home, "memories", "USER.md").write_text("Заметка о пользователе.\n", encoding="utf-8")
+        cases = (((True, True), ["Заметка встроенной памяти.", "Заметка о пользователе."]),
+                 ((True, False), ["Заметка встроенной памяти."]),
+                 ((False, True), ["Заметка о пользователе."]),
+                 ((False, False), []))
+        for flags, notes in cases:
+            with self.subTest(flags=flags), \
+                    unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
+                self.assertEqual(self.p._memory_notes(), notes)
+                p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+                if notes:
+                    with self.assertLogs("memcue_provider", level="WARNING") as logs:
+                        p.initialize("s1", hermes_home=self.home)
+                    self.assertEqual(_builtin_memory_warnings(logs, self.home), 1)
+                else:
+                    with self.assertNoLogs("memcue_provider", level="WARNING"):
+                        p.initialize("s1", hermes_home=self.home)
 
     def test_the_extraction_state_of_an_older_provider_goes(self):
         """sessions/ and pending/ held what the extraction saw; pending/ holds raw messages (#494)."""
@@ -944,6 +988,66 @@ class NoteLabelsTest(unittest.TestCase):
                 self.assertEqual(p._note_labels(target, content), (kind, scope))
 
 
+class BuiltinMemoryFlagsTest(unittest.TestCase):
+    """The flags of the built-in memory come from Hermes, and no test reads them from the host (#504)."""
+
+    def test_the_flags_are_those_hermes_reads(self):
+        for flags in ((True, True), (True, False), (False, True), (False, False)):
+            memory_tool = types.ModuleType("tools.memory_tool")
+            memory_tool.get_builtin_memory_store_flags = lambda flags=flags: flags
+            with self.subTest(flags=flags), unittest.mock.patch.dict(sys.modules, {"tools.memory_tool": memory_tool}):
+                self.assertEqual(_BUILTIN_MEMORY_FLAGS(), flags)
+
+    def test_both_flags_are_on_when_hermes_cannot_tell(self):
+        def broken():
+            raise RuntimeError("config.yaml is unreadable")
+
+        failing = types.ModuleType("tools.memory_tool")
+        failing.get_builtin_memory_store_flags = broken
+        for name, module in (("no memory_tool", None), ("a failing reader", failing)):
+            with self.subTest(name), unittest.mock.patch.dict(sys.modules, {"tools.memory_tool": module}):
+                self.assertEqual(_BUILTIN_MEMORY_FLAGS(), (True, True))
+
+    @unittest.skipUnless(BIN, "memcue binary not found (set MEMCUE_BIN)")
+    def test_a_provider_test_pins_the_flags_and_gives_them_back(self):
+        """A provider test leaves the flags, the environment and no home behind, a setUp that fails halfway too (#504):
+        XDG_STATE_HOME pointed at the deleted home of the last test, and a variable that was missing came back set."""
+        env = unittest.mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        hermes_reader = memcue_provider._builtin_memory_flags
+        for xdg in ("/srv/state-of-the-host", None):
+            for fails in (False, True):
+                with self.subTest(xdg=xdg, fails=fails):
+                    os.environ.pop("XDG_STATE_HOME", None)
+                    if xdg is not None:
+                        os.environ["XDG_STATE_HOME"] = xdg
+                    os.environ["MEMCUE_RECALL_TEST"] = "of the shell"
+                    before = dict(os.environ)
+                    test = ProviderTest("test_base_lives_in_hermes_home")
+                    initialize = unittest.mock.patch.object(memcue_provider.MemcueMemoryProvider, "initialize",
+                                                            side_effect=RuntimeError("setUp failed")) \
+                        if fails else contextlib.nullcontext()
+                    try:
+                        with initialize:
+                            if fails:
+                                with self.assertRaisesRegex(RuntimeError, "setUp failed"):
+                                    test.setUp()
+                            else:
+                                test.setUp()
+                        self.assertIsNot(memcue_provider._builtin_memory_flags, hermes_reader)
+                        self.assertEqual(memcue_provider._builtin_memory_flags(), (True, True))
+                        self.assertEqual(os.environ["XDG_STATE_HOME"], str(Path(test.home) / "state"))
+                        self.assertNotIn("MEMCUE_RECALL_TEST", os.environ)
+                    finally:
+                        test.doCleanups()
+                    self.assertIs(memcue_provider._builtin_memory_flags, hermes_reader)
+                    self.assertIs(memcue_provider._builtin_memory_flags, _BUILTIN_MEMORY_FLAGS)
+                    self.assertEqual(dict(os.environ), before)
+                    self.assertEqual(os.environ.get("XDG_STATE_HOME"), xdg)
+                    self.assertFalse(Path(test.home).exists())
+
+
 TRUE = shutil.which("true") or "/bin/true"  # /usr/bin/true on macOS
 
 
@@ -954,6 +1058,7 @@ class InstallTest(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.root, True)
+        _pin_builtin_memory(self)
         self.version = memcue_provider._plugin_version()
         build = Path(self.root) / "build"
         build.mkdir()
