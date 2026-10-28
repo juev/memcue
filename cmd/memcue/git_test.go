@@ -102,7 +102,7 @@ func TestGitWithoutTheDriverStopsOnConflict(t *testing.T) {
 	addAndCommit(t, bin, mac, env, "Caddy-private монтирует файл, после замены пересоздать контейнер")
 	cmd := exec.Command("git", "pull", "-q", "--no-rebase", "origin", "main")
 	cmd.Dir = mac
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(append(os.Environ(), env...), "LC_ALL=C")
 	out, err := cmd.CombinedOutput()
 	if err == nil || !strings.Contains(string(out), "CONFLICT") {
 		t.Errorf("want a visible conflict, got err=%v\n%s", err, out)
