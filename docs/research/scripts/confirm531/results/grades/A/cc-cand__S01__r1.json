@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "0507117f5394ef2b28783c356edd0fdc3e54e2c423ec1b33bae3befcfffc4d59",
+ "cost_usd": 0.0501,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EE5WBJDHV6MRR6C2DTZ4Z"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EE5WBJDHV6MRR6C2DTZ4Z",
+    "version": 2,
+    "verdict": "expected",
+    "note": "Corrects the stale 1.4 shelf fact in place with the 2.0.0 @include details (relative path, 8 levels, override) and the 2.1.0 ${ENV} support, citing the changelog."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes for the pinned 2.1.3 and gives every changelog detail: @include \"path\" since 2.0.0, paths relative to the including file, 8 nesting levels, later keys override, and ${ENV} since 2.1.0. It also says the 1.4 shelf fact is out of date for 2.x and restructures nothing."
+ }
+}

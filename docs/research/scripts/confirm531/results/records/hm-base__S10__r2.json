@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S10",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 32.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.002004342,
+  "turns": 6,
+  "input_tokens": 50329,
+  "output_tokens": 1358,
+  "cache_read_tokens": 43264
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ostrel vendor integration retries backoff payload"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "memcue_search",
+   "read_file",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No — not as the code is written today.\n\nPayload\n\n- Ostrel caps a job payload at 256 KiB *after serialization*; larger payloads are rejected at enqueue with `PayloadTooLarge` (docs/vendor/ostrel-limits.md:7-9). Fail-fast, so it won't silently truncate — but the job never runs.\n- Our invoices are up to 300 KB (README.md:6), and `send_invoice` puts the PDF straight into the payload as base64 (`payload[\"pdf_base64\"]`, jobs/send_invoice.py:5). Base64 inflates by 4/3: 300 KB becomes ~400 KiB (409,600 bytes at 300×1024), roughly 145 KiB over the 256 KiB limit. Even the raw 300 KB is already over the cap before encoding.\n- The doc's own remedy: store the bytes elsewhere and pass a reference in the payload (ostrel-limits.md:9). That means putting the PDF in object storage and sending a key/URL plus the metadata, instead of `pdf_base64`.\n\nRetries\n\n- Exponential backoff, no jitter mentioned: first retry after 2s, each subsequent delay doubled, capped at 10 minutes (ostrel-limits.md:13-14).\n- 25 attempts, then the job goes to the dead-letter queue (line 15).\n- `retry_limit` per job type overrides the 25-attempt count, but the backoff curve itself is not configurable in 5.3 (line 16).\n\nPractical consequence: the cap of 10 minutes means a job retrying for hours effectively ticks at 10-minute intervals after about the ninth retry, so 25 attempts spans a long time — worth setting `retry_limit` lower for invoice sends if the customer-facing SLA matters more than eventual delivery."
+ }
+}

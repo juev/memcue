@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "946ffdb48b0ccff104ed800a81db80b3476fec92063cc238e12f08964f493574",
+ "cost_usd": 0.0125,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says yes and names the 5,000-part limit from the Corvane gateway 2.3 docs. It computes about 7,153–7,680 parts at 8 MiB and changes CHUNK_MB in scripts/upload.sh to 32 MiB, which is above the 12–13 MiB minimum and inside the 8–512 MiB range. It also says to re-check the limit if the gateway is no longer on 2.3."
+ }
+}

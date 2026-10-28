@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "134598a3a4bbb70aff208eb91d3790ff9523892df758092dbb834e04f530052b",
+ "cost_usd": 0.0326,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "The write guard blocked the edit, so the function was never added to units/convert.py, which meets the wrong_if criterion 'Does not add the function', even though the proposed code (km / 1.609344, typed, one-line docstring) would have been correct."
+ }
+}

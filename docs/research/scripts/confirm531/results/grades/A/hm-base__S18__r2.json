@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6402da8fc706d463f9a55ec5d75e05a49017bada3182a0419e8f432d48d9c7ac",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It honestly says it has no published TLS numbers and invents none, but it never finds or cites the Marrowlog 2.4 report's limitation (plain TCP only, lines of 200 bytes or less, about 180k lines/s, TLS not measured, Q4 report planned), so it misses the source and the short-line caveat."
+ }
+}

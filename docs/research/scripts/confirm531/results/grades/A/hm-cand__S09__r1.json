@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "741416105467821a66188eeabfb396917c4eb865e588aee9ba06d78ba262cc1e",
+ "cost_usd": 0.0468,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says yes, names the 5,000-part limit from Corvane gateway 2.3, works out about 7,150 parts at 8 MiB, and recommends 16 MiB parts (3,577 parts) inside the 8–512 MiB range by changing scripts/upload.sh; its claim that uploads are already failing is an inference, but it contradicts none of the label's facts."
+ }
+}

@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S16",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 44.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0032960940000000003,
+  "turns": 8,
+  "input_tokens": 81793,
+  "output_tokens": 2011,
+  "cache_read_tokens": 69248
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G3FNT1QS67AHNBDSXEDT0\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:54:52Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "tool_describe",
+   "read_file",
+   "read_file",
+   "read_file"
+  ],
+  "pages_read": [],
+  "final_answer": "I don't know — I have no information about a Quorvel event bus or its message size limit. I checked the workspace and my stored notes: nothing on Quorvel, and there's no documentation here to check.\n\nSo I can't tell you whether 2 MB order snapshots will fit, and I won't guess a number. Before you design around it, confirm the limit in Quorvel's own docs or in the broker's configuration (the setting that caps a single message/record size), and check whether there's a separate limit on the producer/client side or on the consumer fetch size. If you can point me at Quorvel's docs or the service config, I'll read it and give you a definite answer."
+ }
+}

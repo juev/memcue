@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "ec7f663129fbc9bdbdc37693bf394d50ea4a63056863eb0853f23ec0649ce9d5",
+ "cost_usd": 0.0435,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says the default setup won't reach 5 s: polling is every 30 s by default and can't go below 10 s, so push updates are needed, which require stream: true and the Team plan or above. It cites docs.nimbrel.example/sdk/updates read on 2026-04-20 and says the note may be out of date and needs checking."
+ }
+}

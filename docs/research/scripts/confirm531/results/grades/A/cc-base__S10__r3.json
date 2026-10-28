@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "72b29127bc2d025a1dd0e2d5c369c7c5f52e25483bf3473ee92af47296d7a545",
+ "cost_usd": 0.0326,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the 300 KB invoices exceed Ostrel 5.3's 256 KiB limit and should be passed by reference, and it gets the backoff right: 2 s first retry, doubling, 10-minute cap, dead-letter after 25 attempts, with retry_limit changing the count but not the curve."
+ }
+}

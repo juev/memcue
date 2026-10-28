@@ -1,0 +1,32 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S15",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 17.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.0844652,
+  "turns": 5,
+  "input_tokens": 8,
+  "output_tokens": 1067,
+  "cache_read_tokens": 64346
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "A key can get more than 100 per minute. In the worst case it gets up to **400 per minute**, and up to about 800 in any rolling 60 seconds.\n\n**Why:**\n\n- `gateway/limits.py` builds `Limiter(rate=\"100/minute\", key=\"api_key\")` without setting a `backend`. The Quillon 1.8 docs say the default backend is `memory`, where each process keeps its own counters. They state that \"an application with N worker processes lets a key make up to N times the configured rate.\" We pin `quillon==1.8.2`, so those docs apply.\n- `deploy/server.conf` sets `workers = 4`. Each worker lets a key make 100 requests, so the key can make 400 a minute in total. How close a client gets to 400 depends on how the server spreads requests across workers, but a client sending a lot of traffic will get near it.\n- Windows are fixed and reset at the start of each clock minute. That means a key can use its full allowance at the end of one minute and again at the start of the next. Across the 4 workers, that's up to about 800 requests in roughly 60 seconds.\n\n**Fix:** switch to the shared backend so all workers use one counter:\n\n```python\nlimiter = Limiter(rate=\"100/minute\", key=\"api_key\", backend=\"tally\", url=\"tally://<host>:7070\")\n```\n\nThis needs a tallyd server that every worker can reach. Even then, the fixed window still allows up to about 200 requests around a minute boundary, and the docs don't mention a sliding-window option. A quicker stopgap is to set the rate to 25/minute per worker, which adds up to 100 overall. That only works if requests are spread evenly across workers, and it would refuse legitimate requests when they aren't.\n\nI haven't changed any code."
+ }
+}

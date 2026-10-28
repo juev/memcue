@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "ee8307dc45b250b0e830b62de289145f22e987071d1faf15487be746c3b4dd21",
+ "cost_usd": 0.0454,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EMSB4563JFQ6Z93QMS6JH"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EMSB4563JFQ6Z93QMS6JH",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact stores the 180,000 lines/s figure together with its limits: plain TCP, lines of 200 bytes or less, and the disk buffer off. It also records that TLS was not measured and is planned for the Q4 report."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no because TLS was never enabled and the report's lines were capped at 200 bytes, while the agents send about 900-byte lines at 50,000 lines/s. It notes that the 180,000 lines/s run was already at 85% CPU on one vCPU, and it recommends the team measure TLS cost itself or wait for the planned Q4 report."
+ }
+}

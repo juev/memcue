@@ -1,0 +1,77 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S14",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 43.6,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.002900166,
+  "turns": 8,
+  "input_tokens": 75053,
+  "output_tokens": 2503,
+  "cache_read_tokens": 67072
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [
+   {
+    "id": "01M61ET5NQJR4FP76W7E487KZ8",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "pardalo, 4.2.0, pypi, docs, unavailable, retries, unverified",
+    "content": "As of 2026-10-28, pardalo cannot be inspected or verified from this environment: `pip download pardalo==4.2.0` finds no distribution on the index (though /stand/ws/requirements.txt pins 4.2.0) and https://pardalo.example/docs/retries returns 404. The only known documentation is the 3.1 note about retries, so retry behaviour of 4.2.0 is unconfirmed.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "charge.py retry policy double charge"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "retries idempotency payment double charge HTTP",
+     "in": "shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61ES37AWMGWVHTXCJGJE4DG\", \"content\": \"Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\", \"keywords\": [\"pardalo\", \"retry\", \"post\", \"idempotent\", \"http client\"], \"origin\": \"pardalo.example 2026-02-08\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:31:43Z\"}]}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "As of 2026-10-28, pardalo cannot be inspected or verified from this environment: `pip download pardalo==4.2.0` finds no distribution on the index (though /stand/ws/requirements.txt pins 4.2.0) and https://pardalo.example/docs/retries returns 404. The only known documentation is the 3.1 note about retries, so retry behaviour of 4.2.0 is unconfirmed.",
+     "keywords": "pardalo, 4.2.0, pypi, docs, unavailable, retries, unverified",
+     "shelf": "research",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M61ET5NQJR4FP76W7E487KZ8\"}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "memcue_search",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "search_files",
+   "terminal",
+   "read_file",
+   "tool_call",
+   "memcue_add"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries"
+  ],
+  "final_answer": "Short answer: yes, it's possible — but I could not confirm that 4.2.0 itself retries POST, so I can't give you a clean \"no\".\n\nWhat the code does (client/charge.py):\n- line 5: one module-level session, retry=Retry(total=3), timeout=10\n- lines 9-12: plain POST to /v1/charges with order_id + amount_cents. No idempotency key, no request de-duplication token.\n\nThree ways a duplicate can happen:\n\n1. Library retries POST on transport errors. The only documentation I have on pardalo (v3.1, from the research shelf) says automatic retries fire only on GET, HEAD, PUT, DELETE, OPTIONS — never POST. Your repo pins 4.2.0, and I couldn't verify that version: the package isn't installed, `pip download pardalo==4.2.0` finds nothing on the index, and pardalo.example/docs/retries 404s. If 4.2.0 widened retries to cover POST (common change: retrying on \"connection reset while reading the response\"), a drop after the server committed the charge produces a real automatic double charge. That's the case worth checking in the changelog.\n\n2. Even without a library retry, a drop mid-request is ambiguous. The server may have created the charge and the client never saw the response. `raise_for_status()` never runs, the caller sees an exception, and any caller-level retry or user re-click charges again. Retry policy or not, the client currently has no way to ask \"did my charge go through?\" — the request carries no key the server can dedupe on.\n\n3. timeout=10 counts as the same hazard. A slow charge that exceeds 10s looks like a failed one; the library retries (or the caller does) while the first request is still being processed server-side.\n\nThe real fix, independent of the retry policy, is an Idempotency-Key header with a stable key per charge attempt (e.g. derived from order_id, or a UUID generated once and reused across retries of that same charge) — provided the billing service supports it. That makes retries and timeouts safe by construction.\n\nWant me to add that header to create_charge, and check pardalo's Retry for a way to pin the retryable-method set explicitly?"
+ }
+}

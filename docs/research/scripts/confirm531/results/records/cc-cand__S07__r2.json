@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S07",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 23.1,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.0772292,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 758,
+  "cache_read_tokens": 47546
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search -in shelf:research \"Saltmarsh CI time limit\"; echo ---; memcue search -in shelf:research \"Saltmarsh job timeout duration\"; echo ---; memcue search -in shelf:research \"Saltmarsh nightly maximum runtime hours\"",
+    "result": "01M61F8VRRSYG84KSWCWESC3R3 docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\n---\n01M61F8VRRSYG84KSWCWESC3R3 docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\n---\n01M61F8VRRSYG84KSWCWESC3R3 docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "The research shelf has one note on this, read from docs.saltmarsh.example/limits on 2026-08-21. It says:\n\n- **Hosted runners:** a job is cancelled after **6 hours**. A whole pipeline run is cancelled after 72 hours, and a job that waits in the queue for more than 24 hours is dropped.\n- **Self-hosted runners:** no time limit on a job.\n\n**What this means for your 7-hour job** (my reading, not something the docs state): as one job on a hosted runner, it would be cancelled about an hour before it finishes. You could:\n1. Run it on a self-hosted runner, where there is no job limit.\n2. Split it into several jobs in one pipeline, each under 6 hours, passing results between them as artifacts. The whole run would still be well under the 72-hour limit.\n\n**Caveats:**\n- The note is about two months old, and I haven't checked whether the limits page has changed since. Recheck it before you rely on these numbers.\n- This repository is empty, so I can't tell whether you use hosted or self-hosted runners.\n\nI can fetch the current limits page and update the note if you'd like."
+ }
+}

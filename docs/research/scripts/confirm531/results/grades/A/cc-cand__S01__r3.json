@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "57819e79967e79d6a3c12c77a548a5b36f0f9f2d4adc47df115e5cf811756e4a",
+ "cost_usd": 0.0494,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FMY4W1WHCD0WEYQPQV7NN"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FMY4W1WHCD0WEYQPQV7NN",
+    "version": 2,
+    "verdict": "expected",
+    "note": "Corrects the seeded 1.4 shelf fact in place: it limits the old claim to 1.x and adds the 2.0.0 @include details (relative path, 8 levels, later keys override) and the 2.1.0 ${ENV} support, citing the changelog."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says yes and ties it to the pinned 2.1.3; gives the @include \"path\" syntax, paths relative to the including file, 8-level nesting, override by later keys and 2.1.0 ${ENV} paths; notes the 1.4 fact is outdated; restructures nothing."
+ }
+}

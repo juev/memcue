@@ -1,0 +1,39 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S07",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 174.3,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.071045,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 664,
+  "cache_read_tokens": 46225
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; ls -la; memcue search \"Saltmarsh CI time limit\"; memcue search -in all \"Saltmarsh CI job timeout\"; memcue search -in all \"research shelf\"",
+    "result": "total 12\ndrwxrwxr-x 3 1001 1001 4096 Oct 28 14:40 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:40 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:40 .git\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research\nNo stored facts match."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"Saltmarsh CI time limit\"; memcue search -in shelf:research -min-score 0 \"Saltmarsh timeout hours job\"",
+    "result": "01M61F8SC397V8QYCBWH1HRHCP docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\n01M61F8SC397V8QYCBWH1HRHCP docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "The research shelf has one fact on this. It came from docs.saltmarsh.example/limits, which was read on 2026-08-21:\n\n- **Hosted runners cancel a job after 6 hours.**\n- A whole pipeline run is cancelled after 72 hours.\n- Jobs that wait in the queue for more than 24 hours are dropped.\n- **Self-hosted runners have no job time limit.**\n\n**A single 7-hour job on a hosted runner would be cancelled at the 6-hour mark.** You have two ways around it:\n\n1. **Run it on a self-hosted runner.** That job limit doesn't apply there.\n2. **Split it into several jobs in one pipeline, each under 6 hours.** For example, two stages of about 3.5 hours that pass results along as artifacts. The whole run stays well under the 72-hour pipeline limit. Leave some margin under 6 hours in case a run is slower than usual.\n\nThat fact is two months old. Before you design around it, check that the limits page still says the same thing. I can fetch it now if you'd like."
+ }
+}

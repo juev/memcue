@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "f4277f600bbae8aa0b859c45511cba1fb16ff85e03b325720420fe0993ee492b",
+ "cost_usd": 0.0095,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It honestly says there are no TLS numbers and invents none, but it never names the Marrowlog 2.4 report, its plain-TCP-only measurement, the short-line caveat or the planned Q4 coverage, because its searches never named the shelf and found nothing."
+ }
+}

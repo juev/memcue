@@ -1,0 +1,33 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S10",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 32.0,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.001910304,
+  "turns": 5,
+  "input_tokens": 43312,
+  "output_tokens": 1168,
+  "cache_read_tokens": 35968
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file"
+  ],
+  "pages_read": [],
+  "final_answer": "No — not as things stand. The two constraints collide.\n\nPayload size\n- Ostrel 5.3 caps a job payload at 256 KiB (262,144 bytes) after serialization; anything larger is rejected at enqueue with `PayloadTooLarge` (docs/vendor/ostrel-limits.md:7-9).\n- Our invoice payloads run \"up to 300 KB\" (README.md:6). Even reading that as decimal 300,000 bytes it's above the cap, so every large invoice would fail at enqueue.\n- Worse than it looks: `send_invoice` reads `payload[\"pdf_base64\"]` (jobs/send_invoice.py:5), and base64 inflates binary by ~4/3. A 300 KB rendered PDF is roughly 400 KB as base64 before metadata, so the serialized payload overshoots by even more.\n\nThe vendor's own advice applies: store the rendered PDF elsewhere and pass a reference (key/URL) in the payload, letting the job fetch or stream it. Only the reference plus metadata goes through Ostrel.\n\nRetry backoff\n- Exponential, starting at 2 s for the first retry, doubling each time (2 s, 4 s, 8 s...), capped at 10 minutes per delay.\n- After 25 attempts the job goes to the dead-letter queue.\n- `retry_limit` can be set per job type to change the attempt count, but the backoff curve itself is not configurable in 5.3."
+ }
+}

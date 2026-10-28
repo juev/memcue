@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "43f239b07b0f4c45378b3bef9d4cf79daa87db8cc87d083be1896835b29803f1",
+ "cost_usd": 0.068,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61G55E2Z2SJ4QWX16ZM11RX",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "The correction keeps the shelf fact as it was and adds a recheck note backed by the pages the run read: the docs URL now returns 404 and 0.9.4 is on no reachable package index. That provenance helps later work, though it was not asked for."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer names max_buffered_messages, says the default is 0 (unlimited) and that 0.9 streams have no flow control, and says the stream closes with RESOURCE_EXHAUSTED at the cap so dashboards must reconnect. It also ties the fact to the 0.9 docs against the pinned 0.9.4, adding a reasonable caveat to verify it."
+ }
+}

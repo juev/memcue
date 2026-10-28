@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "4f45050e21a57389cd1a9194c3fb7e6ced6479b5fae15e01a62d86dd76e2494c",
+ "cost_usd": 0.0137,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says the upload will fail. It cites the 5,000-part limit from the Corvane gateway 2.3 docs, works out 7,680 parts for 60 GiB in 8 MiB parts, and recommends raising CHUNK_MB in scripts/upload.sh to 64 MiB, which is inside the 8–512 MiB range."
+ }
+}

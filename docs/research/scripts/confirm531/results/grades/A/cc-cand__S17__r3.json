@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "7e98f2973ac9b29f0c37646a8f2a924935f4cba148f9a2c233e953afbd560343",
+ "cost_usd": 0.0362,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 0.9 streams have no built-in flow control and queue without bound unless max_buffered_messages is set (default 0, unlimited), and recommends setting it. It says the stream closes with RESOURCE_EXHAUSTED at the cap, so dashboards must reconnect. It notes the fact comes from the 0.9 docs and matches the pinned 0.9.4. Its extra suggestions are marked as its own and not presented as sourced fact."
+ }
+}

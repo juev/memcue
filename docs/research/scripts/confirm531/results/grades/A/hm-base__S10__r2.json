@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "e09f309849ddd38af17736413c5878aa5c1bdaa3a102c29bc957b2cbcc2674b5",
+ "cost_usd": 0.0329,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no: the 256 KiB limit is below the 300 KB invoices, so the invoice should be passed by reference. It gives the backoff correctly: 2 s first retry, doubling, 10-minute cap, dead-letter after 25 attempts, and retry_limit changes the count but not the curve."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "bb6a9538f3544540d9bcc51ecef6f8a6dd62fb3270bd9ecee1231ae110787478",
+ "cost_usd": 0.0239,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Answers 5 with the correct per-file breakdown, using a recursive grep with --include='*.log' that leaves out logs/notes.txt."
+ }
+}

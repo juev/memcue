@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a5ffe20c20da9e07f195b17ea1a979489ad73f511e4aed8cbe010135fca22dc7",
+ "cost_usd": 0.0312,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer reports all of the shelf fact's limits with the source and the 2026-08-21 read date, concludes that the 7-hour job would be cancelled on a hosted runner, and gives both splitting the job into parts under 6 hours and using a self-hosted runner as options."
+ }
+}

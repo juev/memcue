@@ -1,0 +1,100 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S18",
+  "repeat": "r3",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 107.3,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.006294888000000001,
+  "turns": 20,
+  "input_tokens": 280644,
+  "output_tokens": 5622,
+  "cache_read_tokens": 266496
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shippers encrypted connections TLS throughput",
+     "limit": "8"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FW2KCRMXBK02W0RWTQMXJ\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:50:49Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "лог шипперы fluentd vector filebeat производительность",
+     "limit": "8"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "query": "logging pipeline collector shipper syslog"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "query": "Marrowlog"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "memcue_search",
+   "read_file",
+   "read_file",
+   "tool_describe",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "search_files",
+   "read_file",
+   "search_files",
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "terminal",
+   "search_files",
+   "read_file",
+   "terminal",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "tool_call"
+  ],
+  "pages_read": [
+   "https://duckduckgo.com/html/?q=Marrowlog+agent+throughput+TLS+logs+per+second",
+   "https://www.bing.com/search?q=Marrowlog+agent+2.4+benchmark+lines+per+second",
+   "https://docs.marrowlog.com/",
+   "https://marrowlog.example/perf/2026-q2/"
+  ],
+  "final_answer": "No — nothing published actually covers that. Here's what exists.\n\nThe only Marrowlog number I found is the vendor's 2.4 performance report, 2026 Q2 (published 2026-06-18):\n\n  180,000 lines/s from one agent, 1 vCPU / 2 GiB, CPU at 85%\n  lines 200 bytes or shorter, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs\n\nThat looks like 3.6x headroom over 50k lines/s, but the report's own \"Not covered\" section kills it: TLS to the collector was not enabled in any run, nor were lines longer than 200 bytes, nor the disk buffer. TLS is explicitly promised for the Q4 report, which isn't out.\n\nAnd our workload is not the benchmark workload even before TLS:\n\n  benchmark: 180k x 200 B = 36 MB/s\n  ours:       50k x 900 B = 45 MB/s  (25% more bytes/s)\n\nSo we'd be pushing more data through the same 1 vCPU that was already at 85% in the plain-TCP run, then adding TLS record-layer encryption and its extra copies on top. On a sidecar capped at 1 vCPU, that's where the failure would show up, not in the line count. Answer: no published number; the one figure we have is credentials for a workload 4.5x smaller per line with encryption switched off. I'd also keep in mind that our agents run with the disk buffer off (config/agent.yaml), so if TLS does push a peak past what the vCPU can do, lines are dropped rather than spooled.\n\nTo get an answer rather than a guess: pilot `tls: true` on one VM with real 900-byte lines at 50k/s and watch agent CPU headroom and the collector's TLS termination, or chase the vendor for the Q4 figures. The published report is agent-side only in any case — collector-side TLS capacity won't be covered by it."
+ }
+}

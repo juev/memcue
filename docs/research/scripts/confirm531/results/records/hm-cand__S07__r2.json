@@ -1,0 +1,70 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S07",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0010865579999999998,
+  "turns": 5,
+  "input_tokens": 42093,
+  "output_tokens": 1072,
+  "cache_read_tokens": 39936
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit job timeout",
+     "in": "shelf",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F9JEJTJXAPPZ61HHGV8S2\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:42Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI maximum build duration hours",
+     "in": "shelf",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F9JEJTJXAPPZ61HHGV8S2\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:42Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "10",
+     "min_score": "0",
+     "query": "Saltmarsh CI time limit job timeout"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F9JEJTJXAPPZ61HHGV8S2\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:42Z\"}, {\"id\": \"01M61F9JEBSVQG4WHX28669QEB\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:42Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "Saltmarsh CI runners pipeline self-hosted"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F9JDR0MJPYC3J02DHEFKZ\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:40:42Z\"}, {\"id\": \"01M61F9JEPVHD5JENEBWJV64WG\", \"content\": \"The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\", \"keywords\": [\"stor-02\", \"corvane\", \"gateway\", \"logs\"], \"scope\": \"host:stor-02\", \"created\": \"2026-10-28T14:40:42Z\"}, {\"id\": \"01M61F9JDSKA9JJXFCW1FXYZHM\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:40:42Z\"}, {\"id\": \"01M61F9JDY1NZ01WXEFFJ36KE9\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:40:42Z\"}, {\"id\": \"01M61F9JEMFXYVCJZVNV687C59\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:40:42Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "search_files",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "From the shelf (one entry, docs.saltmarsh.example/limits, read 2026-08-21):\n\n  Hosted runners: job cancelled after 6 hours; whole pipeline run after 72 hours.\n  Jobs queued more than 24 hours are dropped.\n  Self-hosted runners: no job time limit.\n\nYour 7-hour nightly job would be killed at 6h on a hosted runner. Two ways around it:\n\n  - Run it on a self-hosted runner (no job limit).\n  - Split it into two or more sequential jobs each under 6h; the 72h pipeline limit leaves plenty of room.\n\nCaveat: that fact is from August docs and I have not re-verified it against the current version — the workspace (/stand/ws) has no Saltmarsh config, so there is nothing local to confirm which runner type you would use. Worth a quick re-read of the limits page before you commit the job design."
+ }
+}

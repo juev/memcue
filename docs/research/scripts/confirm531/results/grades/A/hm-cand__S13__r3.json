@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "8584fae11effd7c2526e72543ce934ad2f9b5417e3dff2cca73519d17046f1f2",
+ "cost_usd": 0.0493,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons, NFS/SMB being unsupported and able to corrupt the database and only one writer being allowed at a time. It cites the Kestrune 3.2 docs through the stored shelf fact, and it adds no invented reasons."
+ }
+}

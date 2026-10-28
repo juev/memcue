@@ -1,0 +1,31 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S10",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 29.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001763076,
+  "turns": 4,
+  "input_tokens": 34402,
+  "output_tokens": 1049,
+  "cache_read_tokens": 27392
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No on the payload size, and the backoff is fixed.\n\nPayload — no. docs/vendor/ostrel-limits.md:7-9 caps a job payload at 256 KiB (262,144 bytes) after serialization; anything bigger is rejected at enqueue with `PayloadTooLarge`. README.md:6 says our invoice payloads (rendered invoice plus metadata) run up to 300 KB — 300,000 bytes decimal, 307,200 if you meant KiBs. Either reading is over the cap, so a full-size invoice payload will be refused at enqueue, not fail later. The doc's own advice (line 9) is to store the data elsewhere and pass a reference in the payload; that, or splitting/compressing the payload, is the route in.\n\nBackoff — exponential, not configurable in 5.3 (line 13-16):\n- First retry after 2 s, each subsequent delay doubled, capped at 10 minutes (600 s).\n- So the gap schedule is 2, 4, 8, 16, 32, 64, 128, 256, 512 s, then 600 s for every retry after that (the 1024 s step would overshoot the cap).\n- After 25 attempts the job goes to the dead-letter queue.\n- `retry_limit` per job type changes the attempt count, but the curve itself cannot be changed in 5.3.\n\nPractical consequence: 25 attempts with the last 16 gaps at 10 minutes means a poison invoice job sits in retry for roughly 3.5 hours before dead-lettering — worth deciding whether your per-job-type `retry_limit` should be lower than the default."
+ }
+}

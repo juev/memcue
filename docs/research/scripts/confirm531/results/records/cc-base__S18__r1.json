@@ -1,0 +1,40 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S18",
+  "repeat": "r1",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 24.9,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1059416,
+  "turns": 6,
+  "input_tokens": 12,
+  "output_tokens": 1295,
+  "cache_read_tokens": 102928
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"log shipper TLS throughput benchmark\"; memcue search -in all \"log shipper encrypted 50k lines per second\"; memcue search -in all \"TLS benchmark lines/s\"; ls -la; git ls-files | head -50",
+    "result": "01M61EKKSMVQ22XQN0X44BCWTZ example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) measured plain TCP only with lines of 200 bytes or less; it did not measure TLS, longer lines or the disk buffer, so it cannot show whether log-pipeline agents keep up with TLS. The maintainers plan to measure TLS in the Q4 2026 report.\n01M61EKKSMVQ22XQN0X44BCWTZ example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) measured plain TCP only with lines of 200 bytes or less; it did not measure TLS, longer lines or the disk buffer, so it cannot show whether log-pipeline agents keep up with TLS. The maintainers plan to measure TLS in the Q4 2026 report.\n01M61EKKSMVQ22XQN0X44BCWTZ example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) measured plain TCP only with lines of 200 bytes or less; it did not measure TLS, longer lines or the disk buffer, so it cannot show whether log-pipeline agents keep up with TLS. The maintainers plan to measure TLS in the Q4 2026 report.\ntotal 20\ndrwxr-xr-x 4 1001 1001 4096 Oct 28 14:56 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:56 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:56 .git\n-rw-r--r-- 1 1001 1001  433 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\nREADME.md\nconfig/agent.yam… [1 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2",
+   "https://marrowlog.example/perf/2026-q4"
+  ],
+  "final_answer": "No, there are no published numbers that cover your case.\n\nThe only published figure is the Marrowlog 2.4 performance report from 2026 Q2 (https://marrowlog.example/perf/2026-q2). It shows 180,000 lines/s on 1 vCPU at 85% CPU. That sounds like plenty of room above 50k, but the test setup doesn't match yours:\n\n- **No TLS.** Every run used plain TCP. The report says outright that TLS wasn't measured.\n- **Short lines.** Every test line was 200 bytes or less. The README says your lines average about 900 bytes, since they're JSON with stack traces.\n- **No disk buffer.** It was off in their tests, and it's off in your `config/agent.yaml` as well, so this one doesn't matter for you.\n\nThe line length is a bigger worry than it looks. Their result works out to about 36 MB/s (180k × 200 B). Your peak is about 45 MB/s (50k × 900 B). So even over plain TCP, your load is heavier in bytes than anything they measured, and TLS adds encryption cost on top. That's my own rough arithmetic, not a measurement. Cost may not scale linearly with line size, but it means the 180k figure gives you no real headroom.\n\nThe maintainers said they'd measure TLS in the Q4 report. I checked and that report isn't out yet (the Q4 page returns 404).\n\nI'd suggest running your own benchmark before you switch: one agent on 1 vCPU, `tls: true`, realistic 900-byte JSON lines and `batch_lines: 500`, run until it hits 50k lines/s. That would give you a real answer well before the end-of-next-quarter deadline, without waiting for Q4."
+ }
+}

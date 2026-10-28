@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "e66600e1d7254279df9fd3d1d8a5af6d19099db2439db78543230b8f1d1f0d3d",
+ "cost_usd": 0.0398,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not reachable with the default setup: polling defaults to 30 s and can't go below 10 s, so 5 s needs stream: true on the Team plan or above. It cites the Nimbrel server SDK 4.x docs read 2026-04-20 and says to check the SDK version, without inventing any polling option."
+ }
+}

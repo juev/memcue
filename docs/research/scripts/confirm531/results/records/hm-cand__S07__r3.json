@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S07",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 26.7,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000631818,
+  "turns": 3,
+  "input_tokens": 23799,
+  "output_tokens": 654,
+  "cache_read_tokens": 22656
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit job timeout",
+     "in": "shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV8CSE3CNXZWYDEXA9P35\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:22Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI maximum job duration limit",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV8CSE3CNXZWYDEXA9P35\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:22Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "min_score": "0",
+     "query": "Saltmarsh CI time limit job timeout"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV8CSE3CNXZWYDEXA9P35\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:22Z\"}, {\"id\": \"01M61FV8CNPBADK5M2CV9FPFPV\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:22Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "Found one fact on the shelf:\n\nSaltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours; a whole pipeline run after 72 hours; jobs queued more than 24 hours are dropped; self-hosted runners have no job time limit.\n\nSo a 7-hour nightly job on hosted runners gets killed at the 6-hour mark — the 72-hour pipeline limit doesn't rescue it, since the per-job cancellation bites first. Your options: run it on a self-hosted runner, or split the work across jobs that each finish under 6 hours (relying on the 72-hour run limit). Also watch the 24-hour queue cap if runner availability is tight — a nightly job stuck in queue for a day is silently dropped.\n\nCaveat: that's a vendor doc read two months ago; if you're betting a nightly pipeline on it, re-read that limits page before committing."
+ }
+}

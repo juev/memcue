@@ -1,0 +1,89 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S16",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 155.5,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.012462306000000001,
+  "turns": 36,
+  "input_tokens": 769035,
+  "output_tokens": 9898,
+  "cache_read_tokens": 740352
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EXGZ29W478TWHRBFB2Z3N\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:34:08Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel шина событий лимит размера сообщения"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "tool_search",
+   "tool_describe",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "search_files",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "terminal",
+   "search_files",
+   "terminal",
+   "terminal",
+   "terminal",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "write_file",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://html.duckduckgo.com/html/?q=Quorvel+event+bus",
+   "https://html.duckduckgo.com/html/?q=%22Quorvel%22",
+   "https://lite.duckduckgo.com/lite/?q=Quorvel"
+  ],
+  "final_answer": "Short answer: there isn't an event bus you can publish to, and 2 MB won't fit through the ingest path either. Hard cap is 1 MiB (1,048,576 bytes) of request body.\n\nTwo separate things here:\n\n1. The \"bus\" is internal. apps/api/src/bus.ts is an EventBus interface with two implementations (InProcessBus, and QueueBus over BullMQ when REDIS_URL is set). What it carries is the fixed DomainEvent struct from events.ts:\n\n   type, orgId, idempotencyKey, tool, scope, cost, status, reason?, at\n\n   No payload field, no args, no result. It exists so billing meters and alert transports can react to action.created / action.transition. Customer data never travels over it, so there's no \"message size\" to speak of — even a 900 KB snapshot never reaches a subscriber.\n\n2. The path that does accept data is POST /v1/actions, whose `args` field (arbitrary JSON) is stored in the actions table's jsonb column. That request goes through Fastify with no explicit bodyLimit and no parser override anywhere in the repo, so the framework default applies.\n\nVerified by running the actual buildServer() from the repo against a MemStore with a seeded API key:\n\n  0.500 MiB (524,288 bytes)   -> 200 {\"inserted\":true}\n  1.000 MiB (1,048,576 bytes) -> 200 {\"inserted\":true}\n  1.048 MiB (1,099,511 bytes) -> 413 FST_ERR_CTP_BODY_TOO_LARGE\n  2.000 MiB (2,097,152 bytes) -> 413 FST_ERR_CTP_BODY_TOO_LARGE\n\nSo the boundary is exactly 1,048,576 bytes; a 2 MB snapshot fails before any handler runs, with \"Request body is too large\". Note 2 MB decimal is 2,097,152 bytes — twice the cap.\n\nPractical suggestion: don't push snapshots through either path. Write the snapshot to object storage and put a reference (bucket key, content hash, version, byte size) in `args` — that keeps idempotency semantics and replay intact, and a replay then re-fetches from storage. If you genuinely need large inline bodies you'd have to self-host and set `bodyLimit` on the Fastify instance in apps/api/src/server.ts (plus mind Postgres jsonb/TOAST costs), which is a fork, not configuration.\n\nCaveat: I checked the public repo (kaushalv17/Quorvel at main, v0.7.0) since quorvel.tech has no docs page and no published limits. If you're on api.quorvel.tech with a proxy in front (Fly/render config in the repo sets none), the effective limit could be lower if a CDN caps bodies — worth confirming with them, but 1 MiB is what the code enforces."
+ }
+}

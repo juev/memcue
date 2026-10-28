@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "31603f6b39daabe3d94314ec4109f2edc49e1e07841d1fa442dbb048bce98993",
+ "cost_usd": 0.0062,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons: NFS/SMB is unsupported and may corrupt the database, and only one process may write. It cites the stored Kestrune 3.2 limits page as the source."
+ }
+}

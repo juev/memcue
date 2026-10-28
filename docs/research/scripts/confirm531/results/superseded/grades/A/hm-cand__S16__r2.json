@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "2b6e3b514962970b2542c6bda8ce9cf7af9167d8f051b3f91b466ef8d6f9f911",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says it has no information on Quorvel's size limit after searching memory, the workspace and the web, and asks for the docs or config before giving a number; the Kafka figure is presented as a different broker, not as Quorvel's limit, and 2 MB is never called fine."
+ }
+}

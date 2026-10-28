@@ -1,0 +1,44 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S14",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 35.6,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1183524,
+  "turns": 8,
+  "input_tokens": 14,
+  "output_tokens": 1738,
+  "cache_read_tokens": 122322
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat client/charge.py; ls -R | head -50; memcue search \"charge retry idempotency double charge\"; memcue search -in shelf:research \"urllib3 Retry POST allowed_methods\"",
+    "result": "\"\"\"Create a charge in the billing service.\"\"\"\nimport pardalo\nfrom pardalo import Retry\n\nsession = pardalo.Session(retry=Retry(total=3), timeout=10)\n\n\ndef create_charge(order_id: str, amount_cents: int) -> dict:\n    resp = session.post(\n        \"https://billing.int.example/v1/charges\",\n        json={\"order_id\": order_id, \"amount_cents\": amount_cents},\n    )\n    resp.raise_for_status()\n    return resp.json()\n.:\nREADME.md\nclient\nrequirements.txt\n\n./client:\ncharge.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61FFPQKXB0AWM4RXKCBGKK8 pardalo.example 2026-02-08 | Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries",
+   "https://pardalo.example/docs/4.2/retries",
+   "https://pardalo.example/changelog",
+   "https://pardalo.example/"
+  ],
+  "final_answer": "Probably not from the retry policy itself, but I couldn't confirm that for the Pardalo version you actually use. And the code has no protection against duplicates if a retry does happen.\n\n**What I found**\n- `client/charge.py` sends the charge with `session.post(...)` on a session built with `Retry(total=3)`. It doesn't say which HTTP methods may be retried, so the library default decides.\n- My memory has a note from reading the Pardalo **3.1** docs (pardalo.example/docs/retries, read 2026-02-08). It says that with `Retry(total=N)`, a session retries after a connection error only for GET, HEAD, PUT, DELETE and OPTIONS, **never POST or PATCH**. If that still holds, a dropped connection would not make Pardalo resend your charge.\n- **The catch:** `requirements.txt` pins `pardalo==4.2.0`, a major version later than that note. Pardalo isn't installed here, and the docs URL, a 4.2 docs path, the changelog and the site root all returned 404. So I couldn't check whether 4.x changed the default. Treat \"POST is not retried\" as unconfirmed for 4.2.0.\n\n**Duplicates can happen even without retries.** If the connection drops after the billing service has accepted the request, the client gets an error but the charge may already exist. Then anything above this function that retries (a job runner, a queue redelivery, a user clicking again) sends a second charge. Nothing in the request lets the server spot the duplicate.\n\n**What I'd suggest**\n1. **Use an idempotency key** if the billing service supports one, e.g. a header derived from `order_id`, so a repeated request returns the existing charge. This is the real fix, and it covers retries at every level.\n2. **Make the retry policy explicit** rather than relying on the default. For example, limit retries to connection failures where the request never reached the server, or exclude POST entirely. I'd have to check Pardalo 4.2's `Retry` options for the exact parameter name, since I couldn't reach its docs.\n3. To settle the 4.2 question, look at Pardalo 4.2's `Retry` source or changelog in an environment where it's installed (`python -c \"import pardalo, inspect; print(inspect.getsource(pardalo.Retry))\"`).\n\nI haven't changed any code. I can add the explicit retry setting or the idempotency header if you tell me whether the billing service accepts an idempotency key."
+ }
+}

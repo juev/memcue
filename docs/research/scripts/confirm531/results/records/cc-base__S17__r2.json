@@ -1,0 +1,51 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S17",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 37.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.124555,
+  "turns": 8,
+  "input_tokens": 16,
+  "output_tokens": 1928,
+  "cache_read_tokens": 137775
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "git ls-files | head -50; memcue search \"price-feed streaming backpressure\" ; memcue search -in all \"price-feed grpc\"",
+    "result": "README.md\nrequirements.txt\nserver.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61FJKJRPHKT2YSNB04WQZDN | storefront stores prices as integer cents, never as floats, so that totals do not drift."
+   },
+   {
+    "tool": "Bash",
+    "input": "find / -ipath '*thistlewire*' -not -path '/proc/*' 2>/dev/null | head; memcue search -in all \"thistlewire\"; memcue search -in all \"stream slow client buffer\"",
+    "result": "No stored facts match.\n1 fact on the shelf matches: -in shelf:research\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"thistlewire\"; memcue search -in shelf:research \"stream slow client buffer\"",
+    "result": "01M61FJKK0DG9MZVN86N1KBJNX thistlewire.example 2026-07-11 | Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\n01M61FJKK0DG9MZVN86N1KBJNX thistlewire.example 2026-07-11 | Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://thistlewire.example/docs/streaming"
+  ],
+  "final_answer": "The setting you need is `max_buffered_messages`. By default a slow dashboard can make the server balloon.\n\n**Where this comes from:** I couldn't confirm it against current docs. Thistlewire isn't installed here, and `thistlewire.example/docs/streaming` returns 404 right now. The details below come from a note in my memory base, taken from the Thistlewire 0.9 streaming docs on 2026-07-11. The repo pins `thistlewire==0.9.4`, so it should still apply, but check it against the 0.9.4 source or docs before relying on it.\n\n**What that note says about Thistlewire 0.9:**\n- Server-streaming calls have **no built-in flow control**.\n- For a slow client, the server **queues messages without limit** unless you set the stream option **`max_buffered_messages`**. The default is `0`, which means unlimited.\n- When the cap is reached, the stream is **closed with `RESOURCE_EXHAUSTED`**.\n\nSo with the default, a dashboard stuck on bad Wi-Fi keeps collecting ticks in server memory with no limit.\n\n**What I'd configure:**\n1. **Set `max_buffered_messages` on the streaming endpoint.** Size it from tick rate × the stall you'll tolerate. For example, 50 ticks/s and about 5 s of Wi-Fi hiccup gives roughly 250, which is a few hundred messages per client. Memory is then capped at about cap × message size × number of dashboards.\n2. **Treat `RESOURCE_EXHAUSTED` as normal on the dashboard side.** Reconnect with backoff and jitter, then re-request a fresh snapshot of current prices. Don't try to replay what was missed, because old ticks are worthless anyway.\n3. **Think about conflating ticks in your own handler rather than queueing every one.** Keep only the latest price per symbol for each client and send that when the client can take it. A slow dashboard then just sees fewer updates, not a growing backlog. If Thistlewire doesn't offer a way to check whether a client is keeping up, the buffer cap is your safety net and conflation is your own logic.\n4. **Limit concurrent streams** (overall and per client/IP). That way reconnect storms or many stuck dashboards can't add up to the same problem.\n5. **Use a keepalive or idle timeout** so connections that have silently died on Wi-Fi are actually closed. Check whether Thistlewire has a keepalive option; I don't have a note on one.\n6. **Watch it:** track per-stream buffer depth, the number of `RESOURCE_EXHAUSTED` closes, and open stream count. Frequent cap hits mean the cap is too small or you need conflation.\n\nOne small thing: `lookup` returns a `float`. Another note in my memory base, from a different project, keeps prices as integer cents (or fixed-point) to avoid float drift. That doesn't matter for the streaming question, but you may want to decide it before the tick format is fixed."
+ }
+}

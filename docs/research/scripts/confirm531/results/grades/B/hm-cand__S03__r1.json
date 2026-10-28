@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "bb6a9538f3544540d9bcc51ecef6f8a6dd62fb3270bd9ecee1231ae110787478",
+ "cost_usd": 0.0057,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer is 5 with the correct per-file breakdown, and the command counts ERROR lines in .log files recursively and leaves out logs/notes.txt."
+ }
+}

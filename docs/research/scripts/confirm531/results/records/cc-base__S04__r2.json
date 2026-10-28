@@ -1,0 +1,71 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S04",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 58.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.12336,
+  "turns": 9,
+  "input_tokens": 12,
+  "output_tokens": 1777,
+  "cache_read_tokens": 102900
+ },
+ "record": {
+  "prompt": "Our new product photos are up to 64 megapixels. resize/pipeline.py downscales everything to 40 MP before sending it to Tamberline. Look at their changelog at https://tamberline.example/changelog and tell me whether we can drop that step.",
+  "base_changes": [
+   {
+    "id": "01M61F5XJW4ZEVT492382X43NW",
+    "version": 2,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "environment",
+    "source": "tool",
+    "keywords": "tamberline, image api, megapixels, 413, source limit",
+    "content": "Tamberline image API limits (changelog tamberline.example/changelog, read 2026-10-28): since v2.6 (2026-09-14) source images up to 100 megapixels are accepted, larger ones are rejected with HTTP 413 (before v2.6 the limit was 40 MP); output renditions stay capped at 8,000 px on the long side.",
+    "change": "corrected"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat /stand/ws/resize/pipeline.py; memcue search \"Tamberline resolution limit megapixels\"",
+    "result": "\"\"\"Send product photos to the Tamberline API for the web renditions.\"\"\"\nimport lumenpix\n\nMAX_SOURCE_PIXELS = 40_000_000  # Tamberline rejects larger sources\n\n\ndef prepare(path: str) -> \"lumenpix.Picture\":\n    img = lumenpix.open(path)\n    w, h = img.size\n    if w * h > MAX_SOURCE_PIXELS:\n        scale = (MAX_SOURCE_PIXELS / (w * h)) ** 0.5\n        img = img.resize((int(w * scale), int(h * scale)))\n    return img\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"Tamberline resolution limit megapixels\"",
+    "result": "01M61F5XJW4ZEVT492382X43NW docs.tamberline.example 2026-05-09 | Tamberline image API v2 (docs.tamberline.example/api/limits, read 2026-05-09): source images above 40 megapixels are rejected with HTTP 413; output renditions are capped at 8,000 px on the long side."
+   },
+   {
+    "tool": "Skill",
+    "input": {
+     "skill": "memcue:memcue",
+     "args": "correct fact 01M61F5XJW4ZEVT492382X43NW: Tamberline v2.6 (2026-09-14) raised the source limit to 100 MP"
+    },
+    "result": "Launching skill: memcue:memcue"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue correct 01M61F5XJW4ZEVT492382X43NW \"Tamberline image API limits (changelog tamberline.example/changelog, read 2026-10-28): since v2.6 (2026-09-14) source images up to 100 megapixels are accepted, larger ones are rejected with HTTP 413 (before v2.6 the limit was 40 MP); output renditions stay capped at 8,000 px on the long side.\"",
+    "result": "01M61F5XJW4ZEVT492382X43NW v2"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash",
+   "Bash",
+   "Skill",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://tamberline.example/changelog"
+  ],
+  "final_answer": "Yes, you can drop it, with one caveat. Tamberline's changelog says this under **v2.6 (2026-09-14)**:\n\n> Source images up to 100 megapixels are accepted; larger sources are still rejected with HTTP 413.\n\nYour 40 MP cap in `resize/pipeline.py:4` (`MAX_SOURCE_PIXELS = 40_000_000  # Tamberline rejects larger sources`) matches the old limit. Your photos top out at 64 MP, which is well under the new 100 MP limit.\n\nPoints to know before you remove it:\n\n- **I'd raise the cap rather than delete it.** Larger sources still get an HTTP 413. Changing the constant to `100_000_000` costs nothing and protects you if a bigger camera ever turns up.\n- **The output limit hasn't changed.** Renditions are still capped at 8,000 px on the long side. That limit applies to what Tamberline produces, not to what you send, so your downscale step has nothing to do with it.\n- **I couldn't confirm you're on v2.6.** The repo doesn't pin a Tamberline API version, and the changelog doesn't say whether v2.6 applies to every v2 client automatically. Send one 64 MP photo through without the downscale and check it doesn't return a 413 before relying on this.\n- **Smaller uploads were a side effect of the downscale.** If upload time or bandwidth matters to you, sending full 64 MP files will be slower.\n\nI haven't changed any code. I did update an old memory entry (fact `01M61F5XJW4ZEVT492382X43NW`, from May 2026) that still said the limit was 40 MP. It now records the 100 MP limit from v2.6."
+ }
+}

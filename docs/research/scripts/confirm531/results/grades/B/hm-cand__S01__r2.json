@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "a5c4c9da73643a1176477906bb5ff13d654a495b7855721022e3113a65a4516b",
+ "cost_usd": 0.0115,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes because the pinned 2.1.3 has `@include \"path\"` (added in 2.0.0), and it gives the full mechanism from the changelog: paths are relative to the including file, nesting goes up to 8 levels, later keys override the base, and `${ENV}` works in include paths since 2.1.0. It invents nothing and changes no files; the 1.4 shelf fact was never found, so it did not need to call it outdated."
+ }
+}

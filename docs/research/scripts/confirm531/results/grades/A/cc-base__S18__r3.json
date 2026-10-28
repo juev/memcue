@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "71fbf86528791116c0fb33ed89a50a547ba6f9c5aa013f81a49dcd2e4fdb927d",
+ "cost_usd": 0.0398,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says no published TLS number exists, cites the Marrowlog 2.4 Q2 report (180,000 lines/s on 1 vCPU, plain TCP only, lines of 200 bytes or less), notes that the Q4 report is planned to cover TLS, and says the team must test it themselves; it gives no invented TLS figure."
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S17",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 43.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00279324,
+  "turns": 5,
+  "input_tokens": 43544,
+  "output_tokens": 2707,
+  "cache_read_tokens": 36480
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "price-feed streaming service"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F1J3P7F3ZG50AKYS5JZM1\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:36:20Z\"}, {\"id\": \"01M61F1J3HPCRNAMHVRAGM0A35\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:36:20Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "search_files",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Read the repo — `server.py` is a unary Thistlewire app, and Thistlewire isn't installed in this environment and the README doesn't document its streaming config, so I can't give you exact option names. Here's what to set, and why, in the order that matters:\n\nThe real risk is per-subscriber buffering\n- Don't give each dashboard its own queue of ticks. One slow reader with an unbounded queue is what balloons. Structure the fan-out as a per-symbol latest-value ring buffer (or per-symbol broadcast) that subscribers read via a cursor. Then memory is O(symbols), not O(subscribers × backlog).\n- For price ticks specifically, conflate: a slow dashboard should get the newest price per symbol, skipping intermediate ticks, not a replay. Carry a sequence number per symbol so it can detect gaps and refetch a snapshot on reconnect.\n\nIf the library forces a per-subscriber queue\n- Hard-cap it — a few hundred messages, or ~1-2 seconds of ticks, whichever is smaller.\n- Policy: drop-oldest (conflate), never block the producer, never grow. Blocking the producer serially couples every dashboard to the slowest one; growing is the memory leak.\n- On overflow, either coalesce or close the stream with a retryable status. Don't hold the connection open with a growing backlog.\n\nTransport-level backpressure\n- Keep HTTP/2 flow-control windows modest. The per-stream window is your natural bound; if you tune it up into the megabytes, you've just re-enabled the ballooning at the transport layer.\n- Set a per-send write deadline (1-5s is generous for a tick-sized message). If it can't drain, kill the stream rather than hold the buffer.\n- Cap max concurrent streams per connection and per client, so one dashboard opening 50 tabs can't multiply the buffers. Cap subscribers per client too.\n\nFlaky Wi-Fi needs reaping, not patience\n- Server keepalive: ping every ~10-20s with a ~5-10s timeout. Without it, a dashboard that vanished holds its buffer until TCP gives up — minutes.\n- Treat slow-consumer eviction as normal: disconnect, let it reconnect, send a fresh snapshot. Dashboards don't need tick-by-tick continuity.\n\nAlso worth doing\n- Batch/coalesce ticks into ~50-100ms frames instead of one message per tick — fewer writes, less per-message overhead across many subscribers.\n- Expose per-stream gauges: queue depth, send-block time, eviction count. Alert on evictions so \"flaky Wi-Fi\" is visible rather than mysterious.\n- Test it: a client that reads a little then stalls must leave server RSS flat and producer latency unchanged.\n\nIf you can point me at Thistlewire's docs or install it (`thistlewire` isn't importable here), I can map these onto its actual settings."
+ }
+}

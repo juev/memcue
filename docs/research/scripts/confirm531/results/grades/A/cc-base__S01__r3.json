@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "da657e79368b690d273cfbcf0ca74c5cf1da38a18f9b1960610a84466a0201e3",
+ "cost_usd": 0.0413,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes for the pinned 2.1.3 and gives every changelog detail the label asks for: the @include \"path\" syntax added in 2.0.0, paths relative to the including file, nesting up to 8 levels, later keys overriding the base, and ${ENV} in include paths since 2.1.0. It changes no files, and since the 1.4 shelf fact never appeared in its search results, it did not need to call that fact outdated."
+ }
+}

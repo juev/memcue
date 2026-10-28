@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "b135f3d3b8cb3a19fe9f8a98b8c35cc526436afd58e44216b04da7024a2242bb",
+ "cost_usd": 0.0458,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It meets the main criteria (polling is 30 s by default with a 10 s floor, 5 s needs stream: true, which needs Team plan or above, and it cites the Nimbrel SDK docs read 2026-04-20 with a caveat to re-check), but it also states unsourced specifics as fact, such as streaming delivering changes 'usually within a second or two' and the SDK falling back to polling on its own."
+ }
+}

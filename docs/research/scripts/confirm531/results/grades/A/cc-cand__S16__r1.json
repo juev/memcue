@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "08aa45dfcd89cc06c7faf916a75940f744e941adbc73e678dffbfeed04266b3f",
+ "cost_usd": 0.032,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no information on Quorvel's limit was found in memory, the repo or the docs. It refuses to guess a number and asks for Quorvel's docs or the broker config before anyone relies on 2 MB messages."
+ }
+}

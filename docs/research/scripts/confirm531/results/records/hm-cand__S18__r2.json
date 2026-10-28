@@ -1,0 +1,60 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S18",
+  "repeat": "r2",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 34.1,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00150243,
+  "turns": 4,
+  "input_tokens": 33013,
+  "output_tokens": 1934,
+  "cache_read_tokens": 31360
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shippers encrypted TLS throughput benchmark 50k lines per second",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "логшиппер шифрование производительность замеры",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "limit": "10",
+     "query": "log shippers encrypted TLS throughput benchmark lines per second"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FBAP3HKM2J55WH7HKSNR6\", \"content\": \"Marrowlog 2.4 performance report (2026 Q2, published 2026-06-18, https://marrowlog.example/perf/2026-q2) states: one 2.4 agent shipped 180,000 lines/s to a collector on 1 vCPU / 2 GiB with CPU at 85%, median of three 30-minute runs, plain TCP, disk buffer off, batch_lines 500, input lines 200 bytes or shorter. The report explicitly says TLS was not enabled in any run and lists TLS to the collector, lines longer than 200 bytes and the disk buffer as not measured; TLS is planned for the Q4 report. So it gives no TLS figure and its line-rate does not transfer to longer lines (it implies roughly 36 MB/s at 200 B/line).\", \"keywords\": [\"Marrowlog\", \"performance report\", \"throughput\", \"180000 lines\", \"TLS\", \"not measured\", \"plain TCP\", \"200 bytes\", \"benchmark\", \"log agent\"], \"origin\": \"example.com/acme/log-pipeline 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:41:40Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No. There are no published numbers for the TLS case, and the one published figure we do have doesn't cover the plain-TCP case at our line length either.\n\nWhat exists: Marrowlog 2.4 performance report, 2026 Q2 (published 2026-06-18). Its headline is 180,000 lines/s from one agent to a collector on 1 vCPU / 2 GiB, CPU at 85% — median of three 30-minute runs, plain TCP, disk buffer off, batch_lines 500, lines 200 bytes or shorter. The report states outright that TLS was not enabled in any run, that TLS, lines longer than 200 bytes and the disk buffer were not measured, and that TLS is planned for the Q4 report. So there is no TLS throughput figure to point at.\n\nAnd the plain-TCP figure doesn't transfer:\n\n  published   180,000 lines/s x 200 B  = 36 MB/s (34.3 MiB/s)\n  our peak     50,000 lines/s x 900 B  = 45 MB/s (42.9 MiB/s)\n\nWe need 1.25x the byte rate of the published run while sending 3.6x fewer lines. Throughput here is bounded by bytes, not line count, so the comfortable-looking \"50k vs 180k\" comparison is misleading — at our 900-byte average line the published run has no headroom for us, over TLS or over plain TCP. The 85% CPU on 1 vCPU is also relevant: the agents get exactly 1 vCPU reserved, so the published run left roughly 15% of the core free, and TLS puts handshakes and per-record crypto on that same core.\n\nOur config (config/agent.yaml) otherwise matches the benchmark's conditions — tls: false, batch_lines 500, disk: false — so the only divergence is line size, and that's the one that matters most.\n\nTwo ways to close it: get the Q4 report from the vendor when it lands, or benchmark it ourselves — a staging agent replaying representative 900-byte JSON lines (stack traces included) with tls: true, measuring lines/s and CPU on 1 vCPU, would answer it in an afternoon, and we'd want the MB/s figure rather than lines/s for any comparison. Note the security review deadline is end of next quarter, which likely lands around or after the Q4 report — worth pinning the vendor down on a date rather than assuming it arrives in time."
+ }
+}

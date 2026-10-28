@@ -1,0 +1,85 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S17",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 49.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003578346,
+  "turns": 9,
+  "input_tokens": 91463,
+  "output_tokens": 3294,
+  "cache_read_tokens": 82432
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "thistlewire price-feed streaming"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F1MC96XFHGF3WXHE6G19E\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:36:22Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all,shelf:research",
+     "query": "thistlewire server streaming flow control buffer"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F1MCJ4FR9XH24QKQJHP1T\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:36:22Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all,shelf:research",
+     "min_score": "0",
+     "query": "thistlewire server streaming flow control buffer"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F1MCJ4FR9XH24QKQJHP1T\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:36:22Z\"}, {\"id\": \"01M61F1MCG6KM9BXXVVQFMHJKX\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:36:22Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "price-feed dashboards tick streaming endpoint"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F1MC96XFHGF3WXHE6G19E\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:36:22Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "repo",
+     "query": "price-feed server thistlewire"
+    },
+    "result": "{\"error\": \"memcue: unknown place \\\"repo\\\": project, global, host, all, shelf, or a scope such as repo:KEY\"}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "search_files",
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "tool_describe",
+   "memcue_search",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "memcue_search",
+   "memcue_search"
+  ],
+  "pages_read": [
+   "https://thistlewire.example/docs/streaming",
+   "https://thistlewire.example/docs",
+   "https://thistlewire.example/"
+  ],
+  "final_answer": "Short answer: the one setting that actually bounds the damage is the stream's `max_buffered_messages`. Thistlewire 0.9 has no built-in flow control for server-streaming, and the default is `0`, meaning unlimited — the server will queue ticks for a stalled dashboard until the process dies. Set it to a finite cap; when the cap is hit Thistlewire closes that stream with `RESOURCE_EXHAUSTED` rather than growing.\n\nTwo caveats on that, then the rest:\n\n- I could not re-verify the docs: `thistlewire.example/docs/streaming` (and the host root) now return 404. The details above come from a July 2026 read of the 0.9 streaming docs. Your pin is 0.9.4, same minor line, so it very likely still holds — but confirm the option name and semantics against the 0.9.4 package before you write code.\n- A cap only protects you if writes are actually attempted. A half-open TCP connection from flaky Wi-Fi never drains and never trips the cap, so its queue pins memory forever. Whatever keepalive / write-timeout options 0.9.4 exposes, set them — that's what evicts the zombie. I don't know those option names, so don't take a name from me here.\n\nSizing the cap\n\nIt's in messages, not bytes, so two numbers drive it: ticks/sec per dashboard and seconds of stall you're willing to absorb. Cap ≈ rate × tolerable_lag, times some headroom. At 200 symbols × 10 ticks/s that's 2,000 msg/s, so 5s of tolerance ≈ 10k. The real constraint is RAM per stalled client × how many clients you'll tolerate being stalled at once — do that multiplication before picking the number.\n\nBetter lever, if you can afford it: don't queue ticks, conflate them. Prices are latest-value data, so a slow client doesn't need the intervening ticks — keep one slot per symbol and overwrite. That makes per-client memory a function of symbol count, which is fixed and tiny, instead of a function of stall duration. You can then use a large cap purely as a \"this client is effectively dead, drop it\" tripwire rather than a memory bound. Coalescing into small batches also cuts per-message overhead and makes the message-count cap mean something predictable.\n\nAdjacent things worth configuring while you're in there\n\n- Cap concurrent streams per client. The buffer cap is per stream; one machine opening 50 streams multiplies your budget by 50. If Thistlewire 0.9 doesn't expose a per-client stream limit, enforce it in your handler.\n- Keep the write off the feed loop. If the shared upstream feed blocks pushing into any single stream, one sluggish dashboard becomes a stall for every dashboard. Hand off to a per-stream bounded queue and let the writer drain it.\n- Design the client contract around disconnects now, not later. `RESOURCE_EXHAUSTED` means the dashboard must reconnect and resubscribe, and it will have missed ticks. Give it a snapshot-then-stream path (or re-sync from the existing unary `prices.Get`) so recovery is correct rather than silently gappy.\n\nThen verify with a deliberately slow reader: one client that reads a few messages then stalls, watch RSS plateau instead of climbing, and confirm the stream gets closed at the cap."
+ }
+}

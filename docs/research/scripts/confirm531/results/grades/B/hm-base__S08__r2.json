@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "9689511779debdc2d874f17b062c762ba90c89778039d51ce83f93eff9d8fe76",
+ "cost_usd": 0.0103,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no: TLS was not enabled in any run and test lines were at most 200 bytes, against the team's ~900-byte lines at 50,000 lines/s. It cites the 180,000 lines/s at 85% CPU plaintext figure and says the TLS cost must be measured, by the team's own test or the Q4 report, without inventing a TLS overhead figure; its byte-scaling estimate is explicitly labelled as inference."
+ }
+}

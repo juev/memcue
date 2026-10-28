@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "af0e87968646315604abeb493d8d3e7eb702f8cd730b4514c47d0724708dce15",
+ "cost_usd": 0.0065,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the 5437.50 total, explains that the script doesn't create out/ (which is gitignored and was missing), and says running `mkdir -p out` without editing the script fixed it."
+ }
+}

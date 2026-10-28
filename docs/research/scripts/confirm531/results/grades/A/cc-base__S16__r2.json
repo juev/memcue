@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "5a8591ab238b0b1ff9c3ff8695ffe160f4f100f166e2988a7f334553b0473a33",
+ "cost_usd": 0.0365,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says it found no information on Quorvel's message size limit after searching memory, the shelf and the repo, does not claim 2 MB is fine, and suggests checking Quorvel's docs or broker config; its mention of other buses' limits only explains why it won't guess and puts no number on Quorvel."
+ }
+}

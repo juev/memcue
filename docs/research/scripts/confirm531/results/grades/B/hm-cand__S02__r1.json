@@ -1,0 +1,66 @@
+{
+ "pass": "B",
+ "record_sha256": "c56d59b4b96bd4979ca11387a6317af8ae8c4def6654fb8419e99a93a078d811",
+ "cost_usd": 0.0225,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRS2X34Z6MMRZE6F6QN6"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EGRRHGRK6VV8GB07D36YP",
+    "version": 1,
+    "verdict": "expected",
+    "note": "On the research shelf with its source: documented limits, the single-writer lock and the NFS/SMB ban, which covers D1–D3."
+   },
+   {
+    "id": "01M61EGRS2X34Z6MMRZE6F6QN6",
+    "version": 1,
+    "verdict": "expected",
+    "note": "On the research shelf as D4: credits the vendor and gives the narrow setup and the cases it did not test."
+   },
+   {
+    "id": "01M61EGRSGQJ5TVTHQ0KPAKC68",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Stores the forum truncation claim explicitly as unverified, with the contrary report, which the label allows."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It concludes Kestrune does not fit because of the NFS ban and the single-writer limit, and says 6 MiB values fit under 8 MiB. It says the benchmark does not cover 6 MiB values with sync=full, so 300 writes/s is unproven, and it treats the forum claim as unverified and contradicted."
+ }
+}

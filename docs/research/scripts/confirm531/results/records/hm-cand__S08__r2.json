@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S08",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 36.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0017198699999999999,
+  "turns": 7,
+  "input_tokens": 60461,
+  "output_tokens": 2020,
+  "cache_read_tokens": 58240
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [
+   {
+    "id": "01M61FBAP3HKM2J55WH7HKSNR6",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "agent",
+    "keywords": "Marrowlog, performance report, throughput, 180000 lines, TLS, not measured, plain TCP, 200 bytes, benchmark, log agent",
+    "content": "Marrowlog 2.4 performance report (2026 Q2, published 2026-06-18, https://marrowlog.example/perf/2026-q2) states: one 2.4 agent shipped 180,000 lines/s to a collector on 1 vCPU / 2 GiB with CPU at 85%, median of three 30-minute runs, plain TCP, disk buffer off, batch_lines 500, input lines 200 bytes or shorter. The report explicitly says TLS was not enabled in any run and lists TLS to the collector, lines longer than 200 bytes and the disk buffer as not measured; TLS is planned for the Q4 report. So it gives no TLS figure and its line-rate does not transfer to longer lines (it implies roughly 36 MB/s at 200 B/line).",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "marrowlog log agents collector TLS",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log agent peak events per second throughput collector",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Marrowlog 2.4 performance report (2026 Q2, published 2026-06-18, https://marrowlog.example/perf/2026-q2) states: one 2.4 agent shipped 180,000 lines/s to a collector on 1 vCPU / 2 GiB with CPU at 85%, median of three 30-minute runs, plain TCP, disk buffer off, batch_lines 500, input lines 200 bytes or shorter. The report explicitly says TLS was not enabled in any run and lists TLS to the collector, lines longer than 200 bytes and the disk buffer as not measured; TLS is planned for the Q4 report. So it gives no TLS figure and its line-rate does not transfer to longer lines (it implies roughly 36 MB/s at 200 B/line).",
+     "keywords": "Marrowlog, performance report, throughput, 180000 lines, TLS, not measured, plain TCP, 200 bytes, benchmark, log agent",
+     "shelf": "research"
+    },
+    "result": "{\"result\": \"01M61FBAP3HKM2J55WH7HKSNR6\"}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "tool_describe",
+   "tool_call",
+   "terminal",
+   "read_file",
+   "search_files",
+   "read_file",
+   "terminal",
+   "memcue_add"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. The report doesn't answer the TLS question at all — and its plain-TCP number wouldn't transfer to us even if it did.\n\nWhat the report actually says (Marrowlog 2.4 perf report, 2026 Q2, published 2026-06-18):\n\n- Result: one agent shipped 180,000 lines/s to a collector on 1 vCPU / 2 GiB, CPU at 85%.\n- Method: plain TCP output — \"TLS was not enabled in any run\"; disk buffer off; batch_lines 500; input lines 200 bytes or shorter; median of three 30-minute runs.\n- Not covered: TLS to the collector, lines longer than 200 bytes, and the disk buffer. TLS is planned for the Q4 report.\n\nWhy it can't be extrapolated to our peak (/stand/ws/README.md: 50,000 lines/s per agent, ~900 bytes/line, 1 vCPU reserved):\n\n- Bytes, not lines, are the load here. Our peak is 50,000 × 900 B = 45 MB/s. The benchmark's ceiling is 180,000 × 200 B = 36 MB/s — and only at 85% CPU on unencrypted TCP. We'd need 1.25x that byte rate.\n- Our lines are 4.5x longer than anything they measured. At their byte ceiling we'd be at ~40,000 lines/s, below our 50,000 peak. (The 180,000-line figure looks like 2.8x headroom only if you compare lines; that comparison is invalid.)\n- TLS is additional CPU on the same 1 vCPU, and it's precisely what was excluded. There's no published figure for its cost.\n\nSo: not demonstrated. The honest statement to Security is that the vendor report shows no TLS measurement and our byte rate already exceeds their plain-TCP ceiling, so capacity under TLS is unverified. The batch_lines 500 and disk-buffer-off settings do match our config/agent.yaml, which helps the comparison but doesn't close either gap.\n\nTo get a real answer, measure it: run one agent at 50,000 lines/s of realistic 900-byte lines into a collector with TLS on, on 1 vCPU, and watch CPU and drop rate. Also worth asking Marrowlog for the Q4 TLS numbers or an early internal figure before committing to the end-of-quarter deadline — if TLS costs ~15-20% CPU on an already 85%-utilised profile, the current sizing is likely short and would need either more vCPU per sidecar or line trimming (stack traces are the bulk of those 900 bytes)."
+ }
+}

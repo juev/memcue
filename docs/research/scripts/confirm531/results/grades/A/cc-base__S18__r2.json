@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "68a1effaa93b9afc1386ec747e60d6bda8c31aa4fc7e7af7e436dae4d6755815",
+ "cost_usd": 0.04,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says no and cites the Marrowlog 2.4 Q2 report: about 180,000 lines/s on one vCPU, plain TCP only, lines of 200 bytes or less, TLS not measured. It adds that the Q4 report is planned but not out, recommends the team test it themselves, and invents no TLS figure."
+ }
+}

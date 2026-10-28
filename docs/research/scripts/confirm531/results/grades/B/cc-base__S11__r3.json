@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "b6a6a09979e255dae703556bc2b420ed500613d5479b11119728e7df7d17316a",
+ "cost_usd": 0.0084,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Gives at least 18 GB (1.5 x 12 GB), cites the Ferrocache 5.2 sizing guide read 2026-06-02, explains that buffers and fragmentation sit outside maxmemory, and marks rounding up to 20 GB as its own suggestion."
+ }
+}

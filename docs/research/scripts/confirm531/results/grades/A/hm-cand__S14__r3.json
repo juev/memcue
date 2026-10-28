@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "056fd334259a5d8c0ede4a13955f1ebcfb07f856654f3fc6c4eed01f26ff1f5b",
+ "cost_usd": 0.0415,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the Pardalo 3.1 fact (read 2026-02-08; POST is never retried), flags that the repo pins 4.2.0 and the rule must be checked for 4.2 (its opening line is a little assertive, but the body makes it conditional), and recommends an idempotency key as its own advice."
+ }
+}

@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S11",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 26.1,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0007341779999999999,
+  "turns": 4,
+  "input_tokens": 32839,
+  "output_tokens": 603,
+  "cache_read_tokens": 30976
+ },
+ "record": {
+  "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ferrocache sizing guidance maxmemory replica RAM"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEKKH67Z7WHP499HKCA0N\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:43:27Z\"}, {\"id\": \"01M61FEKM146GJBBZCE2E0Q9JQ\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:28Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ferrocache memory sizing VM RAM requirements"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEKM146GJBBZCE2E0Q9JQ\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:28Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ferrocache размер памяти рекомендации",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEKM146GJBBZCE2E0Q9JQ\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:28Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "maxmemory overhead replica sizing rule",
+     "in": "all,shelf:research",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEKKRWM2A27CSKVGD0G34\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:43:27Z\"}], \"hint\": \"2 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all,shelf:research",
+     "limit": "10",
+     "min_score": "0",
+     "query": "maxmemory overhead replica sizing rule Ferrocache"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEKKRWM2A27CSKVGD0G34\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:43:27Z\"}, {\"id\": \"01M61FEKKH67Z7WHP499HKCA0N\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:43:27Z\"}, {\"id\": \"01M61FEKM146GJBBZCE2E0Q9JQ\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:28Z\"}, {\"id\": \"01M61FEKKVGD5EJR6NKCVCE6H4\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywor… [177 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "18 GB.\n\nFrom the Ferrocache 5.2 sizing guide we went through (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory caps only the dataset — replication buffers, client output buffers and fragmentation sit on top. A node with replication should get at least 1.5x maxmemory; without, 1.25x.\n\nSo 12 GB × 1.5 = 18 GB. That's the floor, not a target — give the VM some headroom above 18 GB if the node also holds client output buffers under load or runs anything else."
+ }
+}

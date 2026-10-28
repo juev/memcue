@@ -1,0 +1,66 @@
+{
+ "pass": "A",
+ "record_sha256": "57f66419ccf5f91507c2b4fc8ddaf5649a384149b7b4a66dc19dfc8df77c0b30",
+ "cost_usd": 0.0678,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F4G9CPFHTWXWE6VXYH0Y0"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F4G9CPFHTWXWE6VXYH0Y0"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F4G9CPFHTWXWE6VXYH0Y0"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F4G9P7H8KEY7T0MEBCV3A"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F4G9CPFHTWXWE6VXYH0Y0",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Combines the D1–D3 documented limits with their source and date, and adds the sync semantics."
+   },
+   {
+    "id": "01M61F4G9P7H8KEY7T0MEBCV3A",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Vendor benchmark stored with its narrow setup, the untested cases and the vendor attribution (D4)."
+   },
+   {
+    "id": "01M61F4G9Z9NCZFWDHS9A9W1CM",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Forum truncation claim stored explicitly as an anonymous, unverified claim with the contrary report, which the label allows."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Meets every correct_if point: NFS is unsupported with corruption risk, only one process can write, 6 MiB fits under 8 MiB, the benchmark does not cover 6 MiB or sync=full so throughput is unproven (inference marked), and the forum claim is treated as unverified."
+ }
+}

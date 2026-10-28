@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "73815ad05095eeab47e9e2c5e576fbfb25915e51da1b6dba22dd4ef8e9198085",
+ "cost_usd": 0.046,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F5XJW4ZEVT492382X43NW"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F5XJW4ZEVT492382X43NW",
+    "version": 2,
+    "verdict": "expected",
+    "note": "Corrects the seeded 40 MP shelf fact in place to the v2.6 (2026-09-14) 100 MP source limit with HTTP 413 above it, keeps the unchanged 8,000 px output cap, and cites the changelog."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says yes because v2.6 (2026-09-14) accepts sources up to 100 MP, notes the 8,000 px output cap is unchanged, and points out that the pipeline.py constant and its comment reflect the old 40 MP limit."
+ }
+}

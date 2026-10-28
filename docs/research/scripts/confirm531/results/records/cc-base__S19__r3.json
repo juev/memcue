@@ -1,0 +1,40 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S19",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 15.9,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.085777,
+  "turns": 4,
+  "input_tokens": 8,
+  "output_tokens": 1091,
+  "cache_read_tokens": 64225
+ },
+ "record": {
+  "prompt": "Which port does our staging cache node listen on, and where is its config file? I need to change its eviction settings.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"staging cache node port config\"; memcue search -in all \"staging cache eviction\"; ls -la; git ls-files | head -50",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\n2 facts on the shelf match: -in shelf:research\n01M61G5944M1T7SSTKXGZ11GB2 | The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\ntotal 12\ndrwxrwxr-x 3 1001 1001 4096 Oct 28 14:55 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:55 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:55 .git"
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search -in shelf:research \"staging cache eviction\"; memcue search -in shelf:research -min-score 0 \"ferrocache\"; memcue search -in all -min-score 0 \"ferrocache brindle\"",
+    "result": "No stored facts match.\n01M61G593TB352SPMFER4TK0BQ docs.ferrocache.example 2026-06-02 | Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\n01M61G5944M1T7SSTKXGZ11GB2 | The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "Long-term memory has an answer, but I couldn't check it from here:\n\n- **Host:** `brindle`, which runs the Ferrocache staging node\n- **Port:** `7411`\n- **Config file:** `/etc/ferrocache/node.conf`\n- **Restart:** `systemctl restart ferrocache-stage`\n\nPlease confirm these before you edit anything:\n- **Not verified.** This machine (`5be4766c7b90`) isn't `brindle`. It has no `/etc/ferrocache` and nothing listening on 7411, so I couldn't confirm anything live. The repo here is empty apart from the initial commit, so it has no config either.\n- **Unclear source.** The fact sits on a separate \"research\" shelf, not with this repository's facts, and it has no date or source. It may be out of date. On `brindle`, `ss -ltnp | grep 7411` and `systemctl cat ferrocache-stage` will show the real port and config path.\n\nOne thing that matters for eviction settings: a Ferrocache 5.2 sizing note in memory says `maxmemory` only limits the dataset. Replication buffers, client output buffers and fragmentation use RAM on top of it. The guide recommends RAM of at least 1.5× `maxmemory` when replication is on, or 1.25× without. If you raise `maxmemory`, check the host has that headroom.\n\nThis is staging, so the \"announce in #ops before restarting\" rule for production hosts doesn't apply. It would if the node turns out to be production."
+ }
+}

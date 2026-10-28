@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "4a5fb7094d66bffa8e52899730beb4b35ce0c8d02984eb1cba2cd13cebf4eb01",
+ "cost_usd": 0.0476,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61ET5NQJR4FP76W7E487KZ8",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Records a verifiable environment finding: pip download of 4.2.0 finds nothing and the docs page returns 404, so 4.2 retry behaviour is unconfirmed; it does not claim any 4.2 behaviour and does not correct the 3.1 fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It states the 3.1 shelf fact (retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST) and flags that the repo pins 4.2.0, which could not be verified; it raises a 4.2 POST retry only as a hypothetical, never as fact, and gives the idempotency key as its own advice."
+ }
+}

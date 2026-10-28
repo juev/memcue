@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "75740ae63d4b2807fceb8abb17a5441c7540a368cfff98e9a62626c8d9d25bd3",
+ "cost_usd": 0.0082,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer gives only general backpressure, timeout and keepalive advice and says outright that it cannot name Thistlewire's options; it never mentions max_buffered_messages, its default of 0 (unlimited) or the RESOURCE_EXHAUSTED close."
+ }
+}

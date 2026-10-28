@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S07",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 25.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0005691120000000001,
+  "turns": 3,
+  "input_tokens": 22660,
+  "output_tokens": 552,
+  "cache_read_tokens": 21504
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit",
+     "in": "shelf"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV6JR2WXF451BZ8991RWC\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:20Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI timeout job duration",
+     "in": "all,shelf"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV6JR2WXF451BZ8991RWC\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:20Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit job duration",
+     "in": "shelf:research",
+     "min_score": "0"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FV6JR2WXF451BZ8991RWC\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:20Z\"}, {\"id\": \"01M61FV6JK66GRZH574K4JTW9H\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:50:20Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "From the research shelf, one note on Saltmarsh:\n\n  Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21)\n  - a job is cancelled after 6 hours\n  - a whole pipeline run is cancelled after 72 hours\n  - jobs queued more than 24 hours are dropped\n  - self-hosted runners have no job time limit\n\nFor your case: a 7-hour nightly job on a hosted runner will be killed at the 6-hour mark. Either run it on a self-hosted runner, or split the work across two or more jobs (the 72-hour cap applies per pipeline run, so the split keeps you well inside it).\n\nThe note is from a docs read in August 2026 — it's the only thing on the shelf about Saltmarsh limits, and it's worth re-checking that limits page before you commit to the design."
+ }
+}

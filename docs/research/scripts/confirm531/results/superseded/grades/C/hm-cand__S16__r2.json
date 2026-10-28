@@ -1,0 +1,14 @@
+{
+ "pass": "C",
+ "record_sha256": "2b6e3b514962970b2542c6bda8ce9cf7af9167d8f051b3f91b466ef8d6f9f911",
+ "cost_usd": 0.0096,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says it found no information on Quorvel's limit after checking memory, the workspace and the web, and asks for Quorvel's docs or config before giving a number; it states no Quorvel limit, and the Kafka figure is clearly about a different broker and warns that 2 MB would need extra configuration."
+ }
+}

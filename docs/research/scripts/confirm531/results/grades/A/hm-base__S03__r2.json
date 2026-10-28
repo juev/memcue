@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "54db9aead7f8b750be40913abfc2a4de7ee27b530a00fc1a7ab37e6527bc1c56",
+ "cost_usd": 0.0232,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer is 5 (2+1+2 across app-1, app-2 and archive/app-0), and the command is grep -r --include='*.log', which counts only .log files recursively, so notes.txt is excluded."
+ }
+}

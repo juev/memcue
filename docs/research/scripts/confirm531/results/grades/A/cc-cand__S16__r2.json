@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6adab8119db96592908a4439e4795caf28e9fedbb06a2778d21e0bd752c283a2",
+ "cost_usd": 0.0406,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no Quorvel size limit was found in memory, the repo or the docs. It gives no number and asks for Quorvel's docs or the broker config before anyone relies on 2 MB messages. Its one general remark about event buses is not a claim about Quorvel."
+ }
+}

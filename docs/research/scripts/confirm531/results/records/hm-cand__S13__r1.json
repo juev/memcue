@@ -1,0 +1,80 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S13",
+  "repeat": "r1",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 42.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003379836,
+  "turns": 5,
+  "input_tokens": 51742,
+  "output_tokens": 3015,
+  "cache_read_tokens": 42112
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune data ingest hosts file server",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EFSJ21X5BYERZ40AFJGZH\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:26:38Z\"}], \"hint\": \"3 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "фаиловыи сервер shared mount NFS ingest",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [], \"hint\": \"3 facts on the shelf match: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "query": "Kestrune",
+     "in": "shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EGRSGQJ5TVTHQ0KPAKC68\", \"content\": \"forum.devpit.example thread \\\"Kestrune and large values?\\\" (t/kestrune-large-values/4417): a user (kv_wrangler) claims Kestrune silently truncates values above 1 MiB when compression is on; a second user says they think they saw the same; a third (marlo_p) says 3 MiB values with compression on Kestrune 3.1 showed no such problem and asks for a repro, with no further replies. The claim is unverified and contradicted, and no version or repro was given — treat as an anecdote, not a documented limit. Worth a truncation test if Kestrune is ever used with compression on large values.\", \"keywords\": [\"Kestrune\", \"large values\", \"truncation\", \"compression\", \"1 MiB\", \"forum\", \"unverified\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:27:10Z\"}, {\"id\": \"01M61EGRS2X34Z6MMRZE6F6QN6\", \"content\": \"Kestrune Labs benchmark post of 2026-07-02 (\\\"1.2 million writes per second with Kestrune 3.2\\\") reports 1.2M writes/s with: one machine (32 cores, 128 GiB RAM, single local NVMe), one writer process, batches of 1000, 16-byte keys and 64-byte values, sync=\\\"off\\\". The post states values larger than 4 KiB and sync=\\\"full\\\" were not tested. At 64-byte values that is roughly 96 MB/s of payload, so the figure measures per-operation overhead, not throughput of large values.\", \"keywords\": [\"Kestrune\", \"benchmark\", \"write throughput\", \"1.2 million writes\", \"sync off\", \"64 byte values… [1098 chars cut]"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "Kestrune data ingest hosts file server"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EFSJ21X5BYERZ40AFJGZH\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:26:38Z\"}, {\"id\": \"01M61EFSGG14HWXD7MDXM54284\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:26:38Z\"}, {\"id\": \"01M61EFSGRJ7Q9X08NWDSJWJEG\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:26:38Z\"}, {\"id\": \"01M61EFSHHYJXEYQ6YG4CMRW42\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:26:38Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "read_file",
+   "read_file",
+   "read_file",
+   "search_files",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No. Two independent blockers, both documented for Kestrune 3.2 (docs.kestrune.example/limits, updated 2026-08-30):\n\n1. One writer per database. A Kestrune database can be opened for writing by exactly one process at a time — it takes an exclusive file lock on open; other processes get read-only. Two workers on ingest-a and ingest-b both writing the same data directory doesn't get you \"either can write\", it gets you one writer and one process that fails to open for writing (or silently degrades to read-only).\n\n2. Network filesystems are explicitly unsupported. The data directory must be on a local filesystem; NFS and SMB/CIFS are listed as unsupported because their file locking isn't reliable enough for that write lock, and a database on one \"may be corrupted\". /mnt/shared/ingest is an NFS export of fs-01 (README:11, config/worker.toml:2), so this is precisely the case the docs warn about — the second writer's lock may not be seen at all, and you find out via corruption rather than a clean error.\n\nWorth being precise about what's breaking: today's store works on that mount because it's one file per key with no shared lock (worker/store.py) — the mount isn't the problem, Kestrune's single-writer lock is. So the requirement in the README (\"two worker processes, one on each host, write to the same data directory\") has to change, not just the storage path.\n\nTwo further points against the proposal as a failover story:\n\n- It isn't redundancy. One export on fs-01 is a shared single point of failure: if fs-01 or the path to it goes down, both ingest hosts lose the store at once. That's worse than two local stores.\n- Durability gets murkier, not better. The README requires that an acknowledged write survive power loss, which means sync=\"full\" (default; returns after data reaches disk). Over NFS \"reaches disk\" means the server committed it, and you're relying on NFS client/server fsync semantics you'd have to prove rather than assume.\n\nWhat does work: keep Kestrune local and split the keyspace by writer. Each host gets its own local data directory (local disk/NVMe, not the mount) and owns a key prefix; the archiver or a thin router sends each batch to the host that owns its keys. If you genuinely need either host to accept any batch, put a single writer service in front of the database and let the other host reach it over RPC/queue — one process owns the lock, both hosts can submit. You keep the \"either host can take work\" goal without two writers on one file.\n\nTwo side notes on fit, since they'll come up: 6 MiB values are under the 8 MiB max and keys under 1 KiB, so sizes are fine; ~300 writes/s is nowhere near any capacity concern. There's a forum claim that Kestrune silently truncates values over 1 MiB with compression on — it's one unverified post, directly contradicted by another user on 3.1, no repro — so don't treat it as a reason to refuse, but run a truncation test before enabling compression on these partial results."
+ }
+}

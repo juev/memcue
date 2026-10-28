@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "73f1164903ff2b7ec13b62994d416f1cfc2e29e27c0209137aa5ade54bcfc210",
+ "cost_usd": 0.0337,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says no and gives both documented reasons, one writer per database and no NFS/SMB support because of corruption risk, citing the Kestrune 3.2 docs page through the stored fact."
+ }
+}

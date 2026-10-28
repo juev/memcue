@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "2e494601369b13f3c400cfb526e6963126417d3d5d17d9f09757c578b36a715e",
+ "cost_usd": 0.0346,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons: only one writer process per database, and NFS/SMB data directories are unsupported because of corruption risk. It cites the Kestrune 3.2 limits page through the stored fact."
+ }
+}

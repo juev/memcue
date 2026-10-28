@@ -1,0 +1,58 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S07",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 25.5,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.0005376959999999999,
+  "turns": 3,
+  "input_tokens": 22896,
+  "output_tokens": 472,
+  "cache_read_tokens": 21632
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit job timeout",
+     "in": "shelf",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EK3RYCQKF4EP9CN10SS6K\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:28:27Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI maximum job duration hours nightly",
+     "in": "all",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EK3TXWM7AD9RKNSRR4PG1\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T14:28:27Z\"}, {\"id\": \"01M61EK3JKD8GBMKBDVCBHF37X\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:28:26Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "10",
+     "min_score": "0",
+     "query": "Saltmarsh CI time limit job timeout"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EK3RYCQKF4EP9CN10SS6K\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:28:27Z\"}, {\"id\": \"01M61EK3Q2MR0GEVAKBHJQV5DT\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:28:26Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "From the research shelf (docs.saltmarsh.example/limits, read 2026-08-21):\n\n- Hosted runner job: cancelled after 6 hours.\n- Whole pipeline run: cancelled after 72 hours.\n- Queued more than 24 hours: dropped.\n- Self-hosted runner: no job time limit.\n\nSo your ~7 hour nightly job will be killed on a hosted runner. You'd need a self-hosted runner (no job limit; the 72h pipeline cap still applies per run), or split the work into under-6-hour jobs.\n\nOne caveat: that note is from August 2026 — worth a quick check against the current docs before you build on it."
+ }
+}

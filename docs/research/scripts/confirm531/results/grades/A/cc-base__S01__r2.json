@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "3d71de561e897fe6ce829974d9ea43df03907951d670d9b474c741c257252859",
+ "cost_usd": 0.0387,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says yes and correctly cites the pinned 2.1.3, @include \"path\" from 2.0.0, paths relative to the including file, 8-level nesting, later keys overriding the base, and ${ENV} in include paths from 2.1.0; the search never surfaced the 1.4 shelf fact, so the answer did not need to call it outdated."
+ }
+}

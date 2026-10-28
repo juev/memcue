@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "8904d648e7fa2337eb5843600c2a26d18e5a6a4e2adbcfc89345c55a39b15f39",
+ "cost_usd": 0.0404,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no TLS figure was published. It cites the Marrowlog 2.4 Q2 2026 report, which measured about 180,000 lines/s over plain TCP with lines of 200 bytes or less, and notes that TLS is deferred to the Q4 report or must be tested in-house. This information came from the stored shelf fact."
+ }
+}

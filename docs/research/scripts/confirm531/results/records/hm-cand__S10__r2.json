@@ -1,0 +1,32 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S10",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0017068379999999998,
+  "turns": 5,
+  "input_tokens": 42949,
+  "output_tokens": 951,
+  "cache_read_tokens": 36096
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "search_files",
+   "read_file",
+   "read_file"
+  ],
+  "pages_read": [],
+  "final_answer": "No — not as-is. Two things from the notes (docs/vendor/ostrel-limits.md):\n\nPayload\n- A job payload is capped at 256 KiB after serialization (262,144 bytes); anything larger is rejected at enqueue time with `PayloadTooLarge` (lines 7-9).\n- Our README states invoice payloads — rendered invoice plus metadata — are up to 300 KB (README.md:6), which is over the cap. So sending the blob inline would fail at enqueue.\n- The documented workaround is to store the data elsewhere and put a reference in the payload (line 9). That fits our code well: `jobs/send_invoice.py:5` only uses `payload[\"pdf_base64\"]`, so it could take a key/URL and fetch the PDF itself.\n- Extra caution: the field is base64, which inflates the bytes ~33% relative to the raw PDF. If the 300 KB figure is the PDF rather than the serialized payload, the inline size would be closer to 400 KB — even further past the limit. Worth pinning down before deciding anything depends on the exact margin.\n\nBackoff (lines 13-15)\n- Exponential: first retry after 2 s, each subsequent delay doubled, capped at 10 minutes.\n- After 25 attempts the job goes to the dead-letter queue; `retry_limit` can override the attempt count per job type, but the backoff curve itself is not configurable in 5.3.\n\nAlso note the notes are a copy taken 2026-05-14 of the \"Operating limits\" section of the Ostrel 5.3 docs, so the numbers hold for 5.3 only."
+ }
+}

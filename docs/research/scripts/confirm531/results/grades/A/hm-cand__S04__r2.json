@@ -1,0 +1,28 @@
+{
+ "pass": "A",
+ "record_sha256": "5320a4e152a0f122616689223f386cea569c9d00259b2a1a989ad578a28483fa",
+ "cost_usd": 0.0429,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F6VSYQ2ACR2TDK13WVC7F",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This adds a new shelf fact about the 100 MP limit but leaves the seeded 40 MP fact live, because nothing was corrected or retired; it also stores the v2.5 avif/fit=stretch entries without a need for them."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes because v2.6 (2026-09-14) accepts sources up to 100 MP, notes the 8,000 px long-side output cap is unchanged, and proposes updating the outdated constant and comment in pipeline.py."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "b0c848d0462557818452ce3458a3d18c25d21c8774885953811dafe2c53b613d",
+ "cost_usd": 0.0149,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "The answer has every point the correct criterion asks for: a 30 s default poll, a 10 s floor, stream: true needed, the Team plan or above, and the Nimbrel SDK 4.x docs read 2026-04-20. But it also states unsupported claims as fact, for example that the SDK falls back to polling when the stream drops and that older clients stay on the 30 s poll, so it is capped at partial."
+ }
+}

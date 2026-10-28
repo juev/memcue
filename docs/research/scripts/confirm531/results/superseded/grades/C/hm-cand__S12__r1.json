@@ -1,0 +1,14 @@
+{
+ "pass": "C",
+ "record_sha256": "649d237f39b0e38462c8b6dd48bae1874b51bbc80fc0d675101743f6d79c8a40",
+ "cost_usd": 0.0111,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The runtime write guard blocked the patch, so km_to_miles was never added to units/convert.py; the proposed code (km / 1.609344, with type hints and a one-line docstring) would meet correct_if, but the run ended without applying it."
+ }
+}

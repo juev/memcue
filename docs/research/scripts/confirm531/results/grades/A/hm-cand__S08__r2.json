@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "f367c39d4983e5e1122ba16be311982b34fd399b96ae04e6186cfd8c8d589a92",
+ "cost_usd": 0.0529,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FBAP3HKM2J55WH7HKSNR6"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FBAP3HKM2J55WH7HKSNR6",
+    "version": 1,
+    "verdict": "expected",
+    "note": "The fact stores the report's 180,000 lines/s figure on the research shelf with its limits: plain TCP, lines of 200 bytes or less, disk buffer off, TLS not measured, and TLS planned for Q4."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no TLS run was made and that the 200-byte lines don't match the agents' 900-byte lines at 50,000 lines/s, notes the 180,000 lines/s at 85% CPU on one vCPU, and recommends an own TLS test or the Q4 report; its 15-20% TLS figure is a clearly marked 'if', not a claim."
+ }
+}

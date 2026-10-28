@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6e513fc71e8d600a19408bb4c20438612fdf732ade726c1a814c692cf6c59120",
+ "cost_usd": 0.0307,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "A sandbox write guard blocked the edit, so km_to_miles was never added to units/convert.py; the agent proposed the correct code (km / 1.609344, type hints, one-line docstring) but stopped to ask the user how to proceed."
+ }
+}

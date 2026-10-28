@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S14",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.11230820000000001,
+  "turns": 8,
+  "input_tokens": 14,
+  "output_tokens": 1623,
+  "cache_read_tokens": 119321
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat client/charge.py; ls -R | head -50; memcue search \"charge retry idempotency\" 2>&1 | head -30",
+    "result": "\"\"\"Create a charge in the billing service.\"\"\"\nimport pardalo\nfrom pardalo import Retry\n\nsession = pardalo.Session(retry=Retry(total=3), timeout=10)\n\n\ndef create_charge(order_id: str, amount_cents: int) -> dict:\n    resp = session.post(\n        \"https://billing.int.example/v1/charges\",\n        json={\"order_id\": order_id, \"amount_cents\": amount_cents},\n    )\n    resp.raise_for_status()\n    return resp.json()\n.:\nREADME.md\nclient\nrequirements.txt\n\n./client:\ncharge.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research"
+   },
+   {
+    "tool": "Bash",
+    "input": "cat README.md requirements.txt; memcue search -in all \"pardalo retry POST\" 2>&1 | head -30; memcue search -in shelf:research \"pardalo retry\" 2>&1 | head -30; python3 -c \"import pardalo,sys;print(pardalo.__file__)\" 2>&1",
+    "result": "Exit code 1\n# billing-client\n\nClient of the billing service: creates charges for orders. HTTP goes through the Pardalo library.\npardalo==4.2.0\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research\n01M61ER5GGWKA2ACE7FCA90F7B pardalo.example 2026-02-08 | Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'pardalo'"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries",
+   "https://pardalo.example/docs/4.2/retries",
+   "https://pardalo.example/"
+  ],
+  "final_answer": "I couldn't confirm it either way for the version you're on.\n\n**What the code does:** `client/charge.py:5` creates `pardalo.Session(retry=Retry(total=3), timeout=10)`, and `create_charge` sends a `POST` to `/v1/charges`. Nothing in the request lets the billing service spot a repeat: there's no idempotency key, and no check before retrying.\n\n**What I know about Pardalo's retries:** a note from an earlier session describes Pardalo **3.1** (from pardalo.example/docs/retries, read 2026-02-08). It says that with `Retry(total=N)`, a session retries after a connection error only for GET, HEAD, PUT, DELETE and OPTIONS, and never for POST or PATCH. If 4.x still works that way, the session won't resend this charge by itself.\n\n**Why that isn't settled:** `requirements.txt` pins `pardalo==4.2.0`, a major version past what that note covers, and I couldn't check 4.2. The library isn't installed here, pip isn't available, and the docs pages I tried all returned 404, including the one the note came from. Major versions often change default retry rules, so don't count on the 3.1 behaviour.\n\n**Even if Pardalo never retries POST, you can still get two charges:**\n- If the connection drops after the billing service has accepted the charge, the client sees an error but the charge exists. Anything that catches that error and calls `create_charge` again will create a second charge, whether that's a caller, a job queue or a user clicking again.\n- The 10-second timeout makes this more likely: a slow but successful charge shows up as a failure.\n\n**What I'd recommend, whatever 4.2 does:**\n1. Send an idempotency key with every charge, generated once per order or attempt (e.g. derived from `order_id`), and have the billing service drop repeats. Check whether `/v1/charges` already supports an `Idempotency-Key` header or uses `order_id` as a unique key. If either is true, a resend is harmless.\n2. Make this code path's behaviour explicit instead of relying on the library default. Turn retries off for this POST, or restrict them to failures that can't have reached the server, such as connect errors before any bytes were sent.\n\nTo settle the 4.2 question, check Pardalo 4.2's changelog or `Retry`'s default allowed-methods setting in its source. If you can get me the package or the right docs URL, I'll check it and add the result to memory. I can also write the idempotency-key change if you tell me what the billing service accepts."
+ }
+}

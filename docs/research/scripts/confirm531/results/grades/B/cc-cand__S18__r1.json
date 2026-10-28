@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "9e52b18c15a29fa050d43a6ec873e89af65ed865a25d06e1b1b706415e4e207a",
+ "cost_usd": 0.0106,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and cites the Q2 2026 report from the stored fact: 180k lines/s, plain TCP only, lines of 200 bytes or less, TLS not measured, Q4 report planned. It also recommends running an in-house test and offers no TLS figure as fact; its guess is clearly labelled as unsupported."
+ }
+}

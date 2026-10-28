@@ -1,0 +1,47 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S15",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 33.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0022248240000000002,
+  "turns": 7,
+  "input_tokens": 63400,
+  "output_tokens": 1531,
+  "cache_read_tokens": 55808
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quillon Limiter rate limit backend memory per process",
+     "in": "shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EV2TWA9W505W5Z5ZRF8X4\", \"content\": \"Quillon 1.8 rate limiter (docs.quillon.example/config, read 2026-08-12): the default `memory` backend keeps counters per process, so an application with N worker processes lets a key make up to N times the configured rate; a limit shared by all processes needs backend=\\\"tally\\\" pointing at a tallyd server.\", \"keywords\": [\"quillon\", \"rate limit\", \"backend\", \"worker processes\", \"tallyd\"], \"origin\": \"docs.quillon.example 2026-08-12\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:32:48Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "tool_describe",
+   "terminal",
+   "tool_call",
+   "search_files",
+   "terminal",
+   "memcue_search"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "More than 100 — up to 400 per minute for a single key.\n\nWhy: gateway/limits.py creates `Limiter(rate=\"100/minute\", key=\"api_key\")` with no `backend` argument, and per the Quillon 1.8 config docs the default backend is `memory`, which keeps counters inside each process. deploy/server.conf runs `workers = 4`, so each of the four workers independently enforces 100/min against its own in-memory counter. A key spread across all four gets up to 4 × 100 = 400/min; in practice you'd see somewhere between 100 and 400 depending on how the load balancer distributes that key's requests.\n\nTwo things worth noting:\n\n- requirements.txt pins quillon==1.8.2, matching the 1.8 docs, and nothing in the repo overrides the backend (`backend`/`tally` appear nowhere else — limits.py is the only place the limiter is constructed).\n- Even at 100/min the enforcement isn't a sliding window: the docs say windows are fixed and clock-aligned, so a minute boundary allows a burst of up to ~200 in a two-second span across the reset.\n\nTo make 100/min hold globally, pass `backend=\"tally\", url=\"tally://<host>:7070\"` so all four workers count against a shared tallyd server. That's an infrastructure dependency, so I haven't changed anything — say the word and I'll wire it up (and add the tallyd host to the deploy config).\n\nCaveat on sourcing: I couldn't resolve `docs.quillon.example` over the network (it's a `.example` domain, curl fails with \"Could not resolve host\"); the page text came through the web-fetch tool, which returned Quillon 1.8 docs. I couldn't independently confirm it against a second source."
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S15",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 29.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001882818,
+  "turns": 5,
+  "input_tokens": 42383,
+  "output_tokens": 1229,
+  "cache_read_tokens": 35456
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "tool_describe",
+   "read_file",
+   "read_file",
+   "tool_call",
+   "search_files",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "More — up to 400 requests per minute per key.\n\nWhy: `Limiter(rate=\"100/minute\", key=\"api_key\")` at gateway/limits.py:5 passes no backend, so it uses the default `memory` backend. Per the docs, memory counters live inside each process, and \"an application with N worker processes lets a key make up to N times the configured rate.\" deploy/server.conf:2 sets `workers = 4`, and every worker imports the same module-level limiter, so each keeps its own 100/min counter per key → 4 × 100.\n\nTwo things that make it worse/looser:\n\n1. No config anywhere in the repo overrides the backend — I grepped for `backend`/`tally` and the only match is that one `Limiter(...)` line, and requirements.txt pins quillon==1.8.2 (the version the docs describe). So memory is definitely in effect.\n2. Even after fixing the backend, the docs note windows are fixed and clock-aligned: a key can send 100 at the end of one minute and 100 at the start of the next, i.e. 200 inside a rolling 60s. That's a burst allowance, not a sustained 2x, but it's real.\n\nTo actually get 100/min per key overall, point the limiter at the shared backend:\n\n    limiter = Limiter(rate=\"100/minute\", key=\"api_key\",\n                      backend=\"tally\", url=\"tally://host:7070\")\n\nThat requires a reachable tallyd instance. If you'd rather not run one, the alternative is keeping memory counters and dividing the rate by the worker count (25/minute), which is only accurate while all 4 workers stay up and traffic spreads evenly — I wouldn't rely on it.\n\nI couldn't verify the default-branch behaviour against the installed package (quillon isn't installed in this workspace), so the 400 figure rests on the 1.8 docs matching the pinned 1.8.2."
+ }
+}

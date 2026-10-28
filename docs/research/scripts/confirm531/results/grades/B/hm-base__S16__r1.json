@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "31095947b461662e643bc954f751d43c9a41d606e5f073c62ed6fde127ee4b71",
+ "cost_usd": 0.0063,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says there is no information on Quorvel's limit and declines to call 2 MB safe. It suggests checking the docs or the broker configuration, and the Kafka settings it names are example config to check, not a guessed limit."
+ }
+}

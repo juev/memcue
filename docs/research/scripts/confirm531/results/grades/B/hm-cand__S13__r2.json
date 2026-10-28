@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "c9655031f6cbcf5b76425159ad917ea0c329be402bccbbd9afbc77ce8d7cf7fc",
+ "cost_usd": 0.0118,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It names both reasons only conditionally and without the Kestrune docs as a source (if Kestrune is an embedded engine, NFS is ruled out and two writers break its contract), says honestly that it has no record of Kestrune, and its main verdict is a hedged 'partly' based on repo code rather than the documented reasons."
+ }
+}

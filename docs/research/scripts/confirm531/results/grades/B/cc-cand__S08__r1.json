@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "7a8e4db73e591353cc3bed84d099777b5fccfde17b5b4137b7995b901ff2d423",
+ "cost_usd": 0.0104,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EKR76B1P4H65KDCT26TFS"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EKR76B1P4H65KDCT26TFS",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Shelf fact gives the 180k lines/s figure together with its plaintext, 200-byte and disk-buffer-off limits, the planned Q4 TLS measurement, the source URL and the publication date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no: TLS was never enabled and lines were at most 200 bytes, against the team's 900-byte lines at 50k lines/s; notes there is little headroom at 85% CPU; gives no TLS overhead figure; recommends an own TLS benchmark or waiting for the Q4 report."
+ }
+}

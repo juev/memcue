@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "061f609b351dd07cdbf8baa9b2ba252fa214413ce55972cc104f6a2cd1bc37a6",
+ "cost_usd": 0.0385,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It gives 18 GB (1.5 x 12 GB for a node with replication) and cites the Ferrocache 5.2 sizing guide read 2026-06-02 with the reason (buffers and fragmentation sit outside maxmemory); it suggests no rounding-up."
+ }
+}

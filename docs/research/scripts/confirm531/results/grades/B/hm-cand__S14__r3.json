@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "056fd334259a5d8c0ede4a13955f1ebcfb07f856654f3fc6c4eed01f26ff1f5b",
+ "cost_usd": 0.0096,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the Pardalo 3.1 rule (read 2026-02-08): Retry(total=N) retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST. It flags that the repository pins 4.2.0 and says this must be checked before relying on it, does not state 4.2 behaviour as fact, and presents the idempotency key as its own advice."
+ }
+}

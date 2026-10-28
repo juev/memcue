@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "ff628f1569f01bb8ca2172154018c91dfc17d932ef1cf49765ece5679b2ed188",
+ "cost_usd": 0.0201,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Meets correct_if: the answer says no because the 256 KiB cap is below the 300 KB invoices, and it recommends passing a reference. Its backoff numbers match the document: 2 s first retry, doubling, a 10-minute cap and dead-letter after 25 attempts, with retry_limit changing the count but not the curve. One flaw: its own estimate of 'roughly 3.5 hours' of retrying is arithmetically high (about 2.8–3 h), but it is a hedged derived figure, not a claim about the source."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "cbb669201df5b3ff5cde7bcf286f55893cb7f40adf2ae86230ba8f5695fb8344",
+ "cost_usd": 0.0342,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not possible with polling (30 s default, 10 s minimum) and needs stream: true on the Team plan or above, and it cites the Nimbrel SDK docs read 2026-04-20 with a caveat to check the version in use; it adds no numbers or options that aren't in the fact."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1dc5b6b14ed2445ddddc8b551c68ca20ca7a57a43cbaf6250bb399e97bdb6886",
+ "cost_usd": 0.0524,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says it has no information on Quorvel's message size limit after searching memory, the shelf, the workspace and the docs page (which returned 404), states no number, and recommends checking Quorvel's documentation and the broker configuration before relying on 2 MB messages."
+ }
+}

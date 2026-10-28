@@ -1,0 +1,69 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S02",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 30.2,
+  "docker_exit": 0,
+  "image": "sha256:3265db735f22b4828bea9b0a8b076fee9293593cf2e06a82fee82cefe7bbcbf1",
+  "cost_usd": 0.1436328,
+  "turns": 10,
+  "input_tokens": 10,
+  "output_tokens": 2399,
+  "cache_read_tokens": 87704
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [
+   {
+    "id": "01M61EFB9MXH6A1FE0FZ6ZGYYT",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/ingest-worker",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "Kestrune, NFS, single writer, ingest-worker, store, хранилище, блокировка",
+    "content": "Kestrune 3.2 (per https://docs.kestrune.example/limits, updated 2026-08-30) allows only one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (risk of corruption), so it cannot replace the ingest-worker store as deployed: ingest-a and ingest-b both write to /mnt/shared/ingest, an NFS export of fs-01.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat README.md && ls -la && memcue search \"Kestrune\"; memcue search -in all \"ingest worker store\"",
+    "result": "# ingest-worker\n\nConsumes uploaded batches from the intake queue, keeps partial results in a local key-value store until a batch is\ncomplete, then hands the batch to the archiver.\n\n## Requirements for the store\n\n- Values: one partial result per key, up to 6 MiB each.\n- Write rate: about 300 writes per second at peak.\n- Deployment: two worker processes, one on each of the hosts ingest-a and ingest-b, write to the same data\n  directory, `/mnt/shared/ingest`, an NFS export of the file server fs-01.\n- Durability: a write acknowledged to the queue must survive a power loss.\n\nThe current store is a directory of JSON files (`worker/store.py`); we want to replace it.\ntotal 24\ndrwxr-xr-x 5 1001 1001 4096 Oct 28 14:26 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:26 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:26 .git\n-rw-r--r-- 1 1001 1001  668 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 worker\nNo facts of this repository, this host or global match; -in all searches every repository.\n01M61EEVVNM16Q5A3BNKPZG0G0 | storefront stores prices as integer cents, never as floats, so that totals do not drift."
+   },
+   {
+    "tool": "Skill",
+    "input": {
+     "skill": "memcue:memcue",
+     "args": "add pitfall: Kestrune 3.2 (docs.kestrune.example/limits, 2026-08-30) allows one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (corruption risk) — so it cannot be used as-is for ingest-worker's shared /mnt/shared/ingest NFS store written by ingest-a and ingest-b."
+    },
+    "result": "Launching skill: memcue:memcue"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue add -kind pitfall -source tool -scope repo -keywords \"Kestrune, NFS, single writer, ingest-worker, store, хранилище, блокировка\" -- \"Kestrune 3.2 (per https://docs.kestrune.example/limits, updated 2026-08-30) allows only one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (risk of corruption), so it cannot replace the ingest-worker store as deployed: ingest-a and ingest-b both write to /mnt/shared/ingest, an NFS export of fs-01.\"",
+    "result": "01M61EFB9MXH6A1FE0FZ6ZGYYT"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "Bash",
+   "Skill",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417"
+  ],
+  "final_answer": "No. Kestrune 3.2 doesn't fit the store as it's deployed today. Two requirements in the README directly conflict with its own limits page, which counts for more than the other two sources.\n\n## Requirement by requirement\n\n| README requirement | Kestrune 3.2 | Verdict |\n|---|---|---|\n| Values up to 6 MiB | The maximum value size is 8 MiB | Fits, though 6 MiB leaves only about 25% headroom |\n| Two workers (ingest-a, ingest-b) writing to the same data directory | Only one process can open a database for writing; it takes an exclusive file lock | **Blocker** |\n| Data directory on NFS (`/mnt/shared/ingest` on fs-01) | \"Network filesystems (NFS, SMB/CIFS) are not supported… a database on one may be corrupted\" | **Blocker** |\n| An acknowledged write survives a power loss | `sync = \"full\"`, the default, returns only after the data is on disk | Fits, as long as nobody turns it off for speed |\n| About 300 writes/s at peak | Not shown by any published evidence | **Unknown**; needs our own benchmark |\n\n## Risks and how much weight each source deserves\n\n1. **Deployment model (official docs, so authoritative).** On NFS the exclusive lock can't be trusted, so the two workers could end up writing at once and corrupt the database. The README's own requirements rule this setup out. To use Kestrune, each host would need its own database on local disk, which means sharding keys by host. That is a design change, and it raises a new question: what happens to a batch whose parts arrive at different hosts? The archiver handoff would have to deal with that.\n\n2. **Write throughput (vendor blog, says little about our case).** The 1.2M writes/s figure came from 64-byte values, `sync = \"off\"`, batches of 1,000 and local NVMe. The post says outright that it didn't test values over 4 KiB or `sync = \"full\"`. Our workload is the opposite: values of several MiB with full sync, possibly without batching. That works out to roughly 1.8 GB/s of fsynced writes at peak (300 × 6 MiB), so disk bandwidth is the likely limit, whatever store we pick. Benchmark this on the real hardware before deciding.\n\n3. **Truncation of large values (forum thread, unverified).** One user says values over 1 MiB are silently truncated when compression is on. There's no version, no repro and one vague \"+1\". Another user reports storing 3 MiB values on 3.1 without trouble, and the thread stopped there. I'd treat it as a rumour, but if it's true it would lose data at our value sizes. It's cheap to rule out: write 6 MiB values with compression on and off, read them back and compare checksums. That can go in the same benchmark.\n\n4. **Headroom.** If partial results ever grow past 8 MiB, writes will fail. `config/worker.toml` already sets `max_value = \"6MiB\"`; check that the worker actually enforces it, because I didn't find that in `worker/store.py`.\n\n## Recommendation\n\nDon't adopt Kestrune with the current shared-NFS, two-writer topology. If we're willing to give each worker a local disk and shard by host, it's a candidate again, provided a benchmark with 6 MiB values and `sync = \"full\"` sustains at least 300 writes/s and the truncation check passes. If the shared directory has to stay, we need a store built for several writers over the network (a server-based store), not an embedded one.\n\nI saved the NFS and single-writer limitation to long-term memory (memcue) so future sessions don't have to look it up again."
+ }
+}

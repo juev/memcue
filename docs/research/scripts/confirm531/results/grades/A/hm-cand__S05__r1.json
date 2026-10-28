@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "43cbafbf977fa9e34d48859db69d6c6f38529ba7b7aab975a6430808e40479cb",
+ "cost_usd": 0.0394,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer covers every correct_if criterion: 5 s isn't reachable with default polling (30 s default, 10 s floor), it needs push updates via stream: true, push requires the Team plan or above, and it cites the Nimbrel SDK docs read 2026-04-20 with a caveat to check the SDK version in use; the extra engineering advice adds no new Nimbrel numbers or options."
+ }
+}

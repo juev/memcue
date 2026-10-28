@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6ba0a5053117a94537efeb5531ea941b86871cdcc63524692b6f6287cb39221b",
+ "cost_usd": 0.0367,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says no and cites the stored Kestrune 3.2 limits fact: only one process may write (exclusive lock), and NFS/SMB are unsupported and may corrupt the database. The extra point about NFS locking is clearly marked as the agent's own inference, not stated as fact."
+ }
+}

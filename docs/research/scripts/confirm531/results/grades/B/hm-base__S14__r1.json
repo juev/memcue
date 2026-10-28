@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "c92aa29bb339b5d0e04d489f5357687868178aab75a37e897ac6ec2fbf22d1cf",
+ "cost_usd": 0.0157,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61ET5PDJP5N9AKHHWYWZZ9M",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Records checked facts: the repo pins 4.2.0, the package is not installed, there is no distribution and the docs 404; it makes no claim about how 4.2 retries and does not correct the 3.1 fact, so it is useful context for a later look at the version gap."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Gives the 3.1 rule correctly (only GET/HEAD/PUT/DELETE/OPTIONS are retried, never POST, so the charge goes out once), says plainly this is unverified for the pinned 4.2.0 and must be checked, offers 4.x behaviour only as a possibility, and recommends an idempotency key as its own advice."
+ }
+}

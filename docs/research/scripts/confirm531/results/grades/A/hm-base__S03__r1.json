@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6c15b116319aa2413e06a5eb15beb2c55d044ba3de04f84cbc75d637f428a53c",
+ "cost_usd": 0.0242,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It answers 5 with the correct per-file breakdown (2/1/2), and its command recursively counts only .log files, so logs/notes.txt is excluded."
+ }
+}

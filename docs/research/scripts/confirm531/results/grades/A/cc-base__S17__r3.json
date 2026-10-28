@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "ef6c69afe299040554d8df114be4277fe18f0ff1f9baecd8bd2d0ec3b12c36bc",
+ "cost_usd": 0.0416,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer covers every point the label asks for. Thistlewire 0.9 has no built-in flow control, and a slow client's queue grows without bound unless max_buffered_messages is set (default 0 means unlimited). It recommends setting that option, says reaching the cap closes the stream with RESOURCE_EXHAUSTED so dashboards must reconnect, and notes the fact comes from the 0.9 docs while the repo pins 0.9.4."
+ }
+}

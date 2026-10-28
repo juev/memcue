@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S15",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00172149,
+  "turns": 4,
+  "input_tokens": 33695,
+  "output_tokens": 1031,
+  "cache_read_tokens": 26880
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "tool_describe",
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "tool_call",
+   "search_files",
+   "search_files"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "More — up to 400 requests/minute per key, not 100.\n\nWhy, from the docs:\n\n- `Limiter(...)` defaults to the `memory` backend, where counters live inside each process. The docs say it plainly: \"Each process counts on its own, so an application with N worker processes lets a key make up to N times the configured rate.\"\n- `deploy/server.conf:2` sets `workers = 4`, so four independent counters, each allowing 100/min.\n- `gateway/limits.py:5` passes no `backend=` argument, and nothing else in the repo configures one (only other quillon reference is `requirements.txt:1`, `quillon==1.8.2`, matching the 1.8 docs). So the in-memory default is in force.\n\nTwo compounding details:\n\n1. The fix the docs give is the shared `tally` backend: `Limiter(rate=\"100/minute\", key=\"api_key\", backend=\"tally\", url=\"tally://host:7070\")`. The 100/min then holds across all four workers — but that only works if a tallyd server is actually running and reachable; I can't see one configured in this repo (no tally URL, compose file, or env var anywhere).\n2. Even fixed, the window is fixed and clock-aligned: a key can do 100 in the last second of one minute and 100 in the first second of the next, i.e. 200 within a rolling minute. That's a burst property, not an overall-rate one.\n\nSo the current effective ceiling is 4×100 = 400/min, with the boundary burst on top of that per process."
+ }
+}

@@ -1,0 +1,69 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S08",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 27.6,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.119501,
+  "turns": 8,
+  "input_tokens": 10,
+  "output_tokens": 1702,
+  "cache_read_tokens": 85185
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [
+   {
+    "id": "01M61FA5BMAQ7KWZVPNTCPZFXW",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/log-pipeline",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "marrowlog, TLS, performance report, benchmark, throughput, производительность, отчёт",
+    "content": "The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) was measured over plain TCP with lines of 200 bytes or less; TLS, longer lines and the disk buffer were not measured. Marrowlog plans TLS figures in its Q4 report, so it cannot be used to size log-pipeline agents with TLS.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"peak log throughput agents\" ; memcue search -in all \"marrowlog collector TLS\"; memcue search -in all \"пиковая нагрузка логи\"; ls -la; git ls-files | head -50",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\nNo stored facts match.\nNo stored facts match.\ntotal 20\ndrwxr-xr-x 4 1001 1001 4096 Oct 28 14:40 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:40 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:40 .git\n-rw-r--r-- 1 1001 1001  433 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\nREADME.md\nconfig/agent.yaml"
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat README.md config/agent.yaml; memcue search -in all \"peak events per second\"; memcue search -in all \"log agent sizing\"",
+    "result": "# log-pipeline\n\nConfiguration of the Marrowlog agents that ship application logs to the central collector.\n\n- Agents run as a sidecar on each application VM (1 vCPU reserved for the agent).\n- Peak volume: 50,000 lines per second per agent; lines average about 900 bytes (JSON with stack traces).\n- Today the agents talk to the collector over plain TCP. Security review requires TLS to the collector by the end of\n  the next quarter.\n# Marrowlog agent 2.4\ninputs:\n  - type: file\n    path: /var/log/app/*.json\noutputs:\n  - type: collector\n    endpoint: collector.int.example:6510\n    tls: false\n    batch_lines: 500\nbuffer:\n  disk: false\nNo stored facts match.\nNo stored facts match."
+   },
+   {
+    "tool": "Skill",
+    "input": {
+     "skill": "memcue:memcue"
+    },
+    "result": "Launching skill: memcue:memcue"
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue add -kind pitfall -source tool -scope repo -keywords \"marrowlog, TLS, performance report, benchmark, throughput, производительность, отчёт\" -- \"The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) was measured over plain TCP with lines of 200 bytes or less; TLS, longer lines and the disk buffer were not measured. Marrowlog plans TLS figures in its Q4 report, so it cannot be used to size log-pipeline agents with TLS.\"",
+    "result": "01M61FA5BMAQ7KWZVPNTCPZFXW"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash",
+   "Skill",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. The report doesn't show that, for two reasons.\n\n**1. It never tested TLS.** The method section says: \"Output: the collector over plain TCP. TLS was not enabled in any run.\" Under \"Not covered\" it lists TLS and says the maintainers plan to measure it in the Q4 report.\n\n**2. The test lines were much shorter than ours, so the result doesn't fit our load even without TLS.**\n\n| | Report | Our peak (README) |\n|---|---|---|\n| Lines/s | 180,000 | 50,000 |\n| Line size | 200 bytes or less | about 900 bytes on average |\n| Bytes/s | 36 MB/s at most | about 45 MB/s |\n| CPU | 1 vCPU, at 85% | 1 vCPU reserved |\n| Batching | `batch_lines: 500` | `batch_lines: 500` |\n| Disk buffer | off | off |\n| Transport | plain TCP | TLS (planned) |\n\nHardware, batching and buffer settings match ours. But per second, our agents move more data than the report's agent did, and it was already at 85% CPU. Lines longer than 200 bytes are also listed under \"not covered\", so nothing in the report says how it scales to 900-byte lines. Adding TLS encryption would only cost more CPU on top of that.\n\n**What would answer it:** run our own benchmark on one agent VM with 1 vCPU. Replay a sample of our real JSON logs at 50,000 lines/s with `tls: true` in `config/agent.yaml`. Measure CPU and check whether lines back up over a run of at least 30 minutes. Or wait for Marrowlog's Q4 report, but that still won't cover our line size, and the security deadline is the end of next quarter.\n\nI saved a note in memcue that this report can't be used to size agents with TLS, so later sessions don't rely on it."
+ }
+}

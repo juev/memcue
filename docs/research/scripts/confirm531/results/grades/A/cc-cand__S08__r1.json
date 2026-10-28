@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "7a8e4db73e591353cc3bed84d099777b5fccfde17b5b4137b7995b901ff2d423",
+ "cost_usd": 0.0423,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EKR76B1P4H65KDCT26TFS"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EKR76B1P4H65KDCT26TFS",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This shelf fact keeps the 180,000 lines/s figure together with its limits: plain TCP only, lines of 200 bytes or less, disk buffer off, TLS planned for Q4, plus the source and date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no and gives both gaps: TLS was never measured, and the test used lines of 200 bytes or less while the team sends about 900-byte lines at 50,000 lines/s. It also notes the 85% CPU headroom and recommends the team's own TLS benchmark or the Q4 report, without making up any TLS overhead figure."
+ }
+}

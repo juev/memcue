@@ -1,0 +1,35 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S10",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 20.3,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.09446760000000001,
+  "turns": 4,
+  "input_tokens": 8,
+  "output_tokens": 1399,
+  "cache_read_tokens": 65078
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; ls -R docs/vendor; memcue search -in shelf:research \"Ostrel payload retry backoff\"; memcue search \"Ostrel invoice payload\"",
+    "result": "docs/vendor:\nostrel-limits.md\nNo stored facts match.\nNo facts of this repository, this host or global match; -in all searches every repository."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "**Not as they are.** Ostrel rejects any job payload over 256 KiB at enqueue time, and our invoice payloads are bigger than that.\n\n**Payload size**\n- The vendor notes (`docs/vendor/ostrel-limits.md`, copied from the Ostrel 5.3 docs on 2026-05-14) cap a job payload at **256 KiB after serialization**. Anything larger fails at enqueue with `PayloadTooLarge`.\n- `README.md` says invoice payloads (the rendered invoice plus metadata) are **up to 300 KB**. 256 KiB is 262,144 bytes, so the largest invoices are over the limit.\n- The real gap is probably bigger. `jobs/send_invoice.py` carries the PDF as `pdf_base64`, and the limit applies to the serialized form. If the 300 KB figure is the raw PDF size, base64 alone turns it into about 400 KB. I'm inferring this; the README doesn't say how it measured the 300 KB.\n- The vendor's own advice is to store large data elsewhere and pass a reference. For us, that means putting the rendered PDF in object storage or a database and enqueuing only the reference plus metadata. `send_invoice` would then fetch the PDF itself instead of reading `payload[\"pdf_base64\"]`.\n\n**Retry backoff**\n- Retries use exponential backoff. The first retry waits 2 s and each later delay doubles, up to a cap of 10 minutes: 2, 4, 8, 16, 32, 64, 128, 256 and 512 s. From the 10th retry on, every delay is 600 s.\n- After 25 attempts the job moves to the dead-letter queue. Depending on whether \"25 attempts\" includes the first run, a job keeps retrying for roughly 2.8–3 hours before it lands there.\n- You can override the attempt count per job type with `retry_limit`. The backoff curve itself can't be changed in 5.3.\n\nOne caveat: these notes cover Ostrel 5.3 and were copied in May. The repo doesn't pin an Ostrel version yet, so check them again against whichever version you adopt."
+ }
+}

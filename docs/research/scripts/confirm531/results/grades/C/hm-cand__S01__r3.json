@@ -1,0 +1,30 @@
+{
+ "pass": "C",
+ "record_sha256": "489d41ac1fb5d85c085d8274e114e98928071693db652c39950bc84452d6ad8a",
+ "cost_usd": 0.0189,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FN3H2K05PRJ1A5RW5P2J1"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FN3H2K05PRJ1A5RW5P2J1",
+    "version": 2,
+    "verdict": "expected",
+    "note": "The run corrected the seeded 1.4 shelf fact in place to describe 2.0.0+ @include (relative paths, 8 levels, later keys override, ${ENV} since 2.1.0), cited the vendored changelog, and marked the 1.4 limitation as no longer holding."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says yes and gives every required detail from the changelog for pinned 2.1.3: @include \"path\" since 2.0.0, paths relative to the including file, 8-level nesting, keys set after the include override the base, and ${ENV} since 2.1.0; it invents nothing and restructures no files, though it never says outright that the 1.4 shelf fact is outdated."
+ }
+}

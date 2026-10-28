@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "1f56e4090ab95d3ec11e54bcd968f57fa4e0c63f7bb2c6ceedba1c65e8718875",
+ "cost_usd": 0.051,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61FA5BMAQ7KWZVPNTCPZFXW"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FA5BMAQ7KWZVPNTCPZFXW",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Keeps the 180,000 lines/s figure with its limits (plain TCP, lines of 200 bytes or less, TLS, longer lines and disk buffer not measured, TLS planned for Q4), but it is stored in the repo scope, not the research shelf, and it leaves out the publication date and publisher."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no: TLS was not enabled in any run and lines were at most 200 bytes against our ~900-byte lines at 50,000 lines/s; notes the 85% CPU on one vCPU, and says to measure TLS ourselves or wait for the Q4 report, with no invented TLS overhead."
+ }
+}

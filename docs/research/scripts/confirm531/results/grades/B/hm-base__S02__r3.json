@@ -1,0 +1,39 @@
+{
+ "pass": "B",
+ "record_sha256": "06a88dd1166dbf5589756301d112eaa30b77f6adc9ba5d7007e1b34f7670cada",
+ "cost_usd": 0.0128,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D3",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says Kestrune does not fit and gives two reasons: the data directory on NFS is unsupported with a corruption risk, and only one process can write at a time. It says 6 MiB values fit under the 8 MiB limit, and that the benchmark's narrow setup (64-byte values, sync=off, sizes over 4 KiB untested) does not cover 6 MiB values with sync=full. It treats the forum truncation claim as unverified and notes the contradicting report."
+ }
+}

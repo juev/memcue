@@ -1,0 +1,66 @@
+{
+ "pass": "A",
+ "record_sha256": "ce1413894fffa6573f75e0787a9271f95f817fc860911ad4948e00b5c4a05e12",
+ "cost_usd": 0.0716,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EFQ7N6XGN73TK4DEKAAD9"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EFQ7N6XGN73TK4DEKAAD9"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EFQ7N6XGN73TK4DEKAAD9"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EFQ7YFVGWDDG6240T231C"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EFQ7N6XGN73TK4DEKAAD9",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Combines the doc limits, the local-filesystem/NFS rule and the single-writer lock, with source and date, and adds the sync semantics."
+   },
+   {
+    "id": "01M61EFQ7YFVGWDDG6240T231C",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Vendor benchmark figure stored with its narrow setup, the untested cases, vendor attribution, source and date."
+   },
+   {
+    "id": "01M61EFQ87VNSDKJERZN4R3SZY",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Forum truncation claim stored explicitly as an unconfirmed anonymous claim alongside the contrary report, which the label allows."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Concludes Kestrune does not fit and names the NFS corruption risk and the single-writer blocker. It says 6 MiB values fit under 8 MiB, that the benchmark leaves 300 writes/s with large values and sync=full unproven (its own calculation is marked as such), and it treats the forum claim as an unverified rumour."
+ }
+}

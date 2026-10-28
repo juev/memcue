@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "946a516175736a8fb9c5a0b652fbd634461a26af9f4a241e423f901c25b4d2aa",
+ "cost_usd": 0.0347,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer states the 3.1 fact (read 2026-02-08): POST is never retried. It flags that the repo pins 4.2.0, a newer major version, so 4.2 must be checked before relying on that, and it asserts nothing about 4.2 behaviour. Its idempotency-key advice is presented as its own recommendation."
+ }
+}

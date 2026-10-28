@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "d83e7c0663d41bf58ce6eb5b3d0d8bb44a573be73cf89fc9168c8f105af5c10d",
+ "cost_usd": 0.0238,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer is 5, with the correct per-file breakdown (2 in app-1.log, 1 in app-2.log, 2 in archive/app-0.log), and the command searches recursively but only in .log files, so notes.txt is left out."
+ }
+}

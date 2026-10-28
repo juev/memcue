@@ -1,0 +1,83 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S01",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 46.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0034424219999999997,
+  "turns": 9,
+  "input_tokens": 93261,
+  "output_tokens": 3057,
+  "cache_read_tokens": 84224
+ },
+ "record": {
+  "prompt": "I want config/app.wf split into a shared base plus small per-environment files (staging, prod) that pull the base in. Does the config parser this repo uses allow one file to pull in another? Tell me how it would work; don't restructure anything yet.",
+  "base_changes": [
+   {
+    "id": "01M61FN3H2K05PRJ1A5RW5P2J1",
+    "version": 2,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "environment",
+    "source": "tool",
+    "keywords": "wrenfold, @include, include, import, config file, .wf, nesting, override",
+    "content": "Wrenfold 2.0.0+ supports including another .wf file: the `@include \"path\"` directive loads that file at that point; a relative path resolves against the including file, includes nest up to 8 levels, and a key set after an include overrides the included value. Since 2.1.0 include paths may use ${ENV} variables. The older `!import` spelling was removed in 2.0.0. In Wrenfold 1.4 a .wf file could not include another file (older docs, read 2026-03-15); that no longer holds from 2.0.0 on. Source: third_party/wrenfold/CHANGELOG.md in edge-config (/stand/ws), top entry 2.1.3 (2026-09-20), which matches the pinned requirements.txt version.",
+    "change": "corrected"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "wrenfold config @include app.wf edge-config",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FN3H2K05PRJ1A5RW5P2J1\", \"content\": \"Wrenfold 1.4 (wrenfold.example/docs/syntax, read 2026-03-15): a .wf file cannot include or import another file; every configuration file must be self-contained, so shared settings are duplicated.\", \"keywords\": [\"wrenfold\", \"include\", \"import\", \"config file\", \".wf\"], \"origin\": \"wrenfold.example 2026-03-15\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:47:00Z\"}], \"hint\": \"2 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "wrenfold include file config version",
+     "in": "all,shelf:research",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FN3H2K05PRJ1A5RW5P2J1\", \"content\": \"Wrenfold 1.4 (wrenfold.example/docs/syntax, read 2026-03-15): a .wf file cannot include or import another file; every configuration file must be self-contained, so shared settings are duplicated.\", \"keywords\": [\"wrenfold\", \"include\", \"import\", \"config file\", \".wf\"], \"origin\": \"wrenfold.example 2026-03-15\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:47:00Z\"}, {\"id\": \"01M61FN3H7H7R45THJ5VV68RZM\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:47:00Z\"}, {\"id\": \"01M61FN3GTXC7XR4HDW5MWNHR9\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:47:00Z\"}]}"
+   },
+   {
+    "tool": "memcue_correct",
+    "input": {
+     "content": "Wrenfold 2.0.0+ supports including another .wf file: the `@include \"path\"` directive loads that file at that point; a relative path resolves against the including file, includes nest up to 8 levels, and a key set after an include overrides the included value. Since 2.1.0 include paths may use ${ENV} variables. The older `!import` spelling was removed in 2.0.0. In Wrenfold 1.4 a .wf file could not include another file (older docs, read 2026-03-15); that no longer holds from 2.0.0 on. Source: third_party/wrenfold/CHANGELOG.md in edge-config (/stand/ws), top entry 2.1.3 (2026-09-20), which matches the pinned requirements.txt version.",
+     "id": "01M61FN3H2K05PRJ1A5RW5P2J1",
+     "keywords": "wrenfold, @include, include, import, config file, .wf, nesting, override"
+    },
+    "result": "{\"result\": \"01M61FN3H2K05PRJ1A5RW5P2J1 v2\"}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "terminal",
+   "tool_search",
+   "tool_call",
+   "memcue_correct"
+  ],
+  "pages_read": [
+   "https://wrenfold.example/docs/syntax"
+  ],
+  "final_answer": "Yes — the parser supports it. Basis and mechanics:\n\nWhere the answer comes from\n- `requirements.txt` pins `wrenfold==2.1.3`, and `third_party/wrenfold/CHANGELOG.md` (a vendored copy whose top entry is exactly 2.1.3) records the feature:\n\n      2.0.0 (2026-06-01)\n      - New `@include \"path\"` directive: loads another `.wf` file at that point. A relative\n        path is resolved against the including file. Includes nest up to 8 levels. A key set\n        after an include overrides the included value.\n      - Removed the deprecated `!import` spelling.\n\n      2.1.0 (2026-08-04)\n      - `@include` paths may use `${ENV}` variables.\n\nSo the directive you want exists at your pinned version. Use `@include`, not `!import` — the latter was dropped in 2.0.0.\n\nHow the split would behave\n- `config/staging.wf` would start with `@include \"base.wf\"`. The path is relative to the including file, so no need to spell out `config/` or worry about the process's working directory.\n- Everything from `base.wf` is spliced in at that point, then `staging.wf` continues. Because a key set *after* the include overrides the included value, the base has to be included first and the environment-specific keys (`upstream`, `tls_cert` — the two marked at config/app.wf:6-8) go below it. Reverse the order and the base silently wins.\n- Nesting is capped at 8 levels, so base → staging → (an env-specific fragment) is fine; don't build deep chains.\n- `loader.py` needs no change: `load(path)` just forwards to `wrenfold.load(path)` (loader.py:5-6) and there's no hardcoded env switch, so `load(\"config/staging.wf\")` / `load(\"config/prod.wf\")` works as-is.\n- Optional extra: since 2.1.0, `${ENV}` is allowed in include paths, e.g. `@include \"${EDGE_ENV}.wf\"`, if you'd rather have one entrypoint. That's a live environment dependency at parse time — worth deciding deliberately rather than by default.\n\nTwo caveats, stated plainly\n- I could not execute this: `wrenfold` isn't installed in this environment and there's no `pip` (no module, no binary), so nothing here is empirically verified against the library — it rests on the vendored changelog matching the pin. The project's own docs site (`wrenfold.example/docs/syntax`) returns 404 now, so the changelog copy is the only source in reach.\n- The changelog says nothing about duplicate keys *before* an include, or about a configurable include search path. So don't rely on either; keep each environment file's overrides strictly after its `@include`.\n\nNothing restructured — no files touched."
+ }
+}

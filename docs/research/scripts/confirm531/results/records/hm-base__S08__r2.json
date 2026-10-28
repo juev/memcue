@@ -1,0 +1,52 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S08",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 38.1,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001811769,
+  "turns": 7,
+  "input_tokens": 60247,
+  "output_tokens": 2100,
+  "cache_read_tokens": 57723
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log agent collector Marrowlog peak throughput TLS"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shipping pipeline events per second host inventory"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FADPQDFA6KDYRZMZQ3K13\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:41:10Z\"}, {\"id\": \"01M61FADPSVSMHFSJ2A04HKSZK\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:41:10Z\"}, {\"id\": \"01M61FADPXWRPBJ1EN5A74YXF3\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:41:10Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "tool_describe",
+   "memcue_search",
+   "tool_call",
+   "memcue_search",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. The report cannot answer that question — read it against our own config (`/stand/ws/README.md`, `/stand/ws/config/agent.yaml`) and it says nothing about the case we actually care about.\n\nWhat the report says, from the page itself:\n- 180,000 lines/s, one agent, 1 vCPU / 2 GiB, CPU at 85%.\n- \"TLS was not enabled in any run.\" TLS is listed under \"Not covered\", with measurement deferred to the Q4 report — which hasn't been published (this is the Q2 report, dated 2026-06-18).\n- Lines were \"200 bytes or shorter\"; our lines average ~900 bytes.\n- Disk buffer off, batch_lines 500 — those match our config.\n\nTwo mismatches, and either one alone invalidates the number:\n\n1. TLS is exactly the missing variable. The whole point of the change is the one thing not measured. TLS adds a crypto handshake per connection and per-record symmetric work; at 85% CPU there is only ~15% headroom left to absorb it, and no data here bounds that cost.\n\n2. The benchmark is line-shaped, ours is byte-shaped. Their run moved 180,000 × 200 B = 36.0 MB/s. Our peak is 50,000 × 900 B = 45.0 MB/s — 25% more bytes per second, despite being only 28% as many lines. Even ignoring TLS, at 85% CPU their throughput implies ~42.4 MB/s at 100% CPU, and at 900-byte lines that is roughly 47,000 lines/s — about 6% short of our 50,000 peak. That scaling is my inference (bytes aren't necessarily linear in cost, and the report explicitly didn't measure long lines), but it points the same way as point 1: no margin, before TLS.\n\nSo: unproven, and on the only figure we can transfer, we're already at or past the benchmark's saturation point with plain TCP. Don't take this report to Security as evidence the agents will keep up.\n\nTo actually answer it, you need one of:\n- Wait for the Q4 report (TLS included) — it's still a 200-byte benchmark, so it won't cover our line sizes either.\n- Run the benchmark yourself with production-shaped load: a 900-byte JSON sample at 50,000 lines/s, TLS on, 1 vCPU, 30 minutes. That's the only measurement that settles it.\n- Until then, treat TLS as unvalidated and plan headroom: the cheap levers are raising the agent's CPU allocation above 1 vCPU, or turning on the disk buffer (`buffer.disk: false` today) so a slow TLS path spools instead of dropping.\n\nWant me to draft the benchmark config or the note back to Security?"
+ }
+}

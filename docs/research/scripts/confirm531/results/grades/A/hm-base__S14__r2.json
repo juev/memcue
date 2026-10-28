@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "12b2eccb4ecef1772d8f5827903fcdb0997a7d0a51e282cf0d2c6c3aae309735",
+ "cost_usd": 0.0432,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It gives the Pardalo 3.1 fact: Retry(total=N) retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST, so the charge POST would not be resent under 3.1. It flags that the repo pins 4.2.0 and that this must be checked before relying on it, makes no claim about 4.2 behaviour, and offers the idempotency key as its own advice."
+ }
+}

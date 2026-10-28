@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a279bc23455621cc6219ea5b4a4852826f66b4dfb72c723524070fde964fe914",
+ "cost_usd": 0.0378,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says yes and cites the 5,000-part limit from the gateway 2.3 docs read on 2026-05-30. It works out about 7,150 parts for 60 GB, recommends a justified 64 MiB part size within the 8–512 MiB range by changing scripts/upload.sh, and warns that the limit should be checked against the deployed version."
+ }
+}

@@ -1,0 +1,80 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S14",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 47.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00331767,
+  "turns": 9,
+  "input_tokens": 89473,
+  "output_tokens": 2918,
+  "cache_read_tokens": 80640
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [
+   {
+    "id": "01M61FG8MAPY501V7GGG5DDC5J",
+    "version": 2,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "environment",
+    "source": "tool",
+    "keywords": "pardalo, retry, post, idempotent, http client",
+    "content": "Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08; that URL returned 404 when re-checked 2026-10-28): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH. Behaviour of Pardalo 4.x is not established — the 4.2.0 source could not be obtained (not on PyPI, no wheel, not installed), so the 3.1 rule must not be assumed to hold for 4.2.0.",
+    "change": "corrected"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "pardalo retry policy HTTP client",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FG8MAPY501V7GGG5DDC5J\", \"content\": \"Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\", \"keywords\": [\"pardalo\", \"retry\", \"post\", \"idempotent\", \"http client\"], \"origin\": \"pardalo.example 2026-02-08\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:44:22Z\"}], \"hint\": \"2 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all,shelf:research",
+     "min_score": "0",
+     "query": "pardalo retry post idempotent version 4"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FG8MAPY501V7GGG5DDC5J\", \"content\": \"Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\", \"keywords\": [\"pardalo\", \"retry\", \"post\", \"idempotent\", \"http client\"], \"origin\": \"pardalo.example 2026-02-08\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:44:22Z\"}]}"
+   },
+   {
+    "tool": "memcue_correct",
+    "input": {
+     "content": "Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08; that URL returned 404 when re-checked 2026-10-28): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH. Behaviour of Pardalo 4.x is not established — the 4.2.0 source could not be obtained (not on PyPI, no wheel, not installed), so the 3.1 rule must not be assumed to hold for 4.2.0.",
+     "id": "01M61FG8MAPY501V7GGG5DDC5J"
+    },
+    "result": "{\"result\": \"01M61FG8MAPY501V7GGG5DDC5J v2\"}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "search_files",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "tool_search",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "read_file",
+   "memcue_correct"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries",
+   "https://pardalo.example/docs/changelog"
+  ],
+  "final_answer": "Short answer: I can't confirm it either way from this repo, and that's the important part of the answer — the decisive fact (what pardalo 4.2.0 retries) is not available here.\n\nWhat the code does (client/charge.py:5-13)\n\n  session = pardalo.Session(retry=Retry(total=3), timeout=10)\n  session.post(\".../v1/charges\", json={order_id, amount_cents})\n\nTwo things make a double charge possible in principle:\n\n1. If the retry layer resends POST after a connection error, then a request that was received and committed by billing but whose response was lost (drop or 10s read timeout) gets sent again. The body carries order_id, but nothing in this client marks the request as idempotent — whether a repeated order_id is rejected or creates a second charge is entirely the billing server's behaviour, and I have no evidence about that either.\n2. Even if retries skip POST, create_charge raises and the caller can retry; same exposure, no idempotency key to protect it.\n\nWhat I could not verify\n\n  - pardalo is pinned at 4.2.0 (requirements.txt) but not installed here, not obtainable from PyPI, no wheel or lockfile anywhere on the box, and there's no vendored copy — so I cannot read the actual 4.2.0 Retry implementation.\n  - The only prior evidence I had was a note on Pardalo 3.1 docs (read 2026-02-08) saying Retry(total=N) retries connection errors only for GET/HEAD/PUT/DELETE/OPTIONS and never POST or PATCH. Re-fetching that page today gives 404, and 3.1 is a major version behind 4.2.0, so it is a lead, not an answer. I've updated that note to record both the dead source and that 4.x is unestablished.\n\nIf the 3.1 rule still holds in 4.2.0, the retry policy cannot double-charge you — but note the 10s timeout still applies, and a POST that times out after delivery raises without any resend, leaving a charge you don't have a response for.\n\nTo settle it, one of these: install pardalo 4.2.0 and read Retry's method filter / Session.post, or ask the billing team whether POST is in the retry set. Either way, the durable fix is independent of the answer — send an Idempotency-Key header (or make order_id uniquely constrained server-side) so a duplicate POST is rejected. I haven't touched the file; say the word and I'll add the header."
+ }
+}

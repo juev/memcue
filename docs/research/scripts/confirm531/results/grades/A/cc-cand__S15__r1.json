@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "7eadc3172c500193aa2c9eac9c211cba192309d44c31fb97c7d161c4c91838b9",
+ "cost_usd": 0.0418,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61ETDWBX6VWYG28YT8MNH00",
+    "version": 2,
+    "verdict": "expected",
+    "note": "The run corrected the seeded shelf fact in place to add the fixed-window and url details, which the label says is acceptable; it added no duplicate fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says the default memory backend counts per process, so a key can make up to 400 requests per minute with 4 workers, and that backend=\"tally\" with a tallyd server enforces 100/min overall; it also gives the fixed, clock-aligned windows detail, and the burst figures are clearly marked as the agent's own inference."
+ }
+}

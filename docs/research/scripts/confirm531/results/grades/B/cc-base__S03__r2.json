@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "794c324ecacfe77fec94468fc1f312081a76ba56b08df521eab7b198edc6fa8b",
+ "cost_usd": 0.0061,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer is 5, with the right per-file breakdown, and the command `grep -rh --include='*.log' ERROR logs | wc -l` counts only .log files recursively, so logs/notes.txt is excluded."
+ }
+}

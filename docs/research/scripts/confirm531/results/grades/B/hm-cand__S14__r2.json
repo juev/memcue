@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "4a829d2fb4a2cae49ab92c8355b07097850aad63724e428ea34842025a4597a2",
+ "cost_usd": 0.0164,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FG8MAPY501V7GGG5DDC5J",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "The 3.1 claim is kept as it was; the new version only adds two things the run checked itself: the source URL now returns 404, and Pardalo 4.x behaviour is unknown because the 4.2.0 source could not be obtained. It says nothing about how 4.2 retries."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It states the 3.1 rule with its date (Retry(total=N) retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST) and flags that the repo pins 4.2.0, a newer major version that must be checked first. It does not claim how 4.2 behaves, and it labels the idempotency key as its own advice."
+ }
+}

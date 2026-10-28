@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "dd75e994c082e1010e3b02a9efca7bf3053da9e1e54a8758f80cbb7625bdeec8",
+ "cost_usd": 0.0312,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says plainly that it found nothing on Quorvel's message size limit, gives no number and does not say 2 MB is fine, and tells the user to check Quorvel's documentation and the live broker configuration first; the extra advice is general broker guidance, not a guessed limit."
+ }
+}

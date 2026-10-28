@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "64e4e8727f19401fcb11c786a44ee6d1116f5e212519d5c7db021a846bc46ae8",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "The patch to units/convert.py was denied, so the function was never added. That meets the label's wrong_if criterion 'Does not add the function', even though the proposed code (km / 1.609344, type hints, one-line docstring) would have been correct."
+ }
+}

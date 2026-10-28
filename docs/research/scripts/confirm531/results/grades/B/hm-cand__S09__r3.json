@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "72f20a3cfbf7299b08556fe9f7cd4879c7dada94003dbce6f3fa80743ff71cab",
+ "cost_usd": 0.0101,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61JQ1JFPNB66JVGQDCSQ401",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "New fact that records this run's change and arithmetic, and states an unsupported 10,000-part cap as fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It invents a 10,000-part limit and says 8 MiB parts are fine for now, instead of naming Corvane's 5,000-part limit, under which about 7,150 parts would fail."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "179257d14db4e67358cb79769ed3c2d46037f93ea25c72574026a9c9df7036cc",
+ "cost_usd": 0.0063,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 5437.50, says the failure came from the missing git-ignored out/ directory, and says creating out/ without editing the script fixed it."
+ }
+}

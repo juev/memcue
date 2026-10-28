@@ -1,0 +1,88 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S08",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 41.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001975296,
+  "turns": 9,
+  "input_tokens": 78800,
+  "output_tokens": 2220,
+  "cache_read_tokens": 76032
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [
+   {
+    "id": "01M61FX7VAGJVGPBNXKMH1CFMJ",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "Marrowlog, performance report, 2.4, throughput, lines per second, TLS, plain TCP, benchmark, Q2 2026, collector, CPU 85%",
+    "content": "Marrowlog 2.4 performance report (vendor, published 2026-06-18, Q2 2026): one agent shipped 180,000 lines/s to a collector on one vCPU / 2 GiB with CPU at 85%, lines <=200 bytes, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs (about 36 MB/s). The report states that TLS to the collector, lines longer than 200 bytes and the disk buffer were NOT measured in any run, and that TLS would be measured in the Q4 report — so it gives no TLS throughput figure.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog log agent collector TLS performance"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "query": "Marrowlog agent 2.4 performance report throughput TLS"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Marrowlog 2.4 performance report (vendor, published 2026-06-18, Q2 2026): one agent shipped 180,000 lines/s to a collector on one vCPU / 2 GiB with CPU at 85%, lines <=200 bytes, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs (about 36 MB/s). The report states that TLS to the collector, lines longer than 200 bytes and the disk buffer were NOT measured in any run, and that TLS would be measured in the Q4 report — so it gives no TLS throughput figure and no headroom estimate for TLS.",
+     "kind": "other",
+     "keywords": "Marrowlog, performance report, 2.4, throughput, lines per second, TLS, plain TCP, benchmark, Q2 2026, collector, CPU 85%",
+     "shelf": "research",
+     "source": "tool"
+    },
+    "result": "{\"error\": \"memcue: add: unknown -kind \\\"other\\\"; use rule, decision, pitfall, environment, procedure or event\"}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Marrowlog 2.4 performance report (vendor, published 2026-06-18, Q2 2026): one agent shipped 180,000 lines/s to a collector on one vCPU / 2 GiB with CPU at 85%, lines <=200 bytes, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs (about 36 MB/s). The report states that TLS to the collector, lines longer than 200 bytes and the disk buffer were NOT measured in any run, and that TLS would be measured in the Q4 report — so it gives no TLS throughput figure.",
+     "keywords": "Marrowlog, performance report, 2.4, throughput, lines per second, TLS, plain TCP, benchmark, Q2 2026, collector, CPU 85%",
+     "shelf": "research",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M61FX7VAGJVGPBNXKMH1CFMJ\"}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "tool_describe",
+   "tool_call",
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "memcue_add",
+   "memcue_add"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. That report cannot answer the question — TLS was not measured in it.\n\nWhat the report actually says (Marrowlog 2.4 performance report, 2026 Q2, published 2026-06-18):\n  Result: 180,000 lines/s from one agent on 1 vCPU / 2 GiB, CPU at 85%.\n  Method: lines 200 bytes or shorter, output to collector over plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs.\n  Not covered: \"TLS to the collector, lines longer than 200 bytes, and the disk buffer were not measured. We plan to measure TLS in the Q4 report.\"\n\nSo every number in it is a plain-TCP number. Using it to sign off TLS would be an extrapolation the vendor explicitly declines to make.\n\nEven setting TLS aside, the run isn't comparable to our workload (from /stand/ws/README.md and config/agent.yaml):\n  - Line size: their cap is 200 bytes; ours average ~900 bytes (JSON with stack traces).\n  - Throughput in bytes: their run moved ~36 MB/s at 85% CPU. Our peak is 50,000 lines/s x ~900 B = ~45 MB/s — 125% of the bytes that saturated their vCPU, even though it's only 28% of their line count.\n  - Headroom: 85% CPU leaves ~15%. TLS adds encryption and handshake CPU on exactly the shipping path that was already near saturation, so capacity drops below 45 MB/s, not toward it.\n\nBottom line for security: the report is not evidence our agents keep up with TLS on. What would be: run our own load test under TLS at 50k lines/s with ~900-byte lines on one vCPU, and watch CPU (CPU saturation, not line rate, is the binding constraint here). Alternatively, wait for the Q4 report — but it still won't cover 900-byte lines or the disk buffer, so a local run is the reliable path.\n\nOne thing worth deciding before that test: whether the collector endpoint stays at collector.int.example:6510 with TLS on the same port, or moves to a TLS-specific port — that changes what the test targets."
+ }
+}

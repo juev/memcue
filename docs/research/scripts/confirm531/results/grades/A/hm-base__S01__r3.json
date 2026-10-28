@@ -1,0 +1,28 @@
+{
+ "pass": "A",
+ "record_sha256": "2d66f74cd226040ab0e14653aa4342a96e304b466a8a3ef0362c20cd7c82388c",
+ "cost_usd": 0.0509,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FQSQAJCNY1BRG1HJGMAS1",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "It mentions the requirements.txt pin, but its main point is a supported finding that a later investigation would need: the pinned wrenfold 2.1.3 cannot be installed from PyPI, and the PyPI package of that name is an unrelated library."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It meets the correct_if criteria: @include \"path\" is supported in the pinned 2.1.3 (added in 2.0.0), paths resolve relative to the including file, nesting goes up to 8 levels, keys set after an include override it, and 2.1.0 added ${ENV} in include paths; the agent never found the 1.4 shelf fact, so no note on it was required, and nothing was restructured."
+ }
+}

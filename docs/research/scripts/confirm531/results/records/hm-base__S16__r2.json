@@ -1,0 +1,95 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S16",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 51.4,
+  "docker_exit": 0,
+  "image": "sha256:daa9a209c2f39d3aa208f0291e4105afc1e92c1014515aeacd9344e8f6d825bd",
+  "cost_usd": 0.003031188,
+  "turns": 9,
+  "input_tokens": 101054,
+  "output_tokens": 2744,
+  "cache_read_tokens": 93696
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JKS443WHRQS9589B6FRD7\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:38:43Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Кворвел шина событий максимальный размер сообщения"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel",
+     "min_score": "0",
+     "limit": "20"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "20",
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JKS4NKBR33V7GZN446ARW\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4J2NTZGPV1NABJYAH9\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4VJH225B02VE72JW9D\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4KB87RF8FRBW8351Y2\", \"conten… [544 chars cut]"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "20",
+     "query": "event bus maximum message size MB publish"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JKS4J2NTZGPV1NABJYAH9\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4KB87RF8FRBW8351Y2\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4NKBR33V7GZN446ARW\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\"… [65 chars cut]"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all,shelf",
+     "limit": "20",
+     "min_score": "0",
+     "query": "message size bytes limit bus publish"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JKS4NKBR33V7GZN446ARW\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS443WHRQS9589B6FRD7\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4J2NTZGPV1NABJYAH9\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:38:43Z\"}, {\"id\": \"01M61JKS4VJH225B02VE72JW9D\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 … [837 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "search_files",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "read_file",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "memcue_search",
+   "tool_describe",
+   "tool_call"
+  ],
+  "pages_read": [
+   "https://docs.quorvel.example/limits"
+  ],
+  "final_answer": "I don't know — I have no information on Quorvel's message size limit, and I'd rather say that than guess at a number.\n\nWhat I checked:\n\n- My memory, including the research shelf: the only vendor notes stored there are Corvane (multipart uploads), Ferrocache (maxmemory sizing), Saltmarsh CI (job timeouts) and Thistlewire (streaming flow control). Nothing about Quorvel.\n- The workspace (/stand/ws): empty apart from .git, no vendor docs.\n- docs.quorvel.example/limits: 404 Not Found.\n\nSo I can't confirm whether a 2 MB order snapshot would be accepted or rejected. Before building on it:\n\n1. Check Quorvel's own documentation for its max message/payload setting, and the broker config on your cluster — the effective limit is usually whatever the broker is configured with, not just the published default.\n2. Send a real 2 MB test message through the same producer, auth and topic you'd use in production, and watch for a rejection vs. a silent truncation.\n\nIf 2 MB does turn out to exceed the limit, the usual fixes are chunking the snapshot, compressing it, or publishing a reference (object store key) instead of the payload — but which is viable depends on the real limit, which I don't have. Point me at the Quorvel docs or the broker config and I'll work it out properly."
+ }
+}

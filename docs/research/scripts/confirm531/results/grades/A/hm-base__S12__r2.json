@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6fe610d22379b140bfbac4731de115c91fe4681dc6a7abbba015e89f27b67e6b",
+ "cost_usd": 0.0244,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Adds def km_to_miles(km: float) -> float with a one-line docstring that returns km / 1.609344 in units/convert.py, and nothing in the record shows the existing functions were changed."
+ }
+}

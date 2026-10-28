@@ -1,0 +1,113 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S02",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 53.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0039756719999999995,
+  "turns": 8,
+  "input_tokens": 86848,
+  "output_tokens": 3981,
+  "cache_read_tokens": 77824
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [
+   {
+    "id": "01M61FQQ33XFA6M592PFMG2SFG",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "agent",
+    "keywords": "Kestrune, limits, value size, NFS, single writer, exclusive lock, sync full, durability, 8 MiB",
+    "content": "Kestrune 3.2 (docs.kestrune.example/limits, updated 2026-08-30) documents: value limit 8 MiB, key 1 KiB, database file 2 TiB; a database can be opened for writing by one process at a time (exclusive file lock on open), others read-only; the data directory must be on a local filesystem, NFS/SMB are not supported because their file locking is unreliable and a database on one may be corrupted; sync=\"full\" (default) returns after data reaches disk, sync=\"off\" may lose the last writes on power failure.",
+    "change": "added"
+   },
+   {
+    "id": "01M61FQQ3J2SMC5CJQ2F9M5AAP",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "agent",
+    "keywords": "Kestrune, benchmark, write throughput, 1.2 million writes, sync off, 64-byte values, caveats",
+    "content": "Kestrune Labs benchmark of 2026-07-02 (blog.kestrune.example/2026/write-throughput) measured 1.2M writes/s on one 32-core machine with local NVMe, one writer process, batches of 1,000, 16-byte keys / 64-byte values, sync=\"off\"; the post states values larger than 4 KiB and sync=\"full\" were not tested, so it says nothing about large-value or durable-write throughput.",
+    "change": "added"
+   },
+   {
+    "id": "01M61FQQ422KSAN1KE44TPXT5H",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "agent",
+    "keywords": "Kestrune, truncation, compression, large values, forum, unconfirmed, data loss",
+    "content": "Forum thread forum.devpit.example/t/kestrune-large-values/4417: one user (kv_wrangler) claims Kestrune silently truncates values above 1 MiB when compression is on; a second agrees without detail, and marlo_p reports storing 3 MiB values with compression on Kestrune 3.1 without the problem and asks for a repro (no further replies). Unconfirmed and version-unspecified — a lead to test, not an established limit.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune limits value size NFS single writer",
+     "in": "shelf:research"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Kestrune 3.2 (docs.kestrune.example/limits, updated 2026-08-30) documents: value limit 8 MiB, key 1 KiB, database file 2 TiB; a database can be opened for writing by one process at a time (exclusive file lock on open), others read-only; the data directory must be on a local filesystem, NFS/SMB are not supported because their file locking is unreliable and a database on one may be corrupted; sync=\"full\" (default) returns after data reaches disk, sync=\"off\" may lose the last writes on power failure.",
+     "keywords": "Kestrune, limits, value size, NFS, single writer, exclusive lock, sync full, durability, 8 MiB",
+     "shelf": "research"
+    },
+    "result": "{\"result\": \"01M61FQQ33XFA6M592PFMG2SFG\"}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Kestrune Labs benchmark of 2026-07-02 (blog.kestrune.example/2026/write-throughput) measured 1.2M writes/s on one 32-core machine with local NVMe, one writer process, batches of 1,000, 16-byte keys / 64-byte values, sync=\"off\"; the post states values larger than 4 KiB and sync=\"full\" were not tested, so it says nothing about large-value or durable-write throughput.",
+     "keywords": "Kestrune, benchmark, write throughput, 1.2 million writes, sync off, 64-byte values, caveats",
+     "shelf": "research"
+    },
+    "result": "{\"result\": \"01M61FQQ3J2SMC5CJQ2F9M5AAP\"}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Forum thread forum.devpit.example/t/kestrune-large-values/4417: one user (kv_wrangler) claims Kestrune silently truncates values above 1 MiB when compression is on; a second agrees without detail, and marlo_p reports storing 3 MiB values with compression on Kestrune 3.1 without the problem and asks for a repro (no further replies). Unconfirmed and version-unspecified — a lead to test, not an established limit.",
+     "keywords": "Kestrune, truncation, compression, large values, forum, unconfirmed, data loss",
+     "shelf": "research"
+    },
+    "result": "{\"result\": \"01M61FQQ422KSAN1KE44TPXT5H\"}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "tool_search",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "read_file",
+   "terminal",
+   "read_file",
+   "memcue_search",
+   "memcue_add",
+   "memcue_add",
+   "memcue_add",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417"
+  ],
+  "final_answer": "Verdict: Kestrune does not fit as the store is specified today. Two of the four requirements are hard documented conflicts, not tuning problems; a third is unverified; and the benchmark you were pointed at does not measure anything resembling your workload.\n\nRequirement by requirement\n\n  Values up to 6 MiB — passes on paper. Docs (3.2) say value limit 8 MiB, 1.33x headroom. But see the truncation risk below.\n\n  ~300 writes/s at peak — unmeasured for your shape. The blog post's 1.2M writes/s is 64-byte values, sync=\"off\", one writer, batches of 1,000, local NVMe; the post itself says it did not test values over 4 KiB or sync=\"full\". At 6 MiB and 300/s you need ~1.8 GB/s of durable write bandwidth (1.89 GB/s, 1800 MiB/s) — an entirely different problem from 1.2M small async writes. The number tells you nothing about this.\n\n  Two worker processes, two hosts, one shared NFS directory — blocked twice over.\n    - \"A database may be opened for writing by one process at a time; Kestrune takes an exclusive file lock on open.\" Two processes = one of them fails to open, or, worse, the lock is what's unreliable on NFS.\n    - \"The data directory must be on a local filesystem. Network filesystems (NFS, SMB/CIFS) are not supported: their file locking is not reliable enough for Kestrune's write lock, and a database on one may be corrupted.\" This is exactly /mnt/shared/ingest on fs-01.\n\n  Durability across power loss — satisfiable only on local disk. sync=\"full\" (the default) returns after the data reaches disk, so it meets the requirement on a local filesystem. It does not rescue the NFS case: the docs' unsupported-filesystem warning covers corruption, not just lost writes.\n\nRisks, in order of how much they should worry you\n\n1. Corruption, not just unavailability, on NFS. The docs warn a database on NFS \"may be corrupted\" because locking is unreliable. If someone gets this running on /mnt/shared/ingest the failure mode is a damaged database, not a clean error — and with two hosts writing, a broken lock is discovered after the damage.\n\n2. Silent truncation above 1 MiB with compression on. Forum thread 4417 has one claim of exactly that, one \"me too\" with no detail, and one user on 3.1 storing 3 MiB values with compression on without the problem, asking for a repro — and no reply. Treat it as unconfirmed and version-unspecified, but note it targets your value size precisely, the failure is silent, and it collides with requirement 4. Verify with a 6 MiB round-trip digest check, compression on and off, before trusting anything.\n\n3. Throughput at your shape is unknown, and sync=\"full\" is where it usually collapses. You'll be doing 300 fsyncs/s of multi-MiB values on top of ~1.8 GB/s write amplification if every write is max size (148 TiB/day at the ceiling). Average value size matters more than the peak; if it's much smaller than 6 MiB, this risk shrinks a lot.\n\n4. Design assumption behind the shared directory. The README's layout implies a batch can be resumed by either host after a crash or restart. Per-host local Kestrune stores break that: a key written on ingest-a is invisible to ingest-b, so the archiver has to gather from both and failover semantics change. That's a real design decision, not a config tweak.\n\nWhat I'd do\n\n  - Ask the Kestrune maintainers directly about the 1 MiB/compression claim with a 3.2 repro; don't design around a forum anecdote.\n  - Benchmark the actual shape: one process, local NVMe, sync=\"full\", 6 MiB values, 300/s, and measure p99 and fsync cost. That, not the blog post, decides requirement 2.\n  - Pick one of: (a) partition keys by host with a local store per worker plus a merge step before the archiver; (b) a single writer on one host with its own local disk, and the other worker talking to it over the network (Kestrune has no server mode — this means building one); or (c) keep shared-NFS semantics and use something that supports it. Kestrune as documented is out unless the shared-directory requirement itself changes.\n\nUnrelated but worth fixing while you're in worker/store.py: put() fsyncs the temp file and then os.replace()s it, but never fsyncs the directory, so a power loss can drop the rename and leave the old (or no) file — the current store does not fully meet requirement 4 either."
+ }
+}

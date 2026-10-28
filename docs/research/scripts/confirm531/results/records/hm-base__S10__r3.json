@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S10",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 35.1,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.002368266,
+  "turns": 6,
+  "input_tokens": 51383,
+  "output_tokens": 2046,
+  "cache_read_tokens": 44672
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Short answer: no on payload size, and the backoff is a fixed curve you can't tune.\n\nPayload — docs/vendor/ostrel-limits.md (Ostrel 5.3, \"Operating limits\", copied 2026-05-14)\n\nThe limit is 256 KiB after serialization; anything bigger is rejected at enqueue with PayloadTooLarge. README says our invoice payloads run up to 300 KB, and jobs/send_invoice.py carries the rendered PDF inline as payload[\"pdf_base64\"]. That bumps it further:\n\n    256 KiB limit           262,144 bytes\n    300 KB raw PDF          300,000 bytes   already 1.14x over\n    300 KB text as base64   400,000 bytes   1.53x over\n\nSo even before base64 expansion the raw invoice is too big — no invoice at our upper bound fits, and the encoding makes the worst case half again over. The doc's own advice is the fix: store the PDF elsewhere (object store / S3) and pass a reference in the payload, maybe with metadata and a checksum, keeping the job under 256 KiB. That's a change to send_invoice.py and whatever enqueues it, not a config tweak.\n\nRetries\n\nFailed job → exponential backoff, first retry after 2s, each delay doubled, capped at 10 minutes. After 25 attempts it goes to the dead-letter queue. retry_limit per job type can change the 25 attempts, but the backoff curve itself is fixed in 5.3.\n\nThe practical shape, which is worth flagging: 2, 4, 8, 16, 32, 64, 128, 256, 512s, then 600s for the remaining 15 retries — about 2h47m elapsed before a permanently failing invoice job lands in the DLQ. If you want failed invoices surfaced faster than that, the only lever is a lower retry_limit; the delay schedule stays as is.\n\nOne caveat: this note is a copy of the 5.3 docs. If we're actually evaluating a newer Ostrel, the backoff or limit may have moved — worth re-checking before we design around it."
+ }
+}

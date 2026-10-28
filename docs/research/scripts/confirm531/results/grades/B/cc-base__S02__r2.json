@@ -1,0 +1,50 @@
+{
+ "pass": "B",
+ "record_sha256": "cc1fd822fd8689d7ae9a90e6fb44cff579dc2915625c0fd89b20dab4049c58f0",
+ "cost_usd": 0.0251,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F465D6VHC1W7V1J8NSBWE"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F465D6VHC1W7V1J8NSBWE"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F465D6VHC1W7V1J8NSBWE",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "It states the NFS and single-writer limits from the docs, but it also stores the repository's own deployment details (two writers on ingest-a/ingest-b, NFS export /mnt/shared/ingest on fs-01) and a 'does not fit' conclusion in repo scope, which matches must_not_store."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer names both the NFS corruption blocker and the single-writer limit, confirms 6 MiB fits under the 8 MiB limit, explains that the vendor benchmark's narrow setup leaves 6 MiB values with sync=full untested and must be measured, and treats the forum truncation claim as unconfirmed, citing the contrary report."
+ }
+}

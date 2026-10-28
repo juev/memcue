@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a700fec09fb81d90fede19b97d1e11006d074fa776e830a056f6f861c1839413",
+ "cost_usd": 0.0368,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer never searched memory, so it says Retry's defaults and its POST behaviour are unknown, even though the shelf holds the 3.1 fact that Retry(total=N) never retries POST; that matches the wrong_if 'says nothing is known although the shelf has the 3.1 fact'."
+ }
+}

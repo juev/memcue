@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "dda48399d3c40eb9aeab2c2e3b7e8d59fc516f4a16236b0f726b2f4c42135429",
+ "cost_usd": 0.0097,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not possible with the default setup, gives the 30 s default, the 10 s polling floor, and push updates via stream: true on Team plan or above, cites the Nimbrel SDK 4.x docs read 2026-04-20, and notes the figures should be re-checked against the SDK version in use; it adds no made-up numbers or options."
+ }
+}

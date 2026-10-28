@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "8616088f59fab7a92d0166b4ce9e4c236494b4ec7ebaaed4f463590a37e38eaa",
+ "cost_usd": 0.0138,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says yes and cites the Corvane gateway 2.3 docs for the 5,000-part limit. It works out about 7,680 parts at 8 MiB for 60 GiB and recommends a justified 64 MiB part size, which is within 8–512 MiB, set via CHUNK_MB in scripts/upload.sh."
+ }
+}

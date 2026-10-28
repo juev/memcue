@@ -1,0 +1,82 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S02",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 30.8,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.141382,
+  "turns": 8,
+  "input_tokens": 8,
+  "output_tokens": 2700,
+  "cache_read_tokens": 67910
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [
+   {
+    "id": "01M61FP8PQ16YC2X5NBMEBYEBS",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "Kestrune limits NFS network filesystem single writer lock value size durability sync",
+    "content": "Kestrune 3.2 limits: key 1 KiB, value 8 MiB, database file 2 TiB; only one process may open a database for writing (exclusive file lock), others read-only; data directory must be on a local filesystem, NFS and SMB/CIFS are unsupported and may corrupt the database; sync=\"full\" (default) returns after data reaches disk, sync=\"off\" may lose last writes on power failure. Source: docs.kestrune.example/limits, Kestrune 3.2, updated 2026-08-30.",
+    "change": "added"
+   },
+   {
+    "id": "01M61FP8PZNGMPTQP2VG0QXE0X",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "Kestrune benchmark write throughput performance",
+    "content": "Kestrune vendor benchmark claims 1.2 million writes/s for 3.2, but only with one writer, batches of 1,000, 16-byte keys, 64-byte values, sync=\"off\", local NVMe, 32 cores; values over 4 KiB and sync=\"full\" were not tested. Vendor claim, not independent. Source: blog.kestrune.example/2026/write-throughput, 2026-07-02.",
+    "change": "added"
+   },
+   {
+    "id": "01M61FP8Q6P1HEQ7Y19AGSAT3P",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "Kestrune large values truncation compression bug",
+    "content": "Unconfirmed forum claim that Kestrune silently truncates values above 1 MiB with compression on: anonymous users, no version or repro given; another user reports 3 MiB values with compression on Kestrune 3.1 without problems; thread unresolved. Source: forum.devpit.example/t/kestrune-large-values/4417, read 2026-10-28.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat README.md && ls -la; memcue search -in shelf:research \"Kestrune limits\"; memcue search -in shelf:research \"Kestrune write throughput large values\"; memcue search \"Kestrune\"",
+    "result": "# ingest-worker\n\nConsumes uploaded batches from the intake queue, keeps partial results in a local key-value store until a batch is\ncomplete, then hands the batch to the archiver.\n\n## Requirements for the store\n\n- Values: one partial result per key, up to 6 MiB each.\n- Write rate: about 300 writes per second at peak.\n- Deployment: two worker processes, one on each of the hosts ingest-a and ingest-b, write to the same data\n  directory, `/mnt/shared/ingest`, an NFS export of the file server fs-01.\n- Durability: a write acknowledged to the queue must survive a power loss.\n\nThe current store is a directory of JSON files (`worker/store.py`); we want to replace it.\ntotal 24\ndrwxr-xr-x 5 1001 1001 4096 Oct 28 14:47 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:47 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:47 .git\n-rw-r--r-- 1 1001 1001  668 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 worker\nNo stored facts match.\nNo stored facts match.\nNo facts of this repository, this host or global match; -in all searches every repository."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue add -shelf research -source tool -keywords \"Kestrune limits NFS network filesystem single writer lock value size durability sync\" -- \"Kestrune 3.2 limits: key 1 KiB, value 8 MiB, database file 2 TiB; only one process may open a database for writing (exclusive file lock), others read-only; data directory must be on a local filesystem, NFS and SMB/CIFS are unsupported and may corrupt the database; sync=\\\"full\\\" (default) returns after data reaches disk, sync=\\\"off\\\" may lose last writes on power failure. Source: docs.kestrune.example/limits, Kestrune 3.2, updated 2026-08-30.\"\nmemcue add -shelf research -source tool -keywords \"Kestrune benchmark write throughput performance\" -- \"Kestrune vendor benchmark claims 1.2 million writes/s for 3.2, but only with one writer, batches of 1,000, 16-byte keys, 64-byte values, sync=\\\"off\\\", local NVMe, 32 cores; values over 4 KiB and sync=\\\"full\\\" were not tested. Vendor claim, not independent. Source: blog.kestrune.example/2026/write-throughput, 2026-07-02.\"\nmemcue add -shelf research -source tool -keywords \"Kestrune large values truncation compression bug\" -- \"Unconfirmed forum claim that Kestrune silently truncates values above 1 MiB with compression on: anonymous users, no version or repro given; another user reports 3 MiB values with compression on Kestrune 3.1 without problems; thread unresolved. Source: forum.devpit.example/t/kestrune-large-values/4417, read 2026-10-28.\"",
+    "result": "01M61FP8PQ16YC2X5NBMEBYEBS\n01M61FP8PZNGMPTQP2VG0QXE0X\n01M61FP8Q6P1HEQ7Y19AGSAT3P"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417"
+  ],
+  "final_answer": "No. Kestrune doesn't fit your deployment as it's set up now. It breaks two of your requirements outright, according to its own documentation.\n\n## Requirement by requirement\n\n| Requirement (README.md) | What Kestrune 3.2 says | Fit |\n|---|---|---|\n| Values up to 6 MiB | Value limit is 8 MiB (key limit 1 KiB) | ✅ OK, but only 2 MiB of headroom |\n| Two processes (ingest-a and ingest-b) writing to the same data directory | \"A database may be opened for writing by one process at a time\" (exclusive file lock). Other processes can only open it read-only | ❌ **Blocker** |\n| Data directory on NFS (`/mnt/shared/ingest` from fs-01, also set in `config/worker.toml`) | \"Network filesystems (NFS, SMB/CIFS) are not supported … a database on one may be corrupted\" | ❌ **Blocker** |\n| Acknowledged writes survive power loss | `sync = \"full\"` (the default) returns only after the data is on disk | ✅ OK, as long as nobody turns sync off |\n| About 300 writes/s at peak, values up to 6 MiB | No published number matches this workload | ⚠️ Unknown |\n\n## Risks and caveats\n\n1. **Multiple writers and NFS are the deciders.** To use Kestrune you'd have to change the deployment, not just the store. Options:\n   - Each worker gets its own local database and you partition batches by host. A batch's partial results would then need to land on one host, which means changing how the queue routes them.\n   - A single store service that both workers talk to.\n   \n   Simply putting it on NFS risks corrupting the database. The two-host lock contention would only hide the problem at first.\n\n2. **The benchmark tells you nothing about your workload.** The 1.2M writes/s figure is the vendor's own claim. It used one writer, batches of 1,000, 64-byte values, `sync = \"off\"` and local NVMe. The post says values over 4 KiB and `sync = \"full\"` weren't tested. Your case is 300 durable writes/s of values up to 6 MiB, which is up to about 1.8 GB/s with an fsync on every write. That will be limited by the disk, not by Kestrune's speed. You'd have to measure it on your own hardware.\n\n3. **Large values with compression.** The forum thread claims Kestrune silently truncates values over 1 MiB when compression is on. The claim is unconfirmed: it comes from anonymous users with no version and no repro. Another user stores 3 MiB values with compression on 3.1 without problems, and the thread was never resolved. I wouldn't treat it as a known bug. I would test 6 MiB round-trips with compression on before relying on it, or leave compression off.\n\n4. **Durability depends on configuration.** It's only guaranteed with `sync = \"full\"`, so make that explicit in the config rather than relying on the default.\n\n## Recommendation\n\nDon't adopt Kestrune for the current deployment with two hosts on a shared NFS directory. It's worth reconsidering only if you're willing to move to local disks with one writer per database. Then run your own benchmark with 6 MiB values, `sync = \"full\"` and compression on/off, which would cover risks 2 and 3. Otherwise, look for a store that supports concurrent writers from several hosts (a networked database or object store).\n\nI saved the documentation limits, the benchmark's test conditions and the unconfirmed forum claim to the research shelf in memory, each with its source and date."
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S15",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0016990080000000001,
+  "turns": 4,
+  "input_tokens": 34088,
+  "output_tokens": 958,
+  "cache_read_tokens": 27136
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "API gateway rate limit workers per key"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G2M6M7QYQ1JGGKJ2PCQPY\", \"content\": \"The paygate sandbox is https://sandbox.paygate.example; its API keys are in the vault at secret/paygate/sandbox.\", \"keywords\": [\"paygate\", \"sandbox\", \"api key\", \"vault\"], \"scope\": \"service:paygate\", \"created\": \"2026-10-28T14:54:23Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "tool_describe",
+   "tool_call",
+   "terminal",
+   "search_files"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "More — up to 400/min, not 100.\n\n- gateway/limits.py:5 creates `Limiter(rate=\"100/minute\", key=\"api_key\")` with no `backend=`, so it uses the default `memory` backend.\n- The Quillon 1.8 docs (https://docs.quillon.example/config) state that with the `memory` backend \"counters live in the memory of the process. Each process counts on its own, so an application with N worker processes lets a key make up to N times the configured rate.\"\n- deploy/server.conf:2 sets `workers = 4`, so each of the 4 processes independently allows 100/min for the same key → 400/min effective.\n\nTwo secondary points from the same page:\n\n- Windows are fixed and clock-aligned, so even after fixing the backend a client can burst up to ~2× (e.g. 100 at the end of one minute, 100 at the start of the next) inside a sliding 60s span.\n- To make 100/min actually hold, switch to the shared backend: `Limiter(rate=\"100/minute\", key=\"api_key\", backend=\"tally\", url=\"tally://host:7070\")`, which needs a tallyd server reachable by all workers.\n\nI couldn't verify the installed library — `quillon` isn't importable in this environment (requirements.txt pins `quillon==1.8.2`, but no venv with it is present), so the conclusion rests on the versioned docs matching the pinned version."
+ }
+}

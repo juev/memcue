@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1c092b104f5620f5dc1e3add15bcbf8dd401beaee445c0548d1af3ced4be00d0",
+ "cost_usd": 0.05,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "The answer says no and gives a concurrency/no-locking reason close to the single-writer limit, but it draws on local repo files rather than the Kestrune 3.2 docs and never says network filesystems are unsupported and may corrupt the database."
+ }
+}

@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S11",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.1,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.07299480000000001,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 692,
+  "cache_read_tokens": 47094
+ },
+ "record": {
+  "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"Ferrocache sizing maxmemory replica RAM\"; memcue search \"Ferrocache sizing maxmemory\"; memcue search -in all \"Ferrocache memory overhead replication\"",
+    "result": "01M61FE3NWAPQNR4MW7N91S79D docs.ferrocache.example 2026-06-02 | Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61FE3P5GF1ZGH30F1AXKE3E | The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "Give the VM **at least 18 GB of RAM** (12 GB × 1.5).\n\nThis comes from the note we saved on the Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02). It says `maxmemory` only limits the dataset. Replication buffers, client output buffers and memory fragmentation all use RAM on top of that. For a node with replication, the guide recommends at least 1.5× `maxmemory`; without replication, at least 1.25×.\n\nTwo caveats:\n- **18 GB is the guide's minimum.** The OS and anything else running on the VM need memory too. Rounding up to the next standard VM size, such as 20 or 24 GB, would be the safer choice. That's my suggestion, not something the guide says.\n- **The guidance is for version 5.2 and is about five months old.** This workspace doesn't show which Ferrocache version you run. If it's not 5.2, check the current sizing page in case the ratio has changed."
+ }
+}

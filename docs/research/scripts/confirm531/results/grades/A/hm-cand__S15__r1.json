@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "3ca467f085eca0736c3d9cff5b031bc361ebe8f09a83b6e9d439f057bbe82894",
+ "cost_usd": 0.0317,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the default memory backend counts per process, so 4 workers allow up to 400/min, and that backend=\"tally\" with a tallyd server is the fix; it also mentions fixed, clock-aligned windows."
+ }
+}

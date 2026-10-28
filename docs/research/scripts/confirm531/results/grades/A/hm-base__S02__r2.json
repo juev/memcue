@@ -1,0 +1,52 @@
+{
+ "pass": "A",
+ "record_sha256": "2d182d127169d57ec1fb10583119f0e08b7fb0564c65d863d74eb5b16fab4ba2",
+ "cost_usd": 0.0658,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F5MAQ91PPGK0FC6TXVQZP",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact combines the NFS limit, the single-writer lock, the 8 MiB value limit and the benchmark's narrow setup, but it is stored in the repo scope rather than the shelf, gives no source URL and leaves out the key and file-size limits."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It names the NFS corruption risk and the one-writer limit as blockers, says 6 MiB fits under the 8 MiB limit, says the benchmark (sync=off, 64-byte values, nothing over 4 KiB or with sync=full) does not cover the workload so 300 writes/s at sync=full is unmeasured, and treats the forum truncation claim as unverified and contradicted."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "b2a9d2bbc9f84089239d4f4509be5279421f02162b871ba8b8160ae74c5e29f9",
+ "cost_usd": 0.0329,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Gives host brindle, port 7411 and config /etc/ferrocache/node.conf, plus the restart command, which matches correct_if."
+ }
+}

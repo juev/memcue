@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "e643155d1a5ba3651a5f08a988e703db132c7aea5595d5f084933daa765bd41d",
+ "cost_usd": 0.0138,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61F5Z2BPTWAXZ4G9VV1J6B2"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F5Z2BPTWAXZ4G9VV1J6B2",
+    "version": 2,
+    "verdict": "expected",
+    "note": "Corrects the seeded 40 MP shelf fact in place. It now says v2.6 (2026-09-14) accepts sources up to 100 MP, larger ones get HTTP 413, the 8,000 px output cap is unchanged, and the source is the changelog."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes because Tamberline v2.6 (2026-09-14) raised the source limit to 100 MP, so 64 MP photos fit; it notes the 8,000 px output cap is unchanged and that the 40 MP constant in pipeline.py is outdated."
+ }
+}

@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S02",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 44.4,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.0034254539999999997,
+  "turns": 5,
+  "input_tokens": 51453,
+  "output_tokens": 3226,
+  "cache_read_tokens": 42368
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest worker storage"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "search_files",
+   "tool_describe",
+   "memcue_search",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "read_file",
+   "read_file",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417",
+   "https://docs.kestrune.example/",
+   "https://docs.kestrune.example/configuration"
+  ],
+  "final_answer": "Verdict: no, not as the requirements stand. One requirement is a hard blocker from Kestrune's own docs, and the throughput and durability numbers you'd be relying on don't cover your workload.\n\nWhat I read\n- README.md: 6 MiB values, ~300 writes/s, two worker processes on ingest-a and ingest-b writing the same directory on /mnt/shared/ingest (NFS from fs-01), acknowledged writes must survive power loss.\n- worker/store.py + config/worker.toml: as described; no tests, no Kestrune installed here, /mnt/shared doesn't exist on this machine, so none of this is tested — it's all from the vendor docs and the thread.\n\nRequirement by requirement\n1. Value size — nominally fits, with thin margin. Limit is 8 MiB, you need 6 MiB, so 33% headroom. Nothing documents whether framing/encoding overhead counts against it.\n2. Write rate — not supported by the benchmark. 1.2M w/s is one process, 16-byte keys, 64-byte values, batching of 1,000, sync=\"off\", one local NVMe. Your real load is 300 × 6 MiB ≈ 1.76 GiB/s of payload with a 3.33 ms budget per write, and the post explicitly says values above 4 KiB and sync=\"full\" were not tested. So the headline number tells you nothing about this workload.\n3. Deployment — hard blocker, twice over. The limits page says a database may be opened for writing by one process at a time (exclusive file lock on open), and that the data directory must be on a local filesystem: NFS is not supported because lock reliability is insufficient and \"a database on one may be corrupted\". Two processes on two hosts over NFS on the same database violates both rules independently.\n4. Durability — the requirement forces sync=\"full\", which is precisely the untested configuration. sync=\"off\" is what the benchmark used and it fails your power-loss requirement.\n\nRisks\n- Silent data loss, unresolved: the forum thread reports values above 1 MiB being silently truncated with compression on. It is weak evidence — one report, a \"+1\" with no repro, and a counter-report of 3 MiB working on 3.1 — and the docs don't mention any compression limit. But the failure mode is silent truncation of exactly the 6 MiB values you'd store, so it has to be resolved by a test, not by reading. Note it would be silent: nothing in your pipeline would catch a short value.\n- Architecture change is unavoidable: to use Kestrune you need one writer per database on local disk, i.e. a database per host (losing the shared-directory property the archiver may depend on) or a single writer host behind an API. That's a design decision, not a swap-in.\n- The 8 MiB ceiling is a hard limit close to a payload size defined as \"up to 6 MiB\" — confirm it's a hard cap and whether over-limit writes error or truncate.\n- Full/fsync behaviour at 6 MiB × 300/s has no published figure at all; on NFS the current file store already has questionable semantics for two workers, so the shared-directory requirement deserves a re-check regardless of Kestrune.\n\nWhat would make it a fit\nA per-host local database (or one writer with a network layer), a measured run at 6 MiB with sync=\"full\" on your actual disks, and an explicit test of compression on/off with a 6 MiB value that verifies the full byte length comes back. Without those three, I wouldn't move off the file store."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "7505a4815584984397dbc57cd9dfa2823a47e6e0c1b1a626565de107ebb02218",
+ "cost_usd": 0.0408,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "The answer states as fact that Quorvel has a hard limit of 1 MiB (1,048,576 bytes), which meets the wrong_if criterion; it relies on a repository that the recorded pages do not show, when it should have said no information was available."
+ }
+}

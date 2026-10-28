@@ -1,0 +1,70 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S18",
+  "repeat": "r2",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 35.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1569014,
+  "turns": 11,
+  "input_tokens": 16,
+  "output_tokens": 2155,
+  "cache_read_tokens": 147487
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [
+   {
+    "id": "01M61FAAGPZJWSSDBC3HD8J685",
+    "version": 2,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "marrowlog agent 2.4 performance throughput TLS benchmark lines per second vCPU",
+    "content": "Marrowlog 2.4 perf report (vendor/maintainers' own claim): one agent shipped 180,000 lines/s to the collector on 1 vCPU, 2 GiB RAM, CPU 85%; median of three 30-min runs. Conditions: plain TCP only (TLS not enabled in any run), lines <=200 bytes tailed from local SSD, disk buffer off, batch_lines 500. Not measured: TLS, lines >200 bytes, disk buffer; maintainers plan to measure TLS in the Q4 report. Re-checked 2026-10-28: Q2 page unchanged; https://marrowlog.example/perf/2026-q3 and /perf/2026-q4 return 404 (no TLS report found at those URLs). Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.",
+    "change": "corrected"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "ls -la && git log --oneline | head; memcue search \"log shipper TLS throughput\"; memcue search -in shelf:research \"log shipper TLS throughput lines per second\"; memcue search -in shelf:research \"encrypted connection benchmark shipper\"; memcue search -in all \"log shipper\"",
+    "result": "total 20\ndrwxr-xr-x 4 1001 1001 4096 Oct 28 14:58 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:58 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:58 .git\n-rw-r--r-- 1 1001 1001  433 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\n81f67d6 initial\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61FAAGPZJWSSDBC3HD8J685 example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 perf report (vendor/maintainers' own claim): one agent shipped 180,000 lines/s to the collector on 1 vCPU, 2 GiB RAM, CPU 85%; median of three 30-min runs. Conditions: plain TCP only (TLS not enabled in any run), lines <=200 bytes tailed from local SSD, disk buffer off, batch_lines 500. Not measured: TLS, lines >200 bytes, disk buffer; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\n01M61FAAGPZJWSSDBC3HD8J685 example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 perf report (vendor/maintainers' own claim): one agent shipped 180,000 lines/s to the collector on 1 vCPU, 2 GiB RAM, CPU 85%; median of three 30-min runs. Conditions: plain TCP only (TLS not enabled in any run), lines <=200 bytes tailed from local SSD, disk buffer off, batch_lines 500. Not measured: TLS, lines >200 bytes, disk buffer; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\nNo stored facts matc… [2 chars cut]"
+   },
+   {
+    "tool": "Skill",
+    "input": {
+     "skill": "memcue:memcue"
+    },
+    "result": "Launching skill: memcue:memcue"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue correct 01M61FAAGPZJWSSDBC3HD8J685 \"Marrowlog 2.4 perf report (vendor/maintainers' own claim): one agent shipped 180,000 lines/s to the collector on 1 vCPU, 2 GiB RAM, CPU 85%; median of three 30-min runs. Conditions: plain TCP only (TLS not enabled in any run), lines <=200 bytes tailed from local SSD, disk buffer off, batch_lines 500. Not measured: TLS, lines >200 bytes, disk buffer; maintainers plan to measure TLS in the Q4 report. Re-checked 2026-10-28: Q2 page unchanged; https://marrowlog.example/perf/2026-q3 and /perf/2026-q4 return 404 (no TLS report found at those URLs). Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\"",
+    "result": "01M61FAAGPZJWSSDBC3HD8J685 v2"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "Skill",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/",
+   "https://marrowlog.example/perf/2026-q2",
+   "https://marrowlog.example/perf/2026-q4",
+   "https://marrowlog.example/perf/2026-q3"
+  ],
+  "final_answer": "No. I couldn't find any published numbers for Marrowlog over TLS.\n\n**What exists:** the maintainers' own Marrowlog 2.4 report for 2026 Q2 (https://marrowlog.example/perf/2026-q2, published 2026-06-18). It says one agent shipped **180,000 lines/s on 1 vCPU, with CPU at 85%**. That figure is the median of three 30-minute runs. It doesn't fit your case:\n\n- **TLS was off in every run.** The report lists TLS as not measured and says it's planned for the Q4 report.\n- **Every line was 200 bytes or shorter.** The README says your lines average about 900 bytes, and the report also lists longer lines as not measured.\n- Disk buffer off and `batch_lines: 500`. These match `config/agent.yaml`, so they're the one part that does fit.\n\n**Checked today:** the Q2 page hasn't changed. I guessed the URLs `/perf/2026-q3` and `/perf/2026-q4` and both return 404, so I found no Q4 report. One may exist somewhere else on their site.\n\n**My own estimate, not from the report:** by bytes, your peak is 50,000 × 900 B ≈ 45 MB/s. The report's run was at most 180,000 × 200 B ≈ 36 MB/s. So even on plain TCP your load is beyond what they tested, and TLS adds encryption work on the same single vCPU. The 180k figure looks like a lot of headroom, but it doesn't show the agent can handle 50k lines/s over TLS.\n\n**Suggestion:** run your own test on a 1-vCPU agent with `tls: true`, replaying your real ~900-byte JSON lines at 50k/s. Watch CPU use and whether the agent falls behind the log files. You could also ask the maintainers when the Q4 TLS report is coming out.\n\nI added today's check to the existing memory note on this report, so a later session won't redo it."
+ }
+}

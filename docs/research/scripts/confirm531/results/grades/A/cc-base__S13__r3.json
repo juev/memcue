@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "b1f7c757e84c68229054ffacae663f2f97a89168ba4089949ad66b7d38c5e006",
+ "cost_usd": 0.0362,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons: Kestrune 3.2 does not support NFS/SMB and allows only one writer process. It cites the stored fact's source (docs.kestrune.example/limits, 2026-08-30) and mentions the corruption risk."
+ }
+}

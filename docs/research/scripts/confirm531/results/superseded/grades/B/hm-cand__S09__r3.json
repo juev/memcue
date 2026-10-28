@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "230b12cd8d3da619ac68b73ea19308b1305e0b51b3c9f66eac70b2767375c174",
+ "cost_usd": 0.0174,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says yes and names the 5,000-part limit with its source (Corvane gateway 2.3 docs). It works out that 8 MiB pieces need about 7,200–7,680 parts, gives a floor of about 12.3 MiB, and recommends CHUNK_MB=64, which is inside the 8–512 MiB range and goes in scripts/upload.sh."
+ }
+}

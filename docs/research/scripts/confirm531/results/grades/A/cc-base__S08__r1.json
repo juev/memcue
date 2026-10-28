@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "b894af360ea28479c28fbe04897dd8395e24f2840dbe3424dfdc8266d910bcc8",
+ "cost_usd": 0.0488,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61EKKSMVQ22XQN0X44BCWTZ"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EKKSMVQ22XQN0X44BCWTZ",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Keeps the 180,000 lines/s figure together with its untested limits (plain TCP only, lines of 200 bytes or less, no TLS, no longer lines, no disk buffer, TLS planned for Q4), but it was stored in repo scope instead of the research shelf, and it leaves out the 2 GiB and the publication date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no: TLS was not measured and lines were at most 200 bytes, against the agents' roughly 900-byte lines at 50,000 lines/s; it notes the 180,000 lines/s at 85% CPU leaves little headroom and recommends its own TLS test plus the planned Q4 report."
+ }
+}

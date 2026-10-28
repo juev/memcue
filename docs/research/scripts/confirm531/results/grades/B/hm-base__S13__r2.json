@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "488cfe98042495328aadcc1237acb3a17481f91a576b366cc9bd4a057bdd7908",
+ "cost_usd": 0.0129,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons, citing Kestrune's own docs: only one process may write (exclusive lock), and NFS/SMB is unsupported and may corrupt the database. Both came from a stored fact that the memory search returned."
+ }
+}

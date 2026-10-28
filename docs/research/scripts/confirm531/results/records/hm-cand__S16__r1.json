@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S16",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 56.3,
+  "docker_exit": 0,
+  "image": "sha256:daa9a209c2f39d3aa208f0291e4105afc1e92c1014515aeacd9344e8f6d825bd",
+  "cost_usd": 0.002296998,
+  "turns": 10,
+  "input_tokens": 89765,
+  "output_tokens": 2461,
+  "cache_read_tokens": 86016
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JH680DZTPHJMKVBXAE1PV\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:37:18Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Кворвел шина событий лимит размера сообщения"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "event bus message size limit broker publish",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JH680DZTPHJMKVBXAE1PV\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:37:18Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel",
+     "limit": "10",
+     "min_score": "0"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "tool_describe",
+   "tool_call",
+   "tool_call",
+   "terminal",
+   "tool_call",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://duckduckgo.com/html/?q=Quorvel+event+bus+message+size+limit",
+   "https://quorvel.com",
+   "https://lite.duckduckgo.com/lite/?q=Quorvel"
+  ],
+  "final_answer": "I can't answer that — I have no information about a \"Quorvel event bus\", and I'd rather say so than invent a number.\n\nWhat I checked:\n\n- Long-term memory: nothing on Quorvel, event buses, or message size limits (searched in English and Russian).\n- The workspace /stand/ws: empty — a single empty commit on main, no files.\n- The host: no Quorvel service, container, config under /etc, or listening port; no relevant environment variables.\n- The web: quorvel.com returns 404, and search pages aren't fetchable from here, so I can't confirm the product even exists publicly.\n\nThe only place the name appears on this machine is a test-fixture file under /opt/fixtures, which is harness data, not documentation of the system — no use as a source.\n\nTo get you a real answer I need the pointer: a docs URL, the broker's config (e.g. max.request.size / message.max.bytes), or the repo where the bus is defined.\n\nOne general caveat worth checking against whatever the real limit turns out to be: 2 MB payloads are above the default max message size of most brokers (Kafka 1 MB, NATS 1 MB, SNS/EventBridge/SQS 256 KB), so \"publish 2 MB snapshots\" often means either raising a broker/consumer limit consistently or storing the snapshot in object storage and publishing a reference."
+ }
+}

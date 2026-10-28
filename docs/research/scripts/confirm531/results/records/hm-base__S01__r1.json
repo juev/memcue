@@ -1,0 +1,46 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S01",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 39.3,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.00277686,
+  "turns": 6,
+  "input_tokens": 55086,
+  "output_tokens": 2303,
+  "cache_read_tokens": 46720
+ },
+ "record": {
+  "prompt": "I want config/app.wf split into a shared base plus small per-environment files (staging, prod) that pull the base in. Does the config parser this repo uses allow one file to pull in another? Tell me how it would work; don't restructure anything yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "wrenfold config include parser"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EE5Z1MT72YZZ4VNK0R1JG\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:25:45Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "search_files",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Yes — the parser supports it. The repo pins `wrenfold==2.1.3`, and the vendored changelog (`third_party/wrenfold/CHANGELOG.md:10-12`) says 2.0.0 added exactly this:\n\n  @include \"path\"\n\nHow it behaves, per that changelog entry:\n\n- It is a directive that loads another .wf file at that point, i.e. inline expansion, not a separate namespace.\n- A relative path resolves against the including file, so from config/staging.wf you would write @include \"base.wf\" (not config/base.wf).\n- Nesting is allowed up to 8 levels.\n- Order matters: a key set after an include overrides the included value. Keys set before it do not. So the base has to be included at the top of each env file; the env-specific keys below it then win over the base's values.\n- Since 2.1.0 the include path may also contain ${ENV} variables (CHANGELOG.md:7), so a single entry file could pick the env file via an env var if you preferred that over pointing the loader at each env file.\n\nSo the split would look like: config/base.wf holding listen, upstream_timeout, max_body, log_level; config/staging.wf and config/prod.wf each starting with @include \"base.wf\" followed by upstream and tls_cert. The 8-level cap is not a concern at two levels.\n\nOne thing to note about how it plugs in: `loader.py:5` hardcodes `path=\"config/app.wf\"` and just forwards to `wrenfold.load(path)`. There is no include logic in this repo — the includes are resolved entirely inside wrenfold. That means whatever selects the environment has to pass the env file's path into `load()`; the parser won't choose between staging and prod on its own.\n\nCaveat on verification: wrenfold is not installed in this environment (no pip either), so I could not execute a load and confirm the expansion at runtime. The above is from the repo's own changelog copy, not from running the parser. If you want, I can make the split in a scratch copy and test it once the package is available.\n\nNothing changed — read-only inspection."
+ }
+}

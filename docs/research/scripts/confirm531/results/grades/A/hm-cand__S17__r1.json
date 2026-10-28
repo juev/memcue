@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "67407c32de553efdb774d6806cdc3af460480c6d6cffe23ef61f7d30205c8eb0",
+ "cost_usd": 0.0479,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer names max_buffered_messages and its default of 0 (unlimited), says 0.9 server streams have no built-in flow control, recommends a finite cap, and says the stream closes with RESOURCE_EXHAUSTED so dashboards must reconnect. It also notes the fact comes from the 0.9 docs and matches the pinned 0.9.4, and it does not invent any option names."
+ }
+}

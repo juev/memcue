@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "4782b1b1e01936d51e9d0bb39703607c219d1a8870ebede415a83d848f97c5f7",
+ "cost_usd": 0.024,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Adds km_to_miles in units/convert.py with matching type hints and a one-line docstring, returns km / 1.609344, and leaves the existing functions unchanged; the exact signature isn't quoted but the answer says it matches."
+ }
+}

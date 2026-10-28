@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "794c324ecacfe77fec94468fc1f312081a76ba56b08df521eab7b198edc6fa8b",
+ "cost_usd": 0.0241,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Answers 5 with the per-file breakdown 2/1/2, using grep -rh --include='*.log' ERROR logs | wc -l, which counts recursively and only in .log files, so logs/notes.txt is left out."
+ }
+}

@@ -1,0 +1,76 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S17",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 42.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0028429320000000003,
+  "turns": 7,
+  "input_tokens": 65846,
+  "output_tokens": 2326,
+  "cache_read_tokens": 57344
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "price-feed streaming endpoint dashboards"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G4TR649215QP86MTDAS2K\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:55:36Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "thistlewire",
+     "in": "all"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "query": "thistlewire",
+     "min_score": "0",
+     "limit": "20"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G4TRDQVF7CXG701VF1D24\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:55:36Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "20",
+     "min_score": "0",
+     "query": "thistlewire streaming keepalive deadline flow control slow client"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G4TRDQVF7CXG701VF1D24\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:55:36Z\"}, {\"id\": \"01M61G4TRJ8B4BD4MAXCP59D9W\", \"content\": \"Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\", \"keywords\": [\"pardalo\", \"retry\", \"post\", \"idempotent\", \"http client\"], \"origin\": \"pardalo.example 2026-02-08\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:55:36Z\"}, {\"id\": \"01M61G4TRCEG30G1VTQM9HV81G\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.ex… [82 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "tool_describe",
+   "tool_call"
+  ],
+  "pages_read": [
+   "https://thistlewire.example/docs/streaming"
+  ],
+  "final_answer": "Short answer: set `max_buffered_messages` on the stream. Per the Thistlewire 0.9 streaming docs, server-streaming calls have no built-in flow control — a slow consumer's messages are queued without bound, and the default `max_buffered_messages` is 0, meaning unlimited. That default is exactly the balloon you're worried about: one dashboard on bad Wi-Fi stops draining, and the server accumulates every tick for it until memory goes.\n\nWhat to configure:\n\n1. max_buffered_messages — set it to a small bounded number, not 0. Size it from your tick rate, not from a round number: budget = (ticks/sec per dashboard) × (acceptable staleness in seconds). If a dashboard can tolerate 5s of lag and you push 20 ticks/s, 100 is your order of magnitude. Multiply by worst-case message size and by expected concurrent dashboards to get the memory ceiling you're actually signing up for.\n\n2. Treat the cap as the backpressure mechanism it is — when it's reached, Thistlewire closes the stream with RESOURCE_EXHAUSTED. That has to be a normal, expected outcome on the dashboard side, not a fatal error: the client should reconnect and resync from a snapshot (or last-value per symbol), otherwise a dropped stream leaves silent gaps in the dashboard's prices.\n\n3. Prefer conflation over queueing, if the endpoint allows it. For price ticks the newest value per symbol supersedes older ones, so a bounded \"latest price per symbol\" buffer is naturally bounded by symbol count rather than by client speed — a slow dashboard then sees stale-then-current prices instead of a backlog it can never catch up on. That's strictly better than a large per-connection queue for this data shape. If Thistlewire can't do that, do the coalescing yourself before enqueueing.\n\n4. Bound the other direction too: cap concurrent streams per dashboard/session and make sure disconnected clients get reaped promptly (a half-open TCP connection from a laptop that went to sleep is a stream that never drains). Check what 0.9.4 exposes for in-flight/concurrency limits rather than assuming one exists.\n\nOne caveat on grounding: I got `max_buffered_messages` from the stored Thistlewire 0.9 streaming-docs note (read July 2026), not from the package itself — Thistlewire isn't installed in this environment and https://thistlewire.example/docs/streaming now returns 404. Your requirements.txt pins 0.9.4, so confirm the exact option name and its semantics against that version's docs or source before relying on it. The reasoning above holds either way; only the knob name is unverified."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "ba4356af44ca8a4a610dd381a497f1dea34fd8dc2e13cfb9ea90d8f23a39add3",
+ "cost_usd": 0.0537,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FD76E5ZVQFR5A84BP03R2",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "The label forbids storing anything new, and this is a new global fact about a Hermes write-permission pitfall that has nothing to do with the Corvane question."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It assumes a 10,000-part cap and says 8 MiB parts still work for 60 GB, which invents a different limit and contradicts the shelf fact that Corvane allows at most 5,000 parts, so the upload would already fail."
+ }
+}

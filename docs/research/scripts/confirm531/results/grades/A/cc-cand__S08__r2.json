@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e5de376f3718c16cebdf89fcef21ea49149fe6c75f1c33dc7b82edf16ae2bbda",
+ "cost_usd": 0.0476,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FAAGPZJWSSDBC3HD8J685"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FAAGPZJWSSDBC3HD8J685",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the 180,000 lines/s figure along with its plaintext, ≤200-byte and disk-buffer-off conditions, lists TLS, longer lines and the disk buffer as not measured, mentions the planned Q4 TLS report, and gives the source and date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no because TLS was not enabled in any run and lines were at most 200 bytes, against the team's ~900-byte lines at 50,000 lines/s; it gives the 180k lines/s at 85% CPU on one vCPU figure, labels its byte-volume reasoning as inference, invents no TLS figure, and recommends an own test or waiting for the Q4 report."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "31e208837fa157a038251e292c3a5d8e52fade14c2126b67b792256c24edf2fe",
+ "cost_usd": 0.0405,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The agent says it has no information on Quorvel's message size limit after searching memory, the repo and the web, and asks for Quorvel's docs or config before relying on 2 MB; it gives no Quorvel limit, and its generic workaround is clearly conditional."
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S17",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.6,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1006438,
+  "turns": 4,
+  "input_tokens": 8,
+  "output_tokens": 1652,
+  "cache_read_tokens": 65699
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; git ls-files | head -50; memcue search \"price-feed streaming backpressure\"; memcue search -in shelf:research \"grpc server streaming slow client flow control\"",
+    "result": "README.md\nrequirements.txt\nserver.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61G4D4K2B6HRQ5P7AEHB0VC thistlewire.example 2026-07-11 | Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "The thing to configure is a cap on each stream's outgoing buffer. Without one, a stalled dashboard's ticks pile up in server memory with no limit.\n\n**What I'm basing this on.** An earlier session read the Thistlewire docs (thistlewire.example/docs/streaming, version 0.9, read 2026-07-11). They say:\n- Server-streaming calls have **no built-in flow control**. The server queues messages for a slow client **without bound**.\n- The stream option **`max_buffered_messages`** limits that queue. Its default is `0`, which means unlimited.\n- When a stream hits the cap, the server **closes it with `RESOURCE_EXHAUSTED`**.\n\n`requirements.txt` pins `thistlewire==0.9.4`, which is in the same 0.9 line. But the library isn't installed here, so I couldn't check that 0.9.4 behaves the same. Check the 0.9.4 docs or changelog before relying on it.\n\n**What I'd configure:**\n\n1. **Always set `max_buffered_messages` on the new streaming endpoint.** Never leave it at the default. A small cap is enough for price ticks: roughly a few seconds' worth at your peak tick rate. Memory per client then stays bounded no matter how bad the Wi-Fi gets.\n\n2. **Make dashboards reconnect when the stream closes.** The cap works by closing the stream, so a lagging dashboard will get `RESOURCE_EXHAUSTED`. The client should treat that as \"reconnect and resubscribe\": retry with backoff, and get a fresh snapshot (your existing `prices.Get` works) so the screen isn't showing stale prices. Without this, the cap protects the server but leaves the user with a frozen dashboard.\n\n3. **Consider sending only the latest price per symbol (my suggestion, not from the docs).** Old ticks are worthless once a newer price exists. So instead of queueing every tick, you could keep only the newest price for each symbol per client and send whatever is current when the client can take more. A slow client then gets fewer updates instead of being disconnected. Nothing I've found says whether Thistlewire supports this natively, so it would probably be your own code in the stream handler. Keep `max_buffered_messages` as a backstop either way.\n\n4. **Clean up dead connections.** A dashboard that drops off Wi-Fi without closing its connection can hold a stream open indefinitely. Look for keepalive or idle-timeout settings in Thistlewire, and make sure the handler stops producing and unsubscribes as soon as the stream ends. I don't have anything on what options Thistlewire offers for this, so check its docs.\n\n5. **Limit total streams (optional).** Capping concurrent streams per server or per client stops a reconnect storm from turning a per-client limit into a server-wide problem.\n\n6. **Watch it in production.** Counting how often streams close with `RESOURCE_EXHAUSTED`, and which clients, will show whether the cap is sized right and which offices have bad Wi-Fi."
+ }
+}

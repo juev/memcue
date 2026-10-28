@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "c3b3ea8b1c27c8a570dc13988cb2489ccd652900cfc6d37e7d8cd079ff2a2641",
+ "cost_usd": 0.0077,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer reports the 3.1 fact (read 2026-02-08: retries are limited to GET/HEAD/PUT/DELETE/OPTIONS, never POST, so the charge would not be resent). It flags that the repo pins 4.2.0, a newer major version, so this has to be checked for 4.2, and it makes no claim about 4.2 behaviour. It gives the idempotency key as its own advice."
+ }
+}

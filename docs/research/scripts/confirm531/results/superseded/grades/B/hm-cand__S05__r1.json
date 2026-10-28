@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "7b01528d7258a0aeb8a871239d1222ff494ab2a15478da725298284c0481976c",
+ "cost_usd": 0.01,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It meets the correct_if criterion: the default 30 s poll and 10 s floor rule out 5 s, so push is needed (stream: true, Team plan or above), and it cites docs.nimbrel.example read on 2026-04-20 and says to re-check that against the current docs."
+ }
+}

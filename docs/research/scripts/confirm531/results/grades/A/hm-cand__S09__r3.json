@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "72f20a3cfbf7299b08556fe9f7cd4879c7dada94003dbce6f3fa80743ff71cab",
+ "cost_usd": 0.0525,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61JQ1JFPNB66JVGQDCSQ401",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This is a new fact that records the run's own work and arithmetic. It also assumes a 10,000-part cap with no source, which contradicts the 5,000-part limit on the shelf."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It says 8 MiB parts are fine for now because it invents a 10,000-part cap from general S3 rules, instead of reporting that the 5,000-part Corvane limit means about 7,150 parts will fail."
+ }
+}

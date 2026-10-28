@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "6adab8119db96592908a4439e4795caf28e9fedbb06a2778d21e0bd752c283a2",
+ "cost_usd": 0.0086,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The agent says it found nothing on Quorvel's message size limit in memory, the repo or the docs. It gives no limit and does not call 2 MB fine. It asks for Quorvel's docs or the broker/client config to settle the question, and its remark about typical event buses is generic and not presented as Quorvel's limit."
+ }
+}

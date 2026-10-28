@@ -1,0 +1,65 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S18",
+  "repeat": "r1",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 38.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0019064579999999998,
+  "turns": 8,
+  "input_tokens": 71255,
+  "output_tokens": 2204,
+  "cache_read_tokens": 68736
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shippers encrypted connections throughput TLS performance numbers",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EKWHXFH3MDD47Z8G8S3NE\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:28:52Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "query": "Marrowlog agent TLS benchmark throughput"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "limit": "10",
+     "query": "Marrowlog log shipper TLS encrypted throughput performance"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EMSB4563JFQ6Z93QMS6JH\", \"content\": \"Marrowlog 2.4 performance report, 2026 Q2 (published 2026-06-18, marrowlog.example/perf/2026-q2): one agent shipped 180,000 lines/s to a collector on 1 vCPU with 2 GiB RAM at 85% CPU, running the collector over plain TCP — TLS was not enabled in any run and is not measured; lines were 200 bytes or shorter, disk buffer off, batch_lines 500, median of three 30-minute runs. The report states TLS, lines longer than 200 bytes and the disk buffer are not covered, and TLS measurement is planned for the Q4 report.\", \"keywords\": [\"marrowlog\", \"performance report\", \"throughput\", \"TLS\", \"plain TCP\", \"lines per second\", \"benchmark\", \"collector\", \"2026 Q2\"], \"origin\": \"example.com/acme/log-pipeline 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:29:21Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "memcue_search",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "tool_describe",
+   "tool_call",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. There's no published number that covers this case — and the one number that exists doesn't even cover the current plain-TCP load at your line size.\n\nWhat's in the repo: only README.md and config/agent.yaml. No benchmarks, no capacity data.\n\nThe only published figure is the vendor's Marrowlog 2.4 performance report, 2026 Q2 (2026-06-18, marrowlog.example/perf/2026-q2 — I fetched it):\n\n  180,000 lines/s, one agent, 1 vCPU, 2 GiB RAM, CPU at 85%\n\nBut the method matters:\n\n  - Output was plain TCP. TLS was not enabled in any run.\n  - Every input line was 200 bytes or shorter.\n  - The report's own \"Not covered\" section lists TLS, lines longer than 200 bytes, and the disk buffer; TLS measurement is deferred to the Q4 report.\n\nYour stated workload is 50,000 lines/s at ~900 bytes average. That's 45 MB/s, versus 36 MB/s in the benchmark — 25% more bytes per second even before TLS is turned on:\n\n  benchmark: 180,000 × 200 B = 36.0 MB/s (288 Mbit/s)\n  target:     50,000 × 900 B = 45.0 MB/s (360 Mbit/s)\n\nSo the published run is not evidence for your case twice over: wrong line size and no encryption. As a rough linear scaling of its 85% CPU figure, 45 MB/s of plain TCP would already be around 106% of the single reserved vCPU — that's my estimate from their numbers, not a measured result, and TLS record processing and handshakes would add on top.\n\nBottom line: you'd need your own benchmark — TLS enabled, 900-byte lines, one vCPU, 50k lines/s sustained — before committing to the security review deadline. The Q4 report may help if it lands before your deadline, but I wouldn't plan on it."
+ }
+}

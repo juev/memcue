@@ -1,0 +1,38 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S01",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 48.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003196584,
+  "turns": 8,
+  "input_tokens": 83116,
+  "output_tokens": 2612,
+  "cache_read_tokens": 73728
+ },
+ "record": {
+  "prompt": "I want config/app.wf split into a shared base plus small per-environment files (staging, prod) that pull the base in. Does the config parser this repo uses allow one file to pull in another? Tell me how it would work; don't restructure anything yet.",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "terminal",
+   "search_files",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Yes — the version you pin supports it. `@include \"path\"` was added in Wrenfold 2.0.0 and you're on 2.1.3 (requirements.txt), so it's available.\n\nWhat the vendored changelog (third_party/wrenfold/CHANGELOG.md) states:\n\n- Syntax: a top-level line `@include \"base.wf\"` — \"loads another .wf file at that point\".\n- Relative paths resolve against the including file, so `@include \"base.wf\"` inside config/staging.wf resolves to config/base.wf regardless of CWD.\n- Ordering is the override mechanism: \"A key set after an include overrides the included value.\" So the include goes at the top of each env file and the env-specific keys below it. A key written *before* the include would get clobbered by the base.\n- Includes nest up to 8 levels deep.\n- Since 2.1.0 the path may contain `${ENV}` variables, e.g. `@include \"${WF_CONFIG_DIR}/base.wf\"`.\n- The old `!import` spelling was removed in 2.0.0 — don't use it (nothing in the repo uses it today).\n\nThe shape it would take (illustration only, nothing touched):\n\n  config/base.wf      listen, upstream_timeout, max_body, log_level\n  config/staging.wf   @include \"base.wf\"  then upstream / tls_cert\n  config/prod.wf      @include \"base.wf\"  then prod upstream / tls_cert\n\nThree things to be aware of before you commit to it:\n\n1. The changelog is the only documentation here, and I could not verify the behaviour by running it. `wrenfold` isn't installed in this environment, and the package named wrenfold on PyPI is a different project entirely (symbolic/codegen library, latest 0.5.3, no config parser) — so your pinned 2.1.3 must come from a private index, not public PyPI. Everything above is from the changelog, not from an executed test.\n2. Unspecified by the changelog: what happens on a missing/duplicate include (error vs. silent), whether a cycle is caught or only bounded by the 8-level limit, and whether per-file duplicate keys are an error. Worth a small probe config on a machine that has the real package before relying on any of it.\n3. Nothing in this repo chooses an environment. loader.py only has `load(path=\"config/app.wf\")`; the path comes from the caller. Whatever triggers the load (deploy scripts, another repo) has to be pointed at config/staging.wf or config/prod.wf after the split, and config/app.wf presumably disappears or becomes a symlink — that decision isn't visible from here."
+ }
+}

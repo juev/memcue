@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S08",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 37.9,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.002482158,
+  "turns": 6,
+  "input_tokens": 50457,
+  "output_tokens": 2091,
+  "cache_read_tokens": 43136
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "marrowlog log agent collector TLS performance peak throughput"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "peak log volume events per second collector agents",
+     "limit": "8"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "tool_describe",
+   "memcue_search",
+   "tool_call",
+   "memcue_search",
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No. The report can't answer that question — and what it does show is not reassuring.\n\nWhat it actually measured (Marrowlog 2.4 perf report, 2026 Q2, published 2026-06-18):\n\n  - 180,000 lines/s per agent on 1 vCPU / 2 GiB, CPU at 85%\n  - Lines of 200 bytes or shorter\n  - Collector over plain TCP; \"TLS was not enabled in any run\"\n  - Disk buffer off, batch_lines 500\n  - Under \"Not covered\": TLS to the collector, lines longer than 200 bytes, disk buffer. TLS is promised for the Q4 report.\n\nSo the exact thing you're asking about is explicitly listed as not tested. Signing off on TLS from this document isn't supported at all.\n\nAnd our own numbers say the run doesn't transfer even before TLS (from /stand/ws/README.md and config/agent.yaml):\n\n  - Our peak: 50,000 lines/s per agent, ~900 bytes/line (JSON with stack traces)\n  - That's 45 MB/s per agent, versus the report's ceiling of 200 × 180,000 = 36 MB/s\n  - Line count looks fine (28% of theirs), but lines are 4.5x longer, so bytes — not lines — are the binding constraint: we push 1.25x their byte rate\n  - Extrapolating their 85% CPU linearly to our 45 MB/s gives ~106% of one vCPU. On plain TCP, with no TLS at all.\n\nCaveats worth stating plainly: that 106% is a linear extrapolation from one data point, not a measurement, and the report doesn't say whether cost tracks bytes or lines. But the direction is unambiguous — there is 15% CPU headroom at 36 MB/s, and we need 45 MB/s, so the remaining budget for TLS symmetric encryption and handshakes is negative under the most plausible reading. Our config matches theirs on the two settings they did fix (disk buffer off, batch_lines 500), so nothing there buys headroom back.\n\nWhat would actually settle it: a staging run with tls: true, our real 900-byte JSON samples, at 50k lines/s sustained, watching agent CPU on 1 vCPU. If you want, I can draft the config change and a load-test plan for that. Until then the honest answer to Security is \"not established by the vendor report; we're piloting it,\" not \"the report says we'll keep up.\""
+ }
+}

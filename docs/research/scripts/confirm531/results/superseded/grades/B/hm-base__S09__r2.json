@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "ba4356af44ca8a4a610dd381a497f1dea34fd8dc2e13cfb9ea90d8f23a39add3",
+ "cost_usd": 0.0116,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FD76E5ZVQFR5A84BP03R2",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "A new fact about a write-root pitfall in the agent's tool environment; the label forbids storing anything new."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It assumes an invented 10,000-part limit and says 8 MiB parts work today; the correct limit is Corvane's 5,000 parts, so the upload of about 7,150 parts fails."
+ }
+}

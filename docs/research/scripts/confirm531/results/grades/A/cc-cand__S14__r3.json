@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "932749309586f6a9023e54d396f757c3f78378dfc06e8611777c93e267ab0239",
+ "cost_usd": 0.0346,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the Pardalo 3.1 fact with its source and date (Retry retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST). It flags that the repository pins 4.2.0, a major version later, and says this is unconfirmed for 4.2 without asserting any 4.2 behaviour. It also recommends an idempotency key as its own advice."
+ }
+}

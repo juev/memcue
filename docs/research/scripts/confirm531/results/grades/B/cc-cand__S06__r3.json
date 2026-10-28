@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "d54e5e3800f5029523e61023d6f3a938c7be0503ff80b194b296af0bce2e54f7",
+ "cost_usd": 0.0061,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the total 5437.50, says the script failed because out/ was missing, and says creating out/ without editing the script fixed it."
+ }
+}

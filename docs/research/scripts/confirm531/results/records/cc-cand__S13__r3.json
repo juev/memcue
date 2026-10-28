@@ -1,0 +1,39 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S13",
+  "repeat": "r3",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 21.5,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.09695000000000001,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 1228,
+  "cache_read_tokens": 47630
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"Kestrune shared mount\"; echo ---; memcue search -in all \"Kestrune\"; echo ---; memcue search -in shelf:research \"Kestrune shared network filesystem NFS\"; echo ---; memcue search -in all \"ingest hosts file server\"; echo ---; ls -la; git ls-files | head -50",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\n3 facts on the shelf match: -in shelf:research\n---\nNo stored facts match.\n3 facts on the shelf match: -in shelf:research\n---\n01M61FP8PQ16YC2X5NBMEBYEBS example.com/acme/ingest-worker 2026-10-28 | Kestrune 3.2 limits: key 1 KiB, value 8 MiB, database file 2 TiB; only one process may open a database for writing (exclusive file lock), others read-only; data directory must be on a local filesystem, NFS and SMB/CIFS are unsupported and may corrupt the database; sync=\"full\" (default) returns after data reaches disk, sync=\"off\" may lose last writes on power failure. Source: docs.kestrune.example/limits, Kestrune 3.2, updated 2026-08-30.\n---\n01M61FNQWMTWBZNZPCPXB5V4JZ | mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\n---\ntotal 24\ndrwxr-xr-x 5 1001 1001 4096 Oct 28 14:59 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:59 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:59 .git\n-rw-r--r-- 1 1001 1001  668 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 worker\nREADME.md\nconfig/worker.toml\nworker/store.py"
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat README.md config/worker.toml worker/store.py; git remote -v; memcue search -in shelf:research -n 10 -min-score 0 \"Kestrune\"",
+    "result": "# ingest-worker\n\nConsumes uploaded batches from the intake queue, keeps partial results in a local key-value store until a batch is\ncomplete, then hands the batch to the archiver.\n\n## Requirements for the store\n\n- Values: one partial result per key, up to 6 MiB each.\n- Write rate: about 300 writes per second at peak.\n- Deployment: two worker processes, one on each of the hosts ingest-a and ingest-b, write to the same data\n  directory, `/mnt/shared/ingest`, an NFS export of the file server fs-01.\n- Durability: a write acknowledged to the queue must survive a power loss.\n\nThe current store is a directory of JSON files (`worker/store.py`); we want to replace it.\n[store]\ndata_dir = \"/mnt/shared/ingest\"\nmax_value = \"6MiB\"\n\n[queue]\nurl = \"amqp://intake.int.example:5672/ingest\"\nprefetch = 32\n\"\"\"Partial-result store: one JSON file per key under data_dir.\"\"\"\nimport json\nimport os\n\n\nclass FileStore:\n    def __init__(self, data_dir: str):\n        self.data_dir = data_dir\n\n    def put(self, key: str, value: dict) -> None:\n        path = os.path.join(self.data_dir, key + \".json\")\n        tmp = path + \".tmp\"\n        with open(tmp, \"w\", encoding=\"utf-8\") as f:\n            json.dump(value, f)\n            f.flush()\n            os.fsync(f.fileno())\n        os.replace(tmp, path)\n\n    def get(self, key: str) -> dict | None:\n        path = os.path.join(self.data_dir, key + \".json\")\n        try:\n            with open(path, encoding=\"utf-8\") as f:\n                return json.load(f)\n        except … [1451 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "No, that wouldn't work. It breaks two of Kestrune's documented constraints at once.\n\nAccording to the Kestrune 3.2 limits page (docs.kestrune.example/limits, updated 2026-08-30, from my notes of an earlier reading):\n\n1. **Only one writer per database.** The writing process takes an exclusive file lock, and any other process can only open the database read-only. So ingest-a and ingest-b can't both write to the same database, wherever it lives.\n2. **The data directory must be on a local filesystem.** NFS and SMB/CIFS are unsupported, and the docs say they \"may corrupt the database\". The shared mount `/mnt/shared/ingest` is an NFS export from fs-01 (`README.md`, `config/worker.toml`). That's exactly the setup the docs warn against, and the durability requirement makes it worse: a write acknowledged to the queue must survive a power loss.\n\nThe rest of the requirements fit those docs: 6 MiB values are under the 8 MiB limit, and the default `sync=\"full\"` covers the power-loss requirement. The problem is only where the data lives and who writes to it.\n\nThe repo doesn't pin a Kestrune version yet. If you end up adopting something other than 3.2, check these limits against that version's docs.\n\n**What could work instead** (my suggestions, not from the docs):\n- **One local database per host**, on ingest-a's and ingest-b's own disks. This only works if every partial result of a batch reaches the same worker, for example by routing on batch ID in the queue. It also means a host's in-progress batches are stuck if that host dies.\n- **A single writer service** that owns the database on one host's local disk, with both workers sending writes to it. That makes it a single point of failure, and it puts a network hop on each of the ~300 writes/s.\n- **A store designed for several clients over the network**, if both hosts really need to write to shared state.\n\nOne more thing: today's JSON-file store does work over NFS, so this is a new constraint that comes with switching to Kestrune. Ops' proposal is reasonable for the current setup; it just doesn't carry over."
+ }
+}

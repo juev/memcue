@@ -1,0 +1,21 @@
+{
+ "pass": "C",
+ "record_sha256": "32ceeedb9271e36a749a144c1dacfe4acd6259529a04dabc10a9f10a87c82b66",
+ "cost_usd": 0.0128,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FHF57F8GTF3ABTNTSMZ0K",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "Corrects the seeded shelf fact in place, which the label allows, and adds the tally URL form and the fixed, clock-aligned window detail, both sourced to the reread page; no second copy was created."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the default memory backend counts per process, so 4 workers allow up to about 400 requests per minute per key, and gives the fix (backend=\"tally\" with a tallyd server) plus the fixed-window detail; the only extra claim, that counters reset when a worker restarts, is a minor inference."
+ }
+}

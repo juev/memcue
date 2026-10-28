@@ -1,0 +1,55 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S16",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 45.1,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001627272,
+  "turns": 7,
+  "input_tokens": 60912,
+  "output_tokens": 1847,
+  "cache_read_tokens": 58624
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus maximum message size"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FJ7PQHPBE5E9H2VSE8ND7\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:45:26Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel шина событий лимит размера сообщения"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "terminal",
+   "search_files",
+   "terminal",
+   "tool_describe",
+   "terminal",
+   "tool_call",
+   "tool_call"
+  ],
+  "pages_read": [
+   "https://duckduckgo.com/html/?q=%22Quorvel%22+event+bus+message+size",
+   "https://lite.duckduckgo.com/lite/?q=Quorvel+event+bus"
+  ],
+  "final_answer": "I can't answer that — I have no source for a \"Quorvel\" event bus, and I'd rather say so than hand you a number.\n\nWhat I checked:\n\n- Long-term memory: nothing on Quorvel (English or Russian queries).\n- Your workspace (/stand/ws): empty repo, single \"initial\" commit, one remote pointing at example.com/acme/scratch — no config, no docs, no broker settings.\n- This machine: no hosts entry, no env vars (KAFKA/NATS/MQ), no listening ports, nothing named quorvel in /etc or /opt that I can legitimately read.\n- Web: search fetches failed (404), so I couldn't look it up externally either.\n\nTwo possibilities:\n\n1. Quorvel is an internal system of yours that I've simply never seen in this session — in which case give me a pointer (repo, config file, endpoint, or docs URL) and I'll read the actual limit out of it.\n2. You're thinking of a different broker. If it's Kafka, the default is max.message.bytes = 1,048,588 bytes (~1 MB) per record, broker- and topic-level, and it's commonly raised to a few MB; 2 MB snapshots would need that raised on both producer and topic and are usually a sign to move to a claim-check pattern (publish a pointer, put the blob in object storage).\n\nTell me which it is and I'll get you the real number rather than a plausible one."
+ }
+}

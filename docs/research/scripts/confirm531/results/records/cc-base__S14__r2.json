@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S14",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 27.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.11698740000000002,
+  "turns": 8,
+  "input_tokens": 14,
+  "output_tokens": 1788,
+  "cache_read_tokens": 119657
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat client/charge.py; ls -R | head -50; memcue search \"charge retry idempotency\" 2>&1 | head -30",
+    "result": "\"\"\"Create a charge in the billing service.\"\"\"\nimport pardalo\nfrom pardalo import Retry\n\nsession = pardalo.Session(retry=Retry(total=3), timeout=10)\n\n\ndef create_charge(order_id: str, amount_cents: int) -> dict:\n    resp = session.post(\n        \"https://billing.int.example/v1/charges\",\n        json={\"order_id\": order_id, \"amount_cents\": amount_cents},\n    )\n    resp.raise_for_status()\n    return resp.json()\n.:\nREADME.md\nclient\nrequirements.txt\n\n./client:\ncharge.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research"
+   },
+   {
+    "tool": "Bash",
+    "input": "cat README.md requirements.txt; python3 -c \"import pardalo,sys;print(pardalo.__file__)\" 2>&1; pip show pardalo 2>&1 | head; memcue search -in all \"pardalo retry POST\" 2>&1 | head -30",
+    "result": "# billing-client\n\nClient of the billing service: creates charges for orders. HTTP goes through the Pardalo library.\npardalo==4.2.0\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundError: No module named 'pardalo'\n/bin/bash: line 1: pip: command not found\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"pardalo retry POST\" 2>&1 | head -30; memcue search -in shelf:research \"retry\" 2>&1|head -30",
+    "result": "01M61FFDP57NAJVW3BBF48K5AS pardalo.example 2026-02-08 | Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\n01M61FFDP57NAJVW3BBF48K5AS pardalo.example 2026-02-08 | Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries",
+   "https://pardalo.example/docs/4.2/retries",
+   "https://pardalo.example/changelog"
+  ],
+  "final_answer": "Probably not from the retry policy itself, but I couldn't confirm that for the version you're running, and a dropped connection is still a double-charge risk.\n\n**What I found**\n- `client/charge.py:5` creates `pardalo.Session(retry=Retry(total=3), timeout=10)`, and `create_charge` sends a plain `POST` with no idempotency key.\n- I have a note from an earlier session that cites Pardalo's retry docs from February 2026, for version **3.1**. It says that with `Retry(total=N)` the session retries after a connection error only for GET, HEAD, PUT, DELETE and OPTIONS, and never for POST or PATCH. If that's still true, the session won't resend your charge.\n- **I couldn't check that it's still true.** `requirements.txt` pins `pardalo==4.2.0`, a major version later, and defaults like this can change between major versions. Pardalo isn't installed here, and the docs pages I tried (`pardalo.example/docs/retries`, `/docs/4.2/retries`, `/changelog`) all return 404.\n\n**Why I'd still worry, whatever the library does**\n- When a connection drops mid-request, you can't know whether the billing service already created the charge. If anything above `create_charge` retries after the error or the 10-second timeout (a job queue, a worker restart, a user clicking again), the charge goes out a second time.\n- Nothing in the request lets the billing service spot a duplicate.\n\n**What I'd do**\n1. **Add an idempotency key.** Send something like `Idempotency-Key: charge-{order_id}` (or a stored UUID per charge attempt), and have the billing service deduplicate on it, or on `order_id` if one order can only ever have one charge. This is the real fix: it makes any retry safe, whoever triggers it.\n2. **Make the retry methods explicit instead of trusting the default.** If 4.2's `Retry` has an allowed-methods option, list the safe methods yourself, or use a separate session with retries turned off for charges.\n3. To check the 4.2 behaviour, read the installed package's `Retry` class, or test it against a local server that drops the connection.\n\nDo you want me to make the client-side change (the header plus explicit retry config)? It only helps if the billing service actually honours the key. Do you know whether it does?"
+ }
+}
