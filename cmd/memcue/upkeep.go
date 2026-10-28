@@ -58,13 +58,16 @@ func oldNameHint(cwd string) string {
 // driverHint is the line for a base inside a git repository that is not set up to merge it: no merge driver in the
 // config, no driver script (an install older than 0.4.0 pinned the binary), or no route in .gitattributes. Without
 // them a sync conflict on the base is a binary conflict. Only the files are read; git runs only when one is missing,
-// to tell an ignored base, which needs no driver, from a synced one.
+// to tell an ignored base, which needs no driver, from a synced one. A base of the old format that is set up, and so
+// synced, gets the line about the move to text instead (#530).
 func driverHint() string {
-	base, err := filepath.Abs(factsPath())
+	b := factsBase()
+	base, err := filepath.Abs(b.path)
 	if err != nil {
 		return ""
 	}
-	top := resolveDir(base)
+	resolved := resolveDir(base)
+	top := resolved
 	for {
 		if _, err := os.Stat(filepath.Join(top, ".git")); err == nil {
 			break
@@ -79,11 +82,22 @@ func driverHint() string {
 	if fi, err := os.Stat(gitDir); err != nil || !fi.IsDir() {
 		return "" // a worktree or a submodule: its git directory is elsewhere, so the files cannot be read here
 	}
+	rel, err := filepath.Rel(top, resolved)
+	if err != nil {
+		return ""
+	}
+	attrsPath, _ := attributesOf(b, top, rel)
 	config, _ := os.ReadFile(filepath.Join(gitDir, "config"))
-	attrs, _ := os.ReadFile(filepath.Join(top, ".gitattributes"))
+	attrs, _ := os.ReadFile(attrsPath)
 	_, script := os.Stat(filepath.Join(gitDir, "memcue-driver.sh"))
 	if bytes.Contains(config, []byte("memcue-driver.sh")) && script == nil && bytes.Contains(attrs, []byte("merge=memcue")) {
-		return ""
+		if b.text {
+			return ""
+		}
+		return "memcue: the fact base " + base + " is one SQLite file in git, so every change stores the whole " +
+			"file again. `memcue migrate -text` moves it to a text history git merges fact by fact (README, " +
+			"\"Moving to the text history\"). Ask the user first: every machine that syncs the base needs this " +
+			"memcue version before the move."
 	}
 	if exec.Command("git", "-C", top, "check-ignore", "-q", base).Run() == nil {
 		return "" // the base is ignored, so git never merges it
