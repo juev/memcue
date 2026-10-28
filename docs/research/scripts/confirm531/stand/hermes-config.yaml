@@ -1,5 +1,6 @@
 # Hermes config of the #531 stand: one model, the memcue provider on the run's base, the stand-in web over MCP, and
-# only the terminal, file and todo toolsets, so no tool reaches the real web.
+# only the terminal, file, todo and memory toolsets, so no tool reaches the real web. memory is what loads the
+# memory provider in the CLI: without it the memcue note and tools are missing.
 model:
   provider: deepseek
   default: deepseek-flash
@@ -13,11 +14,11 @@ memory:
     host: stand
     state_dir: /stand/state
 mcp_servers:
-  web:
+  pages:
     command: python3
     args: ["-I", "/opt/stand/web_mcp.py"]
     env:
       STAND_WEB_LOG: /stand/rec/web.log
       STAND_WEB_ROOT: /opt/fixtures/web
 platform_toolsets:
-  cli: [terminal, file, todo]
+  cli: [terminal, file, todo, memory]

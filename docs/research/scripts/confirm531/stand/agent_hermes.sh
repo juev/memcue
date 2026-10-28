@@ -18,7 +18,6 @@ cd /stand/ws
 status=0
 hermes -z "$(cat /stand/prompt.txt)" --provider deepseek -m deepseek-flash --usage-file /stand/rec/usage.json \
 	< /dev/null > /stand/rec/answer.txt 2> /stand/rec/stderr.log || status=$?
-hermes sessions export --help > /dev/null 2>&1 &&
-	hermes sessions export --format jsonl --output /stand/rec/session.jsonl > /stand/rec/export.log 2>&1 || :
+hermes sessions export --format jsonl /stand/rec/session.jsonl > /stand/rec/export.log 2>&1 || :
 memcue dump /stand/base/facts.db > /stand/rec/base_after.txt 2>/dev/null || : > /stand/rec/base_after.txt
 echo "$status" > /stand/rec/exit
