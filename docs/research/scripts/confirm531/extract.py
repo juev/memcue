@@ -120,6 +120,8 @@ def main() -> int:
     out.mkdir(parents=True)  # a new directory; nothing is overwritten
     n = 0
     for d in sorted(runs.glob("*/*/r*")):
+        if not d.name[1:].isdigit():  # r<n>.failed-<k>: a run moved aside before it was run again
+            continue
         arm, sid, rep = d.parent.parent.name, d.parent.name, d.name
         rec = d / "rec"
         meta = json.loads((d / "run.json").read_text(encoding="utf-8"))
