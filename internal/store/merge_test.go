@@ -220,6 +220,53 @@ func TestMergeOfAnOlderCorrectionAndARetire(t *testing.T) {
 	_ = s.Close()
 }
 
+// A side that has not pulled a merge yet merges it later: the version both tails hold is one write and stays one
+// version (#540). Before, B's correction sat at v2 on B and at v3 on A, both tails carried it, and B got a v4 copy.
+func TestMergeOfAStaleSideKeepsOneCopyOfAVersion(t *testing.T) {
+	b, f := base(t)
+	a, bb := clone(t, b), clone(t, b)
+	sa := openAt(t, a, "mac", t0.Add(time.Hour))
+	if _, err := sa.Correct(f.ID, "Hermes работает на deepseek-pro", nil); err != nil {
+		t.Fatal(err)
+	}
+	sb := openAt(t, bb, "server", t0.Add(2*time.Hour))
+	if _, err := sb.Correct(f.ID, "Hermes работает на deepseek-pro, fallback Codex", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sa.Merge(bb); err != nil { // A pulls B: B's correction becomes v3 on A
+		t.Fatal(err)
+	}
+	if _, err := sb.Add("Updater держит по два rollback-образа на сервис", nil, "server-migration"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := sb.Merge(a) // B, before pulling, writes again and then merges A
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Added != 1 {
+		t.Errorf("stats %+v, want one version taken from A", st)
+	}
+	h, err := sb.History(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h) != 3 || !strings.Contains(h[2].Content, "fallback Codex") || h[2].Version != 3 {
+		t.Fatalf("history of %d versions, want 3 with B's correction last: %+v", len(h), h)
+	}
+	// A pulls the result: nothing new for A, and both sides hold the same base.
+	if st, err := sa.Merge(bb); err != nil || st.Added != 1 || st.Diverged != 0 {
+		t.Errorf("A pulls B: stats %+v %v, want only B's new fact", st, err)
+	}
+	if da, db := dump(t, sa), dump(t, sb); da != db {
+		t.Errorf("the sides differ:\n%s\nvs\n%s", da, db)
+	}
+	if st, err := sb.Merge(a); err != nil || st.Added != 0 {
+		t.Errorf("merging again: stats %+v %v, want nothing", st, err)
+	}
+	_ = sa.Close()
+	_ = sb.Close()
+}
+
 // A merge carries no vectors: a copy synced from an older binary may still hold them, and nothing reads them (#260).
 func TestMergeCarriesNoVectors(t *testing.T) {
 	macPath := filepath.Join(t.TempDir(), "mac.db")

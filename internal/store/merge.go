@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,7 +52,15 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		for common < len(ov) && common < len(tv) && same(ov[common], tv[common]) {
 			common++
 		}
-		oTail, tTail := ov[common:], tv[common:]
+		oTail := ov[common:]
+		// A version both tails hold is one write that the two sides number differently: a side that has not pulled
+		// an earlier merge keeps it where it wrote it, the merged side after the version merged before it (#540).
+		var tTail []Fact
+		for _, f := range tv[common:] {
+			if !slices.ContainsFunc(oTail, func(g Fact) bool { return same(f, g) }) {
+				tTail = append(tTail, f)
+			}
+		}
 		if len(tTail) == 0 {
 			continue
 		}
