@@ -43,12 +43,13 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.21.1`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.21.2`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.21.2 | 6 | 0.21.2 | 0.21.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.2 (`hermes-agent` 0.15.2) |
 | 0.21.1 | 6 | 0.21.1 | 0.21.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.1 (`hermes-agent` 0.15.2) |
 | 0.21.0 | 6 | 0.21.0 | 0.21.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.0 (`hermes-agent` 0.15.2) |
 | 0.20.0 | 5 | 0.20.0 | 0.20.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.20.0 (`hermes-agent` 0.15.2) |
@@ -230,6 +231,27 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.21.2: a shelf named beside `all`, `correct ID -- TEXT`, no doubled versions after a merge (#532, #533, #540, #536)
+
+- **`-in` places are a union with the shelves too** (#532). `-in all,shelf` and `-in all,shelf:research`, in either
+  order, now read the named shelf; before, `all` ended the list and the shelf was silently dropped. A named shelf no
+  longer lets the other shelves in: `-in project,shelf:research` used to return facts of every shelf learnt in the
+  project through their origin. A place after `all` is checked, so `-in all,bogus` is an error. `-in all` alone and
+  the default still leave every shelf out.
+- **`memcue correct ID -- TEXT` stores TEXT** (#533). A lone `--` right after the ID is a separator, as in `add`;
+  before, it was stored as the first word of the fact. A text that starts with the word `--` is written
+  `ID -- -- TEXT`, and `ID --` with no text is a usage error. The plugins pass the text as one argument and are not
+  affected.
+- **A repeated merge no longer doubles a version** (#540). A machine that had not pulled an earlier merge and wrote
+  again got a copy of the other machine's correction as a new version at its next merge. Copies that earlier merges
+  already wrote stay in the history; the current state of a fact was right all along.
+- **The Hermes dashboard shows the provider as ready** (#536). The plugin manifest no longer declares
+  `external_dependencies`: the dashboard ran its `memcue version` check with its own `PATH`, so a binary set in
+  `memory.memcue.binary` made a working provider look unavailable, and its install button could only fail. Readiness
+  now comes from the provider.
+- No schema or flag changed: the schema stays 6. From 0.21.0 or 0.21.1, replace the binary and the plugins. From
+  0.20.0 or older, follow [0.21.0](#0210-no-fact-waits-for-approval-schema-6-514-456-521-522).
 
 ### 0.21.1: the Hermes provider tests run in a standalone install (#526)
 
