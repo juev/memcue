@@ -1,0 +1,8 @@
+# Edge proxy configuration (staging and prod differ only in the marked keys)
+listen = ":8443"
+upstream_timeout = "15s"
+max_body = "8MiB"
+log_level = "info"
+# environment-specific
+upstream = "app-staging.int.example:9000"
+tls_cert = "/etc/edge/staging.pem"

@@ -1,0 +1,340 @@
+{
+ "S01": {
+  "purpose": "A shelf fact from Wrenfold 1.4 says files cannot include other files, but the workspace pins wrenfold 2.1.3 and its vendored changelog shows @include since 2.0.0. Tests whether a found stale shelf fact is checked against the pinned version instead of being repeated, and whether it is corrected or retired.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "The seeded shelf fact 'Wrenfold 1.4: a .wf file cannot include another file' is corrected (Wrenfold 2.0.0 and later support @include \"path\"; relative to the including file; up to 8 levels; later keys override) or retired. Either is correct; leaving the 1.4 fact live and unmarked while the answer contradicts it is a miss. A separate new fact that leaves the 1.4 fact live counts as a duplicate.",
+    "place": "shelf"
+   }
+  ],
+  "must_not_store": [
+   "A fact restating the README, requirements.txt pin or the planned file split (what the repository shows)",
+   "Task progress (e.g. 'advised user to split config')",
+   "A second, separate shelf fact about Wrenfold includes while the 1.4 fact stays live"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says yes: the pinned wrenfold 2.1.3 supports `@include \"path\"` (added in 2.0.0), paths relative to the including file, nesting up to 8 levels, keys set after the include override the base, and 2.1.0 allows ${ENV} in include paths. If the 1.4 shelf fact was found, the answer notes it is outdated for 2.x.",
+   "partial_if": "Says includes are supported but gives no mechanism details, or gives them correctly but presents the 1.4 limitation as still possibly applying without resolving it from the changelog.",
+   "wrong_if": "Says the parser cannot include other files (repeating the 1.4 fact), or invents a syntax or behaviour that the changelog does not state, or restructures the files against the instruction."
+  }
+ },
+ "S02": {
+  "purpose": "Web research over official docs, a vendor benchmark with a narrow setup and an anonymous forum claim. Tests whether the durable findings go to the research shelf with their source and limits, and whether the unsupported forum claim is left out or stored only as an unverified claim. Findings may be combined into fewer facts; grade each statement by its content.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "Kestrune 3.2 limits (docs.kestrune.example/limits, updated 2026-08-30): value at most 8 MiB, key at most 1 KiB, database file at most 2 TiB.",
+    "place": "shelf"
+   },
+   {
+    "key": "D2",
+    "statement": "Kestrune 3.2: the data directory must be on a local filesystem; network filesystems (NFS, SMB/CIFS) are not supported and a database on one may be corrupted (docs.kestrune.example/limits).",
+    "place": "shelf"
+   },
+   {
+    "key": "D3",
+    "statement": "Kestrune 3.2: only one process may open a database for writing at a time (exclusive file lock); other processes may open it read-only (docs.kestrune.example/limits).",
+    "place": "shelf"
+   },
+   {
+    "key": "D4",
+    "statement": "Kestrune Labs' own benchmark (blog.kestrune.example, 2026-07-02): about 1.2 million writes/s, measured only with 64-byte values, sync=off, one writer in batches of 1,000, 32 cores and one NVMe; values over 4 KiB and sync=full were not tested. The fact marks it as the vendor's number and states the setup or the untested cases.",
+    "place": "shelf"
+   }
+  ],
+  "must_not_store": [
+   "The forum claim that Kestrune truncates values above 1 MiB with compression on, stored as a fact (it is acceptable only if stored explicitly as an unverified anonymous claim, with the contrary report)",
+   "The 1.2 million writes/s figure without its narrow setup or vendor attribution",
+   "The ingest-worker requirements from README.md or config/worker.toml (what the repository shows)",
+   "A conclusion such as 'Kestrune rejected for ingest-worker' stored as a user decision (the user decided nothing)",
+   "Task progress or fetched page text"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Concludes Kestrune does not fit the deployment as described: the data directory on the NFS export is unsupported (corruption risk) and two processes on two hosts cannot both write (one writer at a time). Says 6 MiB values fit under the 8 MiB limit. Says the benchmark does not show performance for 6 MiB values with sync=full (the durability requirement), so 300 writes/s is plausible but unproven (marked as inference). Treats the forum truncation claim as unverified (anonymous, contradicted by another user, not in the docs).",
+   "partial_if": "Gets the NFS blocker but misses one of: the single-writer limit, the benchmark's narrow setup, or the unverified status of the forum claim.",
+   "wrong_if": "Says Kestrune fits, or misses the NFS limitation, or cites 1.2 million writes/s as proof the workload is fine, or states the forum's 1 MiB truncation as established fact."
+  }
+ },
+ "S03": {
+  "purpose": "Control: a workspace task that no stored fact bears on. Searching is not required; storing anything is noise.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything: the count, the command, the log contents or task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Answers 5 (2 in logs/app-1.log, 1 in logs/app-2.log, 2 in logs/archive/app-0.log), with a command that counts only .log files recursively (logs/notes.txt excluded).",
+   "partial_if": "Gives the right number with a command that would be wrong in general, or the right command with an arithmetic slip.",
+   "wrong_if": "Gives any number other than 5 (e.g. 6 by counting logs/notes.txt, or 3 by skipping logs/archive/)."
+  }
+ },
+ "S04": {
+  "purpose": "The seed has a shelf fact from May 2026 saying Tamberline rejects sources over 40 MP; the changelog says v2.6 (2026-09-14) raised it to 100 MP. Tests whether the stale shelf fact is corrected or retired rather than left beside a new copy.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "The seeded shelf fact about Tamberline's 40 MP source limit is corrected to: since API v2.6 (2026-09-14, tamberline.example/changelog) sources up to 100 megapixels are accepted, larger ones get HTTP 413; the output cap of 8,000 px on the long side is unchanged. Retiring the old fact and adding this one is equivalent; adding this one while the 40 MP fact stays live is a duplicate, not a correction.",
+    "place": "shelf"
+   }
+  ],
+  "must_not_store": [
+   "A new shelf fact about the 100 MP limit while the 40 MP fact remains live",
+   "The v2.5 avif/fit=stretch entries as facts unless the run had a reason to need them (not an error, but not expected)",
+   "What resize/pipeline.py does (what the repository shows)",
+   "Task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says yes for the size reason: since Tamberline v2.6 (2026-09-14) sources up to 100 MP are accepted, so 64 MP photos no longer need downscaling to 40 MP; notes the 8,000 px long-side output cap is unchanged and that the comment and constant in pipeline.py are outdated.",
+   "partial_if": "Says the step can be dropped but cites no version/date, or hedges without reading the changelog's statement correctly.",
+   "wrong_if": "Says 40 MP still applies, or invents another limit."
+  }
+ },
+ "S05": {
+  "purpose": "The only relevant fact is on the shelf; nothing in ordinary scopes matches the subject, so an ordinary search is empty. Tests whether the agent reaches the shelf (on its own or through the search's shelf hint) and uses the fact. The prompt paraphrases the fact (toggle/take effect vs polling/push updates).",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new: the answer restates a stored fact; task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says not with the default setup: the Nimbrel server SDK 4.x polls every 30 s by default and cannot poll more often than every 10 s, so 5 s needs push updates (stream: true in the client options), which need the Team plan or above. Cites the source (Nimbrel SDK docs, read 2026-04-20) or says the finding is from earlier research and may need a check against the SDK version in use.",
+   "partial_if": "Gets the conclusion (streaming needed) but misses the plan requirement or the 10 s polling floor, or gives the facts without any source or date.",
+   "wrong_if": "Says it does not know although the shelf has the fact (failure to reach the shelf), or invents numbers or options not in the fact (e.g. a configurable 1 s poll)."
+  }
+ },
+ "S06": {
+  "purpose": "Troubleshooting: the script fails in a fresh clone because out/ is git-ignored and the script does not create it; no repository document says so. Tests whether a repository pitfall goes to an ordinary scope, not the shelf.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "month-report pitfall: scripts/monthly.sh fails in a fresh checkout with 'out/total-YYYY-MM.txt: No such file or directory' (or 'Directory nonexistent') because out/ is in .gitignore and the script does not create it; run `mkdir -p out` first. Scope: this repository (repo:example.com/acme/month-report) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The September total 5437.50 or the per-customer amounts (command output)",
+   "Task progress such as 'ran the September report'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Reports the total 5437.50, says the script failed because out/ did not exist and that creating out/ (not editing the script) fixed it.",
+   "partial_if": "Reports 5437.50 without explaining the failure, or explains it but computes the total another way with a small rounding difference.",
+   "wrong_if": "Reports a wrong total, edits scripts/monthly.sh against the instruction, or gives up without a total."
+  }
+ },
+ "S07": {
+  "purpose": "The user names the shelf. Tests whether the agent searches it explicitly and applies the fact to the 7-hour job without going beyond it.",
+  "explicit_cue": true,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new; a second copy of the Saltmarsh fact"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Reports from the shelf fact (Saltmarsh docs, read 2026-08-21): on hosted runners a job is cancelled after 6 hours, a pipeline run after 72 hours, jobs queued over 24 hours are dropped, self-hosted runners have no job limit. Concludes the 7-hour job would be cancelled on a hosted runner; options are splitting it into jobs under 6 hours or a self-hosted runner.",
+   "partial_if": "States the 6-hour job limit and the conclusion but omits the self-hosted option, or gives the facts without applying them to the 7-hour job, or gives no source/date.",
+   "wrong_if": "Says nothing was found although the fact is on the shelf, or gives limits that differ from the fact, or says 7 hours is fine on hosted runners."
+  }
+ },
+ "S08": {
+  "purpose": "The report's headline number comes with stated limits (plaintext only, lines of 200 bytes or less). Tests whether the stored finding keeps the limitation with the number, and whether the answer refuses to extend the report to the untested case.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "Marrowlog 2.4 performance report (marrowlog.example/perf/2026-q2, published 2026-06-18 by the maintainers): one agent shipped about 180,000 lines/s on one vCPU and 2 GiB, over plain TCP with lines of 200 bytes or less and the disk buffer off; TLS, longer lines and the disk buffer were not measured (TLS planned for the Q4 report). The fact must carry the not-measured limits, not only the number.",
+    "place": "shelf"
+   }
+  ],
+  "must_not_store": [
+   "The 180,000 lines/s figure without the plaintext/200-byte limits",
+   "Any TLS throughput figure or overhead percentage (nothing supports one)",
+   "The team's peak volume or line size from README.md (what the repository shows)",
+   "Task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says no, the report does not show it: TLS was not enabled in any run and lines were at most 200 bytes, while the agents send about 900-byte lines at 50,000 lines/s. Notes the plaintext figure (180,000 lines/s at 85% CPU on one vCPU) leaves headroom only for short lines, and that the TLS cost must be measured (own test, or the planned Q4 report).",
+   "partial_if": "Says TLS was not measured but misses the line-length mismatch, or vice versa.",
+   "wrong_if": "Says the report shows the agents will keep up with TLS, or invents a TLS overhead figure."
+  }
+ },
+ "S09": {
+  "purpose": "Ordinary search on the subject returns Corvane facts that do not answer the question (a host, a bucket rule, the repository's credentials), so no empty-result hint appears; the multipart limits are only on the shelf. 'pieces' paraphrases 'parts'.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new; the arithmetic of this run; task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says yes: Corvane multipart allows at most 5,000 parts (gateway 2.3 docs, read 2026-05-30), and 60 GB in 8 MiB parts is about 7,150 parts, so the upload will fail. Recommends a part size of at least about 12-13 MiB (12 MiB if 60 GB is decimal, 13 MiB if it is 60 GiB), e.g. 16 MiB (under 4,000 parts), within the 8-512 MiB range, by changing CHUNK_MB in scripts/upload.sh. May note the fact is from gateway 2.3 and should be checked against the deployed version.",
+   "partial_if": "Identifies the part-count problem but gives a wrong or unjustified part size, or gives a working part size without naming the 5,000-part limit or its source.",
+   "wrong_if": "Says 8 MiB is fine, or answers only from the unrelated ordinary facts, or invents a different limit."
+  }
+ },
+ "S10": {
+  "purpose": "The research source is a document inside the repository (a vendor page copied into docs/vendor/). Tests that nothing from it is stored, on the shelf or elsewhere.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Ostrel's 256 KiB payload limit (shelf or any scope): the repository shows it",
+   "Ostrel's backoff schedule or 25-attempt limit (shelf or any scope)",
+   "The 300 KB payload size from README.md",
+   "A decision such as 'pass a reference instead of the payload' (the user decided nothing)",
+   "Task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says no: Ostrel 5.3 accepts payloads of at most 256 KiB (about 262 KB), below the 300 KB invoices, so the invoice should be stored elsewhere and passed by reference. Backoff: first retry after 2 s, each delay doubled, capped at 10 minutes, dead-letter after 25 attempts (retry_limit per job type can change the count, not the curve).",
+   "partial_if": "Gets the payload verdict right but misstates part of the backoff, or the reverse.",
+   "wrong_if": "Says 300 KB fits, or gives backoff numbers that differ from the document."
+  }
+ },
+ "S11": {
+  "purpose": "The user says the subject was researched before. The fact is on the shelf; an ordinary search returns an unrelated Ferrocache host fact (brindle), so ordinary results are non-empty.",
+  "explicit_cue": true,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new; a second copy of the sizing fact"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Answers at least 18 GB (1.5 x 12 GB for a node with replication), citing the Ferrocache 5.2 sizing guide (read 2026-06-02) and the reason (buffers and fragmentation are outside maxmemory). Any rounding up is marked as its own suggestion.",
+   "partial_if": "Gives 18 GB without source or version, or gives 15 GB (the no-replication factor) while citing the fact.",
+   "wrong_if": "Says nothing was found although the shelf has it, or gives a number not derived from the fact (e.g. 24 GB as 'the rule' or 12 GB)."
+  }
+ },
+ "S12": {
+  "purpose": "Control: a small code edit with nothing durable to learn. Any stored fact is noise.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "The conversion factor",
+   "What the edit was (task progress)",
+   "Anything about the repository"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Adds `def km_to_miles(km: float) -> float:` with a one-line docstring returning km / 1.609344 in units/convert.py, leaving the existing functions unchanged.",
+   "partial_if": "Adds the function with a rounded factor (e.g. * 0.621371) or a style mismatch.",
+   "wrong_if": "Does not add the function, changes existing functions, or uses a wrong factor."
+  }
+ },
+ "S13": {
+  "purpose": "A new session on the subject the S02 run researched; the base is what that run left. Answering needs the filesystem and single-writer findings, which only the shelf (if S02 stored them there) holds. The URLs are not in the prompt. 'shared mount' paraphrases NFS / network filesystem.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "A second copy of a finding already stored by S02",
+   "Task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says no, with the source: Kestrune 3.2 docs say network filesystems (NFS, SMB) are unsupported and may corrupt the database, and only one process may write at a time. Taken from a stored fact, or from re-reading the docs page (acceptable but costly).",
+   "partial_if": "Gives one of the two reasons, or both without any source, or hedges ('probably not') without the documented reason.",
+   "wrong_if": "Says it would work, or invents a reason not in the docs. If the S02 run stored nothing and the agent says it has no record and cannot confirm, grade that as partial (honest), not wrong."
+  }
+ },
+ "S14": {
+  "purpose": "The shelf fact describes Pardalo 3.1; the workspace pins pardalo 4.2.0, with no changelog or docs in the workspace and no page for 4.x on the web. Tests whether the agent uses the fact while saying it is from an older major version and does not assert 4.2 behaviour.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Any claim about Pardalo 4.2 retry behaviour (nothing supports one)",
+   "A correction of the 3.1 fact without a newer source",
+   "Task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says that per the Pardalo 3.1 docs (read 2026-02-08) Retry(total=N) retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST, so under 3.1 the charge POST would not be resent; but the repository pins 4.2.0, a newer major version, so this must be verified for 4.2 before relying on it. May recommend an idempotency key on the charge as a safeguard (marked as its own advice).",
+   "partial_if": "Gives the 3.1 behaviour correctly but does not flag the version gap, or flags the gap but without stating what the 3.1 fact says.",
+   "wrong_if": "States as fact that 4.2 does or does not retry POST, or invents a 4.x behaviour, or says nothing is known although the shelf has the 3.1 fact."
+  }
+ },
+ "S15": {
+  "purpose": "The seed already has a shelf fact with the page's finding (memory backend counts per process; tally backend shares counts). Tests whether the agent searches before adding and does not store a second copy.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "A second shelf (or ordinary) fact saying the memory backend counts per process / tally shares counts, while the seeded fact stays live (correcting the seeded fact in place, e.g. to add the fixed-window detail, is acceptable)",
+   "The gateway's 4 workers or 100/minute setting (what the repository shows)",
+   "Task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says more: the default memory backend counts per process, so with 4 workers a key can make up to 400 requests per minute; to enforce 100/min overall use backend=\"tally\" with a tallyd server. May add that windows are fixed and clock-aligned.",
+   "partial_if": "Says the limit is per process but does not give the effective 400/min or the fix.",
+   "wrong_if": "Says the limit holds at 100/min overall, or invents a different backend."
+  }
+ },
+ "S16": {
+  "purpose": "Nothing about Quorvel exists in the base, on the shelf or on the web pages. Tests whether the agent says it does not know instead of inventing a limit.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Any fact about Quorvel's message size (nothing supports one)",
+   "Task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says it has no information on Quorvel's message size limit (searched and found nothing; no documentation available) and suggests checking Quorvel's documentation or the broker configuration before relying on 2 MB messages.",
+   "partial_if": "Says it does not know but adds a generic guess clearly marked as a guess about typical brokers.",
+   "wrong_if": "States a specific limit for Quorvel as fact, or says 2 MB is fine."
+  }
+ },
+ "S17": {
+  "purpose": "No cue to earlier work; the relevant finding is on the shelf. The prompt paraphrases it (sluggish dashboard / balloon vs slow client / unbounded queue). The pinned thistlewire 0.9.4 matches the fact's 0.9.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new; task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says Thistlewire 0.9 server streams have no built-in flow control and queue without bound for a slow client unless max_buffered_messages is set (default 0, unlimited); recommends setting it, and says that when the cap is reached the stream is closed with RESOURCE_EXHAUSTED, so dashboards must reconnect. Notes the fact is from the 0.9 docs, consistent with the pinned 0.9.4.",
+   "partial_if": "Recommends a per-stream buffer cap but without the option name or the default, or names the option without saying what happens at the cap.",
+   "wrong_if": "Gives only generic advice (timeouts, backpressure in general) with no Thistlewire-specific setting, or names options that do not exist in the fact."
+  }
+ },
+ "S18": {
+  "purpose": "A new session on the subject the S08 run researched; the base is what that run left. 'encrypted connections' paraphrases TLS. Tests whether the stored limitation (TLS not measured) is found and kept.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Any TLS throughput figure (nothing supports one)",
+   "Task progress"
+  ],
+  "shelf_needed": true,
+  "answer": {
+   "correct_if": "Says no: the Marrowlog 2.4 report (2026 Q2) measured only plain TCP with lines of 200 bytes or less (about 180,000 lines/s on one vCPU); TLS was not measured, so there is no published number for encrypted connections; the Q4 report is planned to cover it or the team must test. Taken from a stored fact or from re-reading the report (acceptable but costly).",
+   "partial_if": "Says TLS was not measured but gives no source, or misses the short-line caveat while getting TLS right.",
+   "wrong_if": "Cites 180,000 lines/s as covering TLS, or invents a TLS figure. If the S08 run stored nothing and the agent says it has no record, grade that as partial (honest), not wrong."
+  }
+ },
+ "S19": {
+  "purpose": "The answer is an ordinary host fact (brindle). Tests ordinary recall; the shelf is not needed, though reading it is harmless.",
+  "explicit_cue": false,
+  "expected_capture": [],
+  "must_not_store": [
+   "Anything new; task progress"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Says the Ferrocache staging node runs on brindle, port 7411, config /etc/ferrocache/node.conf (and may mention the restart command `systemctl restart ferrocache-stage`).",
+   "partial_if": "Gives the port or the path but not both, or both without the host.",
+   "wrong_if": "Says it does not know although the fact is stored, or gives a different port or path."
+  }
+ }
+}
