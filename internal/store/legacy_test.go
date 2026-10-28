@@ -88,11 +88,10 @@ func TestLegacyProvisionalIsLive(t *testing.T) {
 }
 
 // Two machines change the same fact apart: one retires it, the other corrects it. The merge keeps both versions and
-// the later one by creation time is current, as for any two changes made apart, whatever the review state the fact
-// had (#514 does not change the merge). A correction made after the retire therefore brings the fact back; one made
-// before it does not. Both sides get the same base, the index follows the current version, and merging a side again
+// the correction is current whichever was made later (#544), whatever the review state the fact had (#514 does not
+// change the merge). Both sides get the same base, the index follows the current version, and merging a side again
 // changes nothing.
-func TestMergeOfARetireAndACorrectionKeepsTheLatest(t *testing.T) {
+func TestMergeOfARetireAndACorrectionKeepsTheCorrection(t *testing.T) {
 	for _, meta := range []struct {
 		name string
 		meta Meta
@@ -107,7 +106,7 @@ func TestMergeOfARetireAndACorrectionKeepsTheLatest(t *testing.T) {
 			status           string
 			currentIsCorrect bool
 		}{
-			{"retire later", time.Hour, time.Minute, Retired, false},
+			{"retire later", time.Hour, time.Minute, Active, true},
 			{"correction later", time.Minute, time.Hour, Active, true},
 		} {
 			t.Run(meta.name+"/"+order.name, func(t *testing.T) {
@@ -189,12 +188,13 @@ func TestMergeOfARetireAndACorrectionKeepsTheLatest(t *testing.T) {
 }
 
 // A fact retired by a merge and reopened afterwards stays open when the branch that was merged before comes in
-// again: its versions are already common, so the replay adds nothing and cannot undo the reopen.
+// again: its versions are already common, so the replay adds nothing and cannot undo the reopen. The other branch
+// changes only the keywords, so the later retire wins the first merge (a changed text would win it, #544).
 func TestMergeReplayKeepsALaterReopen(t *testing.T) {
 	b, f := base(t)
 	corrected := clone(t, b)
 	c := openAt(t, corrected, "builder", t0.Add(time.Minute))
-	if _, err := c.Correct(f.ID, "Hermes работает на deepseek-pro", nil); err != nil {
+	if _, err := c.Correct(f.ID, f.Content, []string{"hermes", "deepseek-pro"}); err != nil {
 		t.Fatal(err)
 	}
 	_ = c.Close()
@@ -217,7 +217,7 @@ func TestMergeReplayKeepsALaterReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := s.Get(f.ID)
-	// The retire copied the text its machine saw, so the reopen carries that text, not the correction made elsewhere.
+	// The retire copied the version its machine saw, so the reopen carries that one, not the keywords changed elsewhere.
 	if err != nil || got.Status != Active || got.Version != 4 || got.Content != f.Content {
 		t.Errorf("after the replay %+v %v, want the reopen at version 4", got, err)
 	}

@@ -130,7 +130,10 @@ plugin and the binary from the same release.
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
    Without a repository memcue works the same; the base is just not synced. A merge carries no vectors. A machine
    whose base is in git without the driver hears it on the session card, Hermes and DSH included, until
-   `memcue install` runs there.
+   `memcue install` runs there. When two machines change a fact apart, the merge keeps every version and the latest
+   by creation time is current, with one exception: a correction of the text wins over a retirement made without
+   knowing it, whichever is later (#544). A retirement made after the correction was merged, or one against a change
+   of keywords or labels only, still retires the fact.
 
 ### The note file and the base
 
