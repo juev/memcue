@@ -149,10 +149,12 @@ func runMigrateText(out io.Writer) error {
 	if err := os.Remove(b.path); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "%d facts (%d versions) written to %s\ncache %s\nremoved %s\n"+
+	if _, err := fmt.Fprintf(out, "%d facts (%d versions) written to %s\ncache %s\nremoved %s\n"+
 		"commit %s and the removal of %s; other machines pick the text up after a pull\n",
-		facts, versions, text.path, cache, b.path, text.path, filepath.Base(b.path))
-	return err
+		facts, versions, text.path, cache, b.path, text.path, filepath.Base(b.path)); err != nil {
+		return err
+	}
+	return runInstall(nil, out) // routes the fact files to the merge driver, or says the base is outside git
 }
 
 // takeInLeftover is migrate -text on a base already moved: a file of the old format beside the text is merged into it

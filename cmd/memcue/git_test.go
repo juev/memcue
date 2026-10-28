@@ -211,3 +211,119 @@ func TestInstallWritesStableDriverScript(t *testing.T) {
 		t.Fatalf("driver without a binary said %q", failed)
 	}
 }
+
+// machine is one clone with its own memcue state, so two clones on one disk keep two caches.
+type machine struct {
+	repo string
+	env  []string
+}
+
+func newMachine(repo, state string, env []string) machine {
+	return machine{repo: repo, env: append(append([]string{}, env...),
+		"MEMCUE_FACTS="+filepath.Join(repo, "memory", "facts.db"), "MEMCUE_STATE_DIR="+state)}
+}
+
+func (m machine) memcue(t *testing.T, bin string, args ...string) string {
+	t.Helper()
+	return run(t, m.repo, m.env, bin, args...)
+}
+
+func (m machine) git(t *testing.T, args ...string) string {
+	t.Helper()
+	return run(t, m.repo, m.env, "git", args...)
+}
+
+// factID is the ID of the fact whose line in memcue facts contains text.
+func factID(t *testing.T, facts, text string) string {
+	t.Helper()
+	for _, l := range strings.Split(facts, "\n") {
+		if strings.Contains(l, text) {
+			return strings.Fields(l)[0]
+		}
+	}
+	t.Fatalf("no fact with %q:\n%s", text, facts)
+	return ""
+}
+
+// The move to text on one machine reaches the other through a pull, and from then on git merges the fact files: new
+// facts on both sides without the driver, one fact changed on both sides with it (#530, R3, R6, R7).
+func TestGitMergesTextHistories(t *testing.T) {
+	bin := buildBinary(t)
+	env, macRepo, serverRepo := twoClones(t, bin)
+	state := t.TempDir()
+	mac := newMachine(macRepo, filepath.Join(state, "mac"), env)
+	server := newMachine(serverRepo, filepath.Join(state, "server"), env)
+	mac.memcue(t, bin, "install")
+	server.memcue(t, bin, "install")
+
+	moved := mac.memcue(t, bin, "migrate", "-text")
+	if !strings.Contains(moved, "1 facts (1 versions)") || !strings.Contains(moved, "added to ") {
+		t.Fatalf("migrate -text:\n%s", moved)
+	}
+	attrs, err := os.ReadFile(filepath.Join(macRepo, "memory", ".gitattributes"))
+	if err != nil || string(attrs) != "facts/*/*.jsonl merge=memcue\n" {
+		t.Fatalf("memory/.gitattributes %q %v", attrs, err)
+	}
+	mac.git(t, "add", "memory")
+	mac.git(t, "commit", "-q", "-m", "move to text")
+	mac.git(t, "push", "-q", "origin", "main")
+
+	// The server has no command to run: the pull removes its file and brings the text, and the next open builds the
+	// cache from it.
+	server.git(t, "pull", "-q", "--no-rebase", "origin", "main")
+	if _, err := os.Stat(filepath.Join(serverRepo, "memory", "facts.db")); !os.IsNotExist(err) {
+		t.Fatalf("the pull left the old file: %v", err)
+	}
+	seedID := factID(t, server.memcue(t, bin, "facts"), "deepseek-flash")
+
+	server.memcue(t, bin, "add", "Updater держит по два rollback-образа на сервис")
+	server.memcue(t, bin, "correct", seedID, "--", "Hermes работает на модели deepseek-pro")
+	server.git(t, "add", "memory")
+	server.git(t, "commit", "-q", "-m", "server facts")
+	server.git(t, "push", "-q", "origin", "main")
+	mac.memcue(t, bin, "add", "Caddy-private монтирует файл, после замены пересоздать контейнер")
+	mac.memcue(t, bin, "retire", seedID)
+	mac.git(t, "add", "memory")
+	mac.git(t, "commit", "-q", "-m", "mac facts")
+	mac.git(t, "pull", "-q", "--no-rebase", "origin", "main")
+	if st := mac.git(t, "status", "--porcelain"); st != "" {
+		t.Errorf("merge left changes: %s", st)
+	}
+
+	facts := mac.memcue(t, bin, "facts")
+	for _, want := range []string{"deepseek-pro", "rollback-образа", "Caddy-private"} {
+		if !strings.Contains(facts, want) {
+			t.Errorf("merged base lacks %q:\n%s", want, facts)
+		}
+	}
+	// The pull changed a file the mac cache had already read, and the open took the change in.
+	if found := mac.memcue(t, bin, "search", "-in", "all", "deepseek-pro модель"); !strings.Contains(found, "deepseek-pro") {
+		t.Errorf("search does not find the merged correction:\n%s", found)
+	}
+
+	// Both orders of the two sides give the same file.
+	rel := filepath.ToSlash(filepath.Join("memory", "facts", seedID[len(seedID)-1:], seedID+".jsonl"))
+	dir := t.TempDir()
+	side := func(rev, name string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(mac.git(t, "show", rev+":"+rel)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	merged := mac.git(t, "show", "HEAD:"+rel)
+	for _, order := range [][2]string{{"HEAD^1", "HEAD^2"}, {"HEAD^2", "HEAD^1"}} {
+		ours, theirs := side(order[0], "ours"), side(order[1], "theirs")
+		run(t, dir, env, bin, "merge", side("HEAD^1^", "base"), ours, theirs)
+		if got, _ := os.ReadFile(ours); string(got) != merged {
+			t.Errorf("merge %s into %s:\n%s\nwant\n%s", order[1], order[0], got, merged)
+		}
+	}
+
+	// The server takes the merge in with a fast-forward pull, and the two machines agree.
+	mac.git(t, "push", "-q", "origin", "main")
+	server.git(t, "pull", "-q", "--no-rebase", "origin", "main")
+	if a, b := mac.memcue(t, bin, "facts"), server.memcue(t, bin, "facts"); a != b {
+		t.Errorf("the machines disagree:\nmac\n%s\nserver\n%s", a, b)
+	}
+}

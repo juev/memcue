@@ -757,10 +757,14 @@ func searchJSON(hits []store.Hit) []searchFact {
 }
 
 // runMerge is git's merge driver: memcue merge %O %A %B. The result goes into %A; a non-zero exit tells git the
-// merge failed and leaves the conflict to the user.
+// merge failed and leaves the conflict to the user. Both formats come through it: a whole base of the old format,
+// and the file of one fact of a text history (#530), told apart by the first bytes of %A.
 func runMerge(args []string, out io.Writer) error {
 	if len(args) != 3 {
 		return errors.New("usage: memcue merge BASE OURS THEIRS")
+	}
+	if !isSQLite(args[1]) {
+		return mergeFactFiles(args[1], args[2], out)
 	}
 	s, err := store.Open(args[1])
 	if err != nil {
@@ -773,6 +777,44 @@ func runMerge(args []string, out io.Writer) error {
 	}
 	if st.Diverged > 0 {
 		_, err = fmt.Fprintf(out, "memcue: %d facts changed on both sides; the later change is current, both stay in the history\n", st.Diverged)
+	}
+	return err
+}
+
+// isSQLite says whether the file at path starts as an SQLite database does.
+func isSQLite(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, 16)
+	n, _ := io.ReadFull(f, head)
+	return string(head[:n]) == "SQLite format 3\x00"
+}
+
+// mergeFactFiles merges the history of one fact in theirs into ours, by the rules of a merge of two bases.
+func mergeFactFiles(ours, theirs string, out io.Writer) error {
+	o, err := store.ReadFactFile(ours)
+	if err != nil {
+		return err
+	}
+	t, err := store.ReadFactFile(theirs)
+	if err != nil {
+		return err
+	}
+	if len(o) > 0 && len(t) > 0 && o[0].ID != t[0].ID {
+		return fmt.Errorf("%s holds %s, %s holds %s", ours, o[0].ID, theirs, t[0].ID)
+	}
+	h := store.MergeHistories(o, t)
+	if h.Added == 0 {
+		return nil
+	}
+	if err := store.WriteFactFile(ours, h.Versions); err != nil {
+		return err
+	}
+	if h.Diverged {
+		_, err = fmt.Fprintf(out, "memcue: fact %s changed on both sides; the later change is current, both stay in the history\n", h.Versions[0].ID)
 	}
 	return err
 }
@@ -800,7 +842,8 @@ func runInstall(args []string, out io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	base, err := filepath.Abs(factsPath())
+	b := factsBase()
+	base, err := filepath.Abs(b.path)
 	if err != nil {
 		return err
 	}
@@ -817,7 +860,7 @@ func runInstall(args []string, out io.Writer) error {
 		return err
 	}
 	rel, err := filepath.Rel(top, resolveDir(base))
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || b.text && rel == "." {
 		return fmt.Errorf("fact base %s is not inside %s", base, top)
 	}
 	exe, err := os.Executable()
@@ -841,17 +884,28 @@ func runInstall(args []string, out io.Writer) error {
 			return fmt.Errorf("git config %s: %v: %s", kv[0], err, b)
 		}
 	}
-	line := filepath.ToSlash(rel) + " merge=memcue diff=memcue"
-	added, err := ensureLine(filepath.Join(top, ".gitattributes"), line)
+	attrs, line := attributesOf(b, top, rel)
+	added, err := ensureLine(attrs, line)
 	if err != nil {
 		return err
 	}
 	msg := fmt.Sprintf("merge driver registered in %s (driver script %s)\n", top, driver)
 	if added {
-		msg += fmt.Sprintf("added to .gitattributes: %s (commit it)\n", line)
+		msg += fmt.Sprintf("added to %s: %s (commit it)\n", attrs, line)
 	}
 	_, err = fmt.Fprint(out, msg)
 	return err
+}
+
+// attributesOf is the .gitattributes file that routes the base b to the driver and the line it needs; rel is the path
+// of the base inside the repository top. A file of the old format is routed from the root of the repository, merged
+// and shown through memcue. The fact files of a text history are routed from the directory that holds the text, so
+// the line is committed along with it by whatever commits that directory; their diff is text already.
+func attributesOf(b factBase, top, rel string) (path, line string) {
+	if !b.text {
+		return filepath.Join(top, ".gitattributes"), filepath.ToSlash(rel) + " merge=memcue diff=memcue"
+	}
+	return filepath.Join(top, filepath.Dir(rel), ".gitattributes"), filepath.Base(rel) + "/*/*.jsonl merge=memcue"
 }
 
 // installDriver writes the small shell script git calls for a merge or a diff. Pinning the absolute path of the

@@ -112,6 +112,36 @@ func TestCardAsksForInstallUntilTheDriverIsSetUp(t *testing.T) {
 	}
 }
 
+// A base of the old format synced through git is asked on the card to move to text; the line goes with the move,
+// which also routes the fact files to the driver (#530).
+func TestCardAsksToMoveASyncedBaseToText(t *testing.T) {
+	env(t)
+	dir := t.TempDir()
+	for _, kv := range gitEnv(dir) {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v)
+	}
+	repo := filepath.Join(dir, "claude")
+	run(t, dir, nil, "git", "init", "-q", "-b", "main", repo)
+	t.Setenv("MEMCUE_FACTS", filepath.Join(repo, "memory", "facts.db"))
+	seedUpkeepBase(t)
+	if got := sessionCardContext(t, ""); strings.Contains(got, "migrate -text") {
+		t.Errorf("a base without the driver is asked to move before it is asked to install:\n%s", got)
+	}
+	if err := runInstall(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessionCardContext(t, ""); !strings.Contains(got, "`memcue migrate -text`") {
+		t.Errorf("no move line for a synced base of the old format:\n%s", got)
+	}
+	if err := runMigrateText(&bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessionCardContext(t, ""); strings.Contains(got, "migrate -text") || strings.Contains(got, "memcue install") {
+		t.Errorf("the line stays after the move:\n%s", got)
+	}
+}
+
 func seedUpkeepBase(t *testing.T) {
 	t.Helper()
 	s, err := store.Open(factsPath())
