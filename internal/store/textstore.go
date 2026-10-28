@@ -161,7 +161,10 @@ func textDirs(dir string) (map[string]int64, error) {
 	return out, nil
 }
 
-// syncText brings the cache and the text history together (see the comment at the top of this file).
+// syncText brings the cache and the text history together (see the comment at the top of this file). Everything it
+// takes into the cache goes in one transaction: a cache built from the text takes in every fact, and a commit for each
+// of them made the build take seconds (#552). The files are written after the commit and the stamps after the files,
+// so an open stopped between them leaves stamps that make the next open look again.
 func (s *Store) syncText() error {
 	unlock, err := s.lockText()
 	if err != nil {
@@ -180,24 +183,38 @@ func (s *Store) syncText() error {
 	} else if v != "" {
 		_ = json.Unmarshal([]byte(v), &saved)
 	}
-	for name, mtime := range dirs {
-		if saved[name] == mtime {
-			continue
-		}
-		if err := s.importTextDir(filepath.Join(s.text, name)); err != nil {
-			return err
-		}
-	}
 	rows, err := s.stamp(textRowsStamp)
 	if err != nil {
 		return err
 	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	files := map[string][]Fact{} // path → the history its file must hold
+	for name, mtime := range dirs {
+		if saved[name] == mtime {
+			continue
+		}
+		if err := s.importTextDir(tx, filepath.Join(s.text, name), files); err != nil {
+			return err
+		}
+	}
 	var n int
-	if err := s.db.QueryRow(`SELECT count(*) FROM facts`).Scan(&n); err != nil {
+	if err := tx.QueryRow(`SELECT count(*) FROM facts`).Scan(&n); err != nil {
 		return err
 	}
 	if rows != strconv.Itoa(n) {
-		if err := s.exportText(); err != nil {
+		if err := s.exportText(tx, files); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	for path, versions := range files {
+		if err := WriteFactFile(path, versions); err != nil {
 			return err
 		}
 	}
@@ -211,8 +228,9 @@ func (s *Store) syncText() error {
 	return s.saveTextRows()
 }
 
-// importTextDir brings the fact files of one directory into the cache.
-func (s *Store) importTextDir(dir string) error {
+// importTextDir brings the fact files of one directory into the cache, and notes in files the ones that lack versions
+// of the cache.
+func (s *Store) importTextDir(tx *sql.Tx, dir string, files map[string][]Fact) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -230,16 +248,20 @@ func (s *Store) importTextDir(dir string) error {
 		if len(file) == 0 {
 			continue
 		}
-		if err := s.bringTogether(file[0].ID, file, path); err != nil {
+		cached, err := queryOn(tx, `SELECT `+s.cols("")+` FROM facts WHERE id = ? ORDER BY version`, file[0].ID)
+		if err != nil {
+			return err
+		}
+		if err := bringTogether(tx, file[0].ID, cached, file, path, files); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// exportText writes into the files every version the cache holds and they lack.
-func (s *Store) exportText() error {
-	rows, err := s.Rows()
+// exportText notes in files every fact whose file lacks versions the cache holds.
+func (s *Store) exportText(tx *sql.Tx, files map[string][]Fact) error {
+	rows, err := queryOn(tx, `SELECT `+s.cols("")+` FROM facts ORDER BY id, version`)
 	if err != nil {
 		return err
 	}
@@ -253,6 +275,9 @@ func (s *Store) exportText() error {
 	}
 	for _, id := range ids {
 		path := FactPath(s.text, id)
+		if _, ok := files[path]; ok {
+			continue // already merged with its file in this open
+		}
 		file, err := ReadFactFile(path)
 		if err != nil {
 			return err
@@ -260,42 +285,30 @@ func (s *Store) exportText() error {
 		if sameHistory(file, byID[id]) {
 			continue
 		}
-		if err := s.bringTogether(id, file, path); err != nil {
+		if err := bringTogether(tx, id, byID[id], file, path, files); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// bringTogether merges the history of id in its file with the one in the cache and writes the result wherever it
-// differs: the cache gets the versions of the file, the file the versions of the cache.
-func (s *Store) bringTogether(id string, file []Fact, path string) error {
-	cached, err := s.History(id)
-	if err != nil {
-		return err
-	}
+// bringTogether merges the history of id in its file with the one in the cache: the cache gets the versions of the
+// file inside tx, and files notes the merged history for a file that lacks some of it.
+func bringTogether(tx *sql.Tx, id string, cached, file []Fact, path string, files map[string][]Fact) error {
 	if sameHistory(file, cached) {
 		return nil
 	}
 	h := MergeHistories(cached, file)
 	if h.Added > 0 {
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = tx.Rollback() }()
 		if err := replaceTail(tx, id, h); err != nil {
 			return err
 		}
 		if err := reindex(tx, id); err != nil {
 			return err
 		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 	}
 	if !sameHistory(file, h.Versions) {
-		return WriteFactFile(path, h.Versions)
+		files[path] = h.Versions
 	}
 	return nil
 }
