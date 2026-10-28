@@ -411,11 +411,11 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out the shelf and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Words to look for, in Russian or English, the languages of the facts: translate a question asked in another language.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
-			in: { type: 'string', description: 'Where to look, comma-separated: all (every repository: a host, a tool, another project, or when this repository has nothing), project (this repository only), global, host (this machine), or a scope such as repo:KEY, host:NAME, service:NAME.' },
+			in: { type: 'string', description: 'Where to look, comma-separated: all (every repository: a host, a tool, another project, or when this repository has nothing), project (this repository only), global, host (this machine), shelf (facts read from web pages and documents, which no other place returns, all included), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:research; all,shelf:research reads both.' },
 			kind: { type: 'string', description: 'Kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. E.g. rule,decision for what was decided.' },
 			since: { type: 'string', description: 'YYYY-MM-DD: only facts learnt on or after that day.' },
 			expired: { type: 'boolean', description: 'Include facts whose expiry has passed.' },
@@ -502,6 +502,7 @@ export function apply(ctx, config) {
 			kind: { type: 'string', description: 'Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event (what happened that the next days need; expires after a week unless expires is given). A rule or decision the user stated goes on the session card.' },
 			source: { type: 'string', description: 'Optional who said it: user (the user\'s words; the default for rule and decision, and the only source that reaches the session card), user_confirmed, tool (seen in a tool\'s output) or agent (the default otherwise).' },
 			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project.' },
+			shelf: { type: 'string', description: 'Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with in shelf:<name>. For what was read from outside sources; omit scope when you pass it.' },
 		},
 		output: factResult,
 		async execute(args, exec) {
@@ -517,6 +518,7 @@ export function apply(ctx, config) {
 			if (args.expires) flags.push('-expires', String(args.expires))
 			if (args.kind) flags.push('-kind', String(args.kind))
 			if (args.scope) flags.push('-scope', String(args.scope))
+			if (args.shelf) flags.push('-shelf', String(args.shelf))
 			flags.push('--', text)
 			const { code, out, err } = await runMemcue(settings, flags, { timeoutMs: 15_000 })
 			if (code !== 0) return { stored: false, message: `memcue add exited ${code}: ${(err || out).trim().slice(0, 500)}` }

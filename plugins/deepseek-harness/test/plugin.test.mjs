@@ -518,6 +518,18 @@ test('memcue_add passes the source it is given and refuses an unknown one (#494)
 	assert.match(refused.message, /source must be one of/)
 })
 
+test('memcue_add puts a fact on a shelf, and the tools name the shelf (#545)', async () => {
+	await resetLog()
+	const { tools } = mount()
+	const exec = { agent: { session: { header: { cwd: '/repo/demo' } } } }
+	await tools.get('memcue_add').execute({ text: 'Quarrel was archived in 2025.', shelf: 'research' }, exec)
+	assert.match(await waitForLog('arg: add '), /arg: add -source agent -cwd \/repo\/demo -shelf research -- Quarrel was archived in 2025\./)
+	assert.match(tools.get('memcue_add').parameters.properties.shelf.description, /in shelf:<name>/)
+	assert.match(tools.get('memcue_search').parameters.properties.in.description, /shelf \(facts read from web pages and documents/)
+	assert.match(tools.get('memcue_search').parameters.properties.in.description, /shelf:research/)
+	assert.match(tools.get('memcue_search').description, /leaves out the shelf/)
+})
+
 test('memcue_add stores a fact that starts with a dash', async () => {
 	await resetLog()
 	const { tools } = mount()
