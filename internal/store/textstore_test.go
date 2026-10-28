@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -170,6 +171,52 @@ func TestOpenThatCouldNotWriteAFileTriesAgain(t *testing.T) {
 	s = openTextAt(t, dir, cache, "mac", t0)
 	defer func() { _ = s.Close() }()
 	textMatches(t, s)
+}
+
+// changeCounter is the file change counter of a SQLite file, which every write transaction moves in the rollback
+// journal mode the store uses.
+func changeCounter(t *testing.T, path string) uint32 {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return binary.BigEndian.Uint32(b[24:28])
+}
+
+// An open that finds nothing new writes nothing: every search opens the base, and two stamp commits made a search
+// 2-4 ms slower than one on a file base (#557). An open after git changed a directory still takes the change in.
+func TestOpenWithNothingNewWritesNothing(t *testing.T) {
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	s := openTextAt(t, dir, cache, "mac", t0)
+	f, err := s.AddWith("Порт db1 — 5432", nil, "x", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	s = openTextAt(t, dir, cache, "mac", t0) // reads the directory the new file moved
+	_ = s.Close()
+
+	before := changeCounter(t, cache)
+	for range 3 {
+		s = openTextAt(t, dir, cache, "mac", t0)
+		_ = s.Close()
+	}
+	if after := changeCounter(t, cache); after != before {
+		t.Errorf("opens with nothing new wrote the cache: change counter %d → %d", before, after)
+	}
+
+	h, _ := ReadFactFile(FactPath(dir, f.ID))
+	v2 := h[0]
+	v2.Version, v2.Content, v2.Created = 2, "Порт db1 — 5433", t0.Add(time.Hour)
+	if err := WriteFactFile(FactPath(dir, f.ID), append(h, v2)); err != nil {
+		t.Fatal(err)
+	}
+	s = openTextAt(t, dir, cache, "mac", t0)
+	defer func() { _ = s.Close() }()
+	if got, err := s.Get(f.ID); err != nil || got.Content != v2.Content {
+		t.Errorf("after git changed the file: %+v %v", got, err)
+	}
 }
 
 // The cache is disposable: a missing one is built from the text, an unreadable one is set aside and built again.
