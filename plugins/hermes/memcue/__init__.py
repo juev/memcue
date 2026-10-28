@@ -22,8 +22,9 @@ Config, all optional (``memory.memcue`` in config.yaml):
   session_card_chars: most characters of the session card (passed as MEMCUE_CARD_BUDGET; default 0 keeps the
           binary's 3500); the binary drops the oldest user-stated rule first and counts what it left out
   dream: say in the system prompt when a dream is due (default true)
-  facts:  the fact base (default: $MEMCUE_FACTS, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by
-          pointing both at it)
+  facts:  the fact base (default: $MEMCUE_FACTS, else the text history $HERMES_HOME/memcue/facts once
+          `memcue migrate -text` wrote it, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by pointing
+          both at it)
   usage_log: write ``usage.log``, whether a reply used the facts its searches returned (default false; MEMCUE_USAGE_LOG=1 in
           the gateway's environment turns it on too)
   state_dir: where ``memcue/usage.log`` goes (default: $XDG_STATE_HOME, else ~/.local/state); set here, it needs no
@@ -232,6 +233,12 @@ def _expand_path(value: str) -> str:
     """~ and $HOME in a config value: neither the gateway nor a launch environment runs a shell over config.yaml, and
     a literal ~ would make memcue create a directory named "~" in the process working directory."""
     return os.path.expanduser(os.path.expandvars(value)) if value else ""
+
+
+def _base_name(path: str) -> str:
+    """The base a path names, the same for a file X.db and the text history X that `memcue migrate -text` writes
+    from it (#530)."""
+    return path[:-len(".db")] if path.endswith(".db") else path
 
 
 def _load_plugin_config() -> dict[str, Any]:
@@ -467,7 +474,8 @@ class MemcueMemoryProvider(MemoryProvider):
         home = Path(str(kwargs.get("hermes_home") or os.environ.get("HERMES_HOME") or Path.home() / ".hermes"))
         self._state = str(home / "memcue")
         if not self._facts:
-            self._facts = str(Path(self._state) / "facts.db")
+            text = Path(self._state) / "facts"
+            self._facts = str(text if text.is_dir() else Path(self._state) / "facts.db")
         self._keep_state_for_base()
         Path(self._state).mkdir(parents=True, exist_ok=True)
         self._install_in_background()
@@ -495,8 +503,9 @@ class MemcueMemoryProvider(MemoryProvider):
     def _keep_state_for_base(self) -> None:
         """written.json describes the facts of one base. When `facts` changes it describes another base: keeping it
         would point mirror edits at ids that are not there. A marker file names the base, so the switch is detected
-        once and the old file is dropped. The sessions/ and pending/ of the extraction an older provider ran (#494) go
-        on any start: pending/ holds raw messages of a session."""
+        once and the old file is dropped. A file X.db and the text history X it moved to are one base (#530). The
+        sessions/ and pending/ of the extraction an older provider ran (#494) go on any start: pending/ holds raw
+        messages of a session."""
         for name in ("sessions", "pending"):
             shutil.rmtree(Path(self._state) / name, ignore_errors=True)
         if not self._facts:
@@ -507,7 +516,7 @@ class MemcueMemoryProvider(MemoryProvider):
             previous = marker.read_text(encoding="utf-8").strip()
         except OSError:
             previous = ""
-        if previous and previous != key:
+        if previous and _base_name(previous) != _base_name(key):
             logger.warning("memcue base changed from %s to %s: dropping the old mirror state", previous, key)
             try:
                 (Path(self._state) / "written.json").unlink(missing_ok=True)

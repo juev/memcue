@@ -132,6 +132,27 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(Path(second._state, "base").read_text(encoding="utf-8").strip(),
                          str(Path(self.home) / "b.db"))
 
+    def test_the_move_to_text_keeps_the_mirror(self):
+        """`memcue migrate -text` turns $HERMES_HOME/memcue/facts.db into the text history next to it; the provider
+        opens the text from the next start on and keeps the mirror of the built-in memory, since it is the same base
+        (#530)."""
+        self.p.on_memory_write("add", "memory", "Факт до перехода.")
+        written = self.p._written()
+        self.assertTrue(written)
+        self.memcue("migrate", "-text")
+
+        moved = memcue_provider.MemcueMemoryProvider({"binary": BIN})
+        moved.initialize("s2", hermes_home=self.home, agent_context="primary")
+        self.assertEqual(moved._facts, str(Path(self.home) / "memcue" / "facts"))
+        self.assertEqual(moved._written(), written)
+        self.assertEqual(Path(moved._state, "base").read_text(encoding="utf-8").strip(), moved._facts)
+        self.assertTrue(any("Факт до перехода." in line for line in self.memcue_at(moved._facts, "facts")))
+
+    def memcue_at(self, facts, *args):
+        out = subprocess.run([BIN, *args], env=dict(os.environ, MEMCUE_FACTS=facts),
+                             capture_output=True, text=True, check=True).stdout
+        return [line for line in out.splitlines() if line]
+
     def test_facts_path_expands_home(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": "~/memcue/facts.db"})
         self.assertEqual(p._facts, str(Path(os.path.expanduser("~")) / "memcue" / "facts.db"))
