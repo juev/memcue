@@ -1,0 +1,9 @@
+# Hermes for the #531 stand, from the image the live Hermes runs, pinned by digest. Its own home is created per run
+# in the container's /tmp; the run directory is mounted at /stand and the fixtures read-only at /opt/fixtures.
+ARG HERMES_IMAGE
+FROM ${HERMES_IMAGE}
+COPY memcue /usr/local/bin/memcue
+COPY hermes-plugin-base /opt/hermes-plugin-base
+COPY hermes-plugin-cand /opt/hermes-plugin-cand
+COPY web_mcp.py seed.py agent_hermes.sh hermes-config.yaml /opt/stand/
+ENTRYPOINT ["sh", "/opt/stand/agent_hermes.sh"]

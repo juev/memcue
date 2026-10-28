@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "web": {
+      "command": "python3",
+      "args": ["-I", "/opt/stand/web_mcp.py"],
+      "env": {"STAND_WEB_LOG": "/stand/rec/web.log", "STAND_WEB_ROOT": "/opt/fixtures/web"}
+    }
+  }
+}
