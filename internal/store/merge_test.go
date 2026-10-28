@@ -201,6 +201,21 @@ func TestMergeOfACorrectionAndARetirement(t *testing.T) {
 				return err
 			})
 		}, Retired, corrected},
+		// The server corrected and then retired the fact itself; the Mac only changed the keywords of the old text. The
+		// Mac's version has another text than the retirement, but it corrects nothing (#549).
+		{"corrected and retired on one side, keywords changed on the other", func(t *testing.T, mac, server, id string) {
+			write(t, server, "server", time.Hour, func(s *Store) error {
+				if _, err := s.Correct(id, corrected, nil); err != nil {
+					return err
+				}
+				_, err := s.Retire(id)
+				return err
+			})
+			write(t, mac, "mac", 30*time.Minute, func(s *Store) error {
+				_, err := s.Correct(id, "Hermes работает на модели deepseek-flash", []string{"hermes", "flash"})
+				return err
+			})
+		}, Retired, corrected},
 		// The server merged the Mac's correction behind its retirement, so the correction won there; the Mac merges
 		// that result before it pulled it. The correction must win on the Mac too.
 		{"corrected first, retired later, the corrected side merges the result", func(t *testing.T, mac, server, id string) {

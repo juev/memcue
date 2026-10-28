@@ -80,7 +80,11 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 			}
 			return a.Content < b.Content
 		})
-		tail = correctionLast(tail, oTail, tv[common:])
+		base := ""
+		if common > 0 {
+			base = ov[common-1].Content
+		}
+		tail = correctionLast(tail, base, oTail, tv[common:])
 		if _, err := tx.Exec(`DELETE FROM facts WHERE id = ? AND version > ?`, id, common); err != nil {
 			return st, err
 		}
@@ -100,28 +104,42 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 // correctionLast puts after a retirement every correction its writer never saw, so the fact stays current with the
 // corrected text whatever the clocks of the two machines say (#544): a retirement judged the fact outdated, a
 // correction brought new data, and losing the new data is worse than an extra active fact. tail is the merged tail in
-// creation order, a and b the two sides' tails. When tail ends with a retirement, an active version before it with
-// another text is a correction its writer never saw unless one side holds that version before the retirement: a side
-// that does merged the correction and retired the fact afterwards. A version with the retired text (a change of
-// metadata only, a reopen) is no correction. The test looks at the versions themselves, not at which side ends how, so
-// a side that merges an earlier merge's result gets that result again (#544 follow-up).
-func correctionLast(tail, a, b []Fact) []Fact {
+// creation order, a and b the two sides' tails, base the text of the last version both sides share. When tail ends
+// with a retirement, the active versions before it that no side holds before it were never seen by its writer: a side
+// that holds one before the retirement merged it and retired the fact afterwards. They go last when one of them
+// corrects the text, that is changes it from the version before it on its side to something else than the retired
+// text; a change of keywords or labels only, or a reopen, leaves the retirement current. The test looks at the versions
+// themselves, not at which side ends how, so a side that merges an earlier merge's result gets that result again (#549).
+func correctionLast(tail []Fact, base string, a, b []Fact) []Fact {
 	if len(tail) == 0 || tail[len(tail)-1].Status != Retired {
 		return tail
 	}
 	r := tail[len(tail)-1]
+	index := func(side []Fact, f Fact) int { return slices.IndexFunc(side, func(g Fact) bool { return same(f, g) }) }
 	before := func(side []Fact, f Fact) bool {
-		fi := slices.IndexFunc(side, func(g Fact) bool { return same(f, g) })
-		ri := slices.IndexFunc(side, func(g Fact) bool { return same(r, g) })
+		fi, ri := index(side, f), index(side, r)
 		return fi >= 0 && ri >= 0 && fi < ri
 	}
+	corrects := func(f Fact) bool {
+		if f.Content == r.Content {
+			return false
+		}
+		for _, side := range [][]Fact{a, b} {
+			if i := index(side, f); i == 0 && f.Content != base || i > 0 && f.Content != side[i-1].Content {
+				return true
+			}
+		}
+		return false
+	}
 	var unseen []Fact
+	correction := false
 	for _, f := range tail[:len(tail)-1] {
-		if f.Status == Active && f.Content != r.Content && !before(a, f) && !before(b, f) {
+		if f.Status == Active && !before(a, f) && !before(b, f) {
 			unseen = append(unseen, f)
+			correction = correction || corrects(f)
 		}
 	}
-	if len(unseen) == 0 {
+	if !correction {
 		return tail
 	}
 	out := make([]Fact, 0, len(tail))
