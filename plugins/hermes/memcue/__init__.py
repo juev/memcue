@@ -653,7 +653,8 @@ class MemcueMemoryProvider(MemoryProvider):
     def _below_floor(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> tuple[list[Any], str]:
         """Whether the score floor is what made an answer thin. A single fact is the case where a floor hides the
         rest (#407): the same search with the floor off costs one more call and says how many facts sit below it.
-        Runs only for an answer of one fact or none, so the ordinary answer pays nothing.
+        Runs only for an answer of one fact or none, or a shelf search the floor ended (#546), so the ordinary answer
+        pays nothing.
 
         The wide call has its own -n, min(4 * limit, 20): with the caller's limit it could only ever count
         limit - served, so the number tracked the limit instead of the tail (#423). With the wider arm the number is
