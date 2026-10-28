@@ -289,7 +289,7 @@ func dreamDue(dir string, every time.Duration) (fresh, owed int, last time.Time,
 	if err != nil {
 		return 0, 0, last, err
 	}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return 0, 0, last, err
 	}
@@ -354,7 +354,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 	maxFresh, maxGroups := packets*packetFresh, packets*packetGroups
 	start := time.Now()
 	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339)}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return rec, work, err
 	}
@@ -690,7 +690,7 @@ func groupsOf(groups [][]store.Fact) map[string]int {
 func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (dreamRecord, error) {
 	rec.Since = plan.Start.UTC().Format(time.RFC3339)
 	rec.Groups = len(plan.Groups)
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return rec, err
 	}
@@ -911,7 +911,7 @@ func versions(facts []store.Fact) map[string]int {
 
 // markBase marks a first dream on this machine: from now on, and with every fact the base holds already seen.
 func markBase(dir string) error {
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return err
 	}

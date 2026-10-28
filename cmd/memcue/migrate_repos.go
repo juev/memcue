@@ -45,7 +45,7 @@ func runMigrateRepos(roots, pairs []string, apply bool, out io.Writer) error {
 	for _, dir := range repoDirs(roots) {
 		m.learn(dir)
 	}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return err
 	}

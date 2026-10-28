@@ -30,12 +30,19 @@ func runMigrate(args []string, out io.Writer) error {
 	all := fs.Bool("all", false, "migrate every note of the built-in memory")
 	jobs := fs.Int("j", 4, "notes sent to the model at once")
 	list := fs.Bool("list", false, "only list the notes that would be migrated")
+	text := fs.Bool("text", false, "move the base from one SQLite file to a text history git can merge fact by fact (#530)")
 	repos := fs.Bool("repos", false, "move facts written under directory names onto project keys (#343); args are old=new pairs")
 	apply := fs.Bool("apply", false, "with -repos: back the base up and write the changes instead of reporting them")
 	var roots multiFlag
 	fs.Var(&roots, "root", "with -repos: a directory to look for clones under (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *text {
+		if *repos || *apply || len(roots) > 0 || *all || *dry || *list || fs.NArg() > 0 {
+			return errors.New("migrate: -text takes no other flag or argument")
+		}
+		return runMigrateText(out)
 	}
 	if *repos {
 		return runMigrateRepos(roots, fs.Args(), *apply, out)
@@ -55,11 +62,13 @@ func runMigrate(args []string, out io.Writer) error {
 	}
 	if len(named)+len(found) == 0 {
 		return errors.New("usage: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md ...]\n" +
-			"       memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW ...]")
+			"       memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW ...]\n" +
+			"       memcue migrate -text")
 	}
 	var s *store.Store
-	if _, err := os.Stat(factsPath()); err == nil || (!*dry && !*list) {
-		if s, err = store.Open(factsPath()); err != nil {
+	if factsBase().exists() || (!*dry && !*list) {
+		var err error
+		if s, err = openBase(); err != nil {
 			return err
 		}
 		defer func() { _ = s.Close() }()
@@ -338,7 +347,7 @@ func runImport(args []string, out io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("usage: memcue import FILE.json [FILE.json ...]")
 	}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return err
 	}
