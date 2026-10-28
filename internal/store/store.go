@@ -165,6 +165,9 @@ type Store struct {
 	// absent are the columns an older base read without migration lacks, with the value they read as; Open adds
 	// them, so it is empty for a writable store.
 	absent map[string]string
+	// text is the directory of the text history and textLock the file that serializes writes to it; both are empty
+	// for a base that is one SQLite file (see OpenText).
+	text, textLock string
 }
 
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
@@ -656,6 +659,7 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.textWritten(facts...)
 	return facts, nil
 }
 
@@ -930,7 +934,8 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	for _, f := range append([]Fact{retired}, out...) {
+	written := append([]Fact{retired}, out...)
+	for _, f := range written {
 		if err := insert(tx, f); err != nil {
 			return nil, err
 		}
@@ -941,6 +946,7 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.textWritten(written...)
 	return out, nil
 }
 
@@ -961,6 +967,7 @@ func (s *Store) write(f Fact) (Fact, error) {
 	if err := tx.Commit(); err != nil {
 		return Fact{}, err
 	}
+	s.textWritten(f)
 	return f, nil
 }
 
