@@ -85,7 +85,8 @@ func TestSearchReadsTheShelfOnlyWhenNamed(t *testing.T) {
 	if got := searchOutput(t, "Example", "API"); strings.Contains(got, shelved) {
 		t.Errorf("the default returned the shelved fact: %q", got)
 	}
-	for _, in := range []string{"shelf:research", "shelf"} {
+	// A shelf named beside "all", in either order, is read too (#532).
+	for _, in := range []string{"shelf:research", "shelf", "all,shelf", "shelf,all", "all,shelf:research", "shelf:research,all"} {
 		if got := searchOutput(t, "-in", in, "Example", "API"); !strings.Contains(got, shelved) {
 			t.Errorf("-in %s did not return the shelved fact: %q", in, got)
 		}
@@ -106,8 +107,10 @@ func TestSearchHintsAtTheShelf(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	// A search that named the shelf and found nothing has nothing to point at.
-	if got := searchOutput(t, "-in", "shelf", "nothing", "here"); got != "No stored facts match.\n" {
-		t.Errorf("-in shelf: %q", got)
+	for _, in := range []string{"shelf", "all,shelf:research"} {
+		if got := searchOutput(t, "-in", in, "nothing", "here"); got != "No stored facts match.\n" {
+			t.Errorf("-in %s: %q", in, got)
+		}
 	}
 }
 

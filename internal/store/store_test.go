@@ -1544,6 +1544,12 @@ func TestSearchFilteredShelf(t *testing.T) {
 		{"every shelf", Filter{ScopePrefixes: []string{"shelf:"}}, []string{shelved.ID}},
 		{"named and left out", Filter{Scopes: []string{"shelf:research", "host:mac"}, ExcludePrefixes: []string{"shelf:"}},
 			[]string{plain.ID}},
+		{"left out but the shelf kept, any case", Filter{ExcludePrefixes: []string{"shelf:"},
+			KeepScopes: []string{"Shelf:Research"}}, both},
+		{"left out but another shelf kept", Filter{ExcludePrefixes: []string{"shelf:"},
+			KeepScopes: []string{"shelf:rust"}}, []string{plain.ID}},
+		{"named, kept and filtered by scope", Filter{Scopes: []string{"shelf:research"}, ExcludePrefixes: []string{"shelf:"},
+			KeepScopes: []string{"shelf:research"}}, []string{shelved.ID}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if g := got(c.f); !slices.Equal(g, c.want) {

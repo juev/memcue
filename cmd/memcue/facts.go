@@ -569,9 +569,9 @@ func runSearch(args []string, out io.Writer) error {
 	n := fs.Int("n", 5, "the most facts to return; fewer come when the rest do not fit")
 	minScore := fs.Float64("min-score", recall.MinScore,
 		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
-	in := fs.String("in", "", "where to look, comma-separated: project (this repository), global, host (this machine), "+
-		"all (every fact off the shelves), shelf (every shelf), or a scope such as repo:KEY, host:NAME, service:NAME, "+
-		"shelf:SLUG (default: project, host and global in a repository, all elsewhere)")
+	in := fs.String("in", "", "where to look, comma-separated, a union: project (this repository), global, host (this "+
+		"machine), all (every fact off the shelves), shelf (every shelf), or a scope such as repo:KEY, host:NAME, "+
+		"service:NAME, shelf:SLUG (default: project, host and global in a repository, all elsewhere)")
 	kind := fs.String("kind", "", "only facts of these kinds, comma-separated: "+strings.Join(recall.Kinds, ", "))
 	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
 	expired := fs.Bool("expired", false, "include facts whose expiry has passed")
@@ -624,7 +624,7 @@ func runSearch(args []string, out io.Writer) error {
 			if q.NarrowByDefault() {
 				hints = append(hints, "No facts of this repository, this host or global match; -in all searches every repository.")
 			}
-			if len(f.ExcludePrefixes) > 0 {
+			if len(f.ExcludePrefixes) > 0 && len(f.KeepScopes) == 0 {
 				hint, err := shelfHint(s, q)
 				if err != nil {
 					return err

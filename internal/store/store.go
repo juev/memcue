@@ -1192,8 +1192,10 @@ type Filter struct {
 	ScopePrefixes []string
 	Origins       []string
 	// ExcludePrefixes leaves out a fact whose scope starts with one of these (case aside), whatever the rest keeps:
-	// the shelves, which a search reads only when it names them (#433).
+	// the shelves, which a search reads only when it names them (#433). A fact whose scope is one of KeepScopes (case
+	// aside) escapes it: a shelf the search names (#532).
 	ExcludePrefixes []string
+	KeepScopes      []string
 }
 
 // where returns the SQL conditions of f over facts under alias, with their arguments.
@@ -1232,8 +1234,15 @@ func (s *Store) where(alias string, f Filter) (string, []any) {
 		conds = append(conds, "("+strings.Join(or, " OR ")+")")
 	}
 	for _, p := range f.ExcludePrefixes {
-		conds = append(conds, "substr("+scope+", 1, ?) <> ?")
+		cond := "substr(" + scope + ", 1, ?) <> ?"
 		args = append(args, utf8.RuneCountInString(p), strings.ToLower(p))
+		if len(f.KeepScopes) > 0 {
+			cond = "(" + cond + " OR " + scope + " IN (" + marks(len(f.KeepScopes)) + "))"
+			for _, sc := range f.KeepScopes {
+				args = append(args, strings.ToLower(sc))
+			}
+		}
+		conds = append(conds, cond)
 	}
 	if len(conds) == 0 {
 		return "", nil
