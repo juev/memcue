@@ -221,11 +221,13 @@ only when the same subject comes up again (#433). Such a fact is stored in the s
 
 A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf` for every shelf. Every other place
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
-that still read the shelf would hide nothing. A search that finds nothing, while its words fit a shelved fact, says
-where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json` carries each fact's `scope`, so a
-fact from the shelf can be told from the rest, and prints one object, `{"facts": [...], "hints": [...]}`, whose `hints`
-are the lines the plain answer prints after the facts, this one included (#453); the Hermes and DSH plugins read
-both it and the bare array of an older binary.
+that still read the shelf would hide nothing. Places are a union, so `-in all,shelf:research` reads every fact off
+the shelves and that one shelf, in either order; a shelf the search does not name stays out even when a named place
+such as `project` would reach its fact through the origin (#532). A search that finds nothing, while its words fit a
+shelved fact, says where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json` carries each
+fact's `scope`, so a fact from the shelf can be told from the rest, and prints one object,
+`{"facts": [...], "hints": [...]}`, whose `hints` are the lines the plain answer prints after the facts, this one
+included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
 
@@ -682,6 +684,7 @@ memcue search -json postgres port    # the facts that fit, best first, with thei
 memcue search -min-score 0 postgres  # every fact up to -n, the floor off
 memcue search -in all postgres       # every repository; the default in a repository is its own, this host's and the global facts
 memcue search -in shelf:research rate limit  # facts read from pages and documents, which no other place returns
+memcue search -in all,shelf:research rate limit  # places are a union: every fact off the shelves and that shelf
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
 memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."

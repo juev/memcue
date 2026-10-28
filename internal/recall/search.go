@@ -44,7 +44,7 @@ type Query struct {
 	// (this machine), "all", "shelf" (every shelf), or a scope such as "repo:KEY", "host:NAME", "service:NAME" or
 	// "shelf:SLUG". Several are a union. Empty is "project", "host" and "global" in a session that works in a
 	// repository (#418) and "all" outside one. Only a place that names a shelf reads one: "all" is every fact off the
-	// shelves (#433).
+	// shelves (#433), and "all,shelf:research" adds that shelf (#532).
 	In       []string
 	Kinds    []string // only facts of these kinds (rule, decision, pitfall, ...)
 	Since    string   // only facts learnt on or after this day, "YYYY-MM-DD"
@@ -88,16 +88,15 @@ func (q Query) Filter() (store.Filter, error) {
 			in = []string{"project", "host", "global"}
 		}
 	}
-	shelved := false
+	all, everyShelf := false, false
+	var shelves []string
 	for _, in := range in {
 		switch in = strings.TrimSpace(in); {
 		case in == "all":
-			f.Scopes, f.ScopePrefixes, f.Origins = nil, nil, nil
-			f.ExcludePrefixes = []string{ShelfPrefix}
-			return f, nil
+			all = true
 		case in == "shelf":
 			f.ScopePrefixes = append(f.ScopePrefixes, ShelfPrefix)
-			shelved = true
+			everyShelf = true
 		case in == "project":
 			for _, k := range q.Project {
 				f.Scopes = append(f.Scopes, "repo:"+k)
@@ -117,14 +116,21 @@ func (q Query) Filter() (store.Filter, error) {
 			f.Origins = append(f.Origins, strings.TrimPrefix(in, "repo:"))
 		case strings.Contains(in, ":") && !strings.HasSuffix(in, ":"):
 			f.Scopes = append(f.Scopes, in)
-			shelved = shelved || IsShelf(in)
+			if IsShelf(in) {
+				shelves = append(shelves, in)
+			}
 		default:
 			return f, fmt.Errorf("unknown place %q: project, global, host, all, shelf, or a scope such as repo:KEY", in)
 		}
 	}
-	if !shelved {
-		// A shelved fact learnt in the project would come back through its origin.
-		f.ExcludePrefixes = []string{ShelfPrefix}
+	if all {
+		// Every fact off the shelves, whatever else is named; a shelf named beside it is added below (#532).
+		f.Scopes, f.ScopePrefixes, f.Origins = nil, nil, nil
+	}
+	if !everyShelf {
+		// A shelf the search does not name stays out, even when its fact was learnt in the project and would come
+		// back through its origin (#532).
+		f.ExcludePrefixes, f.KeepScopes = []string{ShelfPrefix}, shelves
 	}
 	return f, nil
 }

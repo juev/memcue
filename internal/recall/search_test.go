@@ -471,23 +471,32 @@ func hits(h []store.Hit) []string {
 	return out
 }
 
-// A shelf is read only when it is named (#433): every other place, "all" included, leaves the shelves out.
+// A shelf is read only when it is named (#433): every other place, "all" included, leaves the shelves out, and a
+// named shelf keeps the others out (#532).
 func TestQueryFilterShelf(t *testing.T) {
 	shelves := []string{ShelfPrefix}
+	research := []string{"shelf:research"}
 	for _, c := range []struct {
 		name     string
 		in       []string
 		scopes   []string
 		prefixes []string
 		exclude  []string
+		keep     []string
 	}{
-		{"all", []string{"all"}, nil, nil, shelves},
-		{"default outside a repository", nil, nil, nil, shelves},
-		{"project", []string{"project"}, []string{"repo:example.com/me/app"}, nil, shelves},
-		{"host", []string{"host"}, []string{"host:mac"}, nil, shelves},
-		{"every shelf", []string{"shelf"}, nil, shelves, nil},
-		{"one shelf", []string{"shelf:research"}, []string{"shelf:research"}, nil, nil},
-		{"a shelf and the host", []string{"host", "shelf:research"}, []string{"host:mac", "shelf:research"}, nil, nil},
+		{"all", []string{"all"}, nil, nil, shelves, nil},
+		{"default outside a repository", nil, nil, nil, shelves, nil},
+		{"project", []string{"project"}, []string{"repo:example.com/me/app"}, nil, shelves, nil},
+		{"host", []string{"host"}, []string{"host:mac"}, nil, shelves, nil},
+		{"every shelf", []string{"shelf"}, nil, shelves, nil, nil},
+		{"one shelf", research, research, nil, shelves, research},
+		{"a shelf and the host", []string{"host", "shelf:research"}, []string{"host:mac", "shelf:research"}, nil,
+			shelves, research},
+		{"all and every shelf", []string{"all", "shelf"}, nil, nil, nil, nil},
+		{"every shelf and all", []string{"shelf", "all"}, nil, nil, nil, nil},
+		{"all and a shelf", []string{"all", "shelf:research"}, nil, nil, shelves, research},
+		{"a shelf and all", []string{"shelf:research", "all"}, nil, nil, shelves, research},
+		{"all and the host", []string{"all", "host"}, nil, nil, shelves, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			q := Query{In: c.in, Host: "mac"}
@@ -499,11 +508,21 @@ func TestQueryFilterShelf(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !slices.Equal(f.Scopes, c.scopes) || !slices.Equal(f.ScopePrefixes, c.prefixes) ||
-				!slices.Equal(f.ExcludePrefixes, c.exclude) {
-				t.Errorf("scopes %q prefixes %q exclude %q, want %q %q %q", f.Scopes, f.ScopePrefixes,
-					f.ExcludePrefixes, c.scopes, c.prefixes, c.exclude)
+				!slices.Equal(f.ExcludePrefixes, c.exclude) || !slices.Equal(f.KeepScopes, c.keep) {
+				t.Errorf("scopes %q prefixes %q exclude %q keep %q, want %q %q %q %q", f.Scopes, f.ScopePrefixes,
+					f.ExcludePrefixes, f.KeepScopes, c.scopes, c.prefixes, c.exclude, c.keep)
 			}
 		})
+	}
+}
+
+// "all" no longer ends the list (#532): a place after it is still checked.
+func TestQueryFilterUnknownPlaceBesideAll(t *testing.T) {
+	for _, in := range [][]string{{"all", "bogus"}, {"bogus", "all"}, {"all", "repo:"}} {
+		_, err := Query{In: in}.Filter()
+		if err == nil || !strings.Contains(err.Error(), "unknown place") {
+			t.Errorf("-in %q: error %v, want an unknown place", in, err)
+		}
 	}
 }
 
@@ -528,6 +547,17 @@ func TestSearchShelf(t *testing.T) {
 		{"every shelf", []string{"shelf"}, []string{"research", "rust"}},
 		{"one shelf", []string{"shelf:research"}, []string{"research"}},
 		{"one shelf, any case", []string{"Shelf:Research"}, []string{"research"}},
+		{"two shelves", []string{"shelf:research", "shelf:rust"}, []string{"research", "rust"}},
+		// #532: the union of "all" and a shelf, in either order, and a shelf beside a place that reads origins.
+		{"all and every shelf", []string{"all", "shelf"}, []string{"global rule", "learnt here", "other host",
+			"other repo", "own repo", "research", "rust", "service", "this host"}},
+		{"every shelf and all", []string{"shelf", "all"}, []string{"global rule", "learnt here", "other host",
+			"other repo", "own repo", "research", "rust", "service", "this host"}},
+		{"all and a shelf", []string{"all", "shelf:research"}, []string{"global rule", "learnt here", "other host",
+			"other repo", "own repo", "research", "service", "this host"}},
+		{"a shelf, any case, and all", []string{"SHELF:research", "all"}, []string{"global rule", "learnt here",
+			"other host", "other repo", "own repo", "research", "service", "this host"}},
+		{"project and a shelf", []string{"project", "shelf:research"}, []string{"learnt here", "own repo", "research"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if got := found(t, s, Query{In: c.in}); !slices.Equal(got, c.want) {
