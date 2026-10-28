@@ -19,8 +19,9 @@ type MergeStats struct {
 // Merge takes the facts of the copy at otherPath into s, the way git's merge driver needs: the result is the union
 // of the versions of both. Where both copies added versions to the same fact since they last agreed, the versions
 // after the common ones are ordered by creation time (then author and content, so every machine gets the same
-// order) and numbered anew; the latest of them is current. Nothing is lost: a correction made on one machine and a
-// retirement made on another both stay in the history.
+// order) and numbered anew; the latest of them is current, except that a correction wins over a retirement made
+// without knowing it (see correctionLast). Nothing is lost: a correction made on one machine and a retirement made on
+// another both stay in the history.
 //
 // Vectors are not merged: nothing reads them, and Open deletes the ones an older binary stored (#260).
 func (s *Store) Merge(otherPath string) (MergeStats, error) {
@@ -57,7 +58,7 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		// an earlier merge keeps it where it wrote it, the merged side after the version merged before it (#540).
 		var tTail []Fact
 		for _, f := range tv[common:] {
-			if !slices.ContainsFunc(oTail, func(g Fact) bool { return same(f, g) }) {
+			if !holds(oTail, f) {
 				tTail = append(tTail, f)
 			}
 		}
@@ -79,6 +80,7 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 			}
 			return a.Content < b.Content
 		})
+		tail = correctionLast(tail, oTail, tv[common:])
 		if _, err := tx.Exec(`DELETE FROM facts WHERE id = ? AND version > ?`, id, common); err != nil {
 			return st, err
 		}
@@ -93,6 +95,44 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		return st, err
 	}
 	return st, s.Rebuild()
+}
+
+// correctionLast puts the versions of a correction the retiring side never saw after everything else, so the fact
+// stays current with the corrected text whatever the clocks of the two machines say (#544): a retirement judged the
+// fact outdated, a correction brought new data, and losing the new data is worse than an extra active fact. It applies
+// when one side's tail ends retired, the other's ends active with another text, and neither side holds the other's
+// last version; a change of metadata only, or a retirement made after merging the correction, keeps tail as it is.
+// a and b are the two sides' tails, tail the merged one in creation order.
+func correctionLast(tail, a, b []Fact) []Fact {
+	if len(a) == 0 || len(b) == 0 {
+		return tail
+	}
+	retiring, correcting := a, b
+	if retiring[len(retiring)-1].Status != Retired {
+		retiring, correcting = b, a
+	}
+	r, c := retiring[len(retiring)-1], correcting[len(correcting)-1]
+	if r.Status != Retired || c.Status != Active || c.Content == r.Content || holds(retiring, c) || holds(correcting, r) {
+		return tail
+	}
+	var unseen []Fact
+	for _, f := range correcting {
+		if !holds(retiring, f) {
+			unseen = append(unseen, f)
+		}
+	}
+	out := make([]Fact, 0, len(tail))
+	for _, f := range tail {
+		if !holds(unseen, f) {
+			out = append(out, f)
+		}
+	}
+	return append(out, unseen...)
+}
+
+// holds reports whether vs has a version that is the same write as f.
+func holds(vs []Fact, f Fact) bool {
+	return slices.ContainsFunc(vs, func(g Fact) bool { return same(f, g) })
 }
 
 func byID(rows []Fact) map[string][]Fact {

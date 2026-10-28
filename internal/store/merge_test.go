@@ -110,15 +110,113 @@ func TestMergeIsTheSameFromBothSides(t *testing.T) {
 	if da, dc := dump(t, sa), dump(t, sc); da != dc {
 		t.Errorf("merge depends on side:\n%s\nvs\n%s", da, dc)
 	}
+	// The server retired the fact without knowing the correction: the correction wins, though it is older (#544).
 	hist, _ := sa.History(f.ID)
-	if len(hist) != 3 || !strings.Contains(hist[1].Content, "fallback Codex") || hist[2].Status != Retired {
+	if len(hist) != 3 || hist[1].Status != Retired || !strings.Contains(hist[2].Content, "fallback Codex") ||
+		hist[2].Status != Active {
 		t.Errorf("history %+v", hist)
 	}
-	if len(ids(t, sa, "hermes deepseek")) != 0 {
-		t.Error("the later retirement did not win")
+	if len(ids(t, sa, "hermes deepseek")) != 1 {
+		t.Error("the correction did not win over the retirement")
 	}
 	_ = sa.Close()
 	_ = sc.Close()
+}
+
+// mergeBoth merges the copies x and y each way and returns the result, failing when the two differ.
+func mergeBoth(t *testing.T, x, y string) *Store {
+	t.Helper()
+	a, c := clone(t, x), clone(t, y)
+	sa, sc := openAt(t, a, "mac", t0), openAt(t, c, "server", t0)
+	if _, err := sa.Merge(y); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sc.Merge(x); err != nil {
+		t.Fatal(err)
+	}
+	if da, dc := dump(t, sa), dump(t, sc); da != dc {
+		t.Errorf("merge depends on side:\n%s\nvs\n%s", da, dc)
+	}
+	_ = sc.Close()
+	t.Cleanup(func() { _ = sa.Close() })
+	return sa
+}
+
+// A correction wins over a retirement made without knowing it, whatever the clocks say; a retirement wins over a
+// change of metadata only, and over a correction the retiring side had already merged (#544).
+func TestMergeOfACorrectionAndARetirement(t *testing.T) {
+	const corrected = "Hermes работает на deepseek-pro, fallback Codex"
+	write := func(t *testing.T, path, author string, at time.Duration, do func(*Store) error) {
+		t.Helper()
+		s := openAt(t, path, author, t0.Add(at))
+		if err := do(s); err != nil {
+			t.Fatal(err)
+		}
+		_ = s.Close()
+	}
+	for _, c := range []struct {
+		name    string
+		setup   func(t *testing.T, mac, server string, id string)
+		status  string
+		content string
+	}{
+		{"retired first, corrected later", func(t *testing.T, mac, server, id string) {
+			write(t, server, "server", time.Hour, func(s *Store) error { _, err := s.Retire(id); return err })
+			write(t, mac, "mac", 2*time.Hour, func(s *Store) error { _, err := s.Correct(id, corrected, nil); return err })
+		}, Active, corrected},
+		{"corrected first, retired later", func(t *testing.T, mac, server, id string) {
+			write(t, mac, "mac", time.Hour, func(s *Store) error { _, err := s.Correct(id, corrected, nil); return err })
+			write(t, server, "server", 2*time.Hour, func(s *Store) error { _, err := s.Retire(id); return err })
+		}, Active, corrected},
+		{"keywords changed, retired later", func(t *testing.T, mac, server, id string) {
+			write(t, mac, "mac", time.Hour, func(s *Store) error {
+				_, err := s.Correct(id, "Hermes работает на модели deepseek-flash", []string{"hermes", "flash"})
+				return err
+			})
+			write(t, server, "server", 2*time.Hour, func(s *Store) error { _, err := s.Retire(id); return err })
+		}, Retired, "Hermes работает на модели deepseek-flash"},
+		{"retired after merging the correction", func(t *testing.T, mac, server, id string) {
+			write(t, mac, "mac", time.Hour, func(s *Store) error { _, err := s.Correct(id, corrected, nil); return err })
+			write(t, server, "server", 2*time.Hour, func(s *Store) error {
+				if _, err := s.Merge(mac); err != nil {
+					return err
+				}
+				_, err := s.Retire(id)
+				return err
+			})
+		}, Retired, corrected},
+		// The server corrected, merged the Mac's correction behind its own and then retired; the Mac has not pulled
+		// that merge, so its correction sits at another position but is known to the retiring side.
+		{"retired after merging, the other side stale", func(t *testing.T, mac, server, id string) {
+			write(t, server, "server", time.Hour, func(s *Store) error {
+				_, err := s.Correct(id, "Hermes работает на deepseek-lite", nil)
+				return err
+			})
+			write(t, mac, "mac", 90*time.Minute, func(s *Store) error { _, err := s.Correct(id, corrected, nil); return err })
+			write(t, server, "server", 3*time.Hour, func(s *Store) error {
+				if _, err := s.Merge(mac); err != nil {
+					return err
+				}
+				_, err := s.Retire(id)
+				return err
+			})
+		}, Retired, corrected},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			b, f := base(t)
+			mac, server := clone(t, b), clone(t, b)
+			c.setup(t, mac, server, f.ID)
+			s := mergeBoth(t, mac, server)
+			got, err := s.Get(f.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Status != c.status || got.Content != c.content {
+				hist, _ := s.History(f.ID)
+				t.Errorf("current %s %q, want %s %q; history %+v", got.Status, got.Content, c.status, c.content, hist)
+			}
+		})
+	}
 }
 
 func TestMergeOfIdenticalCopiesChangesNothing(t *testing.T) {
@@ -188,8 +286,8 @@ func TestDumpOneLinePerVersion(t *testing.T) {
 	_ = s.Close()
 }
 
-// A machine on an older memcue corrects a candidate while this one retires it later: the merge keeps both versions,
-// the retire is the latest, and the candidate state of the older machine does not bring the fact back.
+// A machine on an older memcue corrects a candidate while this one retires it later without knowing: the merge keeps
+// both versions, and the correction is current (#544), its candidate state live like any other (#514).
 func TestMergeOfAnOlderCorrectionAndARetire(t *testing.T) {
 	b := filepath.Join(t.TempDir(), "facts.db")
 	m := Meta{Kind: "environment", Review: Candidate}
@@ -208,14 +306,14 @@ func TestMergeOfAnOlderCorrectionAndARetire(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := s.Get(v1.ID)
-	if err != nil || got.Status != Retired || got.Version != 3 {
+	if err != nil || got.Status != Active || got.Version != 3 || got.Content != "Кандидат про db1, уточнён." {
 		t.Errorf("merged %+v %v", got, err)
 	}
-	if h, _ := s.History(v1.ID); len(h) != 3 || h[1].Content != "Кандидат про db1, уточнён." || h[1].Review != Candidate {
+	if h, _ := s.History(v1.ID); len(h) != 3 || h[1].Status != Retired || h[2].Review != Candidate {
 		t.Errorf("history %+v", h)
 	}
-	if _, ok := ids(t, s, "кандидат db1")[v1.ID]; ok {
-		t.Error("a retired candidate is recalled after the merge")
+	if _, ok := ids(t, s, "кандидат db1")[v1.ID]; !ok {
+		t.Error("the corrected candidate is not recalled after the merge")
 	}
 	_ = s.Close()
 }
