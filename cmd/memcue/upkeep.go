@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/tier"
 )
 
@@ -17,7 +16,7 @@ import (
 // without the merge driver. Each check is a few stats or one query, so a session start pays nothing noticeable, and a
 // check that fails says nothing: the session must start either way.
 func upkeepHint(cwd string) string {
-	if _, err := os.Stat(factsPath()); err != nil {
+	if !factsBase().exists() {
 		return "" // no base yet: the hint must not create one
 	}
 	var lines []string
@@ -42,7 +41,7 @@ func oldNameHint(cwd string) string {
 	if len(keys) == 0 || old == "" || old == keys[0] {
 		return ""
 	}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return ""
 	}

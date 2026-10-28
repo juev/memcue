@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -63,7 +62,7 @@ func runNotes(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	facts, err := liveFacts(factsPath())
+	facts, err := liveFacts()
 	if err != nil {
 		return err
 	}
@@ -165,11 +164,11 @@ func readNoteEntries(dir string) ([]noteEntry, error) {
 
 // liveFacts are the facts recall uses: the newest approved version of each, expired ones left out. A base that does
 // not exist yet has none; it is not opened, so the report does not create it.
-func liveFacts(path string) ([]store.Fact, error) {
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+func liveFacts() ([]store.Fact, error) {
+	if !factsBase().exists() {
 		return nil, nil
 	}
-	s, err := store.OpenReadOnly(path)
+	s, err := openBaseReadOnly()
 	if err != nil {
 		return nil, err
 	}

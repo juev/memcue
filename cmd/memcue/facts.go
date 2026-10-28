@@ -106,7 +106,7 @@ func hasSecret(content string, keywords []string) bool {
 }
 
 func withStore(fn func(*store.Store) error) error {
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return err
 	}
@@ -483,7 +483,7 @@ func runReindex(args []string, out io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	ro, err := store.OpenReadOnly(factsPath())
+	ro, err := openBaseReadOnly()
 	if err != nil {
 		return err
 	}

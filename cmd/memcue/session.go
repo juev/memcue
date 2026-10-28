@@ -206,7 +206,7 @@ func dreamToolsHint() string {
 
 // dreamHintTo is the dream hint that names how the model runs the dream.
 func dreamHintTo(how string) string {
-	if _, err := os.Stat(factsPath()); err != nil {
+	if !factsBase().exists() {
 		return "" // no base yet: the hint must not create one
 	}
 	dir, err := stateDir()
@@ -295,10 +295,10 @@ func sessionCard(cwd string) (string, []string, int, cardFit, error) {
 // outside the budget up to that many characters, the way the parts of the Claude Code session start carry them (#480,
 // #495).
 func sessionCardWith(cwd string, statedRoom int) (string, []string, int, cardFit, error) {
-	if _, err := os.Stat(factsPath()); os.IsNotExist(err) {
+	if !factsBase().exists() {
 		return "", nil, 0, cardFit{}, nil
 	}
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return "", nil, 0, cardFit{}, err
 	}
@@ -566,6 +566,12 @@ func logCard(h sessionStartInput, ids []string, chars, excluded, left int, fit c
 // default base keeps the historical $XDG_STATE_HOME/memcue, and any other base gets a subdirectory named after its
 // absolute path. Two bases on one machine must not share a dream schedule.
 func stateDir() (string, error) {
+	return stateDirOf(factsBase())
+}
+
+// stateDirOf is the state directory of the base b. A text history that moved from a file of the old format takes over
+// the state of that file, so the move keeps the dream schedule and the logs.
+func stateDirOf(b factBase) (string, error) {
 	dir := strings.TrimSpace(os.Getenv("MEMCUE_STATE_DIR"))
 	if dir == "" {
 		base := os.Getenv("XDG_STATE_HOME")
@@ -577,22 +583,29 @@ func stateDir() (string, error) {
 			base = filepath.Join(home, ".local", "state")
 		}
 		dir = filepath.Join(base, "memcue")
-		if !isDefaultBase() {
-			dir = filepath.Join(dir, baseKey(factsPath()))
+		if !isDefaultBase(b) {
+			root := dir
+			dir = filepath.Join(root, baseKey(b.path))
+			if b.text {
+				if _, err := os.Stat(dir); os.IsNotExist(err) {
+					_ = os.Rename(filepath.Join(root, baseKey(b.path+".db")), dir) // no state of the old format: nothing to take
+				}
+			}
 		}
 	}
 	return dir, os.MkdirAll(dir, 0o700)
 }
 
-// isDefaultBase says whether the active base is memcue's own default. That base keeps the pre-0.5 state directory,
-// so an existing Claude Code or DSH install does not lose its session offsets or its dream schedule.
-func isDefaultBase() bool {
-	base, err := filepath.Abs(factsPath())
+// isDefaultBase says whether b is memcue's own default, the file or the text history of the Claude config directory.
+// That base keeps the pre-0.5 state directory, so an existing Claude Code or DSH install does not lose its session
+// offsets or its dream schedule.
+func isDefaultBase(b factBase) bool {
+	base, err := filepath.Abs(b.path)
 	if err != nil {
 		return false
 	}
 	def, err := filepath.Abs(filepath.Join(claudeDir(), "memory", "facts.db"))
-	return err == nil && base == def
+	return err == nil && (base == def || base == strings.TrimSuffix(def, ".db"))
 }
 
 // baseKey names a state subdirectory for a base path: 12 hex characters of SHA-256 are enough to separate the bases

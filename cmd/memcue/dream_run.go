@@ -110,7 +110,7 @@ func runDreamOnce(out io.Writer, all bool, packets int) error {
 
 // owedTranslations counts the active facts that have no translation yet.
 func owedTranslations() (int, error) {
-	s, err := store.Open(factsPath())
+	s, err := openBase()
 	if err != nil {
 		return 0, err
 	}
