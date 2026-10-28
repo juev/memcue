@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -218,12 +219,19 @@ func (s *Store) syncText() error {
 			return err
 		}
 	}
-	stamp, err := json.Marshal(dirs)
-	if err != nil {
-		return err
+	// A stamp is written only when it changes: each write is a commit, and an open that found nothing new would pay
+	// two of them on every search (#557).
+	if !maps.Equal(dirs, saved) {
+		stamp, err := json.Marshal(dirs)
+		if err != nil {
+			return err
+		}
+		if err := saveStamp(s.db, textDirsStamp, string(stamp)); err != nil {
+			return err
+		}
 	}
-	if err := saveStamp(s.db, textDirsStamp, string(stamp)); err != nil {
-		return err
+	if rows == strconv.Itoa(n) {
+		return nil
 	}
 	return s.saveTextRows()
 }
