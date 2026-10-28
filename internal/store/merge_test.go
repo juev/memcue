@@ -201,6 +201,22 @@ func TestMergeOfACorrectionAndARetirement(t *testing.T) {
 				return err
 			})
 		}, Retired, corrected},
+		// The server merged the Mac's correction behind its retirement, so the correction won there; the Mac merges
+		// that result before it pulled it. The correction must win on the Mac too.
+		{"corrected first, retired later, the corrected side merges the result", func(t *testing.T, mac, server, id string) {
+			write(t, mac, "mac", time.Hour, func(s *Store) error { _, err := s.Correct(id, corrected, nil); return err })
+			write(t, server, "server", 2*time.Hour, func(s *Store) error {
+				if _, err := s.Retire(id); err != nil {
+					return err
+				}
+				_, err := s.Merge(mac)
+				return err
+			})
+			write(t, mac, "mac", 3*time.Hour, func(s *Store) error {
+				_, err := s.AddWith("Ещё один факт с Mac", nil, "x", "", Meta{})
+				return err
+			})
+		}, Active, corrected},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			b, f := base(t)

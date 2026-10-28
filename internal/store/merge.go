@@ -97,29 +97,32 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 	return st, s.Rebuild()
 }
 
-// correctionLast puts the versions of a correction the retiring side never saw after everything else, so the fact
-// stays current with the corrected text whatever the clocks of the two machines say (#544): a retirement judged the
-// fact outdated, a correction brought new data, and losing the new data is worse than an extra active fact. It applies
-// when one side's tail ends retired, the other's ends active with another text, and neither side holds the other's
-// last version; a change of metadata only, or a retirement made after merging the correction, keeps tail as it is.
-// a and b are the two sides' tails, tail the merged one in creation order.
+// correctionLast puts after a retirement every correction its writer never saw, so the fact stays current with the
+// corrected text whatever the clocks of the two machines say (#544): a retirement judged the fact outdated, a
+// correction brought new data, and losing the new data is worse than an extra active fact. tail is the merged tail in
+// creation order, a and b the two sides' tails. When tail ends with a retirement, an active version before it with
+// another text is a correction its writer never saw unless one side holds that version before the retirement: a side
+// that does merged the correction and retired the fact afterwards. A version with the retired text (a change of
+// metadata only, a reopen) is no correction. The test looks at the versions themselves, not at which side ends how, so
+// a side that merges an earlier merge's result gets that result again (#544 follow-up).
 func correctionLast(tail, a, b []Fact) []Fact {
-	if len(a) == 0 || len(b) == 0 {
+	if len(tail) == 0 || tail[len(tail)-1].Status != Retired {
 		return tail
 	}
-	retiring, correcting := a, b
-	if retiring[len(retiring)-1].Status != Retired {
-		retiring, correcting = b, a
-	}
-	r, c := retiring[len(retiring)-1], correcting[len(correcting)-1]
-	if r.Status != Retired || c.Status != Active || c.Content == r.Content || holds(retiring, c) || holds(correcting, r) {
-		return tail
+	r := tail[len(tail)-1]
+	before := func(side []Fact, f Fact) bool {
+		fi := slices.IndexFunc(side, func(g Fact) bool { return same(f, g) })
+		ri := slices.IndexFunc(side, func(g Fact) bool { return same(r, g) })
+		return fi >= 0 && ri >= 0 && fi < ri
 	}
 	var unseen []Fact
-	for _, f := range correcting {
-		if !holds(retiring, f) {
+	for _, f := range tail[:len(tail)-1] {
+		if f.Status == Active && f.Content != r.Content && !before(a, f) && !before(b, f) {
 			unseen = append(unseen, f)
 		}
+	}
+	if len(unseen) == 0 {
+		return tail
 	}
 	out := make([]Fact, 0, len(tail))
 	for _, f := range tail {
