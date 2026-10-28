@@ -93,7 +93,7 @@ commands:
   session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
-  correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID TEXT
+  correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT
   retire    take a fact out of recall: memcue retire ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
