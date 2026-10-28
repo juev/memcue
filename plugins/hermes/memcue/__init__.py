@@ -306,7 +306,8 @@ ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory, at once, when you learn it: nothing is extracted from the "
     "session later. Store the user's rules and corrections (with the reason), the user's decisions the code does not "
     "show, pitfalls found by an error or a check, and hosts, services and pointers outside the repository. Not the "
-    "progress of the task, what a command shows, installation state or multi-step procedures, unless the user asks "
+    "progress of the task, what the repository or a command shows, installation state or multi-step procedures, "
+    "unless the user asks "
     "to remember one (kind procedure). One self-contained "
     "statement in one to three sentences, naming the system or project, with exact values; only what the user said "
     "or a tool confirmed. Search first and correct a stored fact instead of adding a second copy.",
