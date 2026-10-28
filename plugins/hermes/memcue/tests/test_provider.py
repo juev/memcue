@@ -1112,6 +1112,28 @@ class BuiltinMemoryFlagsTest(unittest.TestCase):
 TRUE = shutil.which("true") or "/bin/true"  # /usr/bin/true on macOS
 
 
+class ManifestTest(unittest.TestCase):
+    """The provider finds and installs the binary itself, so Hermes learns whether it is ready from is_available()."""
+
+    def test_the_manifest_declares_no_external_dependencies(self):
+        # The dashboard runs `check` with its own PATH and `install` through bash: a binary set in
+        # memory.memcue.binary failed the check and marked a working provider unavailable (#536).
+        text = (HERE / "plugin.yaml").read_text(encoding="utf-8")
+        self.assertNotRegex(text, r"(?m)^external_dependencies\s*:")
+        self.assertTrue(memcue_provider._plugin_version())
+
+    def test_a_configured_binary_off_path_is_available(self):
+        with tempfile.TemporaryDirectory() as root, unittest.mock.patch.dict(
+                os.environ, {"PATH": "/usr/bin:/bin", "MEMCUE_AUTO_INSTALL": "0", "HERMES_HOME": root}):
+            binary = Path(root) / "opt" / "bin" / "memcue"
+            binary.parent.mkdir(parents=True)
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            binary.chmod(0o755)
+            self.assertIsNone(shutil.which("memcue"))
+            self.assertTrue(memcue_provider.MemcueMemoryProvider({"binary": str(binary)}).is_available())
+            self.assertFalse(memcue_provider.MemcueMemoryProvider({}).is_available())
+
+
 @unittest.skipUnless(memcue_provider._release_target(), "no memcue release for this machine")
 class InstallTest(unittest.TestCase):
     """The provider installs the binary of its release when none is configured; a local server stands in for GitHub."""
