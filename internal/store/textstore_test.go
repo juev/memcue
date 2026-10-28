@@ -138,6 +138,40 @@ func TestOpenWritesWhatTheFileMissed(t *testing.T) {
 	}
 }
 
+// An open that cannot write a file it found behind the cache (git checked out an older one) leaves its stamps as they
+// were, so the next open reads the directory again and writes the file (#552).
+func TestOpenThatCouldNotWriteAFileTriesAgain(t *testing.T) {
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	s := openTextAt(t, dir, cache, "mac", t0)
+	f, err := s.AddWith("Порт db1 — 5432", nil, "x", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(f.ID, "Порт db1 — 5433", nil); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	path := FactPath(dir, f.ID)
+	h, _ := ReadFactFile(path)
+	if err := WriteFactFile(path, h[:1]); err != nil { // the older file, written anew as git writes it
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Dir(path), 0o500); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := OpenText(dir, cache); err == nil {
+		_ = s.Close()
+		t.Fatal("an open wrote into a read-only directory")
+	}
+	if err := os.Chmod(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	s = openTextAt(t, dir, cache, "mac", t0)
+	defer func() { _ = s.Close() }()
+	textMatches(t, s)
+}
+
 // The cache is disposable: a missing one is built from the text, an unreadable one is set aside and built again.
 func TestCacheIsBuiltFromTheText(t *testing.T) {
 	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")

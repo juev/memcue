@@ -1163,7 +1163,14 @@ func (s *Store) col(alias, c string) string {
 }
 
 func (s *Store) query(q string, args ...any) ([]Fact, error) {
-	rows, err := s.db.Query(q, args...)
+	return queryOn(s.db, q, args...)
+}
+
+// queryOn runs a query of facts on a *sql.DB or inside a *sql.Tx.
+func queryOn(db interface {
+	Query(string, ...any) (*sql.Rows, error)
+}, q string, args ...any) ([]Fact, error) {
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
