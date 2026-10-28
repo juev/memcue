@@ -115,6 +115,32 @@ def hermes(rec: Path) -> tuple[list[dict], list[str], str]:
     return calls, tools, answer
 
 
+def usage(rec: Path) -> dict:
+    """The provider's cost and tokens of a run: Claude Code's result event, or Hermes's usage report."""
+    stream = rec / "stream.jsonl"
+    if stream.is_file():
+        for line in stream.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if ev.get("type") == "result":
+                u = ev.get("usage") or {}
+                return {"cost_usd": ev.get("total_cost_usd"), "turns": ev.get("num_turns"),
+                        "input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
+                        "cache_read_tokens": u.get("cache_read_input_tokens")}
+    path = rec / "usage.json"
+    if path.is_file():
+        try:
+            u = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            return {}
+        return {"cost_usd": u.get("estimated_cost_usd"), "turns": u.get("api_calls"),
+                "input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
+                "cache_read_tokens": u.get("cache_read_tokens")}
+    return {}
+
+
 def main() -> int:
     runs, out = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
     out.mkdir(parents=True)  # a new directory; nothing is overwritten
@@ -132,7 +158,8 @@ def main() -> int:
         exit_code = (rec / "exit").read_text(encoding="utf-8").strip() if (rec / "exit").is_file() else "missing"
         doc = {
             "meta": {"arm": arm, "scenario": sid, "repeat": rep, "chain_from": meta.get("chain_from"),
-                     "exit": exit_code, "seconds": meta.get("seconds"), "docker_exit": meta.get("docker_exit")},
+                     "exit": exit_code, "seconds": meta.get("seconds"), "docker_exit": meta.get("docker_exit"),
+                     "image": meta.get("image"), **usage(rec)},
             "record": {"prompt": (d / "prompt.txt").read_text(encoding="utf-8"), "base_changes": changes(rec),
                        "memory_calls": calls, "tools_in_order": tools, "pages_read": pages,
                        "final_answer": answer.strip()},
