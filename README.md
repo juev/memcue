@@ -1,6 +1,6 @@
 # memcue
 
-Long-term memory for Claude Code. memcue keeps a base of short, self-contained facts in one SQLite file and works
+Long-term memory for Claude Code. memcue keeps a base of short, self-contained facts in SQLite, with a text history git can sync, and works
 through hooks:
 
 - **At session start, and again after a compaction or `/clear`** it tells the agent to search memcue before it
@@ -125,8 +125,9 @@ plugin and the binary from the same release.
    memcue install
    ```
 
-   It registers the driver in the repository's git config and adds `memory/facts.db merge=memcue diff=memcue` to
-   `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
+   It registers the driver in the repository's git config and routes the base to it: a text history gets
+   `facts/*/*.jsonl merge=memcue` in `memory/.gitattributes`, next to the text, and a base of the old format gets
+   `memory/facts.db merge=memcue diff=memcue` in the root `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
    Without a repository memcue works the same; the base is just not synced. A merge carries no vectors. A machine
    whose base is in git without the driver hears it on the session card, Hermes and DSH included, until
@@ -234,6 +235,33 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### Moving to the text history (#530)
+
+A base of the old format is one SQLite file, and git stores the whole file again at every commit: on one machine
+that came to 354 MiB of loose objects in ten days ([git-growth-530](docs/research/git-growth-530-2026-10.md)). The
+text history keeps one JSON-lines file per fact, `memory/facts/<last character of the ID>/<ID>.jsonl`, a line per
+version, so a commit stores only the facts that changed and `git log -p` shows the history of a fact. Search still
+runs on SQLite: the base becomes a cache, `facts.db` in the state directory, outside git. Every write goes to the
+cache and to the file of the fact. An open reads the directories git changed and takes their versions into the
+cache; a missing cache is built from the text. A fact changed on two machines is merged by the same driver and the
+same rules as before.
+
+The session card of a synced base of the old format suggests the move. Do it in this order:
+
+1. Install this memcue on every machine that syncs the base, and run `memcue install` there.
+2. Stop the sessions, dreams and gateways that write to the base, and sync every machine.
+3. On one machine, run `memcue migrate -text`. It writes the text next to the file (`facts.db` becomes `facts/`),
+   copies the base into the cache, removes the file and routes the text to the driver.
+4. Commit `memory/` (the text, `memory/.gitattributes` and the removal of `facts.db`) and push.
+5. Pull on the other machines. A pull removes their `facts.db`, and the next open builds the cache from the text; no
+   command is needed.
+
+`MEMCUE_FACTS` and the `facts` option of the plugins may keep naming `facts.db`: once the `facts` directory exists
+next to it, memcue opens the text. A base outside the default keeps its dream schedule and logs: its state directory
+moves to the key of the new path. A second `migrate -text` is safe; if a `facts.db` is left next to the text, it is
+merged into the text and removed. To go back, check out the commit before the move on every machine and install the
+older memcue.
 
 ### 0.21.2: a shelf named beside `all`, `correct ID -- TEXT`, no doubled versions after a merge (#532, #533, #540, #536)
 
@@ -893,7 +921,7 @@ uses.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts.db`, else `~/.claude/memory/facts.db` |
+| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history-530)), else `$CLAUDE_CONFIG_DIR/memory/facts.db`; `~/.claude` without `CLAUDE_CONFIG_DIR` |
 | `MEMCUE_STATE_DIR` | state directory for logs, locks and the dream schedule; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
 | `MEMCUE_MODEL` | model of `migrate`, the queries of `add` and `dream -run` | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
@@ -993,7 +1021,8 @@ State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other 
 overrides the whole path. Hermes keeps its mirror file under `$HERMES_HOME/memcue`; the binary's logs, locks and dream
 schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
 (or `~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH
-unless `facts` is configured. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the
+unless `facts` is configured; each becomes a `facts` directory after `memcue migrate -text`, and the cache of a text
+history is `facts.db` in the state directory. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the
 same file.
 
 ## DeepSeek Harness

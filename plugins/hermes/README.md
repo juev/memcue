@@ -138,6 +138,10 @@ Claude Code. A leading `~/` or `$HOME/` is expanded; the path must be absolute, 
 than one per process working directory. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
 repository that holds it. The binary's logs, locks and dream schedule follow the base: the default Hermes base gets
 its own `$XDG_STATE_HOME/memcue/<hash>` directory, so it does not share a dream clock with a Claude Code/DSH base.
+After `memcue migrate -text` the base is the text history `$HERMES_HOME/memcue/facts`, which `hermes backup` still
+covers, and its SQLite cache sits in that state directory. The provider opens the text from the next start and keeps
+the mirror of the built-in memory, since `facts.db` and `facts` are one base (see the main README, "Moving to the text
+history"). A Hermes base outside git does not need the move.
 The provider's own state, the `written.json` mirror map, names the base in a `base` file: changing `facts` drops that
 state for the old base and starts the new one fresh, with a warning in the log. The `sessions/` and `pending/` an
 older provider kept for its extraction are removed at start.
