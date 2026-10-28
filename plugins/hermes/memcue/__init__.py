@@ -229,6 +229,11 @@ def _on(v: Any) -> bool:
     return v is True or (isinstance(v, str) and v.strip().lower() in ("1", "true", "yes", "on"))
 
 
+def _names_shelf(places: str) -> bool:
+    """Whether an in value names a shelf: shelf, or shelf:SLUG, among its comma-separated places."""
+    return any(p.strip() == "shelf" or p.strip().startswith("shelf:") for p in places.split(","))
+
+
 def _expand_path(value: str) -> str:
     """~ and $HOME in a config value: neither the gateway nor a launch environment runs a shell over config.yaml, and
     a literal ~ would make memcue create a directory named "~" in the process working directory."""
@@ -286,7 +291,10 @@ SEARCH_SCHEMA = _schema(
     "service or repository, and before diagnosing an unexpected error or result, with a short query naming the "
     "system and the problem; check what comes back against the current state. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
     "the whole base — a chat is not about one repository — except the shelf, and leaves out expired facts; the "
-    "optional parameters narrow or widen that.",
+    "optional parameters narrow or widen that. The answer may carry a hint: a note from memcue about this search, "
+    "not a stored fact. It says what the search left out and how to get it: facts below the score floor (on a thin "
+    "answer, and on a shelf search whatever the number of facts) or the other language; a fact marked "
+    "below_floor: true scored under the floor and came only because nothing above it did.",
     {"query": "Words of the fact.",
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
               "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
@@ -670,8 +678,8 @@ class MemcueMemoryProvider(MemoryProvider):
         held = [f for f in more if isinstance(f, dict) and f.get("id") not in known]
         if not held:
             return [], ""
-        return held, (f"{len(held)} more facts hold the words but sit below the score floor; run the same search with "
-                      f"min_score 0 to read them (limit still caps the answer).")
+        return held, (f"{len(held)} more facts hold the words but sit below the score floor and are not in this "
+                      f"answer; run the same search with min_score 0 to read them (limit still caps the answer).")
 
     def _remember_found(self, session: str, facts: list[Any]) -> None:
         """Keep the identifiers of the facts a search returned, so the reply of this turn can be judged by them. Only
@@ -913,7 +921,11 @@ class MemcueMemoryProvider(MemoryProvider):
                     result = {"facts": facts}
                     if _CJK.search(arg("query")) and _CJK_HINT not in hints:  # an older binary names no hint
                         hints.append(_CJK_HINT)
-                    if controls_ok and len(facts) <= 1 and arg("min_score") not in ("0", "0.0"):
+                    # A shelf search is told of its floor whatever the count: a finding the agent stored can score
+                    # under the best one and go unsaid behind two others (#546). Fewer facts than limit means the
+                    # floor ended the answer, so what the wide call adds is below it, not past the limit.
+                    shelf = _names_shelf(arg("in")) and len(facts) < limit
+                    if controls_ok and (len(facts) <= 1 or shelf) and arg("min_score") not in ("0", "0.0"):
                         held, floor_hint = self._below_floor(cmd, controls, facts, arg("query"))
                         if floor_hint:
                             hints.append(floor_hint)
