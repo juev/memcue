@@ -4,7 +4,10 @@
 # is never written under /stand, whose records are kept. Records go to /stand/rec.
 set -eu
 arm=$1
-export HOME=/tmp/home HERMES_HOME=/tmp/hermes MEMCUE_STATE_DIR=/stand/state STAND_WEB_LOG=/stand/rec/web.log
+# The image sets HERMES_WRITE_SAFE_ROOT=/opt/data, which denies every file write in the workspace; the first grid ran
+# with it, and the runs that tried to write were redone with the workspace as the safe root.
+export HOME=/tmp/home HERMES_HOME=/tmp/hermes MEMCUE_STATE_DIR=/stand/state STAND_WEB_LOG=/stand/rec/web.log \
+	HERMES_WRITE_SAFE_ROOT=/stand/ws
 mkdir -p "$HOME" "$HERMES_HOME/plugins" /stand/rec /stand/base /stand/state
 cp /opt/stand/hermes-config.yaml "$HERMES_HOME/config.yaml"
 cp -R "/opt/hermes-plugin-$arm" "$HERMES_HOME/plugins/memcue"
