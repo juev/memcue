@@ -836,6 +836,64 @@ class ProviderTest(unittest.TestCase):
                 self.assertEqual(second[second.index("-n") + 1], wide_n)
                 self.assertEqual(second[second.index("-min-score") + 1], "0")
 
+    def test_a_shelf_search_names_its_floor_whatever_the_count(self):
+        """A shelf fact under the floor went unsaid behind two others (#546): a search that names a shelf is told of
+        the facts below its floor however many came back, an ordinary one only when one fact or none did, and an answer
+        the limit ended gets no such hint, since what lies past it is not below the floor."""
+        served = '{"id":"a","content":"x"},{"id":"b","content":"y"}'
+        cases = (({"in": "shelf:research"}, True), ({"in": "all,shelf"}, True), ({"in": "all"}, False),
+                 ({"in": "shelf:research", "limit": "2"}, False))
+        for extra, hinted in cases:
+            with self.subTest(**extra):
+                tag = "-".join(f"{k}{v}" for k, v in extra.items()).replace(":", "").replace(",", "")
+                count = Path(self.home) / f"shelf-count-{tag}"
+                stub = Path(self.home) / f"shelf-memcue-{tag}"
+                stub.write_text("#!/bin/sh\n"
+                                "case \"$1\" in\n"
+                                "  version) printf '{\"version\":\"dev\"}\\n' ;;\n"
+                                f"  search) echo x >> {shlex.quote(str(count))}\n"
+                                f"    if [ \"$(wc -l < {shlex.quote(str(count))})\" -eq 1 ]; then printf '[{served}]\\n'\n"
+                                f"    else printf '[{served},{{\"id\":\"c\",\"content\":\"z\"}}]\\n'; fi ;;\n"
+                                "esac\nexit 0\n", encoding="utf-8")
+                stub.chmod(0o755)
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
+                p.initialize("s-shelf", hermes_home=self.home, agent_context="primary")
+                found = json.loads(p.handle_tool_call("memcue_search", dict(query="quarrel", **extra)))
+                self.assertEqual([f["id"] for f in found["facts"]], ["a", "b"])
+                calls = len(count.read_text(encoding="utf-8").split())
+                if hinted:
+                    self.assertTrue(found["hint"].startswith("1 more facts hold the words but sit below the score "
+                                                             "floor and are not in this answer"), found["hint"])
+                    self.assertIn("min_score 0", found["hint"])
+                    self.assertEqual(calls, 2)
+                else:
+                    self.assertNotIn("hint", found)
+                    self.assertEqual(calls, 1)  # the ordinary answer pays for no second search
+
+    def test_a_shelf_fact_below_the_floor_is_named_behind_two_others(self):
+        """The case of #546 on the real binary: two shelf facts pass the floor, the third, that the project is
+        archived, sits under it, and the hint says one more fact is there."""
+        for content, keywords in (("Quarrel queue library keeps jobs in Postgres, MIT license.", "quarrel,queue,postgres"),
+                                  ("Quarrel queue library needs Postgres 14 or newer.", "quarrel,queue,postgres"),
+                                  ("Quarrel: the project was archived by its author in 2025.", "quarrel")):
+            json.loads(self.p.handle_tool_call("memcue_add", {"content": content, "keywords": keywords,
+                                                              "shelf": "research"}))
+        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
+                                                                     "in": "shelf:research"}))
+        self.assertEqual(len(found["facts"]), 2)
+        self.assertTrue(found.get("hint", "").startswith("1 more facts hold the words but sit below the score floor"),
+                        found)
+        wide = json.loads(self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
+                                                                    "in": "shelf:research", "min_score": "0"}))
+        self.assertIn("archived", " ".join(f["content"] for f in wide["facts"]))
+
+    def test_the_search_description_says_what_a_hint_is(self):
+        """The model reads a hint as a note about the search, not as a fact, and knows below_floor (#546)."""
+        search = memcue_provider.SEARCH_SCHEMA["description"]
+        self.assertIn("not a stored fact", search)
+        self.assertIn("below_floor: true", search)
+        self.assertIn("shelf search whatever the number of facts", search)
+
     def test_an_empty_answer_hands_over_the_first_facts_below_the_floor(self):
         """A count leaves the model nothing to read: when the floor leaves no fact and the wide arm has some, the first
         ones come with the answer, marked, and the hint says what they are (#439)."""
