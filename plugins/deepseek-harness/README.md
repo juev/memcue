@@ -84,7 +84,9 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
    ```
 
    `binary` is worth setting explicitly: an application launched from Finder may not have `~/.local/bin` on `PATH`.
-   `facts` may be omitted when the base is memcue's default (`~/.claude/memory/facts.db`).
+   `facts` may be omitted when the base is memcue's default (`~/.claude/memory/facts`, or `facts.db` before
+   `memcue migrate -text`). A path to `facts.db` keeps working after the move: memcue opens the `facts` directory next
+   to it.
 
 ## Model of `add`
 
