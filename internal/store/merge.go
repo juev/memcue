@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"slices"
@@ -48,57 +49,86 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 	for id, tv := range t {
-		ov := o[id]
-		common := 0
-		for common < len(ov) && common < len(tv) && same(ov[common], tv[common]) {
-			common++
-		}
-		oTail := ov[common:]
-		// A version both tails hold is one write that the two sides number differently: a side that has not pulled
-		// an earlier merge keeps it where it wrote it, the merged side after the version merged before it (#540).
-		var tTail []Fact
-		for _, f := range tv[common:] {
-			if !holds(oTail, f) {
-				tTail = append(tTail, f)
-			}
-		}
-		if len(tTail) == 0 {
+		h := MergeHistories(o[id], tv)
+		if h.Added == 0 {
 			continue
 		}
-		st.Added += len(tTail)
-		if len(oTail) > 0 {
+		st.Added += h.Added
+		if h.Diverged {
 			st.Diverged++
 		}
-		tail := append(append([]Fact{}, oTail...), tTail...)
-		sort.SliceStable(tail, func(i, j int) bool {
-			a, b := tail[i], tail[j]
-			if !a.Created.Equal(b.Created) {
-				return a.Created.Before(b.Created)
-			}
-			if a.Author != b.Author {
-				return a.Author < b.Author
-			}
-			return a.Content < b.Content
-		})
-		base := ""
-		if common > 0 {
-			base = ov[common-1].Content
-		}
-		tail = correctionLast(tail, base, oTail, tv[common:])
-		if _, err := tx.Exec(`DELETE FROM facts WHERE id = ? AND version > ?`, id, common); err != nil {
+		if err := replaceTail(tx, id, h); err != nil {
 			return st, err
-		}
-		for i, f := range tail {
-			f.Version = common + i + 1
-			if err := insert(tx, f); err != nil {
-				return st, err
-			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return st, err
 	}
 	return st, s.Rebuild()
+}
+
+// MergedHistory is the merge of two histories of one fact.
+type MergedHistory struct {
+	Versions []Fact // the merged history, numbered from 1
+	Common   int    // how many leading versions both sides shared; Versions after them are new or renumbered
+	Added    int    // versions of the other side this one lacked; 0 leaves this side as it is
+	Diverged bool   // both sides added versions since they last agreed
+}
+
+// MergeHistories merges the versions of one fact as this side (ours) and the other side (theirs) hold them, each in
+// version order: the rule of Merge, for the base and for the text history alike.
+func MergeHistories(ours, theirs []Fact) MergedHistory {
+	common := 0
+	for common < len(ours) && common < len(theirs) && same(ours[common], theirs[common]) {
+		common++
+	}
+	oTail := ours[common:]
+	// A version both tails hold is one write that the two sides number differently: a side that has not pulled an
+	// earlier merge keeps it where it wrote it, the merged side after the version merged before it (#540).
+	var tTail []Fact
+	for _, f := range theirs[common:] {
+		if !holds(oTail, f) {
+			tTail = append(tTail, f)
+		}
+	}
+	h := MergedHistory{Versions: ours, Common: common, Added: len(tTail), Diverged: len(oTail) > 0 && len(tTail) > 0}
+	if len(tTail) == 0 {
+		return h
+	}
+	tail := append(append([]Fact{}, oTail...), tTail...)
+	sort.SliceStable(tail, func(i, j int) bool {
+		a, b := tail[i], tail[j]
+		if !a.Created.Equal(b.Created) {
+			return a.Created.Before(b.Created)
+		}
+		if a.Author != b.Author {
+			return a.Author < b.Author
+		}
+		return a.Content < b.Content
+	})
+	base := ""
+	if common > 0 {
+		base = ours[common-1].Content
+	}
+	tail = correctionLast(tail, base, oTail, theirs[common:])
+	h.Versions = append(append([]Fact{}, ours[:common]...), tail...)
+	for i := common; i < len(h.Versions); i++ {
+		h.Versions[i].Version = i + 1
+	}
+	return h
+}
+
+// replaceTail rewrites the versions of id after the common ones with the merged ones.
+func replaceTail(tx *sql.Tx, id string, h MergedHistory) error {
+	if _, err := tx.Exec(`DELETE FROM facts WHERE id = ? AND version > ?`, id, h.Common); err != nil {
+		return err
+	}
+	for _, f := range h.Versions[h.Common:] {
+		if err := insert(tx, f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // correctionLast puts after a retirement every correction its writer never saw, so the fact stays current with the
