@@ -224,8 +224,8 @@ learnt in the session's project comes before a global one and the rest.
 **The shelf** holds what a session read from the outside world: another system's limits, versions and terms, wanted
 only when the same subject comes up again (#433). Such a fact is stored in the same base under the scope
 `shelf:<slug>`, and in practice there is one shelf, `shelf:research`. The agent puts a fact there itself:
-`memcue add -shelf research` (the `shelf` parameter of `memcue_add` in Hermes) is `-scope shelf:research`; a slug is
-`[a-z0-9][a-z0-9-]{0,63}`. Until #494 the extraction shelved a fact by the tool its quote came from.
+`memcue add -shelf research` (the `shelf` parameter of `memcue_add` in Hermes and DSH) is `-scope shelf:research`;
+a slug is `[a-z0-9][a-z0-9-]{0,63}`. Until #494 the extraction shelved a fact by the tool its quote came from.
 
 A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf` for every shelf. Every other place
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`

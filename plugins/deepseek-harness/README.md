@@ -16,7 +16,8 @@ fact base:
   source that reaches the session card; `tool` is what a tool's output showed, `agent` anything else, and memcue
   refuses installation state from either (#475).
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
-- **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact),
+- **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact;
+  with `shelf`, a finding read from outside sources that only a search naming the shelf returns, #545),
   `memcue_correct` (a new version of a stored fact, with optional `keywords` and `expires`) and `memcue_retire` (stop
   finding a fact; the history keeps it). `memcue_search` runs `memcue search` with the session's working directory
   and id, so facts of this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the
