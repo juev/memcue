@@ -43,12 +43,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.21.2`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
-or older, so stop every older memcue and back the base up before the first open. The three plugin manifests carry the
+This release is `0.22.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
+by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.22.0 | 6 | 0.22.0 | 0.22.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.22.0 (`hermes-agent` 0.15.2) |
 | 0.21.2 | 6 | 0.21.2 | 0.21.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.2 (`hermes-agent` 0.15.2) |
 | 0.21.1 | 6 | 0.21.1 | 0.21.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.1 (`hermes-agent` 0.15.2) |
 | 0.21.0 | 6 | 0.21.0 | 0.21.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.21.0 (`hermes-agent` 0.15.2) |
@@ -236,7 +238,20 @@ included (#453); the Hermes and DSH plugins read both it and the bare array of a
 
 ## Upgrade
 
-### Moving to the text history (#530)
+### 0.22.0: the text history, a correction beats a parallel retirement (#530, #552, #544, #549)
+
+- **The base is kept in git as text** (#530, #552). See the move below. Until `migrate -text` runs, memcue keeps
+  working with `facts.db` as before. A cache built from the text is written in one transaction: on a copy of the Mac
+  base a build from scratch takes 1.6 s.
+- **A correction wins over a retirement made without knowing it** (#544, #549). When two machines merge, a fact
+  corrected on one and retired on the other stays active with the corrected text, whatever the clocks say. The rule
+  judges by the versions each side had seen, so it holds when a side merges the result of an earlier merge. A change
+  of keywords alone does not bring a retired fact back.
+- No schema changed: the schema stays 6. New command: `memcue migrate -text`. From 0.21.x, replace the binary and the
+  plugins on every machine, then move. From 0.20.0 or older, first follow
+  [0.21.0](#0210-no-fact-waits-for-approval-schema-6-514-456-521-522).
+
+#### Moving to the text history
 
 A base of the old format is one SQLite file, and git stores the whole file again at every commit: on one machine
 that came to 354 MiB of loose objects in ten days ([git-growth-530](docs/research/git-growth-530-2026-10.md)). The
@@ -921,7 +936,7 @@ uses.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history-530)), else `$CLAUDE_CONFIG_DIR/memory/facts.db`; `~/.claude` without `CLAUDE_CONFIG_DIR` |
+| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history)), else `$CLAUDE_CONFIG_DIR/memory/facts.db`; `~/.claude` without `CLAUDE_CONFIG_DIR` |
 | `MEMCUE_STATE_DIR` | state directory for logs, locks and the dream schedule; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
 | `MEMCUE_MODEL` | model of `migrate`, the queries of `add` and `dream -run` | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
