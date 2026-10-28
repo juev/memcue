@@ -1,0 +1,7 @@
+[store]
+data_dir = "/mnt/shared/ingest"
+max_value = "6MiB"
+
+[queue]
+url = "amqp://intake.int.example:5672/ingest"
+prefetch = 32

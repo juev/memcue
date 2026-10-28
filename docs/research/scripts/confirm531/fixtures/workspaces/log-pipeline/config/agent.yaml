@@ -1,0 +1,11 @@
+# Marrowlog agent 2.4
+inputs:
+  - type: file
+    path: /var/log/app/*.json
+outputs:
+  - type: collector
+    endpoint: collector.int.example:6510
+    tls: false
+    batch_lines: 500
+buffer:
+  disk: false

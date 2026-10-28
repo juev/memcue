@@ -1,0 +1,216 @@
+[
+ {
+  "content": "Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.",
+  "keywords": [
+   "commit message",
+   "ticket prefix",
+   "branch name",
+   "english"
+  ],
+  "scope": "global",
+  "kind": "rule"
+ },
+ {
+  "content": "Do not restart services on production hosts without announcing it in the #ops channel first.",
+  "keywords": [
+   "restart",
+   "production",
+   "announce",
+   "ops channel"
+  ],
+  "scope": "global",
+  "kind": "rule"
+ },
+ {
+  "content": "The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.",
+  "keywords": [
+   "tallis",
+   "backup",
+   "cron",
+   "retention"
+  ],
+  "scope": "host:tallis",
+  "kind": "environment"
+ },
+ {
+  "content": "The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.",
+  "keywords": [
+   "ledgerdb",
+   "database",
+   "primary",
+   "replica",
+   "port"
+  ],
+  "scope": "service:ledgerdb",
+  "kind": "environment"
+ },
+ {
+  "content": "storefront stores prices as integer cents, never as floats, so that totals do not drift.",
+  "keywords": [
+   "storefront",
+   "prices",
+   "cents",
+   "float"
+  ],
+  "scope": "repo:example.com/acme/storefront",
+  "kind": "decision"
+ },
+ {
+  "content": "On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.",
+  "keywords": [
+   "corvo",
+   "make test",
+   "TZ",
+   "timezone",
+   "date tests"
+  ],
+  "scope": "host:corvo",
+  "kind": "pitfall"
+ },
+ {
+  "content": "The paygate sandbox is https://sandbox.paygate.example; its API keys are in the vault at secret/paygate/sandbox.",
+  "keywords": [
+   "paygate",
+   "sandbox",
+   "api key",
+   "vault"
+  ],
+  "scope": "service:paygate",
+  "kind": "environment"
+ },
+ {
+  "content": "mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.",
+  "keywords": [
+   "mobile-app",
+   "ios build",
+   "asset catalog",
+   "space"
+  ],
+  "scope": "repo:example.com/acme/mobile-app",
+  "kind": "pitfall"
+ },
+ {
+  "content": "Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.",
+  "keywords": [
+   "ferrocache",
+   "maxmemory",
+   "sizing",
+   "ram",
+   "replication"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "docs.ferrocache.example 2026-06-02"
+ },
+ {
+  "content": "Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.",
+  "keywords": [
+   "thistlewire",
+   "streaming",
+   "flow control",
+   "max_buffered_messages",
+   "slow client"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "thistlewire.example 2026-07-11"
+ },
+ {
+  "content": "Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.",
+  "keywords": [
+   "corvane",
+   "multipart",
+   "part size",
+   "parts limit",
+   "upload"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "docs.corvane.example 2026-05-30"
+ },
+ {
+  "content": "Wrenfold 1.4 (wrenfold.example/docs/syntax, read 2026-03-15): a .wf file cannot include or import another file; every configuration file must be self-contained, so shared settings are duplicated.",
+  "keywords": [
+   "wrenfold",
+   "include",
+   "import",
+   "config file",
+   ".wf"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "wrenfold.example 2026-03-15"
+ },
+ {
+  "content": "Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.",
+  "keywords": [
+   "pardalo",
+   "retry",
+   "post",
+   "idempotent",
+   "http client"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "pardalo.example 2026-02-08"
+ },
+ {
+  "content": "Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.",
+  "keywords": [
+   "saltmarsh",
+   "ci",
+   "timeout",
+   "job limit",
+   "hosted runner"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "docs.saltmarsh.example 2026-08-21"
+ },
+ {
+  "content": "The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.",
+  "keywords": [
+   "brindle",
+   "ferrocache",
+   "staging",
+   "port",
+   "config"
+  ],
+  "scope": "host:brindle",
+  "kind": "environment"
+ },
+ {
+  "content": "The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.",
+  "keywords": [
+   "stor-02",
+   "corvane",
+   "gateway",
+   "logs"
+  ],
+  "scope": "host:stor-02",
+  "kind": "environment"
+ },
+ {
+  "content": "Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.",
+  "keywords": [
+   "corvane",
+   "ledger-archive",
+   "delete",
+   "bucket"
+  ],
+  "scope": "global",
+  "kind": "rule"
+ },
+ {
+  "content": "nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.",
+  "keywords": [
+   "nightly-export",
+   "corvane",
+   "upload",
+   "credentials",
+   "bucket"
+  ],
+  "scope": "repo:example.com/acme/nightly-export",
+  "kind": "environment"
+ }
+]

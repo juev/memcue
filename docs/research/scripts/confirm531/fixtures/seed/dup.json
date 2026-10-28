@@ -1,0 +1,105 @@
+[
+ {
+  "content": "Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.",
+  "keywords": [
+   "commit message",
+   "ticket prefix",
+   "branch name",
+   "english"
+  ],
+  "scope": "global",
+  "kind": "rule"
+ },
+ {
+  "content": "Do not restart services on production hosts without announcing it in the #ops channel first.",
+  "keywords": [
+   "restart",
+   "production",
+   "announce",
+   "ops channel"
+  ],
+  "scope": "global",
+  "kind": "rule"
+ },
+ {
+  "content": "The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.",
+  "keywords": [
+   "tallis",
+   "backup",
+   "cron",
+   "retention"
+  ],
+  "scope": "host:tallis",
+  "kind": "environment"
+ },
+ {
+  "content": "The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.",
+  "keywords": [
+   "ledgerdb",
+   "database",
+   "primary",
+   "replica",
+   "port"
+  ],
+  "scope": "service:ledgerdb",
+  "kind": "environment"
+ },
+ {
+  "content": "storefront stores prices as integer cents, never as floats, so that totals do not drift.",
+  "keywords": [
+   "storefront",
+   "prices",
+   "cents",
+   "float"
+  ],
+  "scope": "repo:example.com/acme/storefront",
+  "kind": "decision"
+ },
+ {
+  "content": "On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.",
+  "keywords": [
+   "corvo",
+   "make test",
+   "TZ",
+   "timezone",
+   "date tests"
+  ],
+  "scope": "host:corvo",
+  "kind": "pitfall"
+ },
+ {
+  "content": "The paygate sandbox is https://sandbox.paygate.example; its API keys are in the vault at secret/paygate/sandbox.",
+  "keywords": [
+   "paygate",
+   "sandbox",
+   "api key",
+   "vault"
+  ],
+  "scope": "service:paygate",
+  "kind": "environment"
+ },
+ {
+  "content": "mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.",
+  "keywords": [
+   "mobile-app",
+   "ios build",
+   "asset catalog",
+   "space"
+  ],
+  "scope": "repo:example.com/acme/mobile-app",
+  "kind": "pitfall"
+ },
+ {
+  "content": "Quillon 1.8 rate limiter (docs.quillon.example/config, read 2026-08-12): the default `memory` backend keeps counters per process, so an application with N worker processes lets a key make up to N times the configured rate; a limit shared by all processes needs backend=\"tally\" pointing at a tallyd server.",
+  "keywords": [
+   "quillon",
+   "rate limit",
+   "backend",
+   "worker processes",
+   "tallyd"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "docs.quillon.example 2026-08-12"
+ }
+]

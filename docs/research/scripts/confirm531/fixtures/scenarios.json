@@ -1,0 +1,156 @@
+{
+ "scenarios": [
+  {
+   "id": "S01",
+   "kind": "recall",
+   "prompt": "I want config/app.wf split into a shared base plus small per-environment files (staging, prod) that pull the base in. Does the config parser this repo uses allow one file to pull in another? Tell me how it would work; don't restructure anything yet.",
+   "workspace": "edge-config",
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S02",
+   "kind": "capture",
+   "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+   "workspace": "ingest-worker",
+   "seed": "base",
+   "chain_from": null
+  },
+  {
+   "id": "S03",
+   "kind": "recall",
+   "prompt": "How many lines contain ERROR across all .log files under logs/, subdirectories included? Give me the number and the command you used.",
+   "workspace": "log-sample",
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S04",
+   "kind": "capture",
+   "prompt": "Our new product photos are up to 64 megapixels. resize/pipeline.py downscales everything to 40 MP before sending it to Tamberline. Look at their changelog at https://tamberline.example/changelog and tell me whether we can drop that step.",
+   "workspace": "catalog-images",
+   "seed": "stale",
+   "chain_from": null
+  },
+  {
+   "id": "S05",
+   "kind": "recall",
+   "prompt": "Product wants a toggle flipped in the Nimbrel console to take effect in our running services within 5 seconds. Is that achievable, and what would it take?",
+   "workspace": null,
+   "seed": "flags",
+   "chain_from": null
+  },
+  {
+   "id": "S06",
+   "kind": "capture",
+   "prompt": "Please run the September 2026 report (scripts/monthly.sh 2026-09) and tell me the total. Don't change the script itself.",
+   "workspace": "month-report",
+   "seed": "base",
+   "chain_from": null
+  },
+  {
+   "id": "S07",
+   "kind": "recall",
+   "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+   "workspace": null,
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S08",
+   "kind": "capture",
+   "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+   "workspace": "log-pipeline",
+   "seed": "base",
+   "chain_from": null
+  },
+  {
+   "id": "S09",
+   "kind": "recall",
+   "prompt": "The nightly tarball has grown to about 60 GB. scripts/upload.sh still sends it in 8 MiB pieces. Is that going to be a problem, and what should I change?",
+   "workspace": "nightly-export",
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S10",
+   "kind": "capture",
+   "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+   "workspace": "invoice-jobs",
+   "seed": "base",
+   "chain_from": null
+  },
+  {
+   "id": "S11",
+   "kind": "recall",
+   "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+   "workspace": null,
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S12",
+   "kind": "capture",
+   "prompt": "Add km_to_miles to units/convert.py, matching the style of the existing functions (type hints, one-line docstring), and use the exact inverse of the factor miles_to_km uses.",
+   "workspace": "units",
+   "seed": "base",
+   "chain_from": null
+  },
+  {
+   "id": "S13",
+   "kind": "recall",
+   "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+   "workspace": "ingest-worker",
+   "seed": null,
+   "chain_from": "S02"
+  },
+  {
+   "id": "S14",
+   "kind": "recall",
+   "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+   "workspace": "billing-client",
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S15",
+   "kind": "capture",
+   "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+   "workspace": "api-gateway",
+   "seed": "dup",
+   "chain_from": null
+  },
+  {
+   "id": "S16",
+   "kind": "recall",
+   "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+   "workspace": null,
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S17",
+   "kind": "recall",
+   "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+   "workspace": "price-feed",
+   "seed": "research",
+   "chain_from": null
+  },
+  {
+   "id": "S18",
+   "kind": "recall",
+   "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+   "workspace": "log-pipeline",
+   "seed": null,
+   "chain_from": "S08"
+  },
+  {
+   "id": "S19",
+   "kind": "recall",
+   "prompt": "Which port does our staging cache node listen on, and where is its config file? I need to change its eviction settings.",
+   "workspace": null,
+   "seed": "research",
+   "chain_from": null
+  }
+ ]
+}

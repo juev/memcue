@@ -1,0 +1,37 @@
+[
+ {
+  "content": "Nimbrel server SDK 4.x (docs.nimbrel.example/sdk/updates, read 2026-04-20): by default the SDK polls for flag rules every 30 seconds and the polling interval cannot be set below 10 seconds; push updates need stream: true in the client options and are available only on the Team plan or above.",
+  "keywords": [
+   "nimbrel",
+   "feature flag",
+   "polling",
+   "stream",
+   "propagation"
+  ],
+  "scope": "shelf:research",
+  "kind": "environment",
+  "origin": "docs.nimbrel.example 2026-04-20"
+ },
+ {
+  "content": "The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.",
+  "keywords": [
+   "tallis",
+   "backup",
+   "cron",
+   "retention"
+  ],
+  "scope": "host:tallis",
+  "kind": "environment"
+ },
+ {
+  "content": "mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.",
+  "keywords": [
+   "mobile-app",
+   "ios build",
+   "asset catalog",
+   "space"
+  ],
+  "scope": "repo:example.com/acme/mobile-app",
+  "kind": "pitfall"
+ }
+]
