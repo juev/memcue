@@ -5,9 +5,9 @@
     python3 -I run.py cost
 
 ROOT (default ~/stand531) holds fixtures/ (a copy of the repository's), secrets/claude.env and secrets/deepseek.env
-(mode 600, written by the owner), and runs/<arm>/<scenario>/r<n>/. A run directory is created once and never deleted
-or overwritten: a run whose directory exists is skipped when finished and refused when not, so a rerun is a new
-ROOT, not a cleanup. Each run is one container: no capabilities, no new privileges, limits on memory, CPU and
+(mode 600, written by the owner), and runs/<arm>/<scenario>/r<n>/. A run directory is never deleted
+or overwritten: a finished run is skipped, and an unfinished one is moved aside to r<n>.failed-<k> and run again;
+a full rerun is a new ROOT. Each run is one container: no capabilities, no new privileges, limits on memory, CPU and
 processes, its own network, the run directory at /stand and the fixtures read-only; nothing else of the host.
 """
 
@@ -53,7 +53,12 @@ def git(ws: Path, *args: str) -> None:
 def prepare(arm: str, s: dict, repeat: int) -> Path:
     d = run_dir(arm, s["id"], repeat)
     d.parent.mkdir(parents=True, exist_ok=True)
-    d.mkdir()  # FileExistsError for a run that exists: never reuse a directory
+    if d.exists():  # a run that did not finish is moved aside, not deleted, and started again
+        k = 1
+        while d.with_name(f"{d.name}.failed-{k}").exists():
+            k += 1
+        d.rename(d.with_name(f"{d.name}.failed-{k}"))
+    d.mkdir()
     ws = d / "ws"
     if s["workspace"]:
         shutil.copytree(ROOT / "fixtures/workspaces" / s["workspace"], ws)
@@ -133,7 +138,7 @@ def run_cost(d: Path) -> float:
 
 def total_cost() -> float:
     runs = ROOT / "runs"
-    return sum(run_cost(d) for d in runs.glob("*/*/r*")) if runs.is_dir() else 0.0
+    return sum(run_cost(d) for d in runs.glob("*/*/r*") if d.name[1:].isdigit()) if runs.is_dir() else 0.0
 
 
 def grid(arms: list[str], repeats: int, jobs: int, budget: float, only: set[str]) -> int:
