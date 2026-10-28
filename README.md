@@ -691,6 +691,7 @@ memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo databa
 memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
+memcue correct ID -- "…"             # a lone -- after the ID is a separator, as in add; -- -- keeps a leading "--"
 memcue retire ID                     # no longer recalled; history keeps it
 memcue reopen ID                     # undo a retire: the fact is searchable again
 memcue facts                         # every active fact, with expires= when it has one

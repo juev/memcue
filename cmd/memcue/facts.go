@@ -356,13 +356,19 @@ func runCorrect(args []string, out io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() < 2 {
-		return errors.New("usage: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] [-force] ID TEXT")
+	rest := fs.Args()
+	if len(rest) > 1 && rest[1] == "--" {
+		// "ID -- TEXT", the separator add takes before its text (#533): the flag parser stops at the ID, so the "--"
+		// would be stored as the first word. A text that starts with the word "--" is written "ID -- -- TEXT".
+		rest = append([]string{rest[0]}, rest[2:]...)
+	}
+	if len(rest) < 2 {
+		return errors.New("usage: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] [-force] ID [--] TEXT")
 	}
 	if *noExpires && *expires != "" {
 		return errors.New("correct: -expires and -no-expires cannot be combined")
 	}
-	content := strings.Join(fs.Args()[1:], " ")
+	content := strings.Join(rest[1:], " ")
 	return withStore(func(s *store.Store) error {
 		kw := splitKeywords(*keywords)
 		if kw == nil {
