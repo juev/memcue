@@ -48,6 +48,7 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		return st, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var changed []string
 	for id, tv := range t {
 		h := MergeHistories(o[id], tv)
 		if h.Added == 0 {
@@ -60,8 +61,12 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 		if err := replaceTail(tx, id, h); err != nil {
 			return st, err
 		}
+		changed = append(changed, id)
 	}
 	if err := tx.Commit(); err != nil {
+		return st, err
+	}
+	if err := s.textRewritten(changed); err != nil {
 		return st, err
 	}
 	return st, s.Rebuild()
