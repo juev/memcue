@@ -68,7 +68,7 @@ def main() -> None:
         if method == "initialize":
             version = (msg.get("params") or {}).get("protocolVersion") or "2025-06-18"
             reply(msg_id, {"protocolVersion": version, "capabilities": {"tools": {}},
-                           "serverInfo": {"name": "web", "version": "1.0"}})
+                           "serverInfo": {"name": "pages", "version": "1.0"}})
         elif method == "tools/list":
             reply(msg_id, {"tools": [TOOL]})
         elif method == "tools/call":
