@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6c5300f153b934d5ba1a98e50ff97f7504a27590fd651937945c0a598e2b4e7f",
+ "cost_usd": 0.0455,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It says it found no information on Quorvel's limit and suggests checking the docs, the broker config or a test publish, but it also adds a generic remark that many buses cap messages at about 1 MB, which matches the partial_if criterion of a hedged guess about typical brokers."
+ }
+}

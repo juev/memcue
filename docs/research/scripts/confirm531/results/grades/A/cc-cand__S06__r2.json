@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "1efb80ecb314b1ef35b856e8c5f326843cb04cf6630ca26154093d8e2c65066b",
+ "cost_usd": 0.0263,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the total 5437.50, explains that the script failed because out/ did not exist (likely git-ignored), and says creating out/ fixed it without editing the script."
+ }
+}

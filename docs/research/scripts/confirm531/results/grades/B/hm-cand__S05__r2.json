@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "e66600e1d7254279df9fd3d1d8a5af6d19099db2439db78543230b8f1d1f0d3d",
+ "cost_usd": 0.0143,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says 5 s can't be reached with the current polling setup. It gives the 30 s default poll and the 10 s floor, and says push updates need stream: true and the Team plan or above. It cites the Nimbrel SDK 4.x docs read 2026-04-20 and says to check the SDK version in use. Its extra advice (latency spread, startup-time flag reads, a webhook fallback) is labelled as reasoning or options, not as Nimbrel facts."
+ }
+}

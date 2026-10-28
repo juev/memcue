@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "f367c39d4983e5e1122ba16be311982b34fd399b96ae04e6186cfd8c8d589a92",
+ "cost_usd": 0.0169,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FBAP3HKM2J55WH7HKSNR6"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FBAP3HKM2J55WH7HKSNR6",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the 180,000 lines/s figure together with its limits (plain TCP, lines of 200 bytes or less, disk buffer off) and the not-measured items (TLS planned for Q4), on the research shelf; the 36 MB/s figure is derived from the report's own numbers."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no: TLS was never enabled and lines were at most 200 bytes, against the team's 900-byte lines at 50,000 lines/s; notes the 85% CPU plaintext figure leaves headroom only for short lines; recommends an own TLS test or the Q4 report; the ~15-20% TLS cost appears only as a hypothetical, not as a claimed figure."
+ }
+}

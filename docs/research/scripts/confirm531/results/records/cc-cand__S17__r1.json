@@ -1,0 +1,39 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S17",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 25.6,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1102002,
+  "turns": 6,
+  "input_tokens": 12,
+  "output_tokens": 1594,
+  "cache_read_tokens": 102961
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "git ls-files | head -50; memcue search \"price-feed streaming backpressure\"; memcue search -in shelf:research \"grpc server streaming flow control slow consumer\"",
+    "result": "README.md\nrequirements.txt\nserver.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61F0V9GH74X8T5A446H7D3S thistlewire.example 2026-07-11 | Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://thistlewire.example/docs/streaming"
+  ],
+  "final_answer": "The main thing to set is a cap on the per-stream send buffer. Thistlewire won't apply one for you, so you'd be adding it on purpose.\n\nI couldn't confirm this against current docs, so treat it as a lead. It comes from a note in my research memory, taken from the Thistlewire 0.9 streaming docs on 2026-07-11. That page now returns 404, and the library isn't installed here, so I couldn't check it against 0.9.4, which `requirements.txt` pins. The note says:\n\n- Server-streaming calls have **no built-in flow control**. If a client is slow, the server queues messages for it **without limit**.\n- A stream option, **`max_buffered_messages`**, caps that queue. Its default is `0`, which means unlimited.\n- When a stream hits the cap, the stream is **closed with `RESOURCE_EXHAUSTED`**.\n\nWith the default, one dashboard on bad Wi-Fi would pile up ticks in server memory until it caught up or disconnected. That's exactly the ballooning you're worried about.\n\n**What I'd configure:**\n\n1. **Set `max_buffered_messages` on the streaming endpoint.** Base it on how stale you'll let a dashboard get, not on memory. At 50 ticks/s, a cap of about 500 allows roughly 10 s of lag before the server cuts the stream. Memory per client then has a fixed limit, and the server's total is roughly that times the number of connections.\n2. **Have dashboards reconnect when they get `RESOURCE_EXHAUSTED`.** Use backoff and request a fresh snapshot of the latest prices on reconnect, not a replay. For a price feed, old ticks are worthless anyway.\n3. **Better still, don't queue every tick for slow clients.** Keep only the latest price per symbol for each stream (\"conflation\") and send that when the client can accept it. A slow dashboard then sees fewer, current prices, and memory per client is limited by the number of symbols rather than by how long it lags. The `max_buffered_messages` cap then becomes a backstop, not the main control.\n4. **Limit total load as well.** Set a maximum number of concurrent streams, or streams per client/IP. Also use keepalive/idle timeouts so connections that silently died on Wi-Fi get reaped instead of holding buffers.\n5. **Measure it.** Track buffer depth per stream and count `RESOURCE_EXHAUSTED` disconnects, so you can tune the cap from real traffic.\n\nBefore you build on point 1, check in the 0.9.4 docs or source that `max_buffered_messages` still exists and still has those semantics. If it has changed, tell me and I'll correct the stored note."
+ }
+}

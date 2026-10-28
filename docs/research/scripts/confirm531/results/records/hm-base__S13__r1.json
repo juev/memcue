@@ -1,0 +1,64 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S13",
+  "repeat": "r1",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 67.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0055553700000000004,
+  "turns": 10,
+  "input_tokens": 109527,
+  "output_tokens": 6338,
+  "cache_read_tokens": 99840
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EFC5Z1J6NZQYWCVN2FA3R\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:26:24Z\"}], \"hint\": \"3 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Кеструн ингест хосты файловый сервер NFS шаринг"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "min_score": "0",
+     "query": "Kestrune ingest hosts file server shared mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EFC5Z1J6NZQYWCVN2FA3R\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:26:24Z\"}, {\"id\": \"01M61EFC4EPAV729VK127T5RN2\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:26:24Z\"}, {\"id\": \"01M61EFC4N1RZNDYXRAB5JT8W5\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:26:24Z\"}, {\"id\": \"01M61EFC5ESRXP0BW613Q3E89C\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:26:24Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "search_files",
+   "terminal",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Read the repo requirements (README.md, config/worker.toml, worker/store.py). There's no Kestrune code or notes in the workspace or in memory, so I'm reading \"the Kestrune data\" as the replacement for the partial-result store now in worker/store.py, kept on /mnt/shared/ingest (the NFS export of fs-01).\n\nShort answer: no, not as proposed — it will look fine in testing and fail on the peaks and on failover. It depends on one question first, though: is Kestrune an embedded engine that opens a data directory, or a server process?\n\nIf it's embedded (RocksDB/LMDB/SQLite class), the answer is no regardless of tuning. Two hosts opening the same data directory is not a supported configuration, even on NFSv4. Those engines assume exclusive ownership: mmap, plus POSIX byte-range locks that don't survive NFS partitioning, lockd/statd restarts, or a server reboot mid-write. You don't get an error, you get silent corruption. \"Either can write to it\" is precisely the thing that must not happen.\n\nIf it's a server process and only its data directory sits on the mount with one owner, it's still a bad fit for the numbers the README already states:\n\n- Throughput: 300 writes/s at max_value 6 MiB is 1.8 GB/s, about 15 Gbit/s of payload into a single NFS server. Average values are probably far smaller — that's the number to measure, not assume — but the peak is what sizing has to survive.\n- Durability: an acknowledged write must survive power loss, so each put is an fsync/COMMIT round trip to fs-01. At 300/s that leaves 3.3 ms per write including the transfer. Whether fs-01 can absorb that depends on the export being sync and the backing store not being the bottleneck; an async export will ACK before it's on stable media.\n- Single point of failure: fs-01 losing power takes down both writers at once. That is strictly worse than two independent local stores for the durability goal you're trying to meet.\n\nAnd the coordination problem is the same with either kind: a shared directory shares bytes, not semantics. With prefetch=32 on an at-least-once queue, duplicate delivery means both hosts can write the same key; store.py has no cross-host lock, so it's last-rename-wins and one partial result silently disappears. NFS attribute caching also lets the other host read a stale version of a key for up to acregmax (60s default) unless you run noac, which costs a round trip per access.\n\nOne real bug worth fixing wherever the data ends up: worker/store.py:17 fsyncs the temp file and then os.replace()s it, but never fsyncs the parent directory, so a crash right after the rename can still lose it. That's a durability hole on local disk too.\n\nWhat I'd argue for instead: keep the live partial state local to each host, hash-partition keys so each host owns a disjoint set, and arbitrate takeovers with a lease (etcd/Consul or a Postgres advisory lock) rather than with file locks. Use /mnt/shared/ingest for what it's good at — shipping completed batches to the archiver, one writer per file, append-only.\n\nTwo things to get from Ops before this is settled: whether Kestrune is a library or a service, and whether fs-01 exports sync. The first decides whether it's \"no\" or \"no unless tuned\"; the second decides whether your durability requirement holds at all."
+ }
+}

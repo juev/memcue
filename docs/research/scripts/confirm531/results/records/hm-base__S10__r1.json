@@ -1,0 +1,42 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S10",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 36.4,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.002373444,
+  "turns": 6,
+  "input_tokens": 51006,
+  "output_tokens": 1898,
+  "cache_read_tokens": 43648
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ostrel jobs vendor docs invoice payload retry backoff"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "memcue_search",
+   "read_file",
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No — not as written today. Both questions answered from `docs/vendor/ostrel-limits.md`:\n\nPayload — fails on size\n\nThe Ostrel limit is 256 KiB (262,144 bytes) after serialization, rejected at enqueue with `PayloadTooLarge`.\n\nOur README says invoice payloads are up to 300 KB, and `jobs/send_invoice.py` puts the PDF inline as `payload[\"pdf_base64\"]`. Base64 inflates by 4/3, so the serialized job is ~400,000 bytes:\n\n    300 KB raw         -> 300,000 bytes, 37,856 over the limit (+14%)\n    300 KB base64      -> 400,000 bytes, 137,856 over the limit (+53%)\n\nEven if the 300 KB figure means 300 KiB, the raw payload is over; the base64 form is over by nearly 53% either way. Every large invoice would be rejected at enqueue.\n\nThe doc's own escape hatch is the fix: store the PDF elsewhere (blob store/S3) and pass a reference plus metadata in the payload — that also keeps the payload small enough that base64 inflation stops mattering. That's a change to `send_invoice.py`'s payload contract, not just a config tweak.\n\nBackoff\n\nExponential, fixed curve, not configurable in 5.3:\n\n- First retry after 2s, each subsequent delay doubles.\n- Capped at 10 minutes (600s). The 9th delay is 512s; the 10th is the first at the cap.\n- After 25 attempts the job goes to the dead-letter queue.\n\nThat is 2, 4, 8, 16, 32, 64, 128, 256, 512, then 600s for every remaining retry — roughly 2h47m of pure sleeping before dead-lettering if \"25 attempts\" means 24 retries (2h57m if it means 25 retries; the note is ambiguous, worth confirming with the vendor). `retry_limit` can change the attempts per job type, but not the curve."
+ }
+}

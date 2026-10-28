@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "611be72181b5ebe6b1c4a0dc49c858a495c39d2ae03d8781a860f07a6eb43086",
+ "cost_usd": 0.0127,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says no and cites the Marrowlog 2.4 Q2 report. It gives the 180,000 lines/s figure, which was measured over plain TCP only with lines of 200 bytes or less, says TLS was not measured and is planned for the Q4 report, and recommends the team run its own test; it invents no TLS figure and labels its CPU scaling as an estimate."
+ }
+}

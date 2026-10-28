@@ -1,0 +1,50 @@
+{
+ "pass": "B",
+ "record_sha256": "72b4b08f3795d27af399ab8ed6689597f127a207df8c6916cc41fba0c5c7c044",
+ "cost_usd": 0.0238,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61FP0WCXT75F69A4NHCT86F"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61FP0WCXT75F69A4NHCT86F"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FP0WCXT75F69A4NHCT86F",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Gives the NFS and single-writer limits with their source (D2, D3), but files them in the repo scope instead of the shelf and adds the README's deployment details and a fit conclusion."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says Kestrune does not fit because of the NFS corruption risk and the one-writer limit, says 6 MiB fits under the 8 MiB limit, says the benchmark's narrow setup does not show 6 MiB synced writes so the user must test it, and treats the forum truncation claim as unverified and contradicted."
+ }
+}

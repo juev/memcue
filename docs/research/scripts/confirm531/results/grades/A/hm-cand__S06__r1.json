@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "20f0d8996638bf7a2da746b1ecfd817029a725c162b1b1296f1b17cdd72f95ff",
+ "cost_usd": 0.034,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "It reports 5437.50, says the failure came from the missing out/ directory and says creating out/ without editing the script fixed it. But it also states as fact that out/ is not in .gitignore, which contradicts the label's fact that out/ is git-ignored."
+ }
+}

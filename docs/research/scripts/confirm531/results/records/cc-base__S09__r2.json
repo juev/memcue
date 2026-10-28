@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S09",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 34.7,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.15065540000000002,
+  "turns": 7,
+  "input_tokens": 14,
+  "output_tokens": 2544,
+  "cache_read_tokens": 124637
+ },
+ "record": {
+  "prompt": "The nightly tarball has grown to about 60 GB. scripts/upload.sh still sends it in 8 MiB pieces. Is that going to be a problem, and what should I change?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat scripts/upload.sh; ls -R | head -50; memcue search \"upload multipart part size\"; memcue search -in all \"nightly tarball upload\"",
+    "result": "#!/bin/sh\n# Upload the nightly tarball to Corvane with a multipart upload.\nset -eu\nfile=\"$1\"\nCHUNK_MB=8\ncorvane-cli multipart-upload --bucket nightly-dumps --part-size \"${CHUNK_MB}MiB\" \"$file\"\n.:\nREADME.md\nscripts\n\n./scripts:\nupload.sh\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET."
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat README.md; memcue search -in all -min-score 0 \"Corvane multipart limit parts\"; memcue search -in all \"Corvane part count maximum\"; memcue search -in all \"corvane-cli\"; corvane-cli --help 2>&1 | head -40; corvane-cli multipart-upload --help 2>&1 | head -40",
+    "result": "# nightly-export\n\nDumps the reporting database every night and uploads the tarball to the Corvane object storage gateway\n(`scripts/upload.sh`).\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDP8NT2473F09HS6VG8 | The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\n01M61FAKDR4252T9MFPF44VAY1 | Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDP8NT2473F09HS6VG8 | The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\n01M61FAKDR4252T9MFPF44VAY1 | Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDP8NT2473F09HS6VG8 | The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\n01M61FAKDR4252T9MFPF44VAY1 | Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\n/bin/bash: l… [87 chars cut]"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in all -min-score 0 \"лимит частей multipart Corvane\"; memcue search -in all -kind pitfall,environment -min-score 0 \"Corvane\"; memcue search -in all -min-score 0 \"10000 parts\"; ls /var/log/corvane 2>&1 | head",
+    "result": "01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDP8NT2473F09HS6VG8 | The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\n01M61FAKDR4252T9MFPF44VAY1 | Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\n01M61FAKDT2KRNTB1JC10M2VMG | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FAKDP8NT2473F09HS6VG8 | The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research\nls: cannot access '/var/log/corvane': No such file or directory"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research -min-score 0 \"10000 parts\"; memcue search -in shelf:research -min-score 0 \"Corvane multipart part limit\"",
+    "result": "01M61FAKDDBXKTA8W5FHWXBY65 docs.corvane.example 2026-05-30 | Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\n01M61FAKDDBXKTA8W5FHWXBY65 docs.corvane.example 2026-05-30 | Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\n01M61FAKDJ26AZX0RFK82M3H2Y docs.saltmarsh.example 2026-08-21 | Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "Write",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "Yes. At 60 GB the upload is already over Corvane's part limit, so it is probably failing now.\n\n**Why:** my notes from an earlier session have Corvane gateway 2.3's limits, from its docs (docs.corvane.example/multipart, read 2026-05-30):\n- each part must be 8–512 MiB (the last part can be smaller)\n- an upload can have at most **5,000 parts**\n- an object can be at most 5 TiB\n\nAt 8 MiB per part, 60 GB needs about **7,150 parts**, or 7,680 if it's 60 GiB. The largest file 8 MiB parts can handle is 5,000 × 8 MiB, about 41 GB (39 GiB). The nightly upload would have started failing when the tarball passed that size.\n\n**What I changed in `scripts/upload.sh`:** the part size is no longer fixed at 8 MiB. The script now works it out from the file size, aiming for at most 4,000 parts to leave room under the limit. It never goes below 8 MiB, and it exits with a clear error if a file would need parts over 512 MiB (about 2 TB at 4,000 parts). The upload itself is unchanged.\n\nI tested it with `corvane-cli` stubbed out, since the CLI isn't installed here. The resulting part sizes:\n\n| Tarball size | Part size |\n|---|---|\n| 1 GB | 8 MiB |\n| 60 GB | 15 MiB |\n| 60 GiB | 16 MiB |\n| 2 TB | 477 MiB |\n\nThe script passes `sh -n`. Nothing is committed yet.\n\n**Before relying on it:**\n- **Check the gateway version.** Those limits are for Corvane 2.3 as of May. Check which version stor-02 runs; its logs are in `/var/log/corvane/`. Those logs should also show whether last night's upload was rejected for too many parts.\n- **Simpler alternative:** you could just fix the part size at 64 MiB, which handles up to about 312 GiB. Larger parts cost a little more to retry when one fails, but at this size that hardly matters."
+ }
+}

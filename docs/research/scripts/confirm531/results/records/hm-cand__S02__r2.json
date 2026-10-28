@@ -1,0 +1,58 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S02",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 47.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0036522179999999996,
+  "turns": 4,
+  "input_tokens": 41215,
+  "output_tokens": 3686,
+  "cache_read_tokens": 32256
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune limits write throughput large values",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "project",
+     "query": "ingest worker store NFS shared directory decision"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "search_files",
+   "tool_describe",
+   "memcue_search",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417"
+  ],
+  "final_answer": "Verdict: Kestrune does not fit this deployment as described. Two of the docs' limits are hard blockers that no amount of tuning gets around, and the benchmark you were pointed at measures none of your conditions. The forum thread is unverified and shouldn't drive the decision either way.\n\nRequirement by requirement (Kestrune 3.2 docs, updated 2026-08-30):\n\n  Value size, 6 MiB        OK. Limit is 8 MiB (1.33x headroom); key limit 1 KiB.\n  Write rate, ~300/s       Not evidenced. Benchmark is 1.2M/s at 64 B values, sync=off,\n                           one writer, local NVMe. Untested above 4 KiB or with sync=full.\n  Two processes, two hosts BLOCKED. \"A database may be opened for writing by one process at\n                           a time; Kestrune takes an exclusive file lock.\" Other processes\n                           get read-only.\n  Data dir on NFS          BLOCKED. \"The data directory must be on a local filesystem. Network\n                           filesystems (NFS, SMB/CIFS) are not supported: their file locking is\n                           not reliable enough for Kestrune's write lock, and a database on one\n                           may be corrupted.\"\n  Durability on ack        Achievable only with sync=\"full\" (the default), which is exactly the\n                           mode the benchmark did not test.\n\n/mnt/shared/ingest is an NFS export per README.md, and two processes on ingest-a and ingest-b write to it. That is the configuration the docs say corrupts data, combined with a concurrency model Kestrune doesn't have.\n\nThe benchmark is not evidence for this workload. 1.2M writes/s at 64-byte values is 77 MB/s of payload — an fsync-free, single-process, small-value number. Your peak expressed in bytes, if the large values actually occur at that rate, is 300 x 6 MiB = 1.89 GB/s, which is not a number any store on this setup will hold. That mismatch is itself worth resolving before you choose anything: 300/s at 6 MiB implies ~148 TiB/day and would fill the 2 TiB database limit in about 20 minutes. Either 6 MiB is the outlier case rather than the common one, or 300/s is not sustained concurrently across both hosts, or the peak is much lower than stated. Worth measuring from the queue before committing to a store.\n\nThe forum thread: one anonymous report of silent truncation above 1 MiB with compression on, one \"+1\" from another anonymous account, one contradicting data point (3 MiB values with compression on 3.1, no repro provided), and no follow-up. No version, no reproduction, unverifiable. I would not treat it as a fact about 3.2, but if Kestrune ends up in the picture anywhere, a 6 MiB round-trip with compression enabled is a cheap test to insist on — a silent-truncation failure mode matters more than a slowdown for a store holding partial batch results.\n\nRisks, in order:\n\n1. Corruption, not just slowness. Putting the DB on /mnt/shared/ingest is explicitly unsupported and the failure mode named is data corruption. This is the one that makes the current architecture impossible.\n2. Resume/failover semantics. The reason both hosts share a directory is presumably that an unacked message redelivered to the other worker finds its partial result there (config has prefetch=32). Giving each host its own local Kestrune DB on local disk would satisfy the single-writer and local-FS rules but break cross-host resume: a redelivered batch would restart from nothing on the other host. That's a correctness change to the worker, not a swap.\n3. Durability vs throughput is unmeasured. sync=\"full\" is required by your durability requirement and is the mode with no published numbers at 6 MiB.\n4. Version pinning. The limits are documented for 3.2; the truncation claim is versionless.\n5. Pre-existing bug, for context: FileStore.put fsyncs the file but not the directory before os.replace, so even today the rename itself may not survive power loss. Whatever store you pick, that requirement isn't currently met by the file store either.\n\nWhat would make Kestrune viable: one writer process per database on a local disk, i.e. drop the shared-NFS design. If the shared partials are only needed for cross-host failover, that's a real redesign — either route batches to a fixed host and accept losing in-flight partials on host failure, or move to a store that supports concurrent network access. Kestrune 3.2 is not that store.\n\nRecommendation: do not adopt Kestrune for the two-host NFS deployment. First clarify the actual sustained write rate and typical value size from the queue, then choose between (a) keeping a filesystem store and fixing the durability gap, or (b) a network-accessible store that allows concurrent writers."
+ }
+}

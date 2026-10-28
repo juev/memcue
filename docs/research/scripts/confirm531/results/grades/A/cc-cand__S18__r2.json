@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "affe8aa34206a9461626a154c201a709f1408fc3c3e4c88e00dea2cd9f006b32",
+ "cost_usd": 0.0505,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FAAGPZJWSSDBC3HD8J685",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "The correction keeps the TLS-not-measured limitation and adds a supported 2026-10-28 re-check: the Q2 page is unchanged and the Q3/Q4 URLs return 404, which saves a later session from re-checking; it states no TLS figure."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says no and cites the Marrowlog 2.4 Q2 report (180,000 lines/s, 1 vCPU, plain TCP only, lines of 200 bytes or less), notes TLS was not measured and is planned for Q4, and recommends the team run its own test; it invents no TLS figure."
+ }
+}

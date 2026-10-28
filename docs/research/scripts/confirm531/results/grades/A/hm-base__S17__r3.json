@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "cd358edcc1dd67d167c4f97b28a6f2fc4bd1f691be339dced4b4ae71574f187e",
+ "cost_usd": 0.0477,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It recommends setting max_buffered_messages, gives its default of 0 (unlimited) and the lack of built-in flow control, says the stream is closed with RESOURCE_EXHAUSTED when the cap is hit so dashboards must reconnect, and notes the fact comes from the 0.9 docs, consistent with the pinned 0.9.4."
+ }
+}

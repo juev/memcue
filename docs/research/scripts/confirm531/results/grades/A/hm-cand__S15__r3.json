@@ -1,0 +1,27 @@
+{
+ "pass": "A",
+ "record_sha256": "d3eaa3d183441f33b9881aea200d0dc74f06fc1757e9ccb5b6e2689fb0df0e96",
+ "cost_usd": 0.043,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61G3P26TTXJW4GVE23WGRC8",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This adds a second shelf fact saying the memory backend counts per process and tally shares counts, while the seeded fact stays live; the agent never searched first."
+   },
+   {
+    "id": "01M61G3P2NRAMB9CND5CK9CBHX",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This stores the repository's 4 workers and 100/minute setting, which the label forbids, and also repeats the per-process backend finding."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the default memory backend counts per process, so a key gets up to 400/min with 4 workers, and that backend=\"tally\" with a tallyd server is needed to enforce 100/min overall; it also notes the windows are fixed and clock-aligned."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "24921b7aae6556edd61e297a134340c76153c912c7e020e3a8a588f0ad6b31ce",
+ "cost_usd": 0.0262,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says the agent has no information on Quorvel's message size limit after checking memory and the workspace, gives no number, and suggests checking Quorvel's docs or the broker configuration before relying on 2 MB messages."
+ }
+}

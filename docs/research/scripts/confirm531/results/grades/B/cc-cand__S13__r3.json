@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "aaf34e220fa0943408de51bb1f3179900c2e06be1c0478f7ff6d8897283d8029",
+ "cost_usd": 0.0126,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons: only one process may write, and NFS/SMB are unsupported and may corrupt the database. It cites Kestrune 3.2 docs.kestrune.example/limits as the source, which it got from the stored shelf fact, and it labels its alternative designs as its own suggestions rather than documented facts."
+ }
+}

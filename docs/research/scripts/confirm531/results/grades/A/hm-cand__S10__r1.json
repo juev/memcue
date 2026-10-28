@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "700a291a54acc905163ee8021581fe15953a0585c92be014c6fe6067fa6606c0",
+ "cost_usd": 0.0284,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no because the 256 KiB cap is below the 300 KB invoices and recommends passing a reference. It also gives the full backoff: 2 s first retry, doubling, 10-minute cap, dead-letter after 25 attempts, and retry_limit changing the count but not the curve."
+ }
+}

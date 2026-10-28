@@ -1,0 +1,40 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S18",
+  "repeat": "r2",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 21.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1036092,
+  "turns": 6,
+  "input_tokens": 10,
+  "output_tokens": 1354,
+  "cache_read_tokens": 84006
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"log shipper TLS throughput benchmark\"; memcue search -in all \"log shipper encrypted 50k lines per second\"; memcue search -in all \"benchmark TLS shipper lines/s\"; ls -la; git ls-files | head -100",
+    "result": "01M61FA5BMAQ7KWZVPNTCPZFXW example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) was measured over plain TCP with lines of 200 bytes or less; TLS, longer lines and the disk buffer were not measured. Marrowlog plans TLS figures in its Q4 report, so it cannot be used to size log-pipeline agents with TLS.\n01M61FA5BMAQ7KWZVPNTCPZFXW example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) was measured over plain TCP with lines of 200 bytes or less; TLS, longer lines and the disk buffer were not measured. Marrowlog plans TLS figures in its Q4 report, so it cannot be used to size log-pipeline agents with TLS.\n01M61FA5BMAQ7KWZVPNTCPZFXW example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (180,000 lines/s on 1 vCPU) was measured over plain TCP with lines of 200 bytes or less; TLS, longer lines and the disk buffer were not measured. Marrowlog plans TLS figures in its Q4 report, so it cannot be used to size log-pipeline agents with TLS.\ntotal 20\ndrwxr-xr-x 4 1001 1001 4096 Oct 28 14:58 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:58 ..\ndrwxrwxr-x 8 1001 1001 4096 Oct 28 14:58 .git\n-rw-r--r-- 1 1001 1001  433 Oct 28 14:17 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 28 14:17 config\nREADME.md\nconfig/agent.yaml"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2",
+   "https://marrowlog.example/perf/2026-q4"
+  ],
+  "final_answer": "No. As far as I can find, there are no published numbers for that setup.\n\nThe only published figure is the **Marrowlog 2.4 performance report** (https://marrowlog.example/perf/2026-q2, 18 June 2026). It shows one agent shipping **180,000 lines/s on 1 vCPU**, but the test doesn't match how we'd run it:\n\n| | Report | Our agents (`README.md`, `config/agent.yaml`) |\n|---|---|---|\n| Transport | Plain TCP, no TLS in any run | TLS (the planned switch) |\n| Line size | 200 bytes or less | About 900 bytes on average (JSON with stack traces) |\n| Disk buffer | Off | Off (matches) |\n| `batch_lines` | 500 | 500 (matches) |\n| CPU | 1 vCPU | 1 vCPU reserved (matches) |\n\nThe report itself says TLS, lines over 200 bytes and the disk buffer were not measured. That means 180k lines/s doesn't tell us whether we'd reach 50k lines/s per agent. Our lines are about 4.5× longer, and TLS adds per-byte encryption cost, so the plain-TCP figure probably overstates what we'd get. The two effects compound, and we don't know by how much.\n\nThe maintainers said they'd measure TLS in a Q4 report, but it isn't out yet (`/perf/2026-q4` returns 404). An earlier session reached the same conclusion, and the report still says the same.\n\n**Recommendation:** don't wait for Q4. The security deadline is the end of next quarter, so benchmark it ourselves. Run one agent on 1 vCPU with `tls: true` and a replay of real ~900-byte lines against a test collector, and check whether it holds 50k lines/s. Measure CPU headroom too, not just whether it keeps up. If it's tight, adjusting `batch_lines` or giving the agent a second vCPU are the obvious levers. I can draft the test config if you'd like."
+ }
+}

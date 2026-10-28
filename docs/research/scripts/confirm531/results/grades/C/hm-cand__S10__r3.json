@@ -1,0 +1,14 @@
+{
+ "pass": "C",
+ "record_sha256": "ff628f1569f01bb8ca2172154018c91dfc17d932ef1cf49765ece5679b2ed188",
+ "cost_usd": 0.0155,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It gets everything correct_if asks for: 256 KiB is below the 300 KB invoices, pass a reference, 2 s doubling capped at 10 min, dead-letter after 25 attempts, and retry_limit changes the count but not the curve. But it states as fact a derived 'roughly 3.5 hours' to dead-letter that the document doesn't support and the arithmetic doesn't give (about 2.8–3 h), so the answer is capped at partial."
+ }
+}

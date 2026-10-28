@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "4659444cdab2abc79b808ccafbfedb1aa362c97ddbae14198bb1f503f9f60c1f",
+ "cost_usd": 0.0417,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not reachable by polling (30 s default, 10 s floor), that push needs stream: true and the Team plan or above, and it cites the Nimbrel SDK docs URL and asks for a check of the SDK version and plan in use. It omits the read date, and the stream-drop fallback to polling is an assumption it states as fact."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "649d237f39b0e38462c8b6dd48bae1874b51bbc80fc0d675101743f6d79c8a40",
+ "cost_usd": 0.0161,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "The function was never added to units/convert.py: the patch was refused by the write guard, and the label's wrong_if covers 'does not add the function', even though the code the agent proposed (km / 1.609344, type hints, one-line docstring) was correct."
+ }
+}

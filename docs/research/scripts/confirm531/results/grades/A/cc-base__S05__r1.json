@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "0b44aa797e6750f2fe58761f994fefd94c50b929769c80257583a7654ada6344",
+ "cost_usd": 0.0379,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says 5 s is not possible with polling (30 s default, 10 s floor) and needs push updates (stream: true) on the Team plan or above. It names the source (docs.nimbrel.example/sdk/updates, read 2026-04-20) and says the finding should be checked against the SDK version in use."
+ }
+}

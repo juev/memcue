@@ -1,0 +1,28 @@
+{
+ "pass": "B",
+ "record_sha256": "27cbe7928f50968ea1a74851fea6982beba73095e15920dce9196078f6251ad8",
+ "cost_usd": 0.02,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EFKDMVCHS54C74FQ42Z97",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Ordinary repo-scoped pitfall backed by tool evidence (the pip install failed and public PyPI's wrenfold is a different project). It does not touch the 1.4 shelf fact, which the agent never retrieved."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says yes and gives every mechanism detail from the changelog: @include \"path\" since 2.0.0, paths relative to the including file, nesting up to 8 levels, keys set after the include override, and ${ENV} in include paths since 2.1.0. It does not restructure the files; its doubt is about whether the package can be resolved, not the 1.4 limitation."
+ }
+}

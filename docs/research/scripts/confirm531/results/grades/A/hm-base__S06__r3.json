@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c8f4f89cdd25fd5271fc47d344f570c2499044f56561c3f966d1aff6ec3f2a5d",
+ "cost_usd": 0.0267,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, says the first run failed because out/ was missing, and says creating out/ without touching the script fixed it."
+ }
+}

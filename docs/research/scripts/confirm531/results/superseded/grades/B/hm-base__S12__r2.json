@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "6e513fc71e8d600a19408bb4c20438612fdf732ade726c1a814c692cf6c59120",
+ "cost_usd": 0.0109,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The sandbox write guard blocked the edit and the agent stopped to ask the user, so km_to_miles was never added; the code it proposed (km / 1.609344, type hints, one-line docstring) would meet correct_if, but the file was left unchanged."
+ }
+}

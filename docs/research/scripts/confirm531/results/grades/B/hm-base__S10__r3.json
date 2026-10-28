@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "a2d0064efa194d15c9ceea84eb2e43e1aa2bf40bda2717a54209e97a24a75989",
+ "cost_usd": 0.01,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says no because the 256 KiB limit is below the 300 KB invoices and recommends passing a reference; gives the backoff as 2 s first retry, doubling, 10-minute cap and dead-letter after 25 attempts; notes retry_limit changes the count, not the curve."
+ }
+}

@@ -1,0 +1,44 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S18",
+  "repeat": "r3",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 19.5,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.10930539999999998,
+  "turns": 8,
+  "input_tokens": 12,
+  "output_tokens": 1313,
+  "cache_read_tokens": 103427
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"log shipper TLS throughput benchmark\"; memcue search -in all \"log shipper encryption lines per second\"; memcue search -in all \"шиппер логов TLS производительность\"; ls -la; git ls-files | head -100",
+    "result": "01M61FVYQM0KDSDK0J5NJ34QTD example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (published 2026-06-18; 180,000 lines/s on 1 vCPU at 85% CPU) measured only plain TCP with lines of 200 bytes or less; it does not cover TLS to the collector, longer lines or the disk buffer, so it cannot show the log-pipeline agents keep up with TLS on. The maintainers plan a TLS measurement in their Q4 report.\n01M61FVYQM0KDSDK0J5NJ34QTD example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (published 2026-06-18; 180,000 lines/s on 1 vCPU at 85% CPU) measured only plain TCP with lines of 200 bytes or less; it does not cover TLS to the collector, longer lines or the disk buffer, so it cannot show the log-pipeline agents keep up with TLS on. The maintainers plan a TLS measurement in their Q4 report.\n01M61FVYQM0KDSDK0J5NJ34QTD example.com/acme/log-pipeline 2026-10-28 | The Marrowlog 2.4 performance report https://marrowlog.example/perf/2026-q2 (published 2026-06-18; 180,000 lines/s on 1 vCPU at 85% CPU) measured only plain TCP with lines of 200 bytes or less; it does not cover TLS to the collector, longer lines or the disk buffer, so it cannot show the log-pipeline agents keep up with TLS on. The maintainers plan a TLS measurement in their Q4 report.\ntotal 20\ndrwxr-xr-x 4 1001 1001 4096 Oct 28 14:59 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 28 14:59 ..\ndrwxrwxr-x 8 1001 1001 4096… [145 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2",
+   "https://marrowlog.example/perf/",
+   "https://marrowlog.example/perf/2026-q4",
+   "https://marrowlog.example/perf/2026-q3"
+  ],
+  "final_answer": "No, there are no published numbers that show the agents can handle 50k lines/s with TLS on.\n\nThe only published benchmark is the **Marrowlog 2.4 performance report** (https://marrowlog.example/perf/2026-q2, 2026-06-18). It shows 180,000 lines/s on 1 vCPU at 85% CPU. That figure doesn't match our setup:\n\n| | Their benchmark | Our setup (`README.md`, `config/agent.yaml`) |\n|---|---|---|\n| Transport | Plain TCP only, TLS never enabled | TLS to the collector (required by end of next quarter) |\n| Line size | 200 bytes or less | About 900 bytes (JSON with stack traces) |\n| CPU | 1 vCPU | 1 vCPU reserved, same |\n| Disk buffer, batching | Off, `batch_lines: 500` | Off, `batch_lines: 500`, same |\n\nThe report says outright that TLS and lines over 200 bytes weren't measured. Each of our lines is about 4.5 times longer, so we push roughly 45 MB/s compared with their roughly 36 MB/s, before any encryption cost. The 180k figure can't be scaled down to cover our case.\n\nThe maintainers plan to measure TLS in their Q4 report. It isn't out yet: `/perf/2026-q3` and `/perf/2026-q4` both return 404.\n\nIf we need an answer before the Q4 report comes out, we'll have to measure it ourselves. That means one agent on 1 vCPU with `tls: true`, fed about 900-byte lines at 50k/s, while we watch CPU use and the backlog."
+ }
+}

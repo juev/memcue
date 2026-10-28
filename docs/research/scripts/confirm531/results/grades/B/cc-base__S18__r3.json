@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "71fbf86528791116c0fb33ed89a50a547ba6f9c5aa013f81a49dcd2e4fdb927d",
+ "cost_usd": 0.0092,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and cites the Marrowlog 2.4 Q2 report (180,000 lines/s, plain TCP only, lines of 200 bytes or less, TLS not measured). It also notes the planned Q4 report and recommends testing in-house, and it invents no TLS figure."
+ }
+}

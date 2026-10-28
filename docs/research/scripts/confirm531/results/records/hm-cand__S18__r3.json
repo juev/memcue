@@ -1,0 +1,77 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S18",
+  "repeat": "r3",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 33.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0015649020000000002,
+  "turns": 5,
+  "input_tokens": 44541,
+  "output_tokens": 1759,
+  "cache_read_tokens": 41984
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shippers encrypted connections throughput TLS"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FW6VHXQWNJBV97WNCVS7J\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:50:53Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "логшиперы шифрование пропускная способность 50k строк в секунду"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog agent TLS throughput benchmark lines per second",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FX7VAGJVGPBNXKMH1CFMJ\", \"content\": \"Marrowlog 2.4 performance report (vendor, published 2026-06-18, Q2 2026): one agent shipped 180,000 lines/s to a collector on one vCPU / 2 GiB with CPU at 85%, lines <=200 bytes, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs (about 36 MB/s). The report states that TLS to the collector, lines longer than 200 bytes and the disk buffer were NOT measured in any run, and that TLS would be measured in the Q4 report — so it gives no TLS throughput figure.\", \"keywords\": [\"Marrowlog\", \"performance report\", \"2.4\", \"throughput\", \"lines per second\", \"TLS\", \"plain TCP\", \"benchmark\", \"Q2 2026\", \"collector\", \"CPU 85%\"], \"origin\": \"example.com/acme/log-pipeline 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:51:27Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog collector encryption overhead documentation",
+     "in": "shelf:research",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FX7VAGJVGPBNXKMH1CFMJ\", \"content\": \"Marrowlog 2.4 performance report (vendor, published 2026-06-18, Q2 2026): one agent shipped 180,000 lines/s to a collector on one vCPU / 2 GiB with CPU at 85%, lines <=200 bytes, plain TCP, disk buffer off, batch_lines 500, median of three 30-min runs (about 36 MB/s). The report states that TLS to the collector, lines longer than 200 bytes and the disk buffer were NOT measured in any run, and that TLS would be measured in the Q4 report — so it gives no TLS throughput figure.\", \"keywords\": [\"Marrowlog\", \"performance report\", \"2.4\", \"throughput\", \"lines per second\", \"TLS\", \"plain TCP\", \"benchmark\", \"Q2 2026\", \"collector\", \"CPU 85%\"], \"origin\": \"example.com/acme/log-pipeline 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:51:27Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog agent 2.4 release notes TLS",
+     "min_score": "0",
+     "limit": "15"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No. There's no published TLS figure for the Marrowlog agent, and the only published number doesn't cover our workload even before encryption.\n\nWhat exists (vendor performance report, Marrowlog 2.4, published 2026-06-18, Q2 2026):\n- 180,000 lines/s from one agent on 1 vCPU / 2 GiB, CPU at 85%\n- lines <= 200 bytes, plain TCP, disk buffer off, batch_lines 500, ~36 MB/s\n- the report explicitly says TLS to the collector, lines longer than 200 bytes, and the disk buffer were not measured in any run; TLS is deferred to the Q4 report\n\nOur target (README): 50,000 lines/s per agent at ~900 bytes = 45 MB/s. That's 1.25x the byte rate of the published run while the published run was already at 85% CPU — and TLS adds crypto per byte on top of that, on the same single reserved vCPU.\n\nSo the honest position: nothing published supports the claim that 50k lines/s at 900 bytes over TLS fits in 1 vCPU. The published throughput was reached with 4.5x smaller lines, no TLS, and only 15% CPU headroom. If we need a number before committing, it has to be measured on a 2.4 agent with the production line profile and tls: true — or wait for the Q4 report, and even then check whether its line size matches ours.\n\nRelevant files: /stand/ws/README.md, /stand/ws/config/agent.yaml (tls: false, batch_lines: 500, disk: false)."
+ }
+}

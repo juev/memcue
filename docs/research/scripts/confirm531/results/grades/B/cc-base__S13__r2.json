@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "73f1164903ff2b7ec13b62994d416f1cfc2e29e27c0209137aa5ade54bcfc210",
+ "cost_usd": 0.0082,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says no and gives both documented reasons: Kestrune 3.2 allows only one writer per database, and NFS/SMB are unsupported and risk corruption. It cites the docs URL and takes both from a stored fact the search returned."
+ }
+}

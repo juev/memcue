@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "28a88eb09cf489ccaed7d33fc61a30bab35e2ddde3cf1325d611cfd16f6a2ab4",
+ "cost_usd": 0.0369,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer states the Pardalo 3.1 fact (read 2026-02-08, only GET/HEAD/PUT/DELETE/OPTIONS are retried, never POST) and flags that the repository pins 4.2.0, so the behaviour is unconfirmed for that version; it asserts no 4.2 behaviour and gives the idempotency key as its own advice."
+ }
+}

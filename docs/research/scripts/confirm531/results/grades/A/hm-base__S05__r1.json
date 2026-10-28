@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "81229a8971f3f231c0f49c2e6d36cb8193c8f6266af87a60295329e94f86a3fd",
+ "cost_usd": 0.0422,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It meets every correct_if point (30 s default poll, 10 s floor, stream: true, Team plan or above, and the source dated 2026-04-20 with advice to re-check), but it states SDK behaviour as fact that the shelf fact does not support: that client options are read only at construction so each service needs a restart, and that a dropped stream falls back to 30 s polling."
+ }
+}

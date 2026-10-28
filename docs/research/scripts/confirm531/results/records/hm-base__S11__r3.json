@@ -1,0 +1,66 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S11",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 27.7,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00061542,
+  "turns": 4,
+  "input_tokens": 30734,
+  "output_tokens": 555,
+  "cache_read_tokens": 29440
+ },
+ "record": {
+  "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ferrocache sizing memory replica RAM guidance",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G05ZJFAJSWXVX1A52SMPC\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:53:03Z\"}, {\"id\": \"01M61G0605H22KRP2S9HD4XV47\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:53:03Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "maxmemory выделение памяти размер виртуальной машины реплика",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "limit": "20",
+     "query": "Ferrocache sizing maxmemory replica RAM virtual machine"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G05ZTKYT9X358KC37ABWF\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:53:03Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "all",
+     "limit": "20",
+     "query": "Ferrocache"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G0605H22KRP2S9HD4XV47\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:53:03Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "18 GB.\n\nFrom the Ferrocache 5.2 sizing guide stored in memory (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset — replication buffers, client output buffers and fragmentation come on top. The guide recommends RAM ≥ 1.5× maxmemory for a node with replication (1.25× without), so 12 GB × 1.5 = 18 GB for your VM.\n\nCaveat: that's the documented floor, not a tuned figure. If this node has a large replica backlog or clients with big output buffers, watch actual RSS after warm-up and adjust."
+ }
+}

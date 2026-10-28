@@ -1,0 +1,66 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S13",
+  "repeat": "r3",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 43.6,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003007824,
+  "turns": 6,
+  "input_tokens": 57344,
+  "output_tokens": 2782,
+  "cache_read_tokens": 49408
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FPGRBQPX0VATH50K2XWYN\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:47:47Z\"}], \"hint\": \"3 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune данные ingest хосты общий NFS mount файловый сервер"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount",
+     "min_score": "0"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FPGRBQPX0VATH50K2XWYN\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:47:47Z\"}, {\"id\": \"01M61FPGR2N0PHTD2C93NY9XXA\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:47:47Z\"}, {\"id\": \"01M61FPGR3JDWJXSZ8CT8MDNFK\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:47:47Z\"}, {\"id\": \"01M61FPGR8K4HFMMD0QXJ4NV39\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:47:47Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "fs-01 NFS export ingest-a ingest-b /mnt/shared"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Short answer: no. It would mount, and it would look like it works in testing, but it won't meet the requirements written down in README.md — and two of the failure modes are bugs in `worker/store.py` rather than in NFS itself.\n\nWhy it fails on the stated requirements\n\n1. Durability. The contract is \"a write acknowledged to the queue must survive a power loss.\" `put()` does fsync on the file, then `os.replace`, and never fsyncs the directory. On local disk that alone can lose the rename in a power cut; over NFS the same is true, and worse: durability then depends on the export being `sync` and on the server's own cache-empty behaviour. On an async export, fsync/COMMIT returning OK does not mean the bytes are on fs-01's platters. So \"either host can write\" does not give you the guarantee the queue needs — it merely moves the point where you silently lose data. (The directory fsync is missing today even for the local case; that's worth fixing regardless.)\n\n2. Throughput. 300 writes/s at peak with values up to 6 MiB is a 1.8 GB/s ceiling, and the fsync-per-write pattern serializes it: 3.33 ms of budget per acknowledged write, network round trip plus a server-side flush included. A single NFS server's log/disk will not sustain 300 synchronous commits per second from two clients; you'd get latency spikes and a queue that backs up, not lost data but stalled ingest. Values near the 6 MiB maximum make it far worse.\n\n3. Concurrency. `data_dir` is described as \"a directory of JSON files\" and the store has no locking at all. \"Either host can write to it\" implies either host may write the same key, i.e. read-modify-write of a partial result, and nothing here serializes that across hosts — the last writer wins and partial results get silently dropped. On top of that the temp path is the fixed `key + \".json.tmp\"`: two writers on the same key collide on the same temp name, so one can rename a half-written file into place. That's a real corruption path, and it exists already with two workers even on one box if two consumers touch a key.\n\nWhat I'd propose instead\n\n- Make the key's owner unambiguous: partition batches by key (consistent hash or queue routing) so exactly one worker ever writes a given key, and keep the store on that host's local disk. That removes the need for a shared mutable directory entirely and keeps the durability story checkable — fsync file, fsync directory, then ack.\n- If both hosts genuinely must see the same partial state, use a store built for it — a networked KV with its own durability (AOF/replication) or a small database — not a JSON-file directory on an export.\n- If Ops insists on the shared mount, it only becomes defensible with a sync export, unique temp names (`tempfile.mkstemp` in the same directory), directory fsync after rename, and real cross-host locking (NFSv4 byte-range), and even then point 2 probably kills it at peak. That's a lot of machinery to keep a file-per-key layout.\n\nWhat I couldn't verify: this session is not running on ingest-a/ingest-b, and `/mnt/shared` doesn't exist here, so I can't read the actual mount options or fs-01's export mode. If you want a firm verdict on the durability half, send `mount | grep shared` from an ingest host and the export line from `/etc/exports` on fs-01 — whether it says `sync` decides whether acked writes are real."
+ }
+}

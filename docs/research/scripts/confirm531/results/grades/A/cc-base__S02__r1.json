@@ -1,0 +1,50 @@
+{
+ "pass": "A",
+ "record_sha256": "3148df1db05464fceb2d9b3b08780752216caa0089a4fe9e62495dc4d8cdd566",
+ "cost_usd": 0.0677,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61EFB9MXH6A1FE0FZ6ZGYYT"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61EFB9MXH6A1FE0FZ6ZGYYT"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EFB9MXH6A1FE0FZ6ZGYYT",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact covers D2 and D3 with the docs source, but it is in the repo scope instead of the shelf, and it also includes the README deployment details and the agent's conclusion that Kestrune cannot replace the store."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It meets every correct_if point: the NFS data directory and the single-writer limit are blockers, 6 MiB values fit under the 8 MiB limit, the vendor benchmark's narrow setup does not show 300 writes/s with 6 MiB values and sync=full, and the forum truncation claim is treated as an unverified rumour that another user contradicted."
+ }
+}

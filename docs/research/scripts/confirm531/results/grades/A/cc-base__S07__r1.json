@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "e90b5de59d6c54bed59630a92c4ba965210ac71289641cc31ecd8a5fc1ae8ced",
+ "cost_usd": 0.0316,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It gives all four limits from the shelf fact with its source and read date, concludes that the 7-hour job would be cancelled on a hosted runner, and offers both options: splitting it into jobs under 6 hours or using a self-hosted runner."
+ }
+}

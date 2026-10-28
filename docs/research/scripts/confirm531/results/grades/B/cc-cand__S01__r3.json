@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "57819e79967e79d6a3c12c77a548a5b36f0f9f2d4adc47df115e5cf811756e4a",
+ "cost_usd": 0.0108,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FMY4W1WHCD0WEYQPQV7NN"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FMY4W1WHCD0WEYQPQV7NN",
+    "version": 2,
+    "verdict": "expected",
+    "note": "The run corrected the stale 1.4 shelf fact in place. The new version adds 2.0.0 @include support with path resolution, the 8-level nesting limit, override order and 2.1.0 ${ENV} paths, and cites the changelog as its source."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes for pinned 2.1.3 with @include \"path\" since 2.0.0: paths relative to the including file, 8-level nesting, later keys override, and ${ENV} paths from 2.1.0. It notes the 1.4 fact is outdated and restructures nothing."
+ }
+}

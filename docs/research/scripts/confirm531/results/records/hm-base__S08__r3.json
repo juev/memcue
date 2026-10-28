@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S08",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 30.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000930939,
+  "turns": 4,
+  "input_tokens": 30518,
+  "output_tokens": 1165,
+  "cache_read_tokens": 29563
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog log agents collector TLS peak load"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log collector agents throughput peaks"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "tool_search",
+   "tool_call",
+   "terminal"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No — the report doesn't answer that question. I fetched it: Marrowlog 2.4 performance report, 2026 Q2, published 2026-06-18.\n\nWhat it says:\n\n- One agent moved 180,000 lines/sec to the collector on 1 vCPU / 2 GiB, CPU at 85%.\n- Method: tailed local SSD file, lines ≤200 bytes, plain TCP — \"TLS was not enabled in any run.\"\n- Explicit \"Not covered\": TLS to the collector, lines longer than 200 bytes, disk buffer off. TLS is promised for the Q4 report.\n\nSo the only number in it is a non-TLS, short-line, ideal-input figure. It cannot tell you whether TLS keeps up.\n\nTwo things worth flagging from the numbers themselves:\n\n- 85% CPU leaves ~15% headroom, i.e. roughly 31,700 lines/sec, or about 211,800 lines/sec at full CPU. If TLS costs more than ~17.6% of the agent's current CPU time — handshakes on the hot path plus per-record encryption — the agent becomes the bottleneck at the same load. That's not a large margin for a cryptographic path, so the honest default expectation is \"probably some loss, amount unknown.\"\n- Even ignoring TLS: short lines (≤200 bytes) and disk buffer off both flatter throughput. Your agents' real line lengths and buffer settings may already differ from the benchmark.\n\nTo actually answer your question I'd need, per agent: your peak lines/sec (and typical line length), the agent host's CPU count, and the collector's TLS mode. With those I can size whether you're inside a plausible TLS budget — or run a short TLS vs. plain-TCP benchmark on one representative agent host, which is a ~30 minute job and beats waiting for Q4. Want me to set that up? I can also draft the ask to Marrowlog for pre-release TLS numbers."
+ }
+}

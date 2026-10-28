@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S10",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 21.5,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.09548219999999999,
+  "turns": 5,
+  "input_tokens": 10,
+  "output_tokens": 1328,
+  "cache_read_tokens": 81531
+ },
+ "record": {
+  "prompt": "Using the Ostrel notes in docs/vendor/, can Ostrel jobs carry our invoice payloads, and how does it back off between retries?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"Ostrel payload limit retry\"; memcue search -in all \"Ostrel\"",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\nNo stored facts match."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "**Payloads: not as they are now.** Ostrel 5.3 rejects any job payload larger than 256 KiB (262,144 bytes) after serialization, and fails the enqueue with `PayloadTooLarge` (`docs/vendor/ostrel-limits.md`). Our `README.md` says invoice payloads, meaning the rendered invoice plus metadata, run up to 300 KB. That is over the limit whether KB means 300,000 or 307,200 bytes. The real size is probably larger still: `jobs/send_invoice.py` sends the PDF inline as `pdf_base64`, and if the 300 KB figure is the raw PDF, base64 encoding adds about a third, plus JSON overhead.\n\nThe notes give the fix: store the PDF somewhere else (object storage or a DB blob) and put only a reference in the payload, such as a key or URL, plus the email and metadata. `send_invoice` would then fetch the PDF itself instead of reading `payload[\"pdf_base64\"]`.\n\n**Retries:** Ostrel uses exponential backoff:\n- The first retry comes 2 s after a failure, and each later delay doubles: 2, 4, 8, … 512 s.\n- Delays are capped at 10 minutes (600 s). The cap starts at the 10th retry, where 1024 s would otherwise apply.\n- After 25 attempts the job goes to the dead-letter queue. With the defaults, that is roughly 2 h 47 min of total backoff before a job is dead-lettered (9 doubling delays of 2–512 s, then 15 at 600 s), not counting run time.\n- You can override the attempt count per job type with `retry_limit`. You can't change the backoff curve in 5.3.\n\nThese notes were copied from the Ostrel docs on 2026-05-14 and cover version 5.3. If you plan to use a newer Ostrel version, check its current docs, since the limits may have changed."
+ }
+}

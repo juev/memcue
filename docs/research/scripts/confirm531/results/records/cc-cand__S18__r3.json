@@ -1,0 +1,40 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S18",
+  "repeat": "r3",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 22.3,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.11027700000000001,
+  "turns": 6,
+  "input_tokens": 10,
+  "output_tokens": 1584,
+  "cache_read_tokens": 85225
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search -in shelf:research \"log shipper TLS throughput lines per second\"; echo ---; memcue search -in shelf:research \"encrypted connection benchmark log forwarding\"; echo ---; memcue search \"log shipper TLS\"; echo ---; git ls-files | head -50",
+    "result": "01M61FWBME7NMW0G3N24Z6RM2S example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 vendor perf report (maintainers' own claim): one agent shipped 180,000 lines/s on 1 vCPU / 2 GiB at 85% CPU, median of three 30-min runs; lines <=200 bytes, plain TCP to collector, disk buffer off, batch_lines 500. NOT measured: TLS, lines >200 bytes, disk buffer; TLS promised for the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\n---\n01M61FWBME7NMW0G3N24Z6RM2S example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 vendor perf report (maintainers' own claim): one agent shipped 180,000 lines/s on 1 vCPU / 2 GiB at 85% CPU, median of three 30-min runs; lines <=200 bytes, plain TCP to collector, disk buffer off, batch_lines 500. NOT measured: TLS, lines >200 bytes, disk buffer; TLS promised for the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\n---\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n---\nREADME.md\nconfig/agent.yaml"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2",
+   "https://marrowlog.example/perf/2026-q4"
+  ],
+  "final_answer": "No. I couldn't find any published number for Marrowlog over TLS, so there's nothing published that shows 50k lines/s will hold.\n\n**What exists:** The only published figure is the maintainers' own Marrowlog 2.4 report from 2026 Q2 (https://marrowlog.example/perf/2026-q2, published 2026-06-18). I fetched it again today and it says the same as the note I had saved. One agent shipped **180,000 lines/s on 1 vCPU / 2 GiB at 85% CPU**, taking the median of three 30-minute runs. The test conditions were:\n- plain TCP to the collector; \"TLS was not enabled in any run\"\n- every line 200 bytes or shorter\n- disk buffer off, `batch_lines: 500`\n\nThe report says TLS, lines over 200 bytes and the disk buffer were **not measured**. It promises TLS numbers in a Q4 report. I guessed that report's address (`/perf/2026-q4`) and got a 404, so it doesn't seem to be out yet. I didn't search the site any further than that.\n\n**Why it doesn't cover your setup:** According to `README.md` and `config/agent.yaml`, your agents run on 1 vCPU with `batch_lines: 500` and the disk buffer off, which matches the test. But your lines average about **900 bytes**, and you'd be adding TLS. Both of those fall outside what was tested.\n\nMy own rough arithmetic, not anything the report says: 180k lines × at most 200 bytes is at most about 36 MB/s. 50k lines × 900 bytes is about 45 MB/s. So even without TLS, your load in bytes per second is above anything the test covered. The large line count doesn't carry over to your traffic.\n\n**Suggestion:** Don't plan around the vendor number. Run your own test on a 1-vCPU agent with your real ~900-byte JSON lines and `tls: true` to the collector, and watch CPU at 50k lines/s. Or wait for the Q4 report, though even that will probably use short lines."
+ }
+}

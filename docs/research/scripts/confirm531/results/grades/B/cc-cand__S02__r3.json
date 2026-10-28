@@ -1,0 +1,66 @@
+{
+ "pass": "B",
+ "record_sha256": "48858f757bd1e00bbff20db8658cdbb91215209822490a8532caf27c87187526",
+ "cost_usd": 0.0201,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PZNGMPTQP2VG0QXE0X"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FP8PQ16YC2X5NBMEBYEBS",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Combines D1, D2 and D3 (plus sync semantics) with the source and the date."
+   },
+   {
+    "id": "01M61FP8PZNGMPTQP2VG0QXE0X",
+    "version": 1,
+    "verdict": "expected",
+    "note": "D4: the vendor benchmark with its narrow setup, the untested cases and vendor attribution."
+   },
+   {
+    "id": "01M61FP8Q6P1HEQ7Y19AGSAT3P",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "The forum claim is stored explicitly as unverified and anonymous, with the contrary report, which the label allows."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer covers every correct_if point: Kestrune does not fit; NFS is unsupported with a corruption risk; only one process can write at a time; 6 MiB fits under the 8 MiB limit; the benchmark's narrow setup (64-byte values, sync off, no sync=full test) says nothing about the workload, so it must be measured; and the forum truncation claim is treated as unverified."
+ }
+}

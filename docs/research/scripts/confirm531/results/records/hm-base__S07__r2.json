@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S07",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 24.4,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000592212,
+  "turns": 3,
+  "input_tokens": 22698,
+  "output_tokens": 581,
+  "cache_read_tokens": 21504
+ },
+ "record": {
+  "prompt": "Check the research shelf: what did we find about time limits on Saltmarsh CI? I'm planning a nightly job that takes about 7 hours.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Saltmarsh CI time limit",
+     "in": "shelf"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F96WPJSMJWQVZXXZ77V6A\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:31Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "лимит времени CI Saltmarsh джоб",
+     "in": "shelf"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F96WPJSMJWQVZXXZ77V6A\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:31Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "query": "Saltmarsh CI time limit",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F96WPJSMJWQVZXXZ77V6A\", \"content\": \"Saltmarsh CI hosted runners (docs.saltmarsh.example/limits, read 2026-08-21): a job is cancelled after 6 hours and a whole pipeline run after 72 hours; jobs queued for more than 24 hours are dropped; self-hosted runners have no job time limit.\", \"keywords\": [\"saltmarsh\", \"ci\", \"timeout\", \"job limit\", \"hosted runner\"], \"origin\": \"docs.saltmarsh.example 2026-08-21\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:31Z\"}, {\"id\": \"01M61F96WHBRDJTBZ38XZ90VF0\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:40:31Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search"
+  ],
+  "pages_read": [],
+  "final_answer": "Research shelf has one relevant fact — docs.saltmarsh.example/limits, read 2026-08-21:\n\n- Hosted runners: a single job is cancelled after 6 hours.\n- A whole pipeline run: 72 hours.\n- Jobs queued more than 24 hours are dropped.\n- Self-hosted runners: no job time limit.\n\nSo a 7-hour job on hosted runners gets killed around the 6-hour mark, regardless of it being nightly. Two ways it fits: split it across multiple jobs/stages with the work chained (each under 6h), or run it on a self-hosted runner. If it has to stay one job on hosted infrastructure, the limit stands.\n\nOne caveat: that page was read two months ago; worth a quick re-check before you build around it."
+ }
+}

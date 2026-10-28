@@ -1,0 +1,66 @@
+{
+ "pass": "A",
+ "record_sha256": "48858f757bd1e00bbff20db8658cdbb91215209822490a8532caf27c87187526",
+ "cost_usd": 0.0708,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PQ16YC2X5NBMEBYEBS"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FP8PZNGMPTQP2VG0QXE0X"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FP8PQ16YC2X5NBMEBYEBS",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Combines D1–D3 with the source and date, and adds sync semantics."
+   },
+   {
+    "id": "01M61FP8PZNGMPTQP2VG0QXE0X",
+    "version": 1,
+    "verdict": "expected",
+    "note": "D4: the vendor benchmark with its narrow setup, the untested cases and vendor attribution."
+   },
+   {
+    "id": "01M61FP8Q6P1HEQ7Y19AGSAT3P",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "The forum claim is stored explicitly as unconfirmed and anonymous, with the contrary report, which the label allows."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It concludes Kestrune does not fit and names both the NFS and single-writer blockers. It says 6 MiB values fit under the 8 MiB limit and that the benchmark leaves 6 MiB values with sync=full untested, so throughput is unproven. It treats the forum truncation claim as unverified."
+ }
+}

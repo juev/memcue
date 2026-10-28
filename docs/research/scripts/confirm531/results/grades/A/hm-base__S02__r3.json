@@ -1,0 +1,39 @@
+{
+ "pass": "A",
+ "record_sha256": "06a88dd1166dbf5589756301d112eaa30b77f6adc9ba5d7007e1b34f7670cada",
+ "cost_usd": 0.0556,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D3",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer meets the correct_if criteria: it names the NFS and single-writer blockers, says 6 MiB fits under the 8 MiB limit, says the benchmark's narrow setup leaves 6 MiB values with sync=full untested, and treats the forum truncation claim as unverified and contradicted. Calling sustained 6 MiB writes with sync=full a 'blocker' overstates things a little, but it frames that point as unproven rather than as established fact."
+ }
+}

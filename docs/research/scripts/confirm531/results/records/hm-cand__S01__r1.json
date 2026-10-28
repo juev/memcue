@@ -1,0 +1,83 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S01",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 56.6,
+  "docker_exit": 0,
+  "image": "sha256:a667d8efb5e41526b50d2a8f9bee6943b8b6dff74881d50434100f8074baefd0",
+  "cost_usd": 0.004166274,
+  "turns": 12,
+  "input_tokens": 129907,
+  "output_tokens": 3820,
+  "cache_read_tokens": 119808
+ },
+ "record": {
+  "prompt": "I want config/app.wf split into a shared base plus small per-environment files (staging, prod) that pull the base in. Does the config parser this repo uses allow one file to pull in another? Tell me how it would work; don't restructure anything yet.",
+  "base_changes": [
+   {
+    "id": "01M61EFKDMVCHS54C74FQ42Z97",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:edge-config",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "wrenfold, edge-config, requirements.txt, @include, changelog, pypi, dependency pin, config parser, include directive",
+    "content": "In the edge-config repo (/stand/ws) requirements.txt pins wrenfold==2.1.3, but public PyPI's `wrenfold` is a different project (symbolic-math code generator by Gareth Cross, latest 0.5.3) and has no 2.x release; nothing is installed and no private index is configured. The only evidence for the parser's `@include \"path\"` directive (claimed since 2.0.0 in third_party/wrenfold/CHANGELOG.md) is that in-repo changelog copy, which cannot be checked against a real package until the dependency is resolvable.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "wrenfold config parser include directive edge-config"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EE5Z8SBGQACZBRY9AGR69\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:25:45Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "wrenfold библиотека конфигурация парсер internal index"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "In the edge-config repo (/stand/ws) requirements.txt pins wrenfold==2.1.3, but public PyPI's `wrenfold` is a different project (symbolic-math code generator by Gareth Cross, latest 0.5.3) and has no 2.x release; nothing is installed and no private index is configured. The only evidence for the parser's `@include \"path\"` directive (claimed since 2.0.0 in third_party/wrenfold/CHANGELOG.md) is that in-repo changelog copy, which cannot be checked against a real package until the dependency is resolvable.",
+     "keywords": "wrenfold, edge-config, requirements.txt, @include, changelog, pypi, dependency pin, config parser, include directive",
+     "kind": "pitfall",
+     "scope": "repo:edge-config",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M61EFKDMVCHS54C74FQ42Z97\"}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "search_files",
+   "terminal",
+   "search_files",
+   "read_file",
+   "terminal",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "tool_call",
+   "memcue_add"
+  ],
+  "pages_read": [
+   "https://wrenfold.org"
+  ],
+  "final_answer": "Short answer: on paper yes, `@include \"path\"` — but I could not verify it, and there's a problem with the dependency you should settle first.\n\nWhat the repo says\n\nloader.py is a one-liner over `wrenfold.load(path)`, and the only description of the language is the changelog copy in third_party/wrenfold/CHANGELOG.md:\n\n- 2.0.0 — new `@include \"path\"` directive: loads another .wf file at that point. Relative paths resolve against the including file. Nesting up to 8 levels. A key set after an include overrides the included value.\n- 2.1.0 — `@include` paths may use `${ENV}` variables.\n- 1.4.2 and earlier — the old `!import` spelling was still there; 2.0.0 removed it.\n\nSince requirements.txt pins wrenfold==2.1.3, that is inside the range where `@include` is documented, so the split would look like:\n\n  config/base.wf      listen, upstream_timeout, max_body, log_level\n  config/staging.wf   @include \"base.wf\"  then upstream = \"app-staging.int.example:9000\", tls_cert = \"/etc/edge/staging.pem\"\n  config/prod.wf      @include \"base.wf\"  then the prod upstream and cert\n\nloader.py would need no change — `>=2.0.0` syntax is parsed by `load` itself, so `load(\"config/prod.wf\")` picks up the base transparently.\n\nTwo details worth flagging from the wording: the changelog only promises that a key set *after* an include wins, so the include belongs on the first line with every override below it (ordering with keys set *before* the include is unspecified). And it says nothing about whether duplicate keys in one file are an error — relevant if you ever include two files that both define a key.\n\nWhy I'm not confirming it\n\n- `pip3 install wrenfold==2.1.3` fails: no such version on public PyPI. Available: 0.0.0 through 0.5.3.\n- Public PyPI `wrenfold` is a different project entirely — \"Tools for code-generating mathematical functions\", github.com/wrenfold/wrenfold. It does no config parsing and has never had a 2.x.\n- Nothing is installed in the environment, no private index is configured (pip config and env are empty), and there's no vendored source under third_party — only that 15-line changelog.\n- I also searched the repo: single \"initial\" commit, one branch, no other config machinery.\n\nSo the changelog copy describes a parser that no installable package matches. Either the real dependency comes from an internal index not configured here, or the changelog isn't a genuine copy of the pinned package's history — in which case `@include` may just be fiction and the split would fail at load time.\n\nBefore restructuring: get wrenfold importable, then run a two-line probe (base file plus a file that includes it, loaded through loader.load) and confirm the merged dict. If `@include` turns out absent, the fallback is to keep one app.wf per environment generated from a shared source, or to merge dicts in loader.py — both cheap, but neither is worth choosing until the parser's actual capability is known. I recorded this pitfall against the repo so it isn't rediscovered next time."
+ }
+}

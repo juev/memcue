@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "9ff7ed099519bbb3b9a3b4973c3b60ee582d7f721c9eff8ad6f08c4f4f18bd10",
+ "cost_usd": 0.0418,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer uses an assumed S3-style limit of 10,000 parts and says 8 MiB parts won't fail today; the actual limit is Corvane's 5,000 parts (gateway 2.3), so roughly 7,150 parts fails now, which meets the wrong_if 'invents a different limit' / 'says 8 MiB is fine'."
+ }
+}

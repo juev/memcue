@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "4a829d2fb4a2cae49ab92c8355b07097850aad63724e428ea34842025a4597a2",
+ "cost_usd": 0.0521,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FG8MAPY501V7GGG5DDC5J",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "Keeps the 3.1 rule unchanged. It adds two supported findings: the source URL returned 404 when re-fetched, and the 4.2.0 source could not be obtained. It also marks 4.x behaviour as unestablished without claiming anything about it."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It gives the 3.1 docs fact (read 2026-02-08: retries only GET/HEAD/PUT/DELETE/OPTIONS, never POST) and flags that the repo pins the newer major version 4.2.0, so the fact must be checked before relying on it. It never states 4.2 behaviour as fact, and it recommends an idempotency key as its own advice."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "a044e58537c564e64a0a8bc4c07691c29b22eae9efaf973e71edc0d0009de04a",
+ "cost_usd": 0.0085,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no because the 256 KiB limit is below the 300 KB invoices, and it says to pass a reference instead. Its backoff matches the document: first retry after 2 s, each delay doubled, capped at 10 minutes, dead-letter after 25 attempts, and retry_limit changes the count but not the curve."
+ }
+}

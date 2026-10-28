@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "31095947b461662e643bc954f751d43c9a41d606e5f073c62ed6fde127ee4b71",
+ "cost_usd": 0.0322,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says it found no information on Quorvel's message size limit after checking memory and the docs. It does not call 2 MB safe and suggests checking the documentation or the broker configuration before relying on 2 MB messages; the Kafka settings it names are clearly examples, not a claimed Quorvel limit."
+ }
+}

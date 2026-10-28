@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1b10bd461b32f6f8bf4f608a20d384e6477a7b71910ce3aed6799a4525fb19ed",
+ "cost_usd": 0.0452,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It gives every point the label requires: a 30 s default poll, a 10 s polling floor, and stream: true on the Team plan or above, citing the SDK docs read 2026-04-20; but it also states as fact claims the fact does not support, such as that services on an older SDK have no stream option and that the SDK falls back to 10 s polling after a stream break."
+ }
+}

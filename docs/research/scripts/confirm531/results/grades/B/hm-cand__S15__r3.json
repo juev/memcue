@@ -1,0 +1,27 @@
+{
+ "pass": "B",
+ "record_sha256": "d3eaa3d183441f33b9881aea200d0dc74f06fc1757e9ccb5b6e2689fb0df0e96",
+ "cost_usd": 0.0133,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61G3P26TTXJW4GVE23WGRC8",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This is a second shelf fact saying the memory backend counts per process and tally shares counts, added without searching while the seeded fact is still live."
+   },
+   {
+    "id": "01M61G3P2NRAMB9CND5CK9CBHX",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "It stores the gateway's workers = 4 and 100/minute settings, which the repository already shows, and repeats the per-process finding."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the default memory backend counts per process, so with 4 workers a key gets up to 400/min, and that backend=\"tally\" with a tallyd server fixes it; it also notes the fixed, clock-aligned windows."
+ }
+}

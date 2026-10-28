@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "037e75aa7ec1d34ec490c07fa1d14607a74997a38b291a537ef26e5360a9160b",
+ "cost_usd": 0.0474,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It says it has no information on Quorvel and suggests checking the docs or broker configuration, but it also adds a generic guess, clearly labelled as one, that many buses default to about 1 MB; that matches the partial_if criterion."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "611be72181b5ebe6b1c4a0dc49c858a495c39d2ae03d8781a860f07a6eb43086",
+ "cost_usd": 0.0388,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no. It cites the Marrowlog 2.4 Q2 report's 180,000 lines/s figure as plain TCP only, with lines of 200 bytes or less and TLS not measured. It also notes TLS is deferred to the Q4 report and recommends the team's own benchmark, which meets every correct_if criterion."
+ }
+}

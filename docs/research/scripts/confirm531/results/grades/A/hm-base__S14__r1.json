@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c92aa29bb339b5d0e04d489f5357687868178aab75a37e897ac6ec2fbf22d1cf",
+ "cost_usd": 0.0463,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61ET5PDJP5N9AKHHWYWZZ9M",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Records with sources that the repo pins pardalo 4.2.0 but no 4.x package or docs could be found, and that only the 3.1 semantics are known; it makes no claim about how 4.2 retries and does not correct the 3.1 fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the 3.1 rule (Retry(total=N) never retries POST, so under 3.1 the charge is sent once), clearly flags that the pinned 4.2.0 is unverified and needs checking, asserts no 4.x behaviour, and offers an idempotency key as its own advice."
+ }
+}

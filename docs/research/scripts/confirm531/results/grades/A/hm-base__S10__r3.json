@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a2d0064efa194d15c9ceea84eb2e43e1aa2bf40bda2717a54209e97a24a75989",
+ "cost_usd": 0.0346,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no: the 256 KiB limit (262,144 bytes) is below the 300 KB invoices, so the PDF should be passed by reference. It gives the backoff as in the document: first retry at 2 s, each delay doubled, capped at 10 minutes, dead-letter after 25 attempts, and retry_limit changes the count but not the curve."
+ }
+}

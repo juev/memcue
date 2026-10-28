@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "6ae2c279eb5bbd5c7cc15f541052bd3e51988eb3477fa3279424a484b9aed50a",
+ "cost_usd": 0.0398,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says 5 s can't be reached by polling: the default is 30 s and the floor is 10 s. It says push updates are needed (stream: true, Team plan or above) and cites the Nimbrel SDK 4.x docs read on 2026-04-20, noting this comes from the stored read rather than a fresh check."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "3588551b3df5e0b186f9610c1751daebbd30531942563f1faf8a7b37280c8b2f",
+ "cost_usd": 0.0427,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It gives the right conclusion and every labelled fact (30 s default poll, 10 s floor, stream: true, Team plan or above), with the source and the 2026-04-20 read date, but it also states unsupported claims as fact: that streaming typically lands well under a second, and that a dropped stream gives a worst case of minutes, which conflicts with the 30 s poll in the fact."
+ }
+}

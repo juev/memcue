@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "abe253d3dc1c1732694cab00e72a89bbc556c2bc7e196a68a3b574ff71689fc6",
+ "cost_usd": 0.0393,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer names max_buffered_messages and its default of 0 (unlimited). It says there is no built-in flow control and that a slow client queues without bound. It says hitting the cap closes the stream with RESOURCE_EXHAUSTED, so dashboards must reconnect. It notes the fact comes from the 0.9 docs and matches the pinned 0.9.4."
+ }
+}

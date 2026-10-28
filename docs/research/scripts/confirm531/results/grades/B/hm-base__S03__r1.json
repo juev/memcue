@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "6c15b116319aa2413e06a5eb15beb2c55d044ba3de04f84cbc75d637f428a53c",
+ "cost_usd": 0.0068,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer is 5, with the right per-file breakdown (2/1/2), and the command is a recursive grep restricted to *.log files, so logs/notes.txt is excluded."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "95c7cce8376a50b182716699d8c3fd4e38726438af94068475ed022994085136",
+ "cost_usd": 0.0446,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It says no and gives reasons close to both documented ones (NFS corruption and multiple writers), but it never cites the Kestrune 3.2 docs, hedges on whether Kestrune is embedded or a server, and rests on speculation, which fits 'both without any source'."
+ }
+}

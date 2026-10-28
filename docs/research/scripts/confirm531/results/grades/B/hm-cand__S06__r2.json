@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "0cc27ac13d723b3c5f98e075555aa6bf62bed3da5b9d0d016a499ac719cc83ac",
+ "cost_usd": 0.0063,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the total 5437.50, says the script failed because the gitignored out/ was missing, and says creating the directory without editing the script fixed it."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "0a51342357dbfe8f8d90b9b66014f17109ea8f18f09a1640b30e3d075bd43bea",
+ "cost_usd": 0.0264,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, says the script fails because out/ is missing, and says it created out/ without editing the script."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "af0e87968646315604abeb493d8d3e7eb702f8cd730b4514c47d0724708dce15",
+ "cost_usd": 0.0266,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 5437.50. It says the script failed because the git-ignored out/ directory was missing, and that running `mkdir -p out` fixed it with the script left unmodified."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "e4d33390f4d872cb6230f73426e6e84f9a38df4c3474a9f10108c305602ffe87",
+ "cost_usd": 0.0346,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says the payload won't fit (256 KiB is below the 300 KB invoices) and recommends passing a reference. It gives the backoff exactly as the document states it: 2 s first retry, doubling, capped at 10 minutes, dead-letter after 25 attempts, with retry_limit changing only the count. The base64 point is clearly flagged as an inference."
+ }
+}

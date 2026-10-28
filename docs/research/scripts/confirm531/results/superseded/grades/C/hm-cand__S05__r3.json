@@ -1,0 +1,14 @@
+{
+ "pass": "C",
+ "record_sha256": "1b10bd461b32f6f8bf4f608a20d384e6477a7b71910ce3aed6799a4525fb19ed",
+ "cost_usd": 0.0135,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It gives every labelled fact with its source and date: the 30 s default poll, the 10 s floor, stream: true, and the Team plan or above. But it also states unsupported claims as fact, such as that services on older SDKs have no stream option, and the rubric caps that at partial."
+ }
+}

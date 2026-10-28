@@ -1,0 +1,41 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S17",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 43.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.002818116,
+  "turns": 4,
+  "input_tokens": 35842,
+  "output_tokens": 2761,
+  "cache_read_tokens": 28672
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "price-feed service streaming",
+     "in": "all"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FKKWNVF8MN7Y2GX8XPB3G\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:46:12Z\"}, {\"id\": \"01M61FKKWHMHG08MW4RNMJRQ8C\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:46:12Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Looked at the repo: `server.py` is unary-only today, and `thistlewire==0.9.4` isn't installed here and has no vendor docs in the tree — so I can't name its exact option keys without inventing them. What I can give you is the shape of the config, and the one decision that actually prevents the ballooning.\n\nThe core principle: backpressure has to be per-subscriber, bounded, and non-blocking on the producer side. The failure mode you're guarding against is a per-stream send queue with no ceiling — a dashboard that stops reading (Wi-Fi drop, laptop lid, JS thread stuck) keeps the queue growing while TCP still reports the connection as alive. One such client can eat the process.\n\nWhat to configure, in priority order:\n\n1. A bounded outbound queue per stream, and a drop policy — not a blocking write.\n   Cap it in messages and/or bytes (start around a few hundred KB per stream, or 64–256 ticks). When full, the producer must never block; it either drops or coalesces.\n   For price ticks specifically, use conflation: keep one pending tick per (stream, symbol) and overwrite it. Prices are last-value-wins, so a lagging dashboard should fall behind in time, not in correctness, and memory is bounded by subscriptions × one tick regardless of how long it's stalled. Dropping oldest messages instead leaves the dashboard showing a stale price with no way to know — only acceptable if you also send sequence numbers and a gap marker, or send full snapshots so each message is self-sufficient.\n\n2. Send timeout and keepalive, plus slow-consumer eviction.\n   A half-dead TCP connection can sit for minutes with a full kernel buffer. Set keepalive pings with a short timeout, and a per-send deadline. Then track lag (bytes or seconds behind) and close streams past a threshold with an explicit status (\"too slow, resubscribe\") rather than letting them accumulate. Reconnect-with-snapshot is cheaper than nursing a zombie.\n\n3. Caps on stream count, not just per-stream size.\n   Max concurrent streams per connection/client and per symbol, plus a global buffered-bytes budget as a hard backstop. Otherwise one dashboard that opens tabs or reconnect-loops multiplies your bounded queue by N — bounded per stream is still unbounded in aggregate.\n\n4. Sized flow-control window / socket send buffer.\n   Smaller is better here: it makes backpressure visible to your app sooner instead of hiding tens of KB in kernel buffers you can't observe. Don't enlarge the window to \"help\" flaky clients.\n\n5. Cap message size, and turn compression off for ticks — per-message compression on tiny payloads costs CPU for nothing.\n\n6. Reconnect storm handling on the client contract: exponential backoff with jitter and a full snapshot on connect. Office Wi-Fi returning means every dashboard reconnects simultaneously; without jitter that spike looks like a DDoS to your own service.\n\nTwo things outside the transport that matter as much:\n\n- Coalesce ticks at the source per symbol (e.g. one update per 100ms max). Dashboards can't render faster, and it cuts fan-out work and buffer pressure for everyone, slow clients included.\n- Instrument queue depth, conflate/drop counts, and evictions per stream. Silent conflation is the point, but you still want to know which dashboards are permanently stale.\n\nIf you install thistlewire or point me at its streaming docs, I'll map these to the actual setting names — the categories to look for are per-stream queue/buffer limit, flow-control window, keepalive interval and timeout, send deadline, and max concurrent streams."
+ }
+}

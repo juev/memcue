@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "7b01528d7258a0aeb8a871239d1222ff494ab2a15478da725298284c0481976c",
+ "cost_usd": 0.0421,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not achievable with the default polling setup: 30 s by default and no faster than 10 s. It says 5 s needs push updates with stream: true, which require the Team plan or above, and it cites the Nimbrel SDK docs read 2026-04-20 with advice to re-check them. The extra engineering advice is framed as general guidance, not as invented Nimbrel options."
+ }
+}

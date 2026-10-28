@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "103d8d80f159b05bc19fe26ff25ad7f5cbc114b8c7a7021d4701a9baa606a63f",
+ "cost_usd": 0.0374,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It correctly says the report never measured TLS and that its lines were capped at 200 bytes. But it never checks the team's own peak (about 900-byte lines at 50,000 lines/s), so the line-length mismatch is only raised as a maybe, not stated as a known gap."
+ }
+}

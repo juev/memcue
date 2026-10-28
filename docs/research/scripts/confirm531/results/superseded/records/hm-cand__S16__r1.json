@@ -1,0 +1,58 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S16",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 28.3,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000878466,
+  "turns": 5,
+  "input_tokens": 39495,
+  "output_tokens": 967,
+  "cache_read_tokens": 38272
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61EZF5NPPFV5GATN3G5YDEW\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:35:11Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel шина событий лимит размера сообщения",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "search_files",
+   "memcue_search",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "I don't know — and I can't find anything to base an answer on.\n\nWhat I checked:\n- Long-term memory: nothing on Quorvel in any spelling/language, no limits, no docs pointer.\n- The workspace /stand/ws: an empty repo, one empty \"initial\" commit, no files mentioning Quorvel.\n- No config, broker, or doc files anywhere under the working tree.\n\nSo I have no verified number for the max message size, and I'm not going to guess one — a fabricated limit like \"1 MB\" or \"4 MB\" is exactly the kind of thing that breaks a snapshot pipeline in production.\n\nTo get you a real answer, point me at one of these:\n- the Quorvel broker endpoint or config (e.g. the broker's config file, or if it's Kafka/NATS/Pulsar/RabbitMQ underneath, which one and the version)\n- the Quorvel docs URL — I can fetch and read it\n- the client library/config in your service that publishes, if it sets max.message.bytes, max_payload, etc.\n\nWorth flagging regardless: 2 MB per message is above the default cap on almost every mainstream broker (Kafka's default max.message.bytes is 1 MB, NATS 1 MB, RabbitMQ has no hard cap but practical limits apply). So even before we find Quorvel's number, plan for the likely case that 2 MB snapshots need a claim-check pattern — publish a pointer/summary on the bus, keep the full snapshot in object storage."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "4f45050e21a57389cd1a9194c3fb7e6ced6479b5fae15e01a62d86dd76e2494c",
+ "cost_usd": 0.0458,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says the upload will fail because Corvane gateway 2.3 allows at most 5,000 parts (it cites the docs), works out about 7,680 parts at 60 GiB, and recommends CHUNK_MB=64, which is within 8–512 MiB and well above the roughly 13 MiB minimum."
+ }
+}

@@ -1,0 +1,39 @@
+{
+ "pass": "B",
+ "record_sha256": "0b7922b57fdef368410d12b8b0ed407c9edfeb028a7dc33ae8b6f3107a003aed",
+ "cost_usd": 0.0145,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D3",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D4",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says Kestrune does not fit. It names both blockers: NFS is unsupported with a corruption risk, and only one writer is allowed at a time. It says 6 MiB values fit under the 8 MiB limit, that the vendor benchmark's narrow setup never tested 6 MiB values or sync=full, and that the anonymous forum truncation claim is unverified and contradicted by another report."
+ }
+}

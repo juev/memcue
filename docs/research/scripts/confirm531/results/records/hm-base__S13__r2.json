@@ -1,0 +1,58 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S13",
+  "repeat": "r2",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 37.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0025957019999999996,
+  "turns": 6,
+  "input_tokens": 56873,
+  "output_tokens": 1962,
+  "cache_read_tokens": 48384
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F5MAQ91PPGK0FC6TXVQZP\", \"content\": \"Kestrune 3.2 (embedded KV store) opens a database for writing from one process only (exclusive file lock) and does not support data directories on NFS/SMB — the docs say a database on a network filesystem may be corrupted. Its value limit is 8 MiB; the 1.2M writes/s benchmark was sync=\\\"off\\\" with 64-byte values and explicitly did not test values over 4 KiB or sync=\\\"full\\\".\", \"keywords\": [\"Kestrune\", \"NFS\", \"exclusive lock\", \"value limit 8 MiB\", \"sync full\", \"benchmark\", \"ingest worker\", \"embedded KV store\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"repo:/stand/ws\", \"created\": \"2026-10-28T14:38:33Z\"}], \"hint\": \"4 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune данные ingest хосты общий сетевой каталог NFS"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F5MAQ91PPGK0FC6TXVQZP\", \"content\": \"Kestrune 3.2 (embedded KV store) opens a database for writing from one process only (exclusive file lock) and does not support data directories on NFS/SMB — the docs say a database on a network filesystem may be corrupted. Its value limit is 8 MiB; the 1.2M writes/s benchmark was sync=\\\"off\\\" with 64-byte values and explicitly did not test values over 4 KiB or sync=\\\"full\\\".\", \"keywords\": [\"Kestrune\", \"NFS\", \"exclusive lock\", \"value limit 8 MiB\", \"sync full\", \"benchmark\", \"ingest worker\", \"embedded KV store\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"repo:/stand/ws\", \"created\": \"2026-10-28T14:38:33Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "min_score": "0",
+     "query": "Kestrune ingest hosts file server shared mount NFS ingest worker",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F5MAQ91PPGK0FC6TXVQZP\", \"content\": \"Kestrune 3.2 (embedded KV store) opens a database for writing from one process only (exclusive file lock) and does not support data directories on NFS/SMB — the docs say a database on a network filesystem may be corrupted. Its value limit is 8 MiB; the 1.2M writes/s benchmark was sync=\\\"off\\\" with 64-byte values and explicitly did not test values over 4 KiB or sync=\\\"full\\\".\", \"keywords\": [\"Kestrune\", \"NFS\", \"exclusive lock\", \"value limit 8 MiB\", \"sync full\", \"benchmark\", \"ingest worker\", \"embedded KV store\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"repo:/stand/ws\", \"created\": \"2026-10-28T14:38:33Z\"}, {\"id\": \"01M61F4J5J199AZQC1ZGB5H0GE\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:37:58Z\"}, {\"id\": \"01M61F4J58MGA066A5K5PFTARC\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:37:58Z\"}, {\"id\": \"01M61F4J5A3DYXQBV8M3PF2R80\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"hos… [337 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No. That plan hits three separate walls, and the NFS mount is the least of them.\n\n1. Kestrune can't be opened by two writers at all.\n   It's an embedded KV store with an exclusive file lock on the data directory — one process for writing. Two worker processes on ingest-a and ingest-b pointed at /mnt/shared/ingest don't get \"either can write to it\"; they get one process holding the lock and the other failing to open. And an advisory lock on NFS is exactly the case where the lock may not be honoured, so the failure mode isn't a clean error — it's two writers on one file tree.\n\n2. Kestrune's own docs say the data directory must not live on NFS/SMB.\n   Network filesystems may corrupt the database. That applies even with a single writer, so \"put it on the shared mount but only let one host write\" is also unsupported.\n\n3. The durability requirement can't be met on NFS.\n   README requires an acknowledged write to survive power loss, which means sync=\"full\". fsync semantics across an NFS client are not a claim about the server's stable storage, so you can't actually guarantee that from ingest-a. The 1.2M writes/s number in the docs is sync=\"off\" with 64-byte values and explicitly untested above 4 KiB — it tells you nothing about this workload.\n\nPerformance alone would sink it too: 300 writes/s × 6 MiB is ~1.89 GB/s of fsync'd traffic through fs-01 (≈0.88 GiB/s per host), and prefetch=32 lets the queue hand a worker a fair amount of that concurrently.\n\nWhat does work:\n\n- Keep the store local to each host and partition the keyspace. A worker consumes a batch, keeps its partials in its own //var/lib data dir, and hands the finished batch to the archiver — the store never needs to be shared. Route by consistent hashing on the key (or just by batch id) so exactly one worker owns a given key. This is the cheapest change and the only one that keeps 300 writes/s × 6 MiB plausible, since each host writes its own disk.\n- If partials genuinely must be visible to both hosts mid-batch, then Kestrune is the wrong component — that's a client-server store (Postgres, etc.) on fs-01 or elsewhere, which also gets you real concurrency and real durability.\n\nWorth noting your current FileStore (worker/store.py) already writes into /mnt/shared/ingest and gets away with it only because it's one file per key with atomic rename — the JSON-file layout tolerates NFS where a KV store doesn't. That's probably where the \"shared mount works today\" idea came from, and it won't carry over.\n\nIf you want, I can sketch the key-partitioned version of store.py and the config change — no production restarts involved."
+ }
+}

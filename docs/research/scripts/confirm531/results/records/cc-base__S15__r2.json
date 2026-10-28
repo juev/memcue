@@ -1,0 +1,32 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S15",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 15.2,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.082876,
+  "turns": 5,
+  "input_tokens": 8,
+  "output_tokens": 974,
+  "cache_read_tokens": 64340
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [],
+  "memory_calls": [],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "A key can make more than 100 requests per minute: up to **400**, and briefly up to 800 at a minute boundary.\n\n**Why:**\n- `gateway/limits.py` creates `Limiter(rate=\"100/minute\", key=\"api_key\")` without a `backend` argument, so Quillon uses its default `memory` backend. You're pinned to `quillon==1.8.2`, and the Quillon 1.8 docs match that version.\n- According to the docs, with `memory` the counters live inside each process: \"Each process counts on its own, so an application with N worker processes lets a key make up to N times the configured rate.\"\n- `deploy/server.conf` sets `workers = 4`, so each worker separately allows the key 100 requests. That's up to 4 × 100 = 400 per minute. Exactly how many get through depends on how requests are spread across the workers.\n\n**Window reset:** The docs say windows are fixed and reset at the start of each clock minute. A key could use its full 400 in the last seconds of one minute and another 400 in the first seconds of the next. That's up to about 800 requests in a few seconds.\n\n**Fix:** The docs say switching to the shared `tally` backend makes the limit apply across all processes:\n```python\nlimiter = Limiter(rate=\"100/minute\", key=\"api_key\", backend=\"tally\", url=\"tally://host:7070\")\n```\nThis needs a tallyd server that all workers can reach. Even with that, the burst at the minute boundary remains (up to 200 in a few seconds), because the window is still fixed. The page doesn't mention a sliding-window option. Setting the rate to `25/minute` per worker isn't a reliable fix, because requests aren't spread evenly across workers."
+ }
+}

@@ -1,0 +1,54 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S19",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 25.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000665166,
+  "turns": 3,
+  "input_tokens": 23581,
+  "output_tokens": 670,
+  "cache_read_tokens": 22272
+ },
+ "record": {
+  "prompt": "Which port does our staging cache node listen on, and where is its config file? I need to change its eviction settings.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "staging cache node port config file"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FM9FWJYV4KN66DQGJFH2C\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:46:34Z\"}], \"hint\": \"2 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "staging cache eviction settings"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FM9FWJYV4KN66DQGJFH2C\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:46:34Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "staging cache node port config file eviction",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FM9FWJYV4KN66DQGJFH2C\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:46:34Z\"}, {\"id\": \"01M61FM9FABS9W55RCVA2QGYGM\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:46:34Z\"}, {\"id\": \"01M61FM9FG4ZAK35TQJJFW9A92\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:46:34Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Port 7411, config at /etc/ferrocache/node.conf, both on host brindle (the Ferrocache staging node). After changing the eviction settings, apply with `systemctl restart ferrocache-stage`.\n\nThat's from my stored notes on brindle — I'm not on that host right now (this session runs on 7178492d9373, which has no /etc/ferrocache), so I haven't confirmed the values against the live box. If you want, I can check them over SSH before you edit."
+ }
+}

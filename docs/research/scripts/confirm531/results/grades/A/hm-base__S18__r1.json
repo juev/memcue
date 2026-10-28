@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "f4277f600bbae8aa0b859c45511cba1fb16ff85e03b325720420fe0993ee492b",
+ "cost_usd": 0.0346,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It correctly says there are no published numbers and makes up no TLS figure, but it misses the Marrowlog 2.4 report's plain-TCP-only result (about 180,000 lines/s, lines of 200 bytes or less), the fact that TLS was not measured, and the planned Q4 coverage, because its searches never named the shelf; it honestly reports having no record."
+ }
+}

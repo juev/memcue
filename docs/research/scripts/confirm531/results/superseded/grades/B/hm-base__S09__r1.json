@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "3735d496c85bdc7c4a8f11fc288551a31da32621e1aa128c060a4f8cc5f8ed57",
+ "cost_usd": 0.0144,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61EPCP6AHRT9XHQWGK32CH5",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This is a new fact about write access in the environment, and must_not_store forbids anything new."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It assumes the S3 limit of 10,000 parts instead of Corvane's 5,000-part limit, so it wrongly says 8 MiB parts still have headroom at 60 GB; that meets the wrong_if criterion for inventing a different limit, even though the part sizes it suggests would work."
+ }
+}

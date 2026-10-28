@@ -1,0 +1,62 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S17",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 41.9,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00273813,
+  "turns": 7,
+  "input_tokens": 64615,
+  "output_tokens": 2365,
+  "cache_read_tokens": 56960
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "price-feed streaming backpressure server"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FKJB5WB29JJZG5G68FBK9\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:46:10Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "thistlewire RPC framework"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "query": "thistlewire RPC framework streaming"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FKJBCM6YSNZM7EJ0QYP34\", \"content\": \"Thistlewire 0.9 (thistlewire.example/docs/streaming, read 2026-07-11): server-streaming calls have no built-in flow control; the server queues messages for a slow client without bound unless the stream option max_buffered_messages is set (default 0, unlimited); when the cap is reached the stream is closed with RESOURCE_EXHAUSTED.\", \"keywords\": [\"thistlewire\", \"streaming\", \"flow control\", \"max_buffered_messages\", \"slow client\"], \"origin\": \"thistlewire.example 2026-07-11\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:46:10Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "read_file",
+   "memcue_search",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "tool_describe",
+   "tool_call"
+  ],
+  "pages_read": [
+   "https://thistlewire.example/docs/streaming"
+  ],
+  "final_answer": "The key knob in Thistlewire 0.9 is `max_buffered_messages`, set per server-streaming call. From the docs note I have stored (thistlewire.example/docs/streaming): 0.9 has no built-in flow control for server streaming — the server queues for a slow client without bound, and `max_buffered_messages` defaults to 0, meaning unlimited. That default is precisely your balloon: one dashboard that stops reading gets an ever-growing queue until memory or the box gives out.\n\nSo:\n\n1. Set a finite `max_buffered_messages` on the new streaming handler. This is the only backpressure boundary you get on the server side, because there is no client-driven window in 0.9.\n\n2. Size it in ticks, not bytes — it counts messages, and a tick is tiny. Pick the smaller of two budgets: how much memory you'll let one stalled dashboard pin, and how much backlog a merely jittery client should be allowed to work off before you give up on it. A few hundred to a thousand ticks gives a flaky Wi-Fi client a few seconds of grace while keeping per-stream memory in the tens-to-hundreds of KB; tunable once you know your tick rate.\n\n3. Know the overflow semantics: at the cap the stream is closed with RESOURCE_EXHAUSTED. There is no drop-oldest option, so a slow client doesn't get stale ticks — it gets disconnected. Design the dashboard side for that: on RESOURCE_EXHAUSTED, reconnect and resnapshot with the existing unary `prices.Get`, then resubscribe. Without that, a Wi-Fi hiccup silently leaves a dashboard frozen.\n\n4. Watch stream multiplication. If there's no server-side cap on concurrent streams (I couldn't confirm one — the package isn't installed in this environment and the docs domain 404s from here), a browser reconnect loop can hold N buffers per dashboard. Give the client reconnect jitter/backoff.\n\n5. Keep the producer loop non-blocking: with N dashboards fed from one tick loop, bounded queues mean one overflow only closes that one stream — make sure the fan-out doesn't await a slow subscriber inline.\n\nCaveat: requirements.txt pins 0.9.4, and my note is on the 0.9 docs. Confirm the option name and whether it's per-stream or per-call in your installed version before wiring it in — nothing in `server.py` today needs changing yet."
+ }
+}

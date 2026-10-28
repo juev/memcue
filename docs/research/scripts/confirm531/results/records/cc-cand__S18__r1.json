@@ -1,0 +1,40 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S18",
+  "repeat": "r1",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 38.7,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1096956,
+  "turns": 6,
+  "input_tokens": 12,
+  "output_tokens": 1430,
+  "cache_read_tokens": 104558
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; ls; git ls-files | head -50; memcue search \"log shipper TLS throughput\"; memcue search -in shelf:research \"log shipper TLS throughput lines per second\"; memcue search -in shelf:research \"encrypted connection benchmark 50k lines\"; memcue search -in all \"log shipper\"",
+    "result": "README.md\nconfig\nREADME.md\nconfig/agent.yaml\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61EKR76B1P4H65KDCT26TFS example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 perf report 2026 Q2 (vendor/maintainers' own benchmark): one agent shipped 180,000 lines/s to a collector on 1 vCPU, 2 GiB RAM, CPU 85%, median of three 30-min runs. Limits: plain TCP only (TLS never enabled), every line <=200 bytes, disk buffer off, batch_lines 500. TLS, longer lines and disk buffer explicitly not measured; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\n01M61EKR76B1P4H65KDCT26TFS example.com/acme/log-pipeline 2026-10-28 | Marrowlog 2.4 perf report 2026 Q2 (vendor/maintainers' own benchmark): one agent shipped 180,000 lines/s to a collector on 1 vCPU, 2 GiB RAM, CPU 85%, median of three 30-min runs. Limits: plain TCP only (TLS never enabled), every line <=200 bytes, disk buffer off, batch_lines 500. TLS, longer lines and disk buffer explicitly not measured; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\nNo stored facts match."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/",
+   "https://marrowlog.example/perf/2026-q4"
+  ],
+  "final_answer": "No. I found no published number for Marrowlog over TLS, so nothing shows it will handle 50k lines/s.\n\n**The closest published benchmark** is a note from an earlier session. It points to the Marrowlog 2.4 perf report for 2026 Q2 (marrowlog.example/perf/2026-q2, published 2026-06-18), which is the maintainers' own benchmark:\n- One agent shipped **180,000 lines/s** on 1 vCPU and 2 GiB RAM, at 85% CPU (median of three 30-minute runs).\n- **TLS was never turned on.** The test used plain TCP, lines of at most 200 bytes, the disk buffer off and `batch_lines: 500`.\n- The report says outright that TLS, longer lines and the disk buffer were not measured. The maintainers plan to measure TLS in the Q4 report.\n\nI checked for that Q4 report just now and it doesn't seem to be out yet: `/perf/2026-q4` returns 404.\n\n**How that compares with your setup** (from `README.md` and `config/agent.yaml`):\n- Same agent version (2.4), same 1 vCPU, same `batch_lines: 500`, disk buffer also off. That part matches.\n- Your lines average about 900 bytes, roughly 4.5 times the benchmark's ceiling. At 50k lines/s that's about 45 MB/s per agent, compared with at most about 36 MB/s in the benchmark. So in bytes, you're already past what was measured, even before adding encryption.\n- With TLS added, the 180k figure tells you little about your case.\n\nMy guess, which nothing published supports: 50k lines/s is under a third of the benchmark rate, so it may well be fine. But encrypting 45 MB/s on one core, already at 85% CPU on a lighter load, is the part nobody has measured. The safest step is to run our own test before the deadline: one agent, 1 vCPU, real ~900-byte JSON lines, `tls: true`, for 30 minutes at 50k lines/s, watching CPU use and queue backlog. Or wait for the Q4 report, if it arrives in time."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1bc3f19bff7880916c23b01fbfc89be3707cc1fb2db2b08138e509b1d9f47e2c",
+ "cost_usd": 0.0359,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says default polling can't reach 5 s: it polls every 30 s by default and can't go below 10 s. It says push needs stream: true and the Team plan or above, cites the Nimbrel SDK docs read 2026-04-20, and warns the note may not match the SDK version in use; its other suggestions are labelled as its own inference, not stated as sourced fact."
+ }
+}

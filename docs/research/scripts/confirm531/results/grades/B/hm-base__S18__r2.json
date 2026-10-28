@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "6402da8fc706d463f9a55ec5d75e05a49017bada3182a0419e8f432d48d9c7ac",
+ "cost_usd": 0.0117,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It correctly says no one has published a TLS figure and invents none, but it never found or cited the Marrowlog 2.4 report (2026 Q2). It also misses that the report measured only plain TCP with lines of 200 bytes or less (about 180,000 lines/s), and that the Q4 report is planned to cover TLS."
+ }
+}

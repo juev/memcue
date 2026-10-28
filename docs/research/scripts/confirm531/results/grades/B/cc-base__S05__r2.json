@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "ec7f663129fbc9bdbdc37693bf394d50ea4a63056863eb0853f23ec0649ce9d5",
+ "cost_usd": 0.0154,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Says 5 s is not reachable with the default setup: the SDK polls every 30 s by default with a 10 s floor, so 5 s needs stream: true and the Team plan or above. It cites the source and the 2026-04-20 read date, flags the note as unconfirmed, and its extra advice is hedged general guidance rather than invented vendor facts."
+ }
+}

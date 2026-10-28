@@ -1,0 +1,42 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S17",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 40.1,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.1250672,
+  "turns": 8,
+  "input_tokens": 16,
+  "output_tokens": 2089,
+  "cache_read_tokens": 137236
+ },
+ "record": {
+  "prompt": "I'm about to add a server-streaming endpoint to price-feed that pushes price ticks to the trading dashboards. Some dashboards sit on flaky office Wi-Fi. What should I configure so one sluggish dashboard can't make the server balloon? Just advise, no code yet.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "git ls-files | head -50; memcue search \"price-feed streaming backpressure\"; memcue search -in all \"price-feed grpc\"",
+    "result": "README.md\nrequirements.txt\nserver.py\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61F0AVA1Y5ESTHG1JS4Q682 | storefront stores prices as integer cents, never as floats, so that totals do not drift."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://pypi.org/project/thistlewire/0.9.4/",
+   "https://pypi.org/project/thistlewire/"
+  ],
+  "final_answer": "I couldn't check what Thistlewire itself can do. `price-feed` uses `thistlewire==0.9.4`, which isn't installed here and isn't on PyPI, so it's probably an internal library. The advice below is the general pattern. Look in Thistlewire's docs or source for whatever options match it, and if something is missing, build it in your handler.\n\n**The core problem:** a server-streaming handler writes ticks faster than a slow client reads them. If nothing limits that, the backlog sits in an unbounded per-stream send queue, and one stalled dashboard grows memory with no ceiling. Fix it with limits at each layer.\n\n1. **A fixed-size outbound buffer per stream.** Give each subscriber a small queue, sized by message count or bytes, e.g. a few hundred ticks or a few hundred KB. Never use the default unbounded queue. This setting matters most.\n\n2. **A rule for when that buffer is full.** For price ticks, don't block the producer, because one slow client would then stall the shared feed for everyone. Use one of these instead:\n   - **Conflate (recommended):** keep only the latest price per symbol for that client. When they catch up, they get current prices, not stale history. Memory per client is then capped at about one entry per symbol, however far behind they fall.\n   - Or drop the oldest ticks and count the drops.\n   - In either case, keep the producer separate: one fan-out loop feeds per-client buffers, and a full buffer never pushes back on the source.\n\n3. **Disconnect clients that stay behind.** If a client's buffer stays full longer than N seconds, or it drops more than X ticks, close the stream with a clear status like \"resource exhausted / too slow\". The dashboard then reconnects and gets a fresh snapshot. This turns a slow leak into a quick, recoverable reset.\n\n4. **Transport-level flow control.** If Thistlewire uses HTTP/2 or something like gRPC, cap the per-stream and per-connection flow-control windows, and don't enable large or auto-growing windows. Also set a write or send deadline, so a socket that accepts no bytes for, say, 10–30 s gets closed.\n\n5. **Keepalives to catch dead Wi-Fi peers.** Flaky Wi-Fi often leaves half-open TCP connections that never send a FIN. Turn on server keepalive pings (e.g. every 15–30 s, with a 10 s ack timeout) and close the connection when pings go unanswered. Otherwise those zombie streams keep their buffers forever.\n\n6. **Global limits as a backstop:**\n   - a maximum number of concurrent streams in total and per client or connection\n   - a maximum message size\n   - a cap on total memory across all subscriber buffers, if the framework supports one\n\n7. **Make reconnects cheap on the client side.** Have dashboards resubscribe with backoff and jitter, and have the server send a snapshot of current prices on subscribe. Disconnecting slow clients then costs almost nothing, and a Wi-Fi blip doesn't turn into a thundering herd of reconnects.\n\n8. **Metrics:** track buffer depth per stream, drops or conflations, slow-consumer disconnects, and active streams. These let you tune the numbers above with real data.\n\nTo start, I'd do conflation into a small per-client buffer, a write deadline plus keepalive, and disconnecting clients that stay behind. If you can point me at Thistlewire's docs or source, I'll match these to its actual settings before you write the endpoint."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "fb1148eb8973624fdae329167d0824f42541c8d475a8333594ead3dbd8742963",
+ "cost_usd": 0.0241,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The run added km_to_miles(km: float) -> float with a one-line docstring that returns km / 1.609344, using the exact inverse factor and matching the existing style, and the answer does not say the existing functions were changed."
+ }
+}

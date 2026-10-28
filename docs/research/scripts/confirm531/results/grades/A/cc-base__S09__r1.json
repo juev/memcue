@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "e22a4b17559be765b3d501fd19edb6c67b7e0825a9a713d4c7c7616c8fd3564c",
+ "cost_usd": 0.0458,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "It assumes an S3-style 10,000-part limit and says 8 MiB is probably fine for now, instead of the 5,000-part Corvane limit, under which the ~7,150-part upload already fails."
+ }
+}

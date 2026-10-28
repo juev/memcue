@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a582a7df803c6003d7d3d8c6299578207a6af12357f1c0cde2a8a01914741e8d",
+ "cost_usd": 0.025,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer gives 5, broken down as 2+1+2 across app-1.log, app-2.log and archive/app-0.log, using a recursive grep restricted to *.log that leaves out notes.txt, which meets correct_if."
+ }
+}

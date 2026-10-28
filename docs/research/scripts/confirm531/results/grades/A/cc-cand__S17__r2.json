@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1cdfd5fd457f074d0d833b10053479380d29bcecfbe58f73b448665645b7611c",
+ "cost_usd": 0.0391,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer covers everything the correct_if criterion asks for: Thistlewire 0.9 streams have no flow control and queue without bound, max_buffered_messages defaults to 0 (unlimited) and should be set, the stream is closed with RESOURCE_EXHAUSTED at the cap so dashboards must reconnect, and the source is the 0.9 docs, which fits the pinned 0.9.4."
+ }
+}

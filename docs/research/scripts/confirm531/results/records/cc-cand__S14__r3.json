@@ -1,0 +1,47 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S14",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 24.2,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.11592480000000001,
+  "turns": 10,
+  "input_tokens": 12,
+  "output_tokens": 1682,
+  "cache_read_tokens": 104544
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "memcue search -in shelf:research \"urllib3 Retry POST allowed_methods retry\"; memcue search \"charge retry idempotency\"",
+    "result": "01M61G11BWK448NP5HE720H3K6 pardalo.example 2026-02-08 | Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\nNo facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch",
+   "mcp__pages__web_fetch"
+  ],
+  "pages_read": [
+   "https://pardalo.example/docs/retries",
+   "https://pardalo.example/docs/4.2/retries",
+   "https://pardalo.example/changelog",
+   "https://pardalo.example/",
+   "https://pypi.org/pypi/pardalo/4.2.0/json"
+  ],
+  "final_answer": "**Probably not, but I couldn't confirm it for the version you use.**\n\n**What the code does** (`client/charge.py:5`): the session uses `Retry(total=3)` with no method list, so the library's default decides which methods get retried. `create_charge` sends a POST. The code itself never retries.\n\n**What I found about that default:** a note from an earlier session records the Pardalo **3.1** docs (pardalo.example/docs/retries, read 2026-02-08). They said that after a connection error, a session retries only GET, HEAD, PUT, DELETE and OPTIONS, and never POST or PATCH. If 4.2 still works that way, a dropped connection makes `create_charge` raise an exception instead of sending the charge again.\n\n**What I couldn't check:** `requirements.txt` pins `pardalo==4.2.0`. That's a major version later than the docs in the note, and a default like this can change between major versions. Pardalo isn't installed here. The docs page, a 4.2 docs path, the changelog and PyPI all returned 404. So \"POST is not retried\" comes from the 3.1 docs, not from 4.2.\n\n**Two risks remain even if POST isn't retried:**\n- If the connection drops after the billing service has created the charge, your client gets an error even though the charge exists. Any caller or job that retries `create_charge` on that error will charge twice. Check how callers handle exceptions from it.\n- `timeout=10` has the same problem: a slow but successful charge looks like a failure.\n\n**What I'd do:**\n1. Make the retry policy explicit so it doesn't depend on the library default. In Pardalo's `Retry` that's probably a parameter like `allowed_methods`, but check the 4.2 API.\n2. More importantly, send an idempotency key derived from `order_id` (for example an `Idempotency-Key` header), if the billing service supports one. Then any retry is safe, whether it comes from the library, a caller or a person.\n\nI can make either change. First I'd need the Pardalo 4.2 docs or source to confirm the parameter name, and confirmation of whether the billing service accepts idempotency keys."
+ }
+}

@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S14",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 54.3,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0039098399999999995,
+  "turns": 9,
+  "input_tokens": 86624,
+  "output_tokens": 3990,
+  "cache_read_tokens": 78080
+ },
+ "record": {
+  "prompt": "In client/charge.py the session is created with a retry policy. If the connection drops mid-request, could the charge be sent twice? I'm worried about double charges.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "pardalo retry POST idempotency billing charges",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G1S2G4BXY4909MVBRRXDT\", \"content\": \"Pardalo 3.1 HTTP client (pardalo.example/docs/retries, read 2026-02-08): automatic retries are off by default; with retry=Retry(total=N) a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS, never POST or PATCH.\", \"keywords\": [\"pardalo\", \"retry\", \"post\", \"idempotent\", \"http client\"], \"origin\": \"pardalo.example 2026-02-08\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:53:56Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "billing service idempotency key charges"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G1S21FPY0B5WAD6ZANBS5\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:53:56Z\"}, {\"id\": \"01M61G1S28QPTE7KR6YFBDYQ3G\", \"content\": \"The paygate sandbox is https://sandbox.paygate.example; its API keys are in the vault at secret/paygate/sandbox.\", \"keywords\": [\"paygate\", \"sandbox\", \"api key\", \"vault\"], \"scope\": \"service:paygate\", \"created\": \"2026-10-28T14:53:56Z\"}, {\"id\": \"01M61G1S2RZ2JE48M2K0ZM2FK9\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T14:53:56Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "search_files",
+   "terminal",
+   "search_files",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Looked at the code (client/charge.py:5-14) and the Pardalo docs note I have on file.\n\nShort answer: not from the session's retry layer, but yes from everything around it — and the retry layer is the least of the problem.\n\nWhat the code does\n- Module-level `pardalo.Session(retry=Retry(total=3), timeout=10)`, then a POST to `/v1/charges` with `raise_for_status()`.\n- No `status_forcelist`, so status-code retries aren't in play. The question is only about transport errors.\n\nThe documented retry rule\nMy notes from pardalo.example/docs/retries (Pardalo 3.1, read 2026-02-08) say: with `retry=Retry(total=N)`, a session retries after a connection error only GET, HEAD, PUT, DELETE and OPTIONS — never POST or PATCH. If 4.2.0 still holds that, a dropped connection cannot make this session resend the charge; the POST surfaces as an exception instead.\n\nTwo caveats on that\n1. You pin pardalo==4.2.0 (requirements.txt:1). My doc note is 3.1. pardalo.example doesn't resolve from here and the package isn't installable from PyPI, so I could not confirm the rule survived into 4.2.0. Check the 4.2.0 docs or CHANGELOG before relying on it — this is a library default protecting you by accident, not a property of your code.\n2. Even where it holds, \"no retry\" is only half of safety. The bad case isn't the resend — it's the ambiguous outcome: connection drops after the server recorded the charge but before the response reaches you. You get an exception, the charge exists, and you don't know. Any caller-level retry, queue redelivery, or a human re-running the job POSTs a second charge. A 10s timeout plus `raise_for_status()` makes that ambiguous failure look exactly like a clean one to your callers, so they will retry it.\n\nThe durable fix is server-side deduplication: send a deterministic idempotency key, e.g. `Idempotency-Key: charge:{order_id}`, so a repeat POST for the same order returns the original charge instead of creating another. That covers the retry layer and every other resend path, and it doesn't depend on a library default.\n\nI haven't made the edit: nothing in this repo says whether the billing service honours `Idempotency-Key`, and if it silently ignores the header you'd get false confidence. Confirm that with the service's API docs and I'll patch create_charge (and make the key stable across calls, not a fresh UUID)."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "c3af9d32fdb5f7ac4442c9e62924a67f3a90e0bcf15b9f6ad4f2bacc731c29e8",
+ "cost_usd": 0.0411,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not reachable with the default setup. It gives the 30 s default poll, the 10 s polling floor, and that push updates need stream: true and the Team plan or above. It cites docs.nimbrel.example/sdk/updates, read 2026-04-20. The other points are framed as checks to make or examples, not as invented facts."
+ }
+}

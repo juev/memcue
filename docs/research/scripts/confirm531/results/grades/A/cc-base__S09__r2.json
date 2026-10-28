@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "87c996159bba48009f7affec6b0edf765d2f7968063ed7010406c7833aeea33c",
+ "cost_usd": 0.0521,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 8 MiB parts will fail, citing the 5,000-part limit from the Corvane gateway 2.3 docs (read 2026-05-30) and about 7,150 parts for 60 GB. It changes scripts/upload.sh so 60 GB gets 15–16 MiB parts, within 8–512 MiB, and notes the gateway version should be checked."
+ }
+}

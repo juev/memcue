@@ -1,0 +1,33 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S13",
+  "repeat": "r1",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 14.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.0649804,
+  "turns": 2,
+  "input_tokens": 4,
+  "output_tokens": 601,
+  "cache_read_tokens": 28842
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue search \"Kestrune shared mount\"; memcue search -in all \"Kestrune\"; memcue search -in all \"ingest hosts file server NFS\"",
+    "result": "01M61EFB9MXH6A1FE0FZ6ZGYYT example.com/acme/ingest-worker 2026-10-28 | Kestrune 3.2 (per https://docs.kestrune.example/limits, updated 2026-08-30) allows only one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (risk of corruption), so it cannot replace the ingest-worker store as deployed: ingest-a and ingest-b both write to /mnt/shared/ingest, an NFS export of fs-01.\n01M61EFB9MXH6A1FE0FZ6ZGYYT example.com/acme/ingest-worker 2026-10-28 | Kestrune 3.2 (per https://docs.kestrune.example/limits, updated 2026-08-30) allows only one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (risk of corruption), so it cannot replace the ingest-worker store as deployed: ingest-a and ingest-b both write to /mnt/shared/ingest, an NFS export of fs-01.\n01M61EFB9MXH6A1FE0FZ6ZGYYT example.com/acme/ingest-worker 2026-10-28 | Kestrune 3.2 (per https://docs.kestrune.example/limits, updated 2026-08-30) allows only one writer process per database (exclusive file lock) and does not support NFS/SMB data directories (risk of corruption), so it cannot replace the ingest-worker store as deployed: ingest-a and ingest-b both write to /mnt/shared/ingest, an NFS export of fs-01."
+   }
+  ],
+  "tools_in_order": [
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "No, that wouldn't work. It breaks two separate limits.\n\n1. **One writer per database.** Kestrune 3.2 takes an exclusive file lock, so only one process can write to a database. If ingest-a and ingest-b both write, one gets locked out, or the lock fails and they corrupt the data.\n2. **No NFS or SMB data directories.** Kestrune doesn't support a data directory on a network filesystem, because of corruption risk. The shared mount is `/mnt/shared/ingest`, an NFS export of fs-01. So even a single writer there isn't supported.\n\nThis comes from a note saved earlier today, which cites https://docs.kestrune.example/limits (updated 2026-08-30). I didn't re-check that page now, so it's worth a quick look before Ops decides.\n\nSome layouts that would fit those limits:\n- **One writer on local disk.** Kestrune runs on one host with its data on local storage, and the other ingest host sends its writes there (through a queue or an API).\n- **One database per host.** Each host has its own local Kestrune database, and the data gets merged afterwards if needed.\n- **Keep the current store.** If both hosts really need to write directly to shared storage, keep the store ingest-worker uses now for that path."
+ }
+}

@@ -1,0 +1,75 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S13",
+  "repeat": "r2",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 57.6,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.004551648,
+  "turns": 9,
+  "input_tokens": 95100,
+  "output_tokens": 4885,
+  "cache_read_tokens": 86016
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F4MRZMF70YAQDR4C2V5J5\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:38:01Z\"}], \"hint\": \"3 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune данные ingest хосты файловый сервер общий монтирование",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "20",
+     "min_score": "0",
+     "query": "Kestrune ingest hosts file server shared mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61F4MRZMF70YAQDR4C2V5J5\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:38:01Z\"}, {\"id\": \"01M61F4MRP4MFMRNMXMMD9RCPM\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:38:01Z\"}, {\"id\": \"01M61F4MRRHNRZV0CPQTCRT38W\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:38:01Z\"}, {\"id\": \"01M61F4MRWF6XAAMJRHWC9SJFM\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:38:01Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "20",
+     "min_score": "0",
+     "query": "Kestrune"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "read_file",
+   "terminal",
+   "read_file",
+   "read_file",
+   "terminal",
+   "search_files",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "First, a caveat: \"Kestrune\" appears nowhere in this repo or in my notes — the only store I can see is worker/store.py, and nothing names Kestrune. So I can't vouch for its own guarantees; the answer below is about what the shared mount can and can't give you.\n\nSecond: for the store in this repo, Ops isn't proposing anything new. README.md:10-11 and config/worker.toml:2 already say both hosts write to /mnt/shared/ingest, an NFS export of fs-01. So the question is whether the status quo is sound.\n\nWould it work?\n\nPartly, and not to the stated requirement.\n\n- Atomicity per key: put() writes <key>.tmp, fsyncs it, then os.replace (store.py:10-17). Per-file rename over NFS is atomic on the server, and get() never sees a half-written file — that part is fine.\n- Durability: README.md:12 requires an acknowledged write to survive power loss. put() never fsyncs the directory after os.replace, so the rename itself can be lost — a crash leaves the old content or no file, while the write was already acked. That bug exists on local disk too, but NFS makes it worse: the client's fsync only reaches the file server, and whether it reaches the server's disk depends on the export being sync. If fs-01 exports async, no amount of fsync on ingest-a or ingest-b buys you the guarantee.\n- Concurrency: the temp name is key + \".tmp\", shared by both hosts. There's no lock anywhere. If the same key is ever in flight on both hosts — a batch redelivered after a consumer timeout is the normal way that happens — the two processes write into the same temp file, interleaving bytes, and then both rename. You get a corrupt value, not last-writer-wins. Nothing here pins a batch to one host.\n- Throughput: 300 writes/s at up to 6 MiB each is 1800 MiB/s (~1.76 GiB/s) at peak through one NFS export, with create+fsync+rename metadata on every write. That's the number I'd measure before committing; a file server is unlikely to absorb it, and the queue will back up on write latency rather than bandwidth.\n\nIf Kestrune is an embedded engine that the worker opens directly on its data directory, the answer is no outright: that class of engine relies on advisory locks and mmap over its own files and its docs almost always rule out NFS, and two processes on one data directory violates its contract even on local disk. That setup loses data rather than merely running slowly. If Kestrune has its own server process, then pointing the workers at its data directory is the wrong move entirely — the workers should speak its protocol, and two writers over a shared mount is exactly the failure mode its locking exists to prevent.\n\nWhat would work: one writer per data directory, batches pinned to a host (queue routing key or a consistent hash on the batch id) so a retry never hops hosts mid-batch; a unique temp name per write and an fsync of the directory; and the export's sync mode checked against fs-01's actual config. If both hosts must serve the same keys, use something with a server that arbitrates writes, not a shared filesystem.\n\nWhat is Kestrune, and is it the replacement store or something else already in production? That decides whether this is a \"slow and slightly lossy\" answer or a \"don't do it\" one."
+ }
+}

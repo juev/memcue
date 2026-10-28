@@ -1,0 +1,52 @@
+{
+ "pass": "B",
+ "record_sha256": "2d182d127169d57ec1fb10583119f0e08b7fb0564c65d863d74eb5b16fab4ba2",
+ "cost_usd": 0.0235,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61F5MAQ91PPGK0FC6TXVQZP"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61F5MAQ91PPGK0FC6TXVQZP",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact combines D2, D3 and D4 (the benchmark's setup and untested cases, but not that it is the vendor's own number) plus only the 8 MiB value limit from D1. It went to a repo scope instead of the research shelf, and it gives no source URLs."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer meets every criterion. It names NFS (corruption risk) and the one-writer limit as blockers, says 6 MiB fits under 8 MiB, says the benchmark leaves 6 MiB values with sync=full untested so the rate is unproven, and treats the forum truncation claim as unverified and contradicted."
+ }
+}

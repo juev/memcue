@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "700a291a54acc905163ee8021581fe15953a0585c92be014c6fe6067fa6606c0",
+ "cost_usd": 0.0067,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says 300 KB invoices go over the 256 KiB cap, so the PDF should be passed by reference. Its backoff matches the document: 2 s, doubling, capped at 10 min, dead-letter after 25 attempts, and retry_limit changes the count but not the curve."
+ }
+}

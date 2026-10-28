@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "632ef88a37a72d721cf9e66ed986a53506546888679acabe8b89c622328cde6b",
+ "cost_usd": 0.0411,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says it found no information on Quorvel's size limit in memory, the workspace or the web, and asks the user to check Quorvel's docs or broker config before using 2 MB messages. It gives no limit as fact, and its advice about large messages is general and clearly marked as such."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "cf33c00e5a0d501f5b28d4cc6331c6f591702d8e5850a73603539835115171f3",
+ "cost_usd": 0.0381,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says Thistlewire 0.9 server streams have no built-in flow control and queue without bound for a slow client, recommends setting max_buffered_messages (default 0, unlimited), says the stream closes with RESOURCE_EXHAUSTED and that dashboards must reconnect, and notes the fact comes from the 0.9 docs while requirements.txt pins 0.9.4."
+ }
+}

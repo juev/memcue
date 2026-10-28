@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S02",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 41.2,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003184002,
+  "turns": 5,
+  "input_tokens": 47399,
+  "output_tokens": 2959,
+  "cache_read_tokens": 38784
+ },
+ "record": {
+  "prompt": "We want to replace the file-based store in the ingest worker with Kestrune. Our requirements are in README.md. Please read https://docs.kestrune.example/limits, the benchmark post at https://blog.kestrune.example/2026/write-throughput and the thread at https://forum.devpit.example/t/kestrune-large-values/4417, then tell me whether Kestrune fits and what the risks are.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest worker store NFS"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FPGR6ZT1C0YG3G29BSQVA\", \"content\": \"storefront stores prices as integer cents, never as floats, so that totals do not drift.\", \"keywords\": [\"storefront\", \"prices\", \"cents\", \"float\"], \"scope\": \"repo:example.com/acme/storefront\", \"created\": \"2026-10-28T14:47:47Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "read_file",
+   "tool_search",
+   "tool_call",
+   "tool_call",
+   "tool_call",
+   "read_file",
+   "search_files",
+   "memcue_search",
+   "terminal",
+   "read_file"
+  ],
+  "pages_read": [
+   "https://docs.kestrune.example/limits",
+   "https://blog.kestrune.example/2026/write-throughput",
+   "https://forum.devpit.example/t/kestrune-large-values/4417"
+  ],
+  "final_answer": "Verdict: Kestrune does not fit these requirements as they're written. Two independent blockers, and the throughput benchmark doesn't cover your workload.\n\nBlocker 1 — the deployment (decisive)\n\n  README requires two worker processes, on ingest-a and ingest-b, writing to the same directory /mnt/shared/ingest, an NFS export.\n\n  Kestrune docs (3.2, Limits): \"A database may be opened for writing by one process at a time; Kestrune takes an\n  exclusive file lock on open.\" And: \"The data directory must be on a local filesystem. Network filesystems (NFS,\n  SMB/CIFS) are not supported ... a database on one may be corrupted.\"\n\n  So this isn't a performance risk, it's a startup failure plus a data-integrity risk. The second worker's open\n  fails or hangs on the lock, and if the lock does misbehave over NFS you get corruption, not an error. No\n  configuration fixes this; the topology has to change.\n\nBlocker 2 — durability at 6 MiB and 300/s\n\n  Durability needs sync=\"full\" (it's the default, and it's correct: the write returns after the data is on disk).\n  300 writes/s × 6 MiB = 1800 MiB/s ≈ 1.76 GiB/s of fsync'd data, sustained at peak. That is a single-NVMe-class\n  sequential write rate before you account for fsync latency. It is not something to assume, and it is not\n  something NFS will do at all.\n\nThe benchmark is not evidence for this workload\n\n  blog.kestrune.example/2026/write-throughput: 1.2M writes/s, but the setup is one machine, one writer process,\n  batches of 1,000, 16-byte keys, 64-byte values, sync=\"off\". The post says plainly: \"We did not test values larger\n  than 4 KiB or sync=\"full\" in this round.\"\n\n  Your workload is the exact complement of every one of those choices: 6 MiB values, sync=\"full\", two writers.\n  The 1.2M figure tells you the B-tree/engine is fast; it tells you nothing about your case, and citing it as headroom\n  for \"300/s is only 0.025% of 1.2M\" would be the mistake to avoid.\n\nWhat actually fits\n\n  Size: values of 6 MiB are within the documented 8 MiB limit — only 25% headroom, but formally fine.\n\nOpen risk — the truncation claim in the forum thread\n\n  forum.devpit.example/t/kestrune-large-values/4417: kv_wrangler reports Kestrune silently truncating values above\n  1 MiB when compression is on. Treat as unverified: no version, no repro, an unconfirmed \"+1\" from anon_7731, and\n  marlo_p contradicts it (3 MiB values, compression on, 3.1, no truncation). The thread has no further replies.\n\n  It's worth taking seriously for two reasons: \"silently\" is the worst failure mode for a partial-result store, and\n  your 6 MiB is well above the claimed 1 MiB threshold. Before anything else, do a round-trip test — write 6 MiB\n  values on 3.2 with compression on and off, read back, compare checksums. That's an hour of work and it either\n  closes the risk or kills the option.\n\nPaths forward, cheapest first\n\n  1. Single writer service. Put Kestrune on one host with a local disk (fs-01 or a host with local NVMe), let the\n     two workers talk to it over the network instead of touching the store directly. This removes NFS and satisfies\n     the one-writer rule; it's the only option that keeps both requirements.\n  2. Per-host local stores. Each worker owns a local directory, no sharing. Only works if keys can be partitioned by\n     host and the archiver can tell which host holds a given key — and you lose the data on that host if it dies\n     mid-batch, which likely violates \"must survive a power loss\".\n  3. Don't switch yet. Fix the current FileStore's cost centre instead: it does one fsync per key over NFS (see\n     worker/store.py:16). Batching writes and fsyncing once per batch is a much smaller change than a store migration.\n\nAlso, independent of Kestrune: store.py:11 builds the path as key + \".json\" with no validation, so any key\ncontaining \"/\" or \"..\" escapes the data dir. Worth fixing whichever store you land on.\n\nMy recommendation: don't adopt Kestrune under the current topology. Ask the owner whether a single-writer service is\nacceptable — that's the question that decides it. If yes, run the 6 MiB round-trip test and your own sync=\"full\"\nbenchmark at target size before committing."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "612023a1937eecf6a54199fc9d520dea9e541f1a71b37baf7ea65489eca25fe1",
+ "cost_usd": 0.0528,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M61FVYQM0KDSDK0J5NJ34QTD"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FVYQM0KDSDK0J5NJ34QTD",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact keeps the 180,000 lines/s figure together with its limits: plain TCP, lines of 200 bytes or less, and no TLS, long lines or disk buffer, plus the planned Q4 TLS test. It was stored in the repo scope rather than the shelf and leaves out the 2 GiB detail."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both reasons: TLS was never enabled, and the test lines were 200 bytes or less while ours are about 900 bytes at 50k lines/s. It also notes the 85% CPU use on 1 vCPU and recommends our own TLS benchmark, mentioning the planned Q4 report."
+ }
+}

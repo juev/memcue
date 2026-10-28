@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "649d237f39b0e38462c8b6dd48bae1874b51bbc80fc0d675101743f6d79c8a40",
+ "cost_usd": 0.0344,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The proposed code (`km / 1.609344`, type hints, one-line docstring) meets the correct_if spec, but the write guard refused the patch, so units/convert.py was never changed and the task ended blocked rather than done."
+ }
+}

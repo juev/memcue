@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "e44f28eae73959b1214512a112bb48776f09bc3097805de7399352fb0ee128df",
+ "cost_usd": 0.0069,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no because the 256 KiB cap is below the 300 KB invoices, and it recommends passing the invoice by reference. It also gets the backoff right: first retry at 2 s, each delay doubled, capped at 10 min, dead-letter after 25 attempts, with retry_limit changing only the attempt count."
+ }
+}

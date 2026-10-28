@@ -1,0 +1,101 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S13",
+  "repeat": "r3",
+  "chain_from": "S02",
+  "exit": "0",
+  "seconds": 42.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.003272982,
+  "turns": 6,
+  "input_tokens": 59893,
+  "output_tokens": 2963,
+  "cache_read_tokens": 50944
+ },
+ "record": {
+  "prompt": "Ops proposes that both ingest hosts keep the Kestrune data on the file server's shared mount so either can write to it. Would that work?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune ingest hosts file server shared mount",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FPJE9A5BQ5BHHY6SF26V0\", \"content\": \"mobile-app: the iOS build fails when a file name in the asset catalog contains a space; rename the file.\", \"keywords\": [\"mobile-app\", \"ios build\", \"asset catalog\", \"space\"], \"scope\": \"repo:example.com/acme/mobile-app\", \"created\": \"2026-10-28T14:47:48Z\"}], \"hint\": \"3 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Kestrune data storage NFS SMB",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Кеструн ingest хосты файловый сервер общий монтирование",
+     "limit": "10"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "Kestrune"
+    },
+    "result": "{\"facts\": [], \"hint\": \"3 facts on the shelf match: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "ingest hosts shared data directory both writers"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FPJE0NNWB5FE8TN1Y0T3T\", \"content\": \"Do not restart services on production hosts without announcing it in the #ops channel first.\", \"keywords\": [\"restart\", \"production\", \"announce\", \"ops channel\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:47:48Z\"}, {\"id\": \"01M61FPJE1C43CGAKG3FC7WS7F\", \"content\": \"The host tallis runs the nightly backup cron at 02:30 UTC; backups land in /srv/backup/daily and are kept for 9 days.\", \"keywords\": [\"tallis\", \"backup\", \"cron\", \"retention\"], \"scope\": \"host:tallis\", \"created\": \"2026-10-28T14:47:48Z\"}, {\"id\": \"01M61FPJE6T047H773M64EVT3H\", \"content\": \"On the build host corvo, `make test` needs TZ=UTC in the environment; otherwise the date tests fail by one day.\", \"keywords\": [\"corvo\", \"make test\", \"TZ\", \"timezone\", \"date tests\"], \"scope\": \"host:corvo\", \"created\": \"2026-10-28T14:47:48Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "in": "shelf:research",
+     "query": "shared network filesystem concurrent writes NFS SMB locking database over network mount"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FQQ33XFA6M592PFMG2SFG\", \"content\": \"Kestrune 3.2 (docs.kestrune.example/limits, updated 2026-08-30) documents: value limit 8 MiB, key 1 KiB, database file 2 TiB; a database can be opened for writing by one process at a time (exclusive file lock on open), others read-only; the data directory must be on a local filesystem, NFS/SMB are not supported because their file locking is unreliable and a database on one may be corrupted; sync=\\\"full\\\" (default) returns after data reaches disk, sync=\\\"off\\\" may lose the last writes on power failure.\", \"keywords\": [\"Kestrune\", \"limits\", \"value size\", \"NFS\", \"single writer\", \"exclusive lock\", \"sync full\", \"durability\", \"8 MiB\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:48:26Z\"}], \"hint\": \"1 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf:research",
+     "limit": "10",
+     "min_score": "0",
+     "query": "Kestrune single writer exclusive lock local filesystem NFS SMB corruption"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FQQ33XFA6M592PFMG2SFG\", \"content\": \"Kestrune 3.2 (docs.kestrune.example/limits, updated 2026-08-30) documents: value limit 8 MiB, key 1 KiB, database file 2 TiB; a database can be opened for writing by one process at a time (exclusive file lock on open), others read-only; the data directory must be on a local filesystem, NFS/SMB are not supported because their file locking is unreliable and a database on one may be corrupted; sync=\\\"full\\\" (default) returns after data reaches disk, sync=\\\"off\\\" may lose the last writes on power failure.\", \"keywords\": [\"Kestrune\", \"limits\", \"value size\", \"NFS\", \"single writer\", \"exclusive lock\", \"sync full\", \"durability\", \"8 MiB\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:48:26Z\"}, {\"id\": \"01M61FQQ3J2SMC5CJQ2F9M5AAP\", \"content\": \"Kestrune Labs benchmark of 2026-07-02 (blog.kestrune.example/2026/write-throughput) measured 1.2M writes/s on one 32-core machine with local NVMe, one writer process, batches of 1,000, 16-byte keys / 64-byte values, sync=\\\"off\\\"; the post states values larger than 4 KiB and sync=\\\"full\\\" were not tested, so it says nothing about large-value or durable-write throughput.\", \"keywords\": [\"Kestrune\", \"benchmark\", \"write throughput\", \"1.2 million writes\", \"sync off\", \"64-byte values\", \"caveats\"], \"origin\": \"example.com/acme/ingest-worker 2026-10-28\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:48:26Z\"}, {\"id\": \"01M61FQQ422KSA… [669 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "read_file",
+   "terminal",
+   "read_file",
+   "read_file"
+  ],
+  "pages_read": [],
+  "final_answer": "No — that breaks Kestrune's storage contract in two separate ways.\n\nFrom the Kestrune 3.2 docs (docs.kestrune.example/limits, updated 2026-08-30):\n\n- The data directory must be on a local filesystem. NFS/SMB are explicitly not supported because their file locking is unreliable and a database on one may be corrupted.\n- One writer per database: opening for write takes an exclusive file lock, and every other opener is read-only. That lock is precisely what NFS/SMB don't implement reliably — so on /mnt/shared/ingest you either get the second ingest host failing to open (the good outcome), or both processes believing they hold the lock and interleaving writes into one database file (the corruption outcome).\n\nThe durability requirement in the README (an acknowledged write survives power loss) also stops being something Kestrune can promise once its data directory sits on a filesystem it doesn't support.\n\nWorth flagging why the proposal sounds plausible: the current FileStore (worker/store.py:10-17) does work on that mount, but only because it's one JSON file per key written via tmp + atomic rename. Kestrune is a single database file guarded by a lock — \"the directory is already shared, so move the store there\" doesn't carry over.\n\nViable shapes if both hosts must run:\n\n- One Kestrune database per host on local disk, keys partitioned by host, combined at the archiver.\n- Single writer: ingest-b sends its work to ingest-a (or both to one designated writer), with the second host as a warm standby taking over on failover — never writing concurrently.\n- If shared storage is non-negotiable, pick a store designed for network access instead of Kestrune.\n\nI'd check with Ops whether they meant moving the existing JSON store rather than Kestrune; if it's Kestrune, the answer is no."
+ }
+}

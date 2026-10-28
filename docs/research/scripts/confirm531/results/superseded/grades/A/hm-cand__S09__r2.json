@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c58e9b6afd079159baf8439015dfd94869476cebf7233c99d3a6c6342edd55e4",
+ "cost_usd": 0.068,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61FDFM4GK5SYH1YVK7C22K8",
+    "version": 1,
+    "verdict": "forbidden",
+    "note": "This is a new fact about write restrictions in the Hermes environment, and the label forbids storing anything new."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says the upload will fail because of the 5,000-part limit, cites the gateway 2.3 docs, and works out more than 7,000 parts at 8 MiB. It recommends part sizes of 15-16 MiB, which fall within the 8-512 MiB range, and changes scripts/upload.sh accordingly. It swaps the GB and GiB labels on the part counts, but that slip is minor."
+ }
+}

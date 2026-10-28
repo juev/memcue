@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "1bc3f19bff7880916c23b01fbfc89be3707cc1fb2db2b08138e509b1d9f47e2c",
+ "cost_usd": 0.0119,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer covers every point in correct_if: 30 s default polling, a 10 s minimum, push via stream: true, and the Team plan or above. It cites the Nimbrel SDK docs read 2026-04-20 and warns the note may be out of date for the SDK version in use. It labels the sub-5 s push latency as its own inference rather than a sourced fact."
+ }
+}

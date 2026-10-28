@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "50c3971291376ccc660ec0ca2625b2803f4f431e5de71b6f48229ab878fcbf06",
+ "cost_usd": 0.0445,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer reports every shelf limit with its source and date (6h job, 72h pipeline, 24h queue, no limit on self-hosted). It concludes the 7-hour job would be cancelled on a hosted runner and gives both options: split it into jobs under 6 hours or use a self-hosted runner."
+ }
+}

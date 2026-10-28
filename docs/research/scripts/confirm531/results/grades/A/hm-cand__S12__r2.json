@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1305b8b3d04dd6656e5daa88b91829906fad71cfc3d9001f925235bce1be8769",
+ "cost_usd": 0.0249,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The run added `def km_to_miles(km: float) -> float:` to units/convert.py with a one-line docstring, returning km / 1.609344 (the exact inverse of miles_to_km's factor), and left the existing functions unchanged."
+ }
+}

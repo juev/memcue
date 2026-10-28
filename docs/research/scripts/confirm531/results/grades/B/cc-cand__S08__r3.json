@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "2c0e8513f8626e1b2b3a0a15e4c8d78196206a32588093c76544c96fb94acd8b",
+ "cost_usd": 0.0106,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FWBME7NMW0G3N24Z6RM2S"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FWBME7NMW0G3N24Z6RM2S",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the 180,000 lines/s figure along with the plain-TCP, ≤200-byte line and disk-buffer-off limits, notes TLS is planned for Q4, and gives the source and publication date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says the report doesn't show it: TLS was never enabled, and its lines were at most 200 bytes against the team's ~900-byte lines at 50,000 lines/s. It notes the 85% CPU on one vCPU and recommends the team's own TLS load test or the Q4 report, without inventing a TLS overhead figure."
+ }
+}

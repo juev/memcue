@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "dda48399d3c40eb9aeab2c2e3b7e8d59fc516f4a16236b0f726b2f4c42135429",
+ "cost_usd": 0.038,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer covers every point in the correct_if criterion: 30 s default polling, a 10 s floor, and push updates through stream: true that require Team or above. It also cites the Nimbrel SDK 4.x docs read 2026-04-20 and says the figures should be re-checked against the current SDK version."
+ }
+}

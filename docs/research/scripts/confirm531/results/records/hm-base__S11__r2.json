@@ -1,0 +1,65 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S11",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 25.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.000615954,
+  "turns": 4,
+  "input_tokens": 30987,
+  "output_tokens": 524,
+  "cache_read_tokens": 29568
+ },
+ "record": {
+  "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Ferrocache sizing guidance maxmemory replica RAM"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEFBY8NVGMGAZV3HQ33CV\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:43:23Z\"}, {\"id\": \"01M61FEFCJYBTEWBB0YPQV3JDX\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:23Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Феррокаш размер памяти maxmemory реплика рекомендации"
+    },
+    "result": "{\"facts\": [], \"hint\": \"1 fact on the shelf matches: -in shelf:research\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "in": "shelf",
+     "query": "Ferrocache sizing guidance maxmemory replica RAM",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEFC6MX56A1ZAS7EEHV5M\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:43:23Z\"}, {\"id\": \"01M61FEFCAVYK1XE5SBK15A4CW\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T14:43:23Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "maxmemory cache node memory sizing overhead"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FEFCJYBTEWBB0YPQV3JDX\", \"content\": \"The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\", \"keywords\": [\"brindle\", \"ferrocache\", \"staging\", \"port\", \"config\"], \"scope\": \"host:brindle\", \"created\": \"2026-10-28T14:43:23Z\"}]}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "18 GB.\n\nThat's from the Ferrocache 5.2 sizing guide I recorded (docs.ferrocache.example/sizing): maxmemory bounds only the dataset, so replication buffers, client output buffers and fragmentation come on top. The rule is RAM ≥ 1.25× maxmemory without replication and ≥ 1.5× with it — 12 GB × 1.5 = 18 GB for your replica node."
+ }
+}

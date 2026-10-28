@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "95c7cce8376a50b182716699d8c3fd4e38726438af94068475ed022994085136",
+ "cost_usd": 0.0108,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "It says no and gives reasons close to the documented ones (silent corruption on NFS, two hosts writing at once is unsupported), but it does not cite the Kestrune 3.2 docs, presents these as general engine reasoning conditional on Kestrune being embedded, and adds speculative throughput claims."
+ }
+}

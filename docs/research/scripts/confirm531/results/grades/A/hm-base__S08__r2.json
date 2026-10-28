@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "9689511779debdc2d874f17b062c762ba90c89778039d51ce83f93eff9d8fe76",
+ "cost_usd": 0.043,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says no. It notes that TLS was not enabled in any run and that test lines were at most 200 bytes, against our roughly 900-byte lines at 50,000 lines/s. It cites the 180,000 lines/s figure at 85% CPU on one vCPU and says the TLS cost must be measured, either in our own test or in the Q4 report. It gives no TLS overhead figure, and it labels its own byte-scaling estimate as an inference."
+ }
+}

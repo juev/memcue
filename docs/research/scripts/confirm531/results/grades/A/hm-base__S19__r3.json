@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "330bf78a6888323a9f8b7dc8b647feb68433684233f0ce7350aa1512dc4f9a2d",
+ "cost_usd": 0.0401,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "Meets the correct_if criterion: names host brindle, port 7411, config /etc/ferrocache/node.conf and the restart command, all matching stored fact 01M61G5RP5Y8DF9HPYYYCTN27E; the side note about announcing production restarts in #ops does not appear in any search result shown, but it is hedged and does not touch the answer."
+ }
+}

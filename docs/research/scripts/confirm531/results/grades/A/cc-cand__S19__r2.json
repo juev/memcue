@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "1f27535afba84bc3004df221c88c012066c050ab344bf97094e6b496be608991",
+ "cost_usd": 0.033,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says the Ferrocache staging node runs on brindle, port 7411, with config /etc/ferrocache/node.conf, and gives the restart command, which meets correct_if."
+ }
+}

@@ -1,0 +1,57 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "S16",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 51.0,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.0033333,
+  "turns": 9,
+  "input_tokens": 102814,
+  "output_tokens": 2588,
+  "cache_read_tokens": 92800
+ },
+ "record": {
+  "prompt": "What's the largest single message the Quorvel event bus accepts? We'd like to publish 2 MB order snapshots on it.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel event bus message size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61G3X1DJVT8H183C7K65EQ5\", \"content\": \"Commit messages are written in English; the ticket prefix comes from the branch name, not from the issue title.\", \"keywords\": [\"commit message\", \"ticket prefix\", \"branch name\", \"english\"], \"scope\": \"global\", \"created\": \"2026-10-28T14:55:05Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Quorvel",
+     "min_score": "0",
+     "in": "all,shelf:research"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "search_files",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "tool_search",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "I don't have an answer for that — nothing I can check documents a Quorvel event bus at all, let alone its message size limit.\n\nWhat I checked:\n- The workspace (/stand/ws) is an empty git repo: one \"initial\" commit, no files, no docs.\n- Long-term memory and the research shelf: nothing about Quorvel.\n- The web: quorvel.com resolves to an unrelated Shopify storefront, and there's no docs site I could reach.\n\nSo I can't tell you whether 2 MB fits, and I'm not going to invent a number. Before you build snapshots around it, get the limit from Quorvel's own documentation or ask their support, and confirm it against the live broker configuration — the effective ceiling is often set per topic/broker (and counts headers as well as payload), so a documented default may not be what your cluster enforces. Also check what your client library does above the limit: most fail the publish outright rather than splitting it, so you'd need explicit chunking or an object-store reference for 2 MB snapshots if there's any doubt."
+ }
+}

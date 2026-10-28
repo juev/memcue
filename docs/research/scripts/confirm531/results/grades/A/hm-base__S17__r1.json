@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "8de06ae78a5b08729e0cb25875e9d042823bff6d7e82132053f96ac1af3ded07",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer gives only general advice on backpressure, keepalive and buffer caps. It never names Thistlewire's max_buffered_messages option, its default of 0 (unlimited), or that the stream closes with RESOURCE_EXHAUSTED when the cap is reached."
+ }
+}

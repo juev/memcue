@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "57ed3fe2ac36a6a884abac39914f1a24b601cb3253b3efa976d19c14f31726fb",
+ "cost_usd": 0.0387,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the 3.1 fact: per the docs read 2026-02-08, POST is never retried, so under 3.1 the charge would not be resent. It flags that 4.2.0 is a newer major version that must be checked, makes no claim about 4.2 behaviour, and offers the idempotency key as its own advice."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "e87bb3fb81d63874f29a112f4b9107f764925673ddf4babbd41031140bb66ab6",
+ "cost_usd": 0.0084,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61G28NBAV5NPPX64V63YD73",
+    "version": 2,
+    "verdict": "extra_useful",
+    "note": "The run corrected the seeded shelf fact in place to add the fixed-window detail and the tally URL, which the label allows, and it did not create a duplicate."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says the memory backend counts per process, so a key can get up to 400/min with 4 workers, and it gives the fix (backend=\"tally\" with a tallyd server), mentioning fixed clock-aligned windows."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "c3b3ea8b1c27c8a570dc13988cb2489ccd652900cfc6d37e7d8cd079ff2a2641",
+ "cost_usd": 0.037,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer states the 3.1 fact (no POST retries, read 2026-02-08) and that under it the charge would not be resent. It flags that 4.2.0 is a newer major version and still unverified, makes no claim about 4.2 behaviour, and gives the idempotency key as its own advice."
+ }
+}

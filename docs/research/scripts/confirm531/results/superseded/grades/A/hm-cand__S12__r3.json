@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "d20a3fff0dc8ff51ce165f661e0cdf75df6b604c30655823d0b289c668f6b1a6",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "wrong",
+  "answer_reason": "The write guard denied the patch, so km_to_miles was never added to units/convert.py, which meets the label's wrong_if 'does not add the function', even though the proposed code (km / 1.609344, type hints, one-line docstring) was correct and the agent reported the failure honestly."
+ }
+}

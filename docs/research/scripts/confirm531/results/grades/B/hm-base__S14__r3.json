@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "a700fec09fb81d90fede19b97d1e11006d074fa776e830a056f6f861c1839413",
+ "cost_usd": 0.01,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer says Retry's defaults are unknown and whether POST is retried can't be determined, which is the 'says nothing is known although the shelf has the 3.1 fact' wrong_if case. It never mentions the 3.1 rule that Retry covers only GET, HEAD, PUT, DELETE and OPTIONS, not POST."
+ }
+}

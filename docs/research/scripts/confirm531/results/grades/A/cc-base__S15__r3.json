@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "d3d6154c025c8f1e14047037d2a9b104e849ac6d37abc2308ca06ae6099fbf38",
+ "cost_usd": 0.029,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says the default memory backend counts per process, so the 4 workers let a key make up to 400 requests a minute, and it gives the fix: backend=\"tally\" with a tallyd server. It also correctly notes the fixed, clock-aligned windows."
+ }
+}

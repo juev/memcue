@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "9b4f3a2cddf9ae68b43298ed0d0f5c746c1f5d8fe8a2ca85fcc13f55e0f01cc8",
+ "cost_usd": 0.0121,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and backs it with the stored fact: the Marrowlog 2.4 Q2 report measured only plain TCP with lines of 200 bytes or less (180,000 lines/s on 1 vCPU), TLS was not measured, and the Q4 report or the team's own test would cover it. It gives no TLS figure and keeps the short-line caveat."
+ }
+}

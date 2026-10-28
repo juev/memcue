@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "3488e4a3f4011bb83ef1bb8f9f16958ab0a1a3695d7d9889c41c83dc48701766",
+ "cost_usd": 0.0145,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FX7VAGJVGPBNXKMH1CFMJ"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FX7VAGJVGPBNXKMH1CFMJ",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the 180,000 lines/s figure along with the report's limits (plain TCP, lines of 200 bytes or less, disk buffer off) and notes that TLS, longer lines and the disk buffer were not measured, with TLS planned for Q4."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Says the report doesn't show it because TLS wasn't measured and lines were capped at 200 bytes against our ~900-byte lines at 50k lines/s. It cites 180k lines/s at 85% CPU on one vCPU and recommends our own TLS test or waiting for the Q4 report, without inventing a TLS overhead figure."
+ }
+}

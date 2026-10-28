@@ -1,0 +1,50 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S18",
+  "repeat": "r1",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 33.5,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.00143166,
+  "turns": 5,
+  "input_tokens": 42102,
+  "output_tokens": 1739,
+  "cache_read_tokens": 40320
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shipper throughput encrypted TLS lines per second benchmark"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "логшиппер пропускная способность шифрование TLS нагрузка"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "search_files",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No — we don't have any numbers, published or measured.\n\nWhat's actually in hand:\n\n- /stand/ws has only README.md and config/agent.yaml, one commit (\"initial\"). No benchmark notes, no load-test output, no vendor doc excerpts. Grep for benchmark/throughput/TLS finds only the README's \"Peak volume: 50,000 lines per second\" and the `tls: false` line in the config.\n- Nothing in memory about Marrowlog throughput.\n- I can't check the vendor's published figures from here either — no DNS/network in this environment (`marrowlog.com` and `collector.int.example` both fail to resolve). So even if the vendor publishes a number, I can't confirm it exists or what it says.\n\nAnd a vendor number wouldn't settle it anyway, because of the size of what we're asking for. At 50k lines/s × ~900 B, each agent pushes:\n\n    45.0 MB/s  ≈ 360 Mbit/s sustained  (~3.9 TB/day if it ran at peak all day)\n    500-line batches arrive at ~100 batches/s\n\nThat's a continuously saturated ~360 Mbps stream from a sidecar with 1 vCPU reserved. TLS itself isn't the scary part — handshakes are per-connection, not per-line, and AES-NI bulk encryption runs in the hundreds of MB/s per core — but you're adding per-byte CPU work onto a core that is already likely the binding constraint, plus record framing and larger write/syscall pressure. Whether it holds at 50k depends on that specific agent build, so it needs a measurement, not a citation.\n\nTo get a real answer, one load test on a representative VM profile (1 vCPU, 900 B lines, peak rate) comparing plain TCP vs TLS: watch achieved lines/s, agent CPU, p99 send latency, and whether the disk buffer spills (`buffer.disk: false` today, so backpressure goes straight to the app). If you want, I can write the test harness and the exact pass/fail thresholds — but I'd need a reachable collector endpoint or a local TLS listener to test against."
+ }
+}

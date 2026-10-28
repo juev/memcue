@@ -1,0 +1,39 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "S11",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 332.5,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.0710118,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 652,
+  "cache_read_tokens": 46339
+ },
+ "record": {
+  "prompt": "We went through Ferrocache's sizing guidance a while ago. I'm setting maxmemory to 12 GB on a node with a replica - how much RAM should the VM get?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "memcue search \"Ferrocache sizing maxmemory RAM\"; memcue search -in all \"Ferrocache memory replica overhead\"",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\n1 fact on the shelf matches: -in shelf:research\n01M61EPPKA814ABS92CV7K60YQ | The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\n01M61EPPM3MYRD58TFHNKMN1AF | The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in all -min-score 0 \"Ferrocache sizing\"; memcue search -in all \"maxmemory headroom VM RAM\"; memcue search -in all -kind rule,decision,pitfall \"Ferrocache\"; memcue search -in shelf:research \"Ferrocache\"",
+    "result": "01M61EPPM3MYRD58TFHNKMN1AF | The host brindle runs the Ferrocache staging node on port 7411; its config file is /etc/ferrocache/node.conf; restart it with `systemctl restart ferrocache-stage`.\nNo stored facts match.\n1 fact on the shelf matches: -in shelf:research\nNo stored facts match.\n01M61EPPKKYREP8MJDXCYKJ65T docs.ferrocache.example 2026-06-02 | Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "**Give the VM at least 18 GB of RAM.**\n\nThis comes from the note I saved when we read the Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing) on 2026-06-02:\n\n- `maxmemory` only caps the dataset. Replication buffers, client output buffers and fragmentation all use memory on top of it.\n- The guide says a node with replication needs RAM of at least **1.5× maxmemory**. A node without replication needs 1.25×.\n\nSo 12 GB × 1.5 = **18 GB minimum**. I'd go a bit higher, to 20 GB or more, so the OS and any other processes on the VM have room. The guide's ratio covers Ferrocache's own overhead, and I don't recall it including those.\n\nThat note is almost five months old and is for version 5.2. If you're running a newer version, check the sizing page again before you provision."
+ }
+}

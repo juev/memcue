@@ -1,0 +1,14 @@
+{
+ "pass": "C",
+ "record_sha256": "81229a8971f3f231c0f49c2e6d36cb8193c8f6266af87a60295329e94f86a3fd",
+ "cost_usd": 0.0167,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says 5 s cannot be reached with the default setup: polling runs every 30 s by default and cannot go below 10 s, so it needs stream: true on the Team plan or above. It cites the Nimbrel SDK 4.x docs read 2026-04-20 and says to re-check them. It invents no numbers or options; its extra rollout advice is general engineering guidance."
+ }
+}

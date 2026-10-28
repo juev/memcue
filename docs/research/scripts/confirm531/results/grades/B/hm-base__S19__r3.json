@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "330bf78a6888323a9f8b7dc8b647feb68433684233f0ce7350aa1512dc4f9a2d",
+ "cost_usd": 0.0112,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives host brindle, port 7411 and config /etc/ferrocache/node.conf, plus the restart command, which meets correct_if; the side remark about announcing restarts in #ops does not appear in the search results shown, but it does not touch the graded facts."
+ }
+}

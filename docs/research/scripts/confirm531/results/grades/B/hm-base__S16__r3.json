@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "cfdc5ba7ac7e7844437133aebe42e9caca1df070614c0f0bf7ff41f2bd3bbaad",
+ "cost_usd": 0.0079,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says plainly that it found no information on Quorvel's limit after checking memory, the workspace and the web, it does not invent a number or approve 2 MB, and it asks for the docs or broker config to get the real limit; its general advice on large messages states no limit for Quorvel."
+ }
+}

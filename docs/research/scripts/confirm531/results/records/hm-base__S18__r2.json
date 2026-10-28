@@ -1,0 +1,58 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S18",
+  "repeat": "r2",
+  "chain_from": "S08",
+  "exit": "0",
+  "seconds": 36.8,
+  "docker_exit": 0,
+  "image": "sha256:357862bef6f2be9e483118841f2b68c66b6f93fe2debf19054225124446491cd",
+  "cost_usd": 0.001615848,
+  "turns": 6,
+  "input_tokens": 49572,
+  "output_tokens": 1966,
+  "cache_read_tokens": 47616
+ },
+ "record": {
+  "prompt": "If we switch the log shippers to encrypted connections, do we have any published numbers showing they'll cope with 50k lines a second?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "log shippers encrypted connections throughput benchmark"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61FADPT82F7PDE1EZJVSNEZ\", \"content\": \"The ledgerdb primary is ledgerdb-01.int.example on port 6544; read replicas are ledgerdb-02 and ledgerdb-03; applications connect through the connection pool on port 6545.\", \"keywords\": [\"ledgerdb\", \"database\", \"primary\", \"replica\", \"port\"], \"scope\": \"service:ledgerdb\", \"created\": \"2026-10-28T14:41:10Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "лог шипперы TLS производительность 50k строк в секунду"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Marrowlog agent log pipeline collector"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "read_file",
+   "terminal",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "tool_search",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "No. I looked — there are no published numbers I can point to, and nothing in this repo either.\n\nWhat's actually available to me: README.md and config/agent.yaml, one commit (\"initial\"), no benchmarks, no vendor docs offline, and no web search tool in this session (only direct page fetch, which needs a URL I don't have). So I can't confirm Marrowlog's docs publish TLS throughput figures, and I won't guess at one.\n\nTwo things worth flagging before you go looking for a number:\n\nThe unit in the question hides the real constraint. 50k lines/s at ~900 bytes is 45 MB/s ≈ 360 Mbit/s of TLS payload per agent, continuous, and agent.yaml reserves 1 vCPU per sidecar with batch_lines: 500 — so ~100 batches/s. A vendor's \"lines per second\" figure is usually for small synthetic lines with batching and a multi-core box; at your byte rate and core budget it says almost nothing. Bulk AES-GCM on one core is not the bottleneck (that's a few GB/s with AES-NI), so if something falls over it'll be per-record framing, syscalls/copies, and the fact that 360 Mbps is a serious sustained rate for one vCPU — not cipher math.\n\nNothing in the repo has been tuned for this. tls: false, buffer.disk: false. Enabling TLS then measuring is the only way to get a number that means anything for your shape of traffic.\n\nConcretely, the cheapest path to a real answer: stand up a collector with TLS on and replay a captured peak-hour log sample through one agent on a 1-vCPU VM, one run plain and one TLS, and compare lines/s sustained and CPU saturation. That's an afternoon and gives you a defensible number for the security review instead of a vendor claim. If you'd rather ask Marrowlog first, the right question is \"what's sustained TLS throughput and CPU per core for 900-byte records at 100 batches/s\", not \"how many lines per second\".\n\nWant me to write the replay harness and the config for the TLS run?"
+ }
+}

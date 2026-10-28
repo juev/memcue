@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "8d4105099457d8682b4816769ad360f76d0b15c2361d4d56c158b1f50f202da0",
+ "cost_usd": 0.0356,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no published TLS number exists. It cites the Marrowlog 2.4 Q2 report (180,000 lines/s, plain TCP, lines of 200 bytes or less, TLS not measured) and says TLS is promised for the Q4 report or the team should run its own test, which meets correct_if with both the short-line and TLS caveats."
+ }
+}

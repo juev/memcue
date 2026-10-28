@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c270e4eaf296929b66c1c4d268e035df9e53139208f5364f9fd5486b981a73a0",
+ "cost_usd": 0.0376,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says the report does not show this. It notes that TLS was not enabled in any run and that lines were 200 bytes or less, against the team's roughly 900-byte lines at 50,000 lines/s. It cites 180,000 lines/s at 85% CPU on one vCPU, gives no TLS overhead figure, and says to measure TLS with a staging run or wait for the Q4 report."
+ }
+}

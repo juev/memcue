@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "2b0be439271fc2580fa98a3eedf86206ddbcf61de8f5f9a7050d7679918555a8",
+ "cost_usd": 0.0237,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer gives 5, naming app-1.log, app-2.log and archive/app-0.log, with a recursive grep restricted to --include='*.log' that leaves out notes.txt."
+ }
+}

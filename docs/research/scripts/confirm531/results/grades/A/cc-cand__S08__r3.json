@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "2c0e8513f8626e1b2b3a0a15e4c8d78196206a32588093c76544c96fb94acd8b",
+ "cost_usd": 0.0424,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FWBME7NMW0G3N24Z6RM2S"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FWBME7NMW0G3N24Z6RM2S",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the 180,000 lines/s figure along with the plaintext, ≤200-byte and disk-buffer-off limits, the items not measured (TLS planned for Q4), the source and the publication date."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says no: TLS was not enabled in any run and lines were ≤200 bytes, while the team's agents send ~900-byte lines at 50,000 lines/s. It notes that the 85% CPU plaintext figure leaves little headroom and recommends the team's own TLS load test or the Q4 report, without inventing a TLS overhead figure."
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "pass": "A",
+ "record_sha256": "27cbe7928f50968ea1a74851fea6982beba73095e15920dce9196078f6251ad8",
+ "cost_usd": 0.0604,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EFKDMVCHS54C74FQ42Z97",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "This ordinary-scope fact repeats the requirements pin, but its main point is a finding backed by tool output: the PyPI package named wrenfold is a different project with no 2.x release, so the in-repo changelog is the only evidence for @include. It does not touch the stale 1.4 shelf fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes on the pinned 2.1.3 with every mechanism detail from the changelog (@include \"path\" since 2.0.0, paths relative to the including file, 8 nesting levels, keys set after the include override, ${ENV} in paths since 2.1.0), and it leaves the files unchanged; the hedging comes from a pip check the agent actually ran, not from the 1.4 limitation."
+ }
+}

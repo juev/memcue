@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "19b0e22ebd39b4e8bad9b95ce8287c8a943b569876f88869f0a728b5d22f2357",
+ "cost_usd": 0.0389,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no. It cites the Marrowlog 2.4 Q2 report (180,000 lines/s on 1 vCPU, plain TCP only, lines of 200 bytes or less), states that TLS was not measured, and notes that the Q4 report is planned but not out yet. It recommends the team run its own test, and it labels its byte-rate arithmetic as an estimate rather than a measured TLS figure."
+ }
+}

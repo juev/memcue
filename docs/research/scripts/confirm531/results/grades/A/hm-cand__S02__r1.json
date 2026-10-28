@@ -1,0 +1,66 @@
+{
+ "pass": "A",
+ "record_sha256": "c56d59b4b96bd4979ca11387a6317af8ae8c4def6654fb8419e99a93a078d811",
+ "cost_usd": 0.0725,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRRHGRK6VV8GB07D36YP"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61EGRS2X34Z6MMRZE6F6QN6"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61EGRRHGRK6VV8GB07D36YP",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Covers D1, D2 and D3 with the docs source and update date, and adds the sync semantics from the docs."
+   },
+   {
+    "id": "01M61EGRS2X34Z6MMRZE6F6QN6",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Covers D4: it names the vendor post and date, the narrow setup and the untested cases."
+   },
+   {
+    "id": "01M61EGRSGQJ5TVTHQ0KPAKC68",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Stores the forum claim explicitly as an unverified anecdote, with the contrary report, which must_not_store allows."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Meets correct_if: it concludes Kestrune does not fit because of the NFS corruption risk and the single-writer limit, says 6 MiB fits under 8 MiB, says the benchmark does not cover 6 MiB values with sync=full so 300/s is unproven, and treats the forum truncation claim as unverified and contradicted."
+ }
+}

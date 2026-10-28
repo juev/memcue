@@ -1,0 +1,56 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S08",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 23.6,
+  "docker_exit": 0,
+  "image": "sha256:3265db735f22b4828bea9b0a8b076fee9293593cf2e06a82fee82cefe7bbcbf1",
+  "cost_usd": 0.1036364,
+  "turns": 6,
+  "input_tokens": 8,
+  "output_tokens": 1548,
+  "cache_read_tokens": 66142
+ },
+ "record": {
+  "prompt": "Security wants our log agents to talk to the collector over TLS. Marrowlog published a performance report at https://marrowlog.example/perf/2026-q2 - does it show our agents will keep up at our peak with TLS on?",
+  "base_changes": [
+   {
+    "id": "01M61EKR76B1P4H65KDCT26TFS",
+    "version": 1,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "",
+    "source": "tool",
+    "keywords": "marrowlog 2.4 agent performance throughput TLS benchmark lines per second",
+    "content": "Marrowlog 2.4 perf report 2026 Q2 (vendor/maintainers' own benchmark): one agent shipped 180,000 lines/s to a collector on 1 vCPU, 2 GiB RAM, CPU 85%, median of three 30-min runs. Limits: plain TCP only (TLS never enabled), every line <=200 bytes, disk buffer off, batch_lines 500. TLS, longer lines and disk buffer explicitly not measured; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; git ls-files | head -50; memcue search \"log agent TLS collector peak throughput\"; memcue search -in shelf:research \"marrowlog TLS performance\"; memcue search -in all \"peak events per second log agent\"",
+    "result": "README.md\nconfig/agent.yaml\nNo facts of this repository, this host or global match; -in all searches every repository.\nNo stored facts match.\nNo stored facts match."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue add -shelf research -source tool -keywords \"marrowlog 2.4 agent performance throughput TLS benchmark lines per second\" -- \"Marrowlog 2.4 perf report 2026 Q2 (vendor/maintainers' own benchmark): one agent shipped 180,000 lines/s to a collector on 1 vCPU, 2 GiB RAM, CPU 85%, median of three 30-min runs. Limits: plain TCP only (TLS never enabled), every line <=200 bytes, disk buffer off, batch_lines 500. TLS, longer lines and disk buffer explicitly not measured; maintainers plan to measure TLS in the Q4 report. Source: https://marrowlog.example/perf/2026-q2, published 2026-06-18.\"",
+    "result": "01M61EKR76B1P4H65KDCT26TFS"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "Bash",
+   "mcp__pages__web_fetch",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://marrowlog.example/perf/2026-q2"
+  ],
+  "final_answer": "No, the report doesn't show that. It doesn't test the setup you'd be running.\n\n**What the report measured** (Marrowlog 2.4, published 2026-06-18 by the Marrowlog maintainers): one agent sent 180,000 lines/s on 1 vCPU at 85% CPU. That was over **plain TCP**, with **every line 200 bytes or shorter**, the disk buffer off and `batch_lines: 500`.\n\n**What it says it didn't measure:** TLS, lines longer than 200 bytes, and the disk buffer. They plan to cover TLS in the Q4 report.\n\n**Your setup** (`README.md`, `config/agent.yaml`): agent 2.4 with 1 vCPU and the same batch and buffer settings. Peak is 50,000 lines/s, but lines average about 900 bytes, and TLS is the change you'd be making.\n\nTwo gaps, both my own reasoning rather than anything the report says:\n\n1. **Line size, even without TLS.** The test pushed at most about 36 MB/s (180k × 200 B). Your peak is about 45 MB/s (50k × 900 B). So in bytes, your peak is already above anything they tested. \"180k lines/s\" can't be compared directly with your 50k lines/s, and the 85% CPU figure suggests there isn't much spare capacity per byte.\n2. **TLS.** Encryption adds CPU cost per byte, and the agent has only one vCPU. The report gives no number for how big that cost is.\n\nSo the report neither confirms nor rules out that the agents keep up. To get an answer before the deadline, I'd do one of these:\n- Run your own benchmark: one agent on a 1-vCPU VM with `tls: true`, replaying real logs (about 900-byte lines) at 50k lines/s or more. Watch CPU and whether the agent falls behind.\n- Wait for the Q4 report's TLS numbers. Even then, they probably won't match your line sizes.\n\nI've saved the report's figures and what it didn't test to the research memory, so later sessions can find them."
+ }
+}

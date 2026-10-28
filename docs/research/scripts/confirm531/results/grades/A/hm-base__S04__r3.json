@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "93aead031281f8c9cbadf985a5e154c1632ed177802c06de30af26a1d3a540a2",
+ "cost_usd": 0.0353,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It says yes because Tamberline v2.6 (2026-09-14) accepts sources up to 100 MP, so 64 MP photos no longer need downscaling. It notes the 8,000 px output cap is unchanged and proposes updating the outdated MAX_SOURCE_PIXELS constant and its comment in pipeline.py."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "103d8d80f159b05bc19fe26ff25ad7f5cbc114b8c7a7021d4701a9baa606a63f",
+ "cost_usd": 0.0104,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It correctly says the report did not measure TLS and that lines were 200 bytes or less, but it never sets this against the agents' real load of about 900-byte lines at 50,000 lines/s; it only says real line lengths 'may differ' and asks the user for their peak, so the line-length mismatch is missing."
+ }
+}

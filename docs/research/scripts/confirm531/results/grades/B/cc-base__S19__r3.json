@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "30e9e9dea1c9c971f45d8ec02952807ed8dac06c434a17dd954aac89d9ed93f6",
+ "cost_usd": 0.0101,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It names brindle as the Ferrocache staging node host, with port 7411 and config /etc/ferrocache/node.conf, and adds the restart command; it says these were not checked live, which does not contradict the label."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "b0c848d0462557818452ce3458a3d18c25d21c8774885953811dafe2c53b613d",
+ "cost_usd": 0.0413,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It gets every part of correct_if: the 30 s default poll, the 10 s floor, stream: true, the Team plan, and the source dated 2026-04-20 with a re-check caveat, but it also states unsupported claims as fact (streaming 'usually propagates in well under a second', the SDK falling back to polling when the stream drops, older clients staying on a 30 s poll), and the rule makes that at least partial."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "ceb6f83c54b3cbd09046914dbd23c2292be6dcf4090aa1519120daadeff3683e",
+ "cost_usd": 0.0351,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It names the staging node as Ferrocache on host brindle, gives port 7411 and the config path /etc/ferrocache/node.conf, and adds the matching restart command."
+ }
+}

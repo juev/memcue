@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "1b10bd461b32f6f8bf4f608a20d384e6477a7b71910ce3aed6799a4525fb19ed",
+ "cost_usd": 0.0098,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says 5 s is not reachable with the default setup. It gives the 30 s default poll, the 10 s polling floor, and push via stream: true, which needs the Team plan or above, and cites the Nimbrel SDK 4.x docs read 2026-04-20; the extra caching and proxy points are offered as recommendations, not as Nimbrel facts."
+ }
+}

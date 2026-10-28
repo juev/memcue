@@ -1,0 +1,62 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S15",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 21.4,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.11051060000000001,
+  "turns": 7,
+  "input_tokens": 10,
+  "output_tokens": 1593,
+  "cache_read_tokens": 85493
+ },
+ "record": {
+  "prompt": "Our API gateway runs 4 worker processes (deploy/server.conf) and limits each API key to 100 requests a minute in gateway/limits.py. Read https://docs.quillon.example/config and tell me whether a key really gets 100 per minute overall, or more.",
+  "base_changes": [
+   {
+    "id": "01M61ETDWBX6VWYG28YT8MNH00",
+    "version": 2,
+    "status": "active",
+    "scope": "shelf:research",
+    "kind": "environment",
+    "source": "tool",
+    "keywords": "quillon, rate limit, limiter, workers, processes, memory backend, tally, window",
+    "content": "Quillon 1.8 rate limiter: the default `memory` backend keeps counters per process, so an application with N worker processes lets a key make up to N times the configured rate; a limit shared by all processes needs backend=\"tally\" with url=\"tally://host:7070\" pointing at a tallyd server. Windows are fixed and aligned to the clock (a minute window resets at the start of every minute). Source: docs.quillon.example/config (Quillon 1.8), read 2026-08-12 and re-read 2026-10-28.",
+    "change": "corrected"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat deploy/server.conf; cat gateway/limits.py; ls -R | head -50; memcue search -in shelf:research \"quillon rate limit workers\"",
+    "result": "bind = \"0.0.0.0:8080\"\nworkers = 4\ntimeout = 30\n\"\"\"Per-key rate limits for the public API.\"\"\"\nfrom quillon import Limiter\n\n# Each API key may make 100 requests per minute.\nlimiter = Limiter(rate=\"100/minute\", key=\"api_key\")\n.:\nREADME.md\ndeploy\ngateway\nrequirements.txt\n\n./deploy:\nserver.conf\n\n./gateway:\nlimits.py\n01M61ETDWBX6VWYG28YT8MNH00 docs.quillon.example 2026-08-12 | Quillon 1.8 rate limiter (docs.quillon.example/config, read 2026-08-12): the default `memory` backend keeps counters per process, so an application with N worker processes lets a key make up to N times the configured rate; a limit shared by all processes needs backend=\"tally\" pointing at a tallyd server."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue correct --help 2>&1 | head -30",
+    "result": "Usage of correct:\n  -expires string\n    \tnew last day the fact is worth recalling, YYYY-MM-DD; empty keeps the current one\n  -force\n    \tstore it even when it looks like a secret\n  -keywords string\n    \tcomma-separated; empty keeps the current ones\n  -no-expires\n    \tdrop the expiry: the fact is recalled from now on without end\nmemcue: flag: help requested"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue correct -keywords \"quillon,rate limit,limiter,workers,processes,memory backend,tally,window\" 01M61ETDWBX6VWYG28YT8MNH00 -- \"Quillon 1.8 rate limiter: the default \\`memory\\` backend keeps counters per process, so an application with N worker processes lets a key make up to N times the configured rate; a limit shared by all processes needs backend=\\\"tally\\\" with url=\\\"tally://host:7070\\\" pointing at a tallyd server. Windows are fixed and aligned to the clock (a minute window resets at the start of every minute). Source: docs.quillon.example/config (Quillon 1.8), read 2026-08-12 and re-read 2026-10-28.\" 2>&1",
+    "result": "01M61ETDWBX6VWYG28YT8MNH00 v2"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "ToolSearch",
+   "mcp__pages__web_fetch",
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [
+   "https://docs.quillon.example/config"
+  ],
+  "final_answer": "A key can get more than 100 per minute. With your current setup the limit works out to as much as **400 requests per minute per key**.\n\n**Why:**\n- `gateway/limits.py` creates `Limiter(rate=\"100/minute\", key=\"api_key\")` and doesn't set a backend, so it uses the default `memory` backend.\n- The Quillon 1.8 docs (https://docs.quillon.example/config) say the `memory` backend keeps its counters in each process's own memory. \"Each process counts on its own, so an application with N worker processes lets a key make up to N times the configured rate.\"\n- `deploy/server.conf` sets `workers = 4`, and `requirements.txt` pins `quillon==1.8.2`, which matches the version the docs cover. So the ceiling is 4 × 100 = 400 per minute. A client reaches it when its requests are spread across all four workers, which is what normally happens under load.\n\n**Short bursts can go higher:** The docs say windows are fixed and line up with the clock, so a `minute` window resets at the start of every minute. My inference from that, which the docs don't state: a key could send about 400 requests just before a minute ends and another 400 just after, so about 800 in a few seconds.\n\n**How to get a real 100 per minute:** Switch to the `tally` backend, which keeps the counters on a tallyd server that all processes share:\n```python\nlimiter = Limiter(rate=\"100/minute\", key=\"api_key\", backend=\"tally\", url=\"tally://host:7070\")\n```\nYou'd need a tallyd server running. Even then the fixed windows allow bursts at the minute boundary, up to about 200.\n\nAn earlier session had already saved this finding to the research shelf in memory. I re-read the page today, and it still matches. I updated that saved fact to include the detail about fixed windows."
+ }
+}

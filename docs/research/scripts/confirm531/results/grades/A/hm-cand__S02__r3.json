@@ -1,0 +1,66 @@
+{
+ "pass": "A",
+ "record_sha256": "5ed95a25770b6aabe02b897916de9972a3531eb57a8c2288d4d251cb8e93638a",
+ "cost_usd": 0.0745,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FQQ33XFA6M592PFMG2SFG"
+    ]
+   },
+   {
+    "key": "D2",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FQQ33XFA6M592PFMG2SFG"
+    ]
+   },
+   {
+    "key": "D3",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FQQ33XFA6M592PFMG2SFG"
+    ]
+   },
+   {
+    "key": "D4",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FQQ3J2SMC5CJQ2F9M5AAP"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FQQ33XFA6M592PFMG2SFG",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores D1–D3 from the limits page with the version, date and source; it also adds the sync semantics."
+   },
+   {
+    "id": "01M61FQQ3J2SMC5CJQ2F9M5AAP",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores D4 as Kestrune Labs' own benchmark, with its full narrow setup and the cases it did not test."
+   },
+   {
+    "id": "01M61FQQ422KSAN1KE44TPXT5H",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Stores the forum truncation claim explicitly as unconfirmed, with the contrary report, which the label allows; it is a lead a later investigation would need."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says Kestrune does not fit because of the NFS corruption risk and the one-writer limit. It says 6 MiB values fit under 8 MiB, and that the benchmark's narrow setup leaves throughput for 6 MiB values with sync=full unmeasured. It treats the forum truncation claim as unconfirmed and notes the contrary report."
+ }
+}

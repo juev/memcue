@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "ff628f1569f01bb8ca2172154018c91dfc17d932ef1cf49765ece5679b2ed188",
+ "cost_usd": 0.0372,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It gets the core criteria right: 256 KiB is below the 300 KB invoices, so pass a reference instead; the backoff is 2 s doubling to a 10-minute cap, dead-letter after 25 attempts, and retry_limit changes the count but not the curve. But it also states a derived '~3.5 hours' time-to-dead-letter, which the document's numbers don't support (they give about 2.8–2.9 h), so this is an unsupported claim stated as fact."
+ }
+}

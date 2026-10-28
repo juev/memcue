@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "4324c579b5ef1fff2aeb195c4860ab9145d7c046d520201582a441186ec79c73",
+ "cost_usd": 0.0552,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer says no and gives both documented reasons with the Kestrune 3.2 docs as its source: network filesystems (NFS, SMB) are unsupported and may corrupt the database, and only one process can write at a time. It fetched no web pages, so these facts most likely came from the shelf search. That search returned three Kestrune facts but was cut after the second, so the limits fact itself is not visible in the record; the 'yes' above is an inference."
+ }
+}

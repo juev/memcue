@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "cccef129b2f3e05d609e5450363ce4d8b59ea3b5427c12184513c45a093d9bde",
+ "cost_usd": 0.0241,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The run added `def km_to_miles(km: float) -> float:` with a one-line docstring that returns km / 1.609344, right after miles_to_km, and there is no sign that the existing functions changed."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a9377ec226f2c4c0c8ba48221e77147f4032726798c29f7426e5a62d77b76d32",
+ "cost_usd": 0.0416,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It says the upload will fail and cites the 5,000-part limit from the gateway 2.3 docs (read 2026-05-30). It works out about 7,153 parts at 8 MiB and gives a valid minimum (about 11.5 MiB for decimal GB). It recommends a fixed CHUNK_MB=64 or a part size computed from the file size, both within the 8–512 MiB range, and says to check the limits against the deployed version."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "b135f3d3b8cb3a19fe9f8a98b8c35cc526436afd58e44216b04da7024a2242bb",
+ "cost_usd": 0.0195,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It matches the correct_if core: 30 s default poll, 10 s floor, stream: true, Team plan or above, and it cites the source read 2026-04-20 with a caveat to re-check. But it also states unsupported details as fact, such as push latency 'usually within a second or two' and the SDK falling back to polling by itself, which the sources do not back."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "c9655031f6cbcf5b76425159ad917ea0c329be402bccbbd9afbc77ce8d7cf7fc",
+ "cost_usd": 0.0456,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "partial",
+  "answer_reason": "The answer only hedges: it says 'no outright' only if Kestrune is an embedded engine, and it guesses that the docs 'almost always rule out NFS' and allow one writer, without citing the Kestrune 3.2 docs or any stored fact, so it gives the reasons with no source."
+ }
+}

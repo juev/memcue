@@ -1,0 +1,75 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "S09",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 47.2,
+  "docker_exit": 0,
+  "image": "sha256:daa9a209c2f39d3aa208f0291e4105afc1e92c1014515aeacd9344e8f6d825bd",
+  "cost_usd": 0.00327726,
+  "turns": 9,
+  "input_tokens": 91314,
+  "output_tokens": 2704,
+  "cache_read_tokens": 81920
+ },
+ "record": {
+  "prompt": "The nightly tarball has grown to about 60 GB. scripts/upload.sh still sends it in 8 MiB pieces. Is that going to be a problem, and what should I change?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Corvane multipart upload part size limit"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JFGTMA5KWAEMFECRDQXP7\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T15:36:23Z\"}], \"hint\": \"2 more facts hold the words but sit below the score floor and are not in this answer; run the same search with min_score 0 to read them (limit still caps the answer).\"}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Corvane multipart upload part size limit",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JFGTMA5KWAEMFECRDQXP7\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTFKFQT13M27ASCTNJQ\", \"content\": \"The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\", \"keywords\": [\"stor-02\", \"corvane\", \"gateway\", \"logs\"], \"scope\": \"host:stor-02\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTJYQ9A5P8T0E30W63Q\", \"content\": \"Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\", \"keywords\": [\"corvane\", \"ledger-archive\", \"delete\", \"bucket\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:36:23Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "Corvane gateway tarball chunks upload 10,000 parts",
+     "min_score": "0",
+     "limit": "10"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JFGTFKFQT13M27ASCTNJQ\", \"content\": \"The host stor-02 runs the Corvane gateway for the backup buckets; its logs are in /var/log/corvane/.\", \"keywords\": [\"stor-02\", \"corvane\", \"gateway\", \"logs\"], \"scope\": \"host:stor-02\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTMA5KWAEMFECRDQXP7\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTJYQ9A5P8T0E30W63Q\", \"content\": \"Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\", \"keywords\": [\"corvane\", \"ledger-archive\", \"delete\", \"bucket\"], \"scope\": \"global\", \"created\": \"2026-10-28T15:36:23Z\"}]}"
+   },
+   {
+    "tool": "memcue_search",
+    "input": {
+     "limit": "10",
+     "min_score": "0",
+     "query": "multipart upload maximum parts part size object storage",
+     "in": "all,shelf"
+    },
+    "result": "{\"facts\": [{\"id\": \"01M61JFGT5DPJS4RGE4PFE1X5G\", \"content\": \"Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB.\", \"keywords\": [\"corvane\", \"multipart\", \"part size\", \"parts limit\", \"upload\"], \"origin\": \"docs.corvane.example 2026-05-30\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGT0GWCX1P2A0F65M2A4\", \"content\": \"Ferrocache 5.2 sizing guide (docs.ferrocache.example/sizing, read 2026-06-02): maxmemory bounds only the dataset; replication and client output buffers and fragmentation come on top. The guide recommends RAM of at least 1.5x maxmemory on a node with replication and 1.25x without.\", \"keywords\": [\"ferrocache\", \"maxmemory\", \"sizing\", \"ram\", \"replication\"], \"origin\": \"docs.ferrocache.example 2026-06-02\", \"scope\": \"shelf:research\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTMA5KWAEMFECRDQXP7\", \"content\": \"nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\", \"keywords\": [\"nightly-export\", \"corvane\", \"upload\", \"credentials\", \"bucket\"], \"scope\": \"repo:example.com/acme/nightly-export\", \"created\": \"2026-10-28T15:36:23Z\"}, {\"id\": \"01M61JFGTJYQ9A5P8T0E30W63Q\", \"content\": \"Never delete objects in the Corvane bucket ledger-archive without asking Nadia Brell first: it is the legal archive.\"… [120 chars cut]"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "terminal",
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "memcue_search",
+   "memcue_search",
+   "memcue_search",
+   "terminal",
+   "terminal",
+   "patch",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Yes — it's already broken, not just at risk.\n\nCorvane gateway 2.3 allows at most 5,000 parts per multipart upload (parts 8–512 MiB, last one exempt; 5 TiB per object). At 8 MiB that caps an object at 5,000 × 8 MiB ≈ 39 GiB. A 60 GiB tarball needs 7,680 parts, so the upload fails at the part limit — after pushing tens of GB.\n\nFix in scripts/upload.sh: CHUNK_MB 8 → 32 (scripts/upload.sh:10). That's 1,920 parts for 60 GiB, with headroom to ~156 GiB before you have to think about it again. 16 MiB would also work but only buys you to ~78 GiB. Keep it a multiple of 8 and never below 8 — 8 MiB is the documented floor, which is probably why it was picked originally.\n\nTwo things I couldn't check and you should confirm before relying on this:\n\n- `corvane-cli` isn't installed here, so I couldn't verify it accepts `32MiB` in the same way or whether it has a concurrency flag. If it does, the part count also affects retry cost: one failed part is now 32 MiB to re-send instead of 8, which is the trade-off for the higher ceiling.\n- The script has no retry or resume logic and no verification that the completed object matches the tarball size. A 60 GiB nightly upload with ~2,000 requests will occasionally lose one; worth adding `--retries` (if supported) and a post-upload size/ETag check.\n\nIf growth is unpredictable rather than slow, tell me and I'll make the part size computed from file size instead of hardcoded."
+ }
+}

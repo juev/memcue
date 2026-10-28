@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "8e3e826f03ce3216bf990653a680c1c9516fe3102af0435cea007627ac98411d",
+ "cost_usd": 0.037,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It gives all four shelf limits with the source and the 2026-08-21 read date, says the 7-hour job would be killed at 6 hours on a hosted runner, and offers both options: a self-hosted runner or splitting the work into several jobs."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "4a5fb7094d66bffa8e52899730beb4b35ce0c8d02984eb1cba2cd13cebf4eb01",
+ "cost_usd": 0.0157,
+ "grade": {
+  "capture": [],
+  "changes": [
+   {
+    "id": "01M61ET5NQJR4FP76W7E487KZ8",
+    "version": 1,
+    "verdict": "extra_useful",
+    "note": "Records, from tool results, that the 4.2.0 docs and package could not be reached and that 4.2 retry behaviour is unconfirmed; it makes no claim about 4.2 behaviour and does not correct the 3.1 fact."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "It states the 3.1 shelf fact (Retry retries only GET, HEAD, PUT, DELETE and OPTIONS, never POST), flags that the repo pins 4.2.0 and must be checked, presents any 4.2 change only as a possibility, and gives the idempotency key as its own advice."
+ }
+}

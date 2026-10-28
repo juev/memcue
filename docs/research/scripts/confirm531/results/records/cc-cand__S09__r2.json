@@ -1,0 +1,34 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "S09",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 22.3,
+  "docker_exit": 0,
+  "image": "sha256:039f807d4e6626b2733e8e1a1c63c5b5a28b18608b1463651b77d5a9a8711648",
+  "cost_usd": 0.0995364,
+  "turns": 3,
+  "input_tokens": 6,
+  "output_tokens": 1810,
+  "cache_read_tokens": 47442
+ },
+ "record": {
+  "prompt": "The nightly tarball has grown to about 60 GB. scripts/upload.sh still sends it in 8 MiB pieces. Is that going to be a problem, and what should I change?",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; cat scripts/upload.sh; ls -R | head -50; memcue search \"upload multipart part size\"; memcue search -in shelf:research \"multipart upload part limit\"",
+    "result": "#!/bin/sh\n# Upload the nightly tarball to Corvane with a multipart upload.\nset -eu\nfile=\"$1\"\nCHUNK_MB=8\ncorvane-cli multipart-upload --bucket nightly-dumps --part-size \"${CHUNK_MB}MiB\" \"$file\"\n.:\nREADME.md\nscripts\n\n./scripts:\nupload.sh\n01M61FBJPRH4BSJVT940W15HC6 | nightly-export uploads to the Corvane bucket nightly-dumps; credentials come from the environment variables CORVANE_KEY_ID and CORVANE_SECRET.\n01M61FBJP5S9KSM3YBYYKMW62M docs.corvane.example 2026-05-30 | Corvane gateway 2.3 (docs.corvane.example/multipart, read 2026-05-30): multipart upload parts must be between 8 MiB and 512 MiB, except the last part; an upload has at most 5,000 parts; one object is at most 5 TiB."
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "Yes, it will fail. 60 GB is too many parts at 8 MiB.\n\n**The math.** I checked the memory base, and its research shelf has a note on Corvane's limits. It was read from docs.corvane.example/multipart on 2026-05-30, for gateway 2.3:\n- Each part must be between 8 MiB and 512 MiB (the last part can be smaller).\n- An upload can have at most 5,000 parts.\n- An object can be at most 5 TiB.\n\nAt 8 MiB per part, the biggest file you can upload is 5,000 × 8 MiB ≈ 39 GiB (about 42 GB). A 60 GB tarball needs about 7,150 parts (about 7,680 if it's really 60 GiB). Based on that note, the upload will be rejected once it passes part 5,000, or as soon as it starts if the tool checks the count up front. If the tarball first went over about 42 GB recently, that's probably when the failures began. 8 MiB is also the smallest part size allowed, so you can't go any lower.\n\nI couldn't check this against the current gateway: `corvane-cli` isn't installed here, and the repo doesn't say which gateway version you use. Before you rely on these numbers, confirm them against your version.\n\n**The fix.** Work out the part size from the file size, so the upload stays under 5,000 parts as the tarball keeps growing. Use 64 MiB as the minimum, since bigger parts also mean fewer requests:\n\n```sh\n#!/bin/sh\n# Upload the nightly tarball to Corvane with a multipart upload.\n# Corvane limits: parts 8–512 MiB, at most 5,000 parts per upload.\nset -eu\nfile=\"$1\"\nMAX_PARTS=5000\nMIN_CHUNK_MB=64\nMAX_CHUNK_MB=512\n\nsize=$(stat -c %s \"$file\")\nmib=1048576\n# smallest part size (in MiB) that keeps the upload under MAX_PARTS\nneed=$(( (size + MAX_PARTS * mib - 1) / (MAX_PARTS * mib) ))\nCHUNK_MB=$(( need > MIN_CHUNK_MB ? need : MIN_CHUNK_MB ))\nif [ \"$CHUNK_MB\" -gt \"$MAX_CHUNK_MB\" ]; then\n  echo \"upload.sh: $file is too large for a single multipart upload\" >&2\n  exit 1\nfi\ncorvane-cli multipart-upload --bucket nightly-dumps --part-size \"${CHUNK_MB}MiB\" \"$file\"\n```\n\nWith this, 60 GB goes up as 64 MiB parts (about 900 of them). The script raises the part size on its own above about 312 GiB, and stops with a clear error only above about 2.4 TiB. The simplest alternative is to set `CHUNK_MB=64`. That covers you up to about 312 GiB, but it won't adjust if the tarball grows past that.\n\nI haven't changed `scripts/upload.sh`. Do you want me to apply this version?"
+ }
+}

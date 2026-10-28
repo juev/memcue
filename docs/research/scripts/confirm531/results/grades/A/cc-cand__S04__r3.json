@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "d51c1e514a79e3ca6535d32064c842cb1847b9c55f9864cfbdb6d11fd0f7a5bd",
+ "cost_usd": 0.0489,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "shelf",
+    "fact_ids": [
+     "01M61FR4MP2C54ZAAW2WZECC0A"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M61FR4MP2C54ZAAW2WZECC0A",
+    "version": 2,
+    "verdict": "expected",
+    "note": "Corrects the seeded 40 MP shelf fact in place. The new version gives the v2.6 (2026-09-14) 100 MP limit, the HTTP 413 rejection, the unchanged 8,000 px output cap and the changelog as its source."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer says the downscale can be dropped because v2.6 (2026-09-14) accepts sources up to 100 MP. It notes the 8,000 px output cap is unchanged and that the 40 MP constant and its comment reflect the limit before v2.6. The 'probably' and the advice to check the API version are reasonable caveats, not unsupported claims."
+ }
+}

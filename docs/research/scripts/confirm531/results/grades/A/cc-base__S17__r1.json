@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "b0defb8241ad975dcb5e3c09b0ba2f2a457788f69f81b89243452a429b32247f",
+ "cost_usd": 0.0377,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer gives only general backpressure, keepalive and buffer advice and never names Thistlewire's max_buffered_messages option, its default of 0 (unlimited), or the RESOURCE_EXHAUSTED close; that matches the wrong_if criterion."
+ }
+}

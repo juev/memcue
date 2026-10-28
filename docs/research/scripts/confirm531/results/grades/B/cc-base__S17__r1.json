@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "b0defb8241ad975dcb5e3c09b0ba2f2a457788f69f81b89243452a429b32247f",
+ "cost_usd": 0.009,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "no",
+  "answer": "wrong",
+  "answer_reason": "The answer gives only generic advice (bounded buffers, conflation, keepalives, flow-control windows) and names no Thistlewire-specific setting: it never mentions max_buffered_messages, its default of 0 (unlimited), or that the stream closes with RESOURCE_EXHAUSTED at the cap."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "3588551b3df5e0b186f9610c1751daebbd30531942563f1faf8a7b37280c8b2f",
+ "cost_usd": 0.0152,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "It gets all the label's facts right, with source and date: 30 s default poll, 10 s floor, stream: true, Team plan or above, docs read 2026-04-20. But it also states SDK behaviour no source supports as fact: that a dropped stream falls back to polling, a 'minutes' worst case, and sub-second typical streaming latency. Those unsupported claims cap the grade at partial."
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "pass": "B",
+ "record_sha256": "57ed3fe2ac36a6a884abac39914f1a24b601cb3253b3efa976d19c14f31726fb",
+ "cost_usd": 0.0072,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "correct",
+  "answer_reason": "The answer gives the 3.1 fact (retries only GET/HEAD/PUT/DELETE/OPTIONS, never POST, read 2026-02-08) and flags that 4.2.0 is a newer major version that has to be checked. It makes no claim about how 4.2 behaves, and it offers the idempotency key as its own advice."
+ }
+}

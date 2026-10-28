@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "db3c3e0a8d6e89c4ad6ada065a14a9fa16cdf650a5f94d926459f128b7eb0289",
+ "cost_usd": 0.0362,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It says it has no information on Quorvel and points to the docs and broker config, but it also adds generic limits of typical brokers and a 'likely case' that 2 MB needs a workaround, which is a broker-default guess, so the partial_if criterion applies."
+ }
+}

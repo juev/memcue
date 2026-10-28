@@ -1,0 +1,14 @@
+{
+ "pass": "A",
+ "record_sha256": "a7142a7d52dd527f97e7a5837eef8ca001dcc54b4d8d6c852d3c261736ddabcc",
+ "cost_usd": 0.0426,
+ "grade": {
+  "capture": [],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "yes",
+  "answer": "partial",
+  "answer_reason": "The answer has every required fact: 30 s default polling, a 10 s floor, stream: true for push updates, and the Team plan or above, citing docs.nimbrel.example read 2026-04-20. But it also states as SDK fact that 'when the stream drops, the client falls back to polling', which no source supports, and that unsupported claim limits the grade to partial."
+ }
+}
