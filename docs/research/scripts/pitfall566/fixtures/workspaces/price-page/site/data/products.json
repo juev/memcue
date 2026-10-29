@@ -1,0 +1,12 @@
+[
+  {"name": "Anchor mug", "price_cents": 1450, "active": true},
+  {"name": "Bramble journal", "price_cents": 890, "active": true},
+  {"name": "Cinder candle", "price_cents": 1675, "active": false},
+  {"name": "Dune tote bag", "price_cents": 2400, "active": true},
+  {"name": "Ember tea tin", "price_cents": 720, "active": false},
+  {"name": "Fable pencil set", "price_cents": 760, "active": true},
+  {"name": "Gale scarf", "price_cents": 3150, "active": true},
+  {"name": "Harbor coaster set", "price_cents": 980, "active": false},
+  {"name": "Ivy plant pot", "price_cents": 1320, "active": true},
+  {"name": "Juniper soap", "price_cents": 590, "active": false}
+]

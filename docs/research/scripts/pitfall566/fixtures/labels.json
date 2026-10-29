@@ -1,0 +1,112 @@
+{
+ "P01": {
+  "purpose": "Troubleshooting: site/build.js reads partials/ and data/ by paths relative to the working directory, so it fails when run from the repository root; it works only from site/. No repository document says so. Tests whether a pitfall found by running goes to an ordinary scope.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "price-page pitfall: `node site/build.js` from the repository root fails with \"ENOENT: no such file or directory, open 'partials/head.html'\" because build.js opens partials/, data/ and public/ relative to the current directory; run it from site/ (`cd site && node build.js`). Scope: this repository (repo:example.com/acme/price-page) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The product count 6, the cheapest product Fable pencil set or its price 7.60, or other prices (command output)",
+   "Task progress such as 'ran the script' or 'reported the result'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Reports 6 listed products and Fable pencil set (7.60) as the cheapest, says the build failed from the repository root because of relative paths and that running it from site/ (not editing build.js) fixed it.",
+   "partial_if": "Reports 6 and Fable pencil set without explaining the failure, or explains it but gets the count or the cheapest product from the JSON by hand instead of from the build.",
+   "wrong_if": "Reports a wrong count, names an inactive product (Juniper soap or Ember tea tin) as the cheapest, edits build.js against the instruction, or gives up without a result."
+  }
+ },
+ "P02": {
+  "purpose": "Troubleshooting: the rate card data/zone-rates.tsv has CRLF line endings (a spreadsheet export), so the zone, its last column, carries a trailing carriage return and cost.sh finds no rate for any zone. No repository document says so. Tests whether a pitfall found by running goes to an ordinary scope.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "ship-cost pitfall: scripts/cost.sh fails with 'cost.sh: no rate for zone \"north\" (order A-1001)' although the zone is in the rate card, because data/zone-rates.tsv is exported with CRLF line endings and the zone (last column) keeps a trailing \\r; strip the carriage returns into a copy (`tr -d '\\r' < data/zone-rates.tsv > /tmp/rates.tsv`) and pass it as the second argument. Scope: this repository (repo:example.com/acme/ship-cost) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The October total 58.01 or the per-order costs (command output)",
+   "Task progress such as 'ran the script' or 'reported the result'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Reports the total 58.01, says the script failed because the rate card has CRLF line endings and that passing a copy without carriage returns as RATES (not editing the script or the rate card) fixed it.",
+   "partial_if": "Reports 58.01 without naming the line-ending cause, or names it but computes the total another way with a small rounding difference.",
+   "wrong_if": "Reports a wrong total, edits scripts/cost.sh or data/zone-rates.tsv against the instruction, or gives up without a total."
+  }
+ },
+ "P03": {
+  "purpose": "Copy of #531 S06. Troubleshooting: the script fails in a fresh clone because out/ is git-ignored and the script does not create it; no repository document says so. Tests whether a repository pitfall goes to an ordinary scope, not the shelf.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "month-report pitfall: scripts/monthly.sh fails in a fresh checkout with 'out/total-YYYY-MM.txt: No such file or directory' (or 'Directory nonexistent') because out/ is in .gitignore and the script does not create it; run `mkdir -p out` first. Scope: this repository (repo:example.com/acme/month-report) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The September total 5437.50 or the per-customer amounts (command output)",
+   "Task progress such as 'ran the September report'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Reports the total 5437.50, says the script failed because out/ did not exist and that creating out/ (not editing the script) fixed it.",
+   "partial_if": "Reports 5437.50 without explaining the failure, or explains it but computes the total another way with a small rounding difference.",
+   "wrong_if": "Reports a wrong total, edits scripts/monthly.sh against the instruction, or gives up without a total."
+  }
+ },
+ "P04": {
+  "purpose": "Troubleshooting: duty.py reads the tariff schedule path from the environment variable DUTYBOOK and fails with a KeyError when it is unset; no repository document names the variable. Tests whether a pitfall found by running goes to an ordinary scope.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "duty-calc pitfall: `python3 duty.py MANIFEST.csv` fails with KeyError: 'DUTYBOOK' because the script takes the tariff schedule path from the environment variable DUTYBOOK and has no default; run it as `DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<file>.csv`. Scope: this repository (repo:example.com/acme/duty-calc) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The total duty 473.74 or the per-line duties (command output)",
+   "Task progress such as 'ran the script' or 'reported the result'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Reports the total 473.74, says the script failed because DUTYBOOK was not set and that setting it to schedules/hs-2026.csv (not editing duty.py) fixed it.",
+   "partial_if": "Reports 473.74 without explaining the failure, or explains it but computes the duty by hand with a small rounding difference.",
+   "wrong_if": "Reports a wrong total, edits duty.py against the instruction, or gives up without a total."
+  }
+ },
+ "P05": {
+  "purpose": "Troubleshooting: the supplier portal writes its stock export with a UTF-8 byte order mark, so restock.py does not find the 'sku' column unless run with --encoding utf-8-sig; no repository document says so. Tests whether a pitfall found by running goes to an ordinary scope.",
+  "explicit_cue": false,
+  "expected_capture": [
+   {
+    "key": "D1",
+    "statement": "restock pitfall: `python3 restock.py exports/<file>.csv` fails with \"column 'sku' not found ...; header is ['\\ufeffsku', 'warehouse', 'qty']\" because the supplier portal export starts with a UTF-8 BOM; run it with `--encoding utf-8-sig` (or strip the BOM into a copy) instead of editing the export. Scope: this repository (repo:example.com/acme/restock) or another ordinary scope, kind pitfall.",
+    "place": "ordinary"
+   }
+  ],
+  "must_not_store": [
+   "The pitfall on the research shelf (it is this repository's behaviour, not an outside source)",
+   "The SKU list BX-100, CL-310, EN-512, GH-118, the count 4 or the stock figures (command output)",
+   "Task progress such as 'ran the script' or 'reported the result'"
+  ],
+  "shelf_needed": false,
+  "answer": {
+   "correct_if": "Names exactly BX-100, CL-310, EN-512 and GH-118 (4 SKUs), says the check failed because the export has a BOM and that --encoding utf-8-sig or a BOM-stripped copy (not editing restock.py or the export) fixed it.",
+   "partial_if": "Names the four SKUs without explaining the failure, or explains it but the list misses CL-310 (stock equal to its level) or adds one more.",
+   "wrong_if": "Names a different set of SKUs, edits restock.py or the export file against the instruction, or gives up without a list."
+  }
+ }
+}
