@@ -11,6 +11,9 @@ answer.
 
 Never interrupt the user's work for it: finish or pause at a natural point first.
 
+A due dream usually needs no session: with `claude` on `PATH` or `MEMCUE_API_URL` set, the session start runs it in
+the background and says nothing (#569). The session start names the dream only when nothing can run it there.
+
 1. Print the work:
 
    ```bash

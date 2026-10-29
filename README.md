@@ -37,8 +37,9 @@ not yet run for long in daily work.
 ## Requirements
 
 - macOS or Linux.
-- Claude Code. Only `memcue migrate` and `memcue dream -run` call a model, through the `claude` command on `PATH` or
-  an OpenAI-compatible endpoint (see [Configuration](#configuration)).
+- Claude Code. Only `memcue migrate` and `memcue dream -run`, which a session start runs in the background when a
+  dream is due, call a model, through the `claude` command on `PATH` or an OpenAI-compatible endpoint (see
+  [Configuration](#configuration)).
 - Go 1.27 or later, to build from source.
 
 ## Compatibility
@@ -863,21 +864,28 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 
 Who runs it:
 
-- **Claude Code.** When a dream is due, the session start says so in one line, and the agent runs the `memcue-dream`
-  skill when the user's task allows. It never interrupts a turn. A dream is due once `MEMCUE_DREAM_EVERY` (default
-  `1h`) has passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks the start, so
-  the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them.
-- **Hermes.** When a dream is due, the card in the system prompt says so in one line (`session-card -dream-tools`),
-  and the model runs `memcue_dream_prepare` and `memcue_dream_apply` when the user's task allows (#494). Hermes builds
-  the system prompt once and again after a compression or a reset, so the line is as fresh as the last rebuild
-  ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
+- **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has
+  passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks
+  the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
+  dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
+  in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
+  otherwise. The start is stamped in `dream.started`, so a dream that fails is tried again an interval later, not at
+  every session start; what the dream prints goes to `dream.out`, its record to `dream.log`. A held `dream.lock`
+  makes the background run leave quietly, so sessions started together run one dream.
+- **The session's model.** Without an endpoint and without `claude` on `PATH`, or with
+  `MEMCUE_DREAM_BACKGROUND=0`, the session start says in one line that a dream is due instead. On Claude Code the
+  agent then runs the `memcue-dream` skill when the user's task allows; it never interrupts a turn. On Hermes the card
+  in the system prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
+  `memcue_dream_apply` (#494). Hermes builds the system prompt once and again after a compression or a reset, so the
+  line is as fresh as the last rebuild ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
 - **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
   interval, and the merge sweep, which never runs out of groups, does not keep it going. It uses the endpoint when
   `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks) otherwise. It stops on
   the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. With an
   endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405). Without
   `-all`, `-run` checks the interval and the facts the session start checks and makes no call when nothing is due
-  (#401); without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by surprise.
+  (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
+  surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups, the facts to expand and the facts to translate each go in their own calls of
   one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
@@ -969,7 +977,8 @@ uses.
 | `MEMCUE_NUMBER_TERMS` | versions, dates, ports and addresses are indexed as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)); `0` keeps the old word-only index, and a base indexed word-only is rebuilt on the first open without it | on |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_CARD_BUDGET` | most characters of the session card, the facts the user stated included; when they do not fit, the oldest user-stated fact goes first, and a last line counts what is left out (`memcue search -in global -kind rule` finds it). The Hermes provider sets it from `session_card_chars` | `3500` |
-| `MEMCUE_DREAM_EVERY` | how long after a dream the session start says the next one is due (a Go duration, at least `1m`) | `1h` |
+| `MEMCUE_DREAM_EVERY` | how long after a dream the next one is due (a Go duration, at least `1m`) | `1h` |
+| `MEMCUE_DREAM_BACKGROUND` | `0` keeps the session start from running a due dream in the background; it then says the dream is due instead | on |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes `memcue notes` reads | `$CLAUDE_CONFIG_DIR/memory` |
 | `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/card.log` and `memcue/dream.log` are kept | `~/.local/state` |
 
@@ -1003,7 +1012,10 @@ Writing a fact costs no model call: the agent writes it as part of its work, and
 short call only when `MEMCUE_API_URL` is set. Before #494 an extraction of every session cost $0.18–1.33 per session
 on Opus, about $5 per million characters of transcript, and a review followed it; both are gone.
 
-A dream costs no call of its own: it is part of the session that runs it. One packet is about 20,000–36,000
+A dream the session's model runs costs no call of its own: it is part of the session. A background dream (#569) is
+one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation;
+on Opus through `claude -p` the full passes of the author's Mac base cost $63.16 for 106, about $0.60 each
+([dream-run-2026-10](docs/research/dream-run-2026-10.md)), and a pass with little fresh work less. One packet is about 20,000–36,000
 characters on the author's two bases, instructions included; a dream with no fresh fact and nothing to expand prints
 one line. While facts are owed a translation, its 40 facts add about 10,000 characters (64,583 against 54,000 on a
 copy of the author's base with 2,831 fresh facts waiting).
@@ -1050,7 +1062,7 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
-| Dream | `memcue-dream` skill on the session-start hint | none | dream tools on the system-prompt hint |
+| Dream | background on the session start; else the `memcue-dream` skill on its hint | background on `session-card` with `apiUrl` | background on `session-card` with `api_url`; else dream tools on the system-prompt hint |
 | Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as live facts (#440) |
 
 State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
