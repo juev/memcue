@@ -178,7 +178,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.agentSources(); err != nil {
+	if _, err := s.agentSources(); err != nil {
 		_ = s.Close()
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func sqliteSource(path string, readOnly bool) (dsn, file string, err error) {
 		if readOnly {
 			return "", "", errors.New("store: a read-only base must be a file")
 		}
-		return "file::memory:?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)", "", nil
+		return "file::memory:?_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)&_txlock=immediate", "", nil
 	case strings.HasPrefix(path, "file:"):
 		return "", "", fmt.Errorf("store: %q is a URI: give the base as a file path", path)
 	}
@@ -304,7 +304,10 @@ func sqliteSource(path string, readOnly bool) (dsn, file string, err error) {
 	if readOnly {
 		u.RawQuery = "_pragma=busy_timeout(5000)&mode=ro"
 	} else {
-		u.RawQuery = "_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)"
+		// A transaction takes the write lock at its start: one that read first and then wrote after another process
+		// committed a write is refused at once (SQLITE_BUSY) instead of waiting out busy_timeout, which failed parallel
+		// opens of a new cache.
+		u.RawQuery = "_pragma=busy_timeout(5000)&_pragma=journal_mode(DELETE)&_txlock=immediate"
 	}
 	return u.String(), file, nil
 }
@@ -761,26 +764,28 @@ func approved(m Meta) Meta {
 // a merge, an older memcue), so the stamp sourcesStamp keeps how many versions the base had when the last look found
 // nothing, and an open looks again only when that number moved. A base of one SQLite file keeps the stamp only when
 // the look relabelled something, and otherwise looks on every open.
-func (s *Store) agentSources() error {
+//
+// It returns the versions it wrote; a text history writes them to its files under the lock of syncText, which runs
+// it, so they reach the files in order with what that open took in.
+func (s *Store) agentSources() ([]Fact, error) {
 	var n int
 	if err := s.db.QueryRow(`SELECT count(*) FROM facts`).Scan(&n); err != nil {
-		return fmt.Errorf("relabel facts without a source: %w", err)
+		return nil, fmt.Errorf("relabel facts without a source: %w", err)
 	}
 	if v, err := s.stamp(sourcesStamp); err != nil || v == strconv.Itoa(n) {
-		return err
+		return nil, err
 	}
 	relabelled, err := s.query(`INSERT INTO facts(`+columns+`) SELECT id, version + 1, content, keywords, origin,
 		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, queries FROM facts f
 		WHERE f.source = '' AND f.status = ? AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
 		RETURNING `+columns, Active)
 	if err != nil {
-		return fmt.Errorf("relabel facts without a source: %w", err)
+		return nil, fmt.Errorf("relabel facts without a source: %w", err)
 	}
-	s.textWritten(relabelled...)
 	if s.text == "" && len(relabelled) == 0 {
-		return nil // a base of one SQLite file is in git: an open that changes nothing must not change the file
+		return nil, nil // a base of one SQLite file is in git: an open that changes nothing must not change the file
 	}
-	return saveStamp(s.db, sourcesStamp, strconv.Itoa(n+len(relabelled)))
+	return relabelled, saveStamp(s.db, sourcesStamp, strconv.Itoa(n+len(relabelled)))
 }
 
 const sourcesStamp = "sources-rows" // versions of the base when agentSources last left no fact without a source

@@ -134,6 +134,8 @@ func TestFactsRelabelledApartMergeAsOne(t *testing.T) {
 // The parts of the Claude Code session start open the base at once: each fact is relabelled once.
 func TestParallelOpensRelabelOnce(t *testing.T) {
 	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	// The cache exists, as on a machine that upgrades; the facts come with the next pull.
+	_ = openTextAt(t, dir, cache, "laptop", t0).Close()
 	active, provisional, _, _, _ := unlabelled(t, dir)
 	var wg sync.WaitGroup
 	errs := make(chan error, 3)
@@ -159,6 +161,33 @@ func TestParallelOpensRelabelOnce(t *testing.T) {
 			t.Errorf("%s has %d versions, want %d", f.ID, len(h), f.Version+1)
 		}
 	}
+	textMatches(t, s)
+}
+
+// The first opens of a new cache, in parallel, all succeed: each read-then-write transaction waits for the others
+// instead of being refused with SQLITE_BUSY.
+func TestParallelFirstOpensOfACache(t *testing.T) {
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	unlabelled(t, dir)
+	var wg sync.WaitGroup
+	errs := make(chan error, 3)
+	for range 3 {
+		wg.Go(func() {
+			s, err := OpenText(dir, cache)
+			if err != nil {
+				errs <- err
+				return
+			}
+			_ = s.Close()
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	s := openTextAt(t, dir, cache, "laptop", t0)
+	defer func() { _ = s.Close() }()
 	textMatches(t, s)
 }
 
