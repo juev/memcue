@@ -52,10 +52,6 @@ func OpenText(dir, cache string) (*Store, error) {
 		_ = s.Close()
 		return nil, fmt.Errorf("text history %s: %w", dir, err)
 	}
-	if err := s.agentSources(); err != nil {
-		_ = s.Close()
-		return nil, err
-	}
 	return s, nil
 }
 
@@ -223,6 +219,16 @@ func (s *Store) syncText() error {
 			return err
 		}
 	}
+	// The facts without a source are relabelled once the text is in the cache, under the lock of this open.
+	relabelled, err := s.agentSources()
+	if err != nil {
+		return err
+	}
+	for _, f := range relabelled {
+		if err := appendFacts(FactPath(s.text, f.ID), []Fact{f}); err != nil {
+			return err
+		}
+	}
 	// A stamp is written only when it changes: each write is a commit, and an open that found nothing new would pay
 	// two of them on every search (#557).
 	if !maps.Equal(dirs, saved) {
@@ -234,7 +240,7 @@ func (s *Store) syncText() error {
 			return err
 		}
 	}
-	if rows == strconv.Itoa(n) {
+	if rows == strconv.Itoa(n) && len(relabelled) == 0 {
 		return nil
 	}
 	return s.saveTextRows()
