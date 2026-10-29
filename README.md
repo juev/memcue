@@ -227,6 +227,16 @@ only when the same subject comes up again (#433). Such a fact is stored in the s
 `memcue add -shelf research` (the `shelf` parameter of `memcue_add` in Hermes and DSH) is `-scope shelf:research`;
 a slug is `[a-z0-9][a-z0-9-]{0,63}`. Until #494 the extraction shelved a fact by the tool its quote came from.
 
+Every host tells its model the same about the shelf (#567), in the words measured in #531
+([research-shelf-confirm-531](docs/research/research-shelf-confirm-531-2026-10.md)): a finding from a web page,
+another project's documentation, a changelog, a paper or a benchmark outside the repository goes on the shelf with its
+source, as what the conclusion rests on and its limits; a document of the repository and a fact of this repository's
+work do not; when a task returns to a researched subject, search the shelf too, and compare a finding's version or
+date with what the workspace uses before relying on it. On the synthetic grid of #531, Claude Code (Opus 5.5) with
+this text stored 21 of 24 outside findings on the shelf (3 without it), reached the shelf in 24 of 24 runs that needed
+it (15 without it) and answered 57 of 57 correctly (52); Hermes on `deepseek-flash` stored 13 of 24 (3) and reached
+the shelf 21 of 24 (15), with answers about the same. DSH carries the Hermes wording and was not measured.
+
 A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf` for every shelf. Every other place
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
 that still read the shelf would hide nothing. Places are a union, so `-in all,shelf:research` reads every fact off
