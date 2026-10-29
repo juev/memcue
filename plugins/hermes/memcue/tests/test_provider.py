@@ -609,6 +609,18 @@ class ProviderTest(unittest.TestCase):
         self.assertNotIn("copied into memcue", block)
         self.assertIn("at once, when you learn it", memcue_provider.ADD_SCHEMA["description"])
 
+    def test_a_refusal_as_installation_state_names_the_shelf(self):
+        """The binary's refusal reaches the model whole (#577): it names the shelf parameter, and the same finding
+        given that parameter is stored."""
+        finding = ("The vendor server's books/query takes at most 20 format values; every tag v2.0.1-v3.6.0 has it.")
+        refused = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": finding, "kind": "environment", "source": "tool"}))
+        self.assertIn("installation state (version)", refused.get("error", ""))
+        self.assertIn("the shelf parameter of memcue_add", refused["error"])
+        stored = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": finding, "source": "tool", "shelf": "research"}))
+        self.assertNotIn("error", stored)
+
     def test_a_stated_rule_reaches_the_card(self):
         """A rule or decision is the user's words by default, and only those reach the session card (#494); another
         source is passed as given, and an unknown one is refused."""

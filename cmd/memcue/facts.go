@@ -25,6 +25,14 @@ import (
 	"github.com/juev/memcue/internal/vet"
 )
 
+// stateWaysOut ends the refusal of installation state with what the agent can do instead (#577): read alone, the
+// refusal said "not worth storing", and an agent dropped a finding about another system's API that had a version
+// range in it. Hermes and DSH pass the message through, so it names their shelf parameter too.
+const stateWaysOut = "store what does not change with the next release or restart. If it says what another system " +
+	"does (its behaviour, a default, the versions that have it), put it on the research shelf with its source: " +
+	"-shelf research (the shelf parameter of memcue_add). If the version, path or time is only incidental, drop it " +
+	"from the text and store the rest. The state of a machine here is not stored."
+
 func factsPath() string {
 	if p := os.Getenv("MEMCUE_FACTS"); p != "" {
 		return expandHome(p)
@@ -149,7 +157,7 @@ func runAdd(args []string, out io.Writer) error {
 	// outside source states about another system, not the state of the user's machines (#565).
 	if (*source == "agent" || *source == "tool") && !recall.IsShelf(*scope) {
 		if part := vet.State(store.Fact{Kind: *kind, Source: *source, Content: content}); part != "" {
-			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; store what does not change with the next release or restart", part)
+			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; %s", part, stateWaysOut)
 		}
 	}
 	if !*force && hasSecret(content, keywordsList) {

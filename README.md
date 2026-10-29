@@ -835,7 +835,10 @@ saw in a tool's output or concluded (`-source tool` or `agent`): a version, the 
 the size of a base, a restart time or PID, a line count, an mtime. A command reads each of these, and the stored copy
 is stale after the next release or restart (#475); a fact in the user's words is stored as said. A fact for a shelf
 (`-shelf` or `-scope shelf:<slug>`) skips the check: it says what an outside source states about another system, not
-the state of the user's machines (#565).
+the state of the user's machines (#565). The refusal names the ways out (#577): what another system does, a version
+range or a default of it included, goes on the research shelf with its source; a version, path or time that is only
+incidental is dropped from the text and the rest stored. Hermes and DSH hand the model the same message, which fits the
+500 characters DSH keeps of an error.
 
 What goes stale later is handled in two places. A fact a newer one replaced meets it in the dream, which groups
 similar facts and lets the session's model retire or merge the old one ([Dream](#dream)); a fact found wrong in use is
