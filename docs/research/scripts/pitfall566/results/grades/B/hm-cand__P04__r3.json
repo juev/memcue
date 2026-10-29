@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "903c0650bf738651973741976360f25d4107d7fb8c898f345e3fd6694d35c752",
+ "cost_usd": 0.007,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 473.74 and explains that the script failed with a KeyError because DUTYBOOK was not set. It says setting DUTYBOOK to schedules/hs-2026.csv fixed it and that duty.py was left unchanged."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "719e59cb8b48ddc7a9fd8036365efea5c5a20b8e7430d33f9817ae02a5d3331b",
+ "cost_usd": 0.0403,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EDNTHB1C56NWC1SYV92HX"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EDNTHB1C56NWC1SYV92HX",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall gives the error message, the CRLF cause, the trailing \\r on the zone key and the tr workaround passed as $2."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports 58.01 and names CRLF line endings as the cause; the fix was to pass an LF copy as the rates argument, and neither the script nor the rate card was edited."
+ }
+}

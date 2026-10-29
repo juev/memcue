@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "bebcc3ebca243b55c56bd2eb744f2e3e2caa3d7217547ba68cef8f6e2be536ec",
+ "cost_usd": 0.0334,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EDFSJ33GJXYXY6VJ42EEY"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EDFSJ33GJXYXY6VJ42EEY",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact records the repository pitfall in the repo scope: out/ is gitignored and never created, and the fix is mkdir -p out."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, says the script failed because out/ did not exist, and says creating out/ without editing the script fixed it."
+ }
+}

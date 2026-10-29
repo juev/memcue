@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "aebc8796fe1cc11354d0febf54b98c17f1637326ccb0de84be05a4264ab122b8",
+ "cost_usd": 0.0094,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63ECTPG61C9K4RH18RXAPYN"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63ECTPG61C9K4RH18RXAPYN",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall covers the BOM, the 'sku' not-found error and the --encoding utf-8-sig fix, and says to leave the export unchanged."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer names exactly BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure and says --encoding utf-8-sig fixed it without modifying anything."
+ }
+}

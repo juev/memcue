@@ -1,0 +1,66 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "P04",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 34.8,
+  "docker_exit": 0,
+  "image": "sha256:9f0496d0294de209e0b9c65fd0ba2b450a12040e3efe4a20e11a122be098b4ef",
+  "cost_usd": 0.002311782,
+  "turns": 6,
+  "input_tokens": 59585,
+  "output_tokens": 1438,
+  "cache_read_tokens": 50944
+ },
+ "record": {
+  "prompt": "Please compute the import duty for manifests/ship-0412.csv with duty.py and tell me the total. Don't change duty.py.",
+  "base_changes": [
+   {
+    "id": "01M63ECCQNGPCKH8NFSPYFVVYE",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/duty-calc",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "duty.py, DUTYBOOK, duty-calc, KeyError, tariff schedule, manifest, hs-2026.csv",
+    "content": "In /stand/ws (duty-calc), duty.py reads the tariff schedule path from the DUTYBOOK environment variable (duty.py:22) and raises KeyError if it is unset; the README does not mention it. Run as: DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<file>.csv.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "duty.py tariff schedule DUTYBOOK manifest"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "In /stand/ws (duty-calc), duty.py reads the tariff schedule path from the DUTYBOOK environment variable (duty.py:22) and raises KeyError if it is unset; the README does not mention it. Run as: DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<file>.csv.",
+     "kind": "pitfall",
+     "keywords": "duty.py, DUTYBOOK, duty-calc, KeyError, tariff schedule, manifest, hs-2026.csv",
+     "scope": "repo",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M63ECCQNGPCKH8NFSPYFVVYE\"}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "memcue_search",
+   "terminal",
+   "memcue_add"
+  ],
+  "pages_read": [],
+  "final_answer": "Total import duty: **473.74**\n\nPer line, from `DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/ship-0412.csv`:\n\n    1  6109.10  cotton t-shirts     220.80   (1840.00 @ 12.0%)\n    2  6403.99  leather boots       209.24   (2615.50 @ 8.0%)\n    3  4202.92  duffel bags          32.55   (930.00 @ 3.5%)\n    4  8513.10  camping lamps        11.15   (412.80 @ 2.7%, 11.1456 rounded up)\n    5  9503.00  wooden puzzles        0.00   (288.00 @ 0.0%)\n\nNotes:\n- duty.py needs the schedule path in the `DUTYBOOK` env var — passing the manifest alone exits with a KeyError on `os.environ[\"DUTYBOOK\"]` (duty.py:22). The README doesn't mention this, so I set it to `schedules/hs-2026.csv`, the only schedule in the repo.\n- duty.py is untouched; `git status` is clean. I re-derived the sum independently (exact 473.7356 → 473.74) and it matches the script, so the per-line rounding of line 4 doesn't shift the total."
+ }
+}

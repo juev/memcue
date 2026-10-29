@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "0d912c3e9efa2cfc22e7fc91ec447577abc01b91545caf71c5ccd1f17f0c0257",
+ "cost_usd": 0.0093,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EB0VTV91379NZ3D6D0QAB"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EB0VTV91379NZ3D6D0QAB",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall stating the error, the CRLF cause (trailing \\r on the zone), and the tr -d workaround passed as the second argument."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total 58.01, names CRLF line endings in the rate card as the cause, and says passing a copy with the carriage returns removed as the rates argument fixed it, with no files edited."
+ }
+}

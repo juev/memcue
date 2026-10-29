@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "d0a79f00c4e9ef3b91f6d978e22573ec9b87be4d96d2e2fd70a9d14b89696a3c",
+ "cost_usd": 0.0262,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports 5437.50 and says the script failed because out/ was missing. It also says creating the directory, with the script left untouched, fixed it."
+ }
+}

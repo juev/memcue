@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "cc-cand",
+  "scenario": "P04",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 14.9,
+  "docker_exit": 0,
+  "image": "sha256:233285c337a52ad4a6572493506df8eb3b6f933e21eb5482706e789403bab5d2",
+  "cost_usd": 0.1047402,
+  "turns": 5,
+  "input_tokens": 10,
+  "output_tokens": 1092,
+  "cache_read_tokens": 87221
+ },
+ "record": {
+  "prompt": "Please compute the import duty for manifests/ship-0412.csv with duty.py and tell me the total. Don't change duty.py.",
+  "base_changes": [
+   {
+    "id": "01M63EDYQY41Z4BZ213Z32VN3E",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/duty-calc",
+    "kind": "pitfall",
+    "source": "user",
+    "keywords": "duty.py DUTYBOOK KeyError schedule",
+    "content": "duty.py reads the tariff schedule path from the DUTYBOOK env var (not mentioned in README); without it it fails with KeyError. Run: DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<m>.csv",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cat README.md; ls -la schedules manifests; echo \"DUTYBOOK=$DUTYBOOK\"; for f in schedules/*; do echo \"== $f\"; cat \"$f\"; done; memcue search \"DUTYBOOK duty schedule\"",
+    "result": "# duty-calc\n\nImport duty for an incoming shipment.\n\nRun `python3 duty.py manifests/<manifest>.csv`. It prints the duty of every manifest line and the shipment total.\nRates come from the tariff schedule in `schedules/`.\nmanifests:\ntotal 16\ndrwxr-xr-x 2 1001 1001 4096 Oct 29 08:34 .\ndrwxr-xr-x 5 1001 1001 4096 Oct 29 09:03 ..\n-rw-r--r-- 1 1001 1001  163 Oct 29 08:34 ._ship-0412.csv\n-rw-r--r-- 1 1001 1001  189 Oct 29 08:34 ship-0412.csv\n\nschedules:\ntotal 16\ndrwxr-xr-x 2 1001 1001 4096 Oct 29 08:39 .\ndrwxr-xr-x 5 1001 1001 4096 Oct 29 09:03 ..\n-rw-r--r-- 1 1001 1001  163 Oct 29 08:34 ._hs-2026.csv\n-rw-r--r-- 1 1001 1001  167 Oct 29 08:34 hs-2026.csv\nDUTYBOOK=\n== schedules/hs-2026.csv\nhs_code,description,rate_pct\n4202.92,travel bags,3.5\n6109.10,cotton t-shirts,12.0\n6403.99,leather footwear,8.0\n8513.10,portable lamps,2.7\n9503.00,toys and puzzles,0.0\nNo facts of this repository, this host or global match; -in all searches every repository."
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue add -kind pitfall -keywords \"duty.py DUTYBOOK KeyError schedule\" -- \"duty.py reads the tariff schedule path from the DUTYBOOK env var (not mentioned in README); without it it fails with KeyError. Run: DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<m>.csv\"",
+    "result": "01M63EDYQY41Z4BZ213Z32VN3E"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "The total import duty for `manifests/ship-0412.csv` is **473.74**.\n\n| Line | HS code | Item | Duty |\n|---|---|---|---|\n| 1 | 6109.10 | cotton t-shirts | 220.80 |\n| 2 | 6403.99 | leather boots | 209.24 |\n| 3 | 4202.92 | duffel bags | 32.55 |\n| 4 | 8513.10 | camping lamps | 11.15 |\n| 5 | 9503.00 | wooden puzzles | 0.00 |\n| | | **Total** | **473.74** |\n\n`duty.py` gets the rate table from a `DUTYBOOK` environment variable, which wasn't set and isn't mentioned in the README. I pointed it at `schedules/hs-2026.csv`, the only schedule in the repo, which has a rate for all five HS codes. I didn't change `duty.py`:\n\n```\nDUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/ship-0412.csv\n```\n\nI also saved a note in memory about this setting so a later session doesn't miss it."
+ }
+}

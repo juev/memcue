@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "78a9e98cfab16feb16165e5ecb3db89648a824ba00952b1a6977818cb3dfeb5a",
+ "cost_usd": 0.0299,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total of 473.74. It says duty.py requires DUTYBOOK to be set and that running the unmodified script with DUTYBOOK=schedules/hs-2026.csv gave the result, which meets the correct_if criterion."
+ }
+}

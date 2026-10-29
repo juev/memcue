@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "1d60d6c87d303c05384b0a26efe979ebec6bcae67dfadef0381f271997f6c315",
+ "cost_usd": 0.0088,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63E9B4W9TZDC88HPCTDJJ2C"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63E9B4W9TZDC88HPCTDJJ2C",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the out/ directory pitfall with the mkdir -p fix, stored as a pitfall in the repo scope."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, says the failure came from the missing git-ignored out/ directory, and says creating out/ without editing the script fixed it."
+ }
+}

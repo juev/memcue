@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "0d912c3e9efa2cfc22e7fc91ec447577abc01b91545caf71c5ccd1f17f0c0257",
+ "cost_usd": 0.0372,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EB0VTV91379NZ3D6D0QAB"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EB0VTV91379NZ3D6D0QAB",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall that states the error, the CRLF cause and the tr workaround passed as the second argument."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 58.01, names the CRLF line endings as the cause, and says a copy with the carriage returns removed was passed as the rates argument without editing the script or the rate card."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "f4f655129fe10b4eb2efab26ae68f5ee5c7a70156ba08692374ab58b4ee281f2",
+ "cost_usd": 0.0299,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "The answer gets 6 products and Fable pencil set (7.60) right from the build run from site/, but it never says the build fails from the repository root because of relative paths, or that running it from site/ is the fix."
+ }
+}

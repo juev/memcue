@@ -1,0 +1,67 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "P05",
+  "repeat": "r2",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 37.3,
+  "docker_exit": 0,
+  "image": "sha256:9f0496d0294de209e0b9c65fd0ba2b450a12040e3efe4a20e11a122be098b4ef",
+  "cost_usd": 0.00237885,
+  "turns": 7,
+  "input_tokens": 69763,
+  "output_tokens": 1420,
+  "cache_read_tokens": 60800
+ },
+ "record": {
+  "prompt": "Please run the reorder check on exports/stock-2026-10-27.csv and tell me which SKUs need reordering. The export is exactly what the supplier portal produced; leave it and restock.py as they are.",
+  "base_changes": [
+   {
+    "id": "01M63ECTPG61C9K4RH18RXAPYN",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/restock",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "restock.py, reorder, supplier portal, export, BOM, utf-8-sig, encoding, sku not found, warehouse, stock csv",
+    "content": "The supplier portal's stock CSV exports (e.g. exports/stock-2026-10-27.csv in /stand/ws) start with a UTF-8 BOM, so restock.py in /stand/ws fails with \"column 'sku' not found\" on its default --encoding utf-8; run it with --encoding utf-8-sig instead (the export must be left unchanged).",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "supplier portal export BOM encoding restock.py reorder check"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "The supplier portal's stock CSV exports (e.g. exports/stock-2026-10-27.csv in /stand/ws) start with a UTF-8 BOM, so restock.py in /stand/ws fails with \"column 'sku' not found\" on its default --encoding utf-8; run it with --encoding utf-8-sig instead (the export must be left unchanged).",
+     "keywords": "restock.py, reorder, supplier portal, export, BOM, utf-8-sig, encoding, sku not found, warehouse, stock csv",
+     "kind": "pitfall",
+     "scope": "repo",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M63ECTPG61C9K4RH18RXAPYN\"}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "search_files",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "terminal",
+   "terminal",
+   "memcue_search",
+   "memcue_add"
+  ],
+  "pages_read": [],
+  "final_answer": "Ran the check. First attempt failed — the portal's export is UTF-8 with a BOM, so restock.py's default encoding can't see the `sku` column. Reran with `--encoding utf-8-sig`; nothing in the repo was modified.\n\n4 SKUs to reorder:\n\n  BX-100   stock   23  level   25\n  CL-310   stock    5  level    5\n  EN-512   stock    0  level   10\n  GH-118   stock    7  level   12\n\nRest are fine: BX-220 40/30, DR-045 120/80, FT-760 33/20.\n\nI cross-checked the numbers with an independent parse of the same file — identical totals, and both files cover the same 7 SKUs with no gaps. CL-310 is the borderline case: 3 north + 2 south = 5, exactly at its level, so it counts as reorder under \"at or below\".\n\nWorth noting for next time: pass `--encoding utf-8-sig` for portal exports, or the BOM will trip the header check. I've noted that in memory."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "9fea1599a4cd174a29027e8ed4a67f708edc596ab3bdd7234a931f05bb6d33f0",
+ "cost_usd": 0.0385,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EB9VVP5F4TKSJ1P964RMG"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EB9VVP5F4TKSJ1P964RMG",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the CRLF pitfall, the error message and the tr workaround in the repo scope; the garbled \"`,` handling\" remark is minor."
+   }
+  ],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 58.01, names CRLF line endings in the rate card as the cause, and says it fixed the run by passing a copy without carriage returns as the second argument, leaving the script and the rate card unedited."
+ }
+}

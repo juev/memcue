@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "76382228d40020b2603e34b0488ee647cfd2bf828424b29248083b5b16a89ba4",
+ "cost_usd": 0.0364,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63ECCQNGPCKH8NFSPYFVVYE"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63ECCQNGPCKH8NFSPYFVVYE",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall records the DUTYBOOK KeyError and the working command."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 473.74, explains that the KeyError came from DUTYBOOK being unset, and says setting DUTYBOOK=schedules/hs-2026.csv fixed it without changing duty.py."
+ }
+}

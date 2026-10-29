@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "976d776bd37971f42712f4082572eee35acc06c385f20589aecfedbb9418af78",
+ "cost_usd": 0.0127,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63E8W8X7DH2SX44P2EFW99M"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63E8W8X7DH2SX44P2EFW99M",
+    "version": 1,
+    "verdict": "expected",
+    "note": "In the repo scope, it records the CRLF pitfall, its symptom and the workaround of passing a CR-stripped copy as the second argument."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total 58.01, names CRLF line endings in the rate card as the cause, and says the fix was passing a CR-stripped copy as the second argument without editing either file."
+ }
+}

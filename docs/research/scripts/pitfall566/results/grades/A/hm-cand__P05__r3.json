@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "6b6d743ac607d30f449c34e7fd0637bb488625fdb759ebf29e25e98a4e047971",
+ "cost_usd": 0.0391,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63EF1DJ8E10XN8H0S28DVN7"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63EF1DJ8E10XN8H0S28DVN7",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall records the BOM, the 'sku' not found error with the '\\ufeffsku' header, and the --encoding utf-8-sig fix, and it says not to edit the files."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer names exactly BX-100, CL-310, EN-512 and GH-118 (4 SKUs) and explains that the BOM caused the failure. It also says --encoding utf-8-sig fixed it while the export and restock.py were left unedited."
+ }
+}

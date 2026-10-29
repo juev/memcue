@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "0fe5ff1e3e59fdc11bc4f7ab48f7d4dd9204f39ccc32e13a19d6d505b921980b",
+ "cost_usd": 0.013,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 6 listed products with the Fable pencil set (7.60) as the cheapest, explains that build.js uses paths relative to the working directory and so must be run from site/, and says build.js was not changed."
+ }
+}

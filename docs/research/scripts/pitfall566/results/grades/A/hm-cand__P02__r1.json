@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c173d7d09aa8c2890598b49636d79b35354ffdd39bb0bc9dfe2fdad7ebc1be83",
+ "cost_usd": 0.0296,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 58.01 and names CRLF line endings in the rate card as the cause. It also says the fix was passing a copy without carriage returns as the second argument, with neither file edited."
+ }
+}

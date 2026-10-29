@@ -1,0 +1,43 @@
+{
+ "meta": {
+  "arm": "hm-cand",
+  "scenario": "P04",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 32.0,
+  "docker_exit": 0,
+  "image": "sha256:9f0496d0294de209e0b9c65fd0ba2b450a12040e3efe4a20e11a122be098b4ef",
+  "cost_usd": 0.00208236,
+  "turns": 5,
+  "input_tokens": 48564,
+  "output_tokens": 1208,
+  "cache_read_tokens": 40320
+ },
+ "record": {
+  "prompt": "Please compute the import duty for manifests/ship-0412.csv with duty.py and tell me the total. Don't change duty.py.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "duty.py DUTYBOOK tariff schedule import duty repo"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "search_files",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "memcue_search",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Total: 473.74\n\nPer-line output from `DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/ship-0412.csv`:\n\n      1  6109.10  cotton t-shirts     220.80   (1840.00 @ 12.0%)\n      2  6403.99  leather boots       209.24   (2615.50 @ 8.0%)\n      3  4202.92  duffel bags          32.55   (930.00 @ 3.5%)\n      4  8513.10  camping lamps        11.15   (412.80 @ 2.7%, 11.1456 rounded half-up)\n      5  9503.00  wooden puzzles        0.00   (0.0%)\n    total                              473.74\n\nNotes:\n- duty.py reads the schedule path from the `DUTYBOOK` env var (duty.py:22); the README doesn't mention it, so without it the script fails with a KeyError. I set it to `schedules/hs-2026.csv`.\n- All 5 manifest HS codes exist in the schedule, so no lookups failed, and there were no extra manifest lines.\n- duty.py left unchanged (`git status` clean); I re-derived the total independently with Decimal and it matches: 473.74.\n\nWorth knowing: the manifest/schedule directories contain macOS `._*` AppleDouble files alongside the CSVs — read the plain `.csv` names, not those."
+ }
+}

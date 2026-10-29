@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "976d776bd37971f42712f4082572eee35acc06c385f20589aecfedbb9418af78",
+ "cost_usd": 0.0367,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63E8W8X7DH2SX44P2EFW99M"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63E8W8X7DH2SX44P2EFW99M",
+    "version": 1,
+    "verdict": "expected",
+    "note": "The fact records the cost.sh 'no rate for zone' failure, the CRLF cause and the workaround of passing a tr-stripped copy as the second argument, scoped to the repo as a pitfall."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total of 58.01, names CRLF line endings in the rate card as the cause, and says a CR-stripped copy passed as the second argument fixed it, with neither file edited."
+ }
+}
