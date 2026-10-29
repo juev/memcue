@@ -1112,6 +1112,28 @@ class ProviderTest(unittest.TestCase):
                 self.assertTrue(ok)
                 self.assertEqual(out, want, value)
 
+    def test_endpoint_config_is_forwarded_to_memcue(self):
+        """The endpoint of a background dream (#569): the URL and the model as configured, the key from the named
+        environment variable, and dream: false turns the background dream off."""
+        script = Path(self.home) / "endpoint.sh"
+        script.write_text("#!/bin/sh\nprintf '%s|%s|%s|%s' \"${MEMCUE_API_URL-unset}\" \"${MEMCUE_MODEL-unset}\" "
+                          "\"${MEMCUE_API_KEY-unset}\" \"${MEMCUE_DREAM_BACKGROUND-unset}\"\n", encoding="utf-8")
+        script.chmod(0o755)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("MEMCUE_")}
+        env["DEMO_DREAM_KEY"] = "sk-demo"
+        with unittest.mock.patch.dict(os.environ, env, clear=True):
+            for config, want in [
+                ({"api_url": "https://api.example.test", "model": "demo-flash", "api_key_env": "DEMO_DREAM_KEY"},
+                 "https://api.example.test|demo-flash|sk-demo|unset"),
+                ({}, "unset|unset|unset|unset"),
+                ({"dream": False}, "unset|unset|unset|0"),
+            ]:
+                p = memcue_provider.MemcueMemoryProvider(dict(config, binary=str(script)))
+                p.initialize("s1", hermes_home=self.home, agent_context="primary")
+                ok, out = p._run([])
+                self.assertTrue(ok)
+                self.assertEqual(out, want, config)
+
     def test_missing_binary_is_unavailable(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": "/nonexistent/memcue"})
         self.assertFalse(p.is_available())
