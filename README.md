@@ -44,13 +44,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.23.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.24.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.24.0 | 6 | 0.24.0 | 0.24.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.24.0 (`hermes-agent` 0.15.2) |
 | 0.23.0 | 6 | 0.23.0 | 0.23.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.23.0 (`hermes-agent` 0.15.2) |
 | 0.22.1 | 6 | 0.22.1 | 0.22.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.22.1 (`hermes-agent` 0.15.2) |
 | 0.22.0 | 6 | 0.22.0 | 0.22.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.22.0 (`hermes-agent` 0.15.2) |
@@ -250,6 +251,21 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.24.0: a fact without `-source` is the agent's, every host stores a failure it found (#574, #566, #577)
+
+- **`add` without `-source` stores `agent`** (#574), not `user`. A script or a person that stores the user's own
+  words without the flag must now pass `-source user`: it is the only source that reaches the session card. The
+  Claude Code note says which source to name (`-source user` for the user's words, `-source tool` for what a command
+  or a file showed) and gives the pitfall line its command. See [Use](#use).
+- **Every host tells its model to store a failure it found by running something** (#566): the cause and the fix go
+  in as a pitfall when a fresh checkout would hit it again, even when the cause is in the repository's own files.
+  The Claude Code note and skill, the Hermes block and the DSH note carry the line measured in #566.
+- **A refusal as installation state names the ways out** (#577): the research shelf for what another system does,
+  or dropping an incidental version, path or time from the text. Hermes and DSH pass the same message to the model.
+- No schema or format changed: the schema stays 6. Changed: the default of `add -source`. From 0.23.0 or 0.22.x,
+  replace the binary and the plugins. From 0.21.x or older, follow
+  [0.22.0](#0220-the-text-history-a-correction-beats-a-parallel-retirement-530-552-544-549).
 
 ### 0.23.0: the dream runs in the background, every host names the research shelf (#569, #568, #563, #562, #561, #570)
 
