@@ -27,3 +27,26 @@ func TestAddRefusesAgentState(t *testing.T) {
 		}
 	}
 }
+
+// A shelf fact says what an outside source states about another system, so the agent's finding of a config default
+// goes on the shelf, while the same text in an ordinary place is still installation state (#565). Hermes and DSH pass
+// their shelf parameter as -shelf.
+func TestAddKeepsShelfFindingOfAConfigDefault(t *testing.T) {
+	env(t)
+	const finding = "The vendor API's poller.interval defaults to 30 s, with a 10 s floor (API reference, 2026-10)."
+	err := runAdd([]string{"-source", "agent", "--", finding}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "installation state (config default)") {
+		t.Fatalf("ordinary place: err = %v, want a refusal naming the config default", err)
+	}
+	for _, place := range [][]string{{"-shelf", "research"}, {"-scope", "shelf:research"}} {
+		for _, source := range []string{"agent", "tool"} {
+			args := append([]string{"-source", source}, place...)
+			var out bytes.Buffer
+			if err := runAdd(append(args, "--", finding), &out); err != nil {
+				t.Errorf("add %v: %v", args, err)
+			} else if strings.TrimSpace(out.String()) == "" {
+				t.Errorf("add %v printed no id", args)
+			}
+		}
+	}
+}
