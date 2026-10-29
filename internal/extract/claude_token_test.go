@@ -12,8 +12,14 @@ import (
 // fakeClaude puts on PATH a `claude` that answers with the CLAUDE_CODE_OAUTH_TOKEN it was given.
 func fakeClaude(t *testing.T) {
 	t.Helper()
+	fakeClaudeScript(t, "printf '{\"is_error\":false,\"structured_output\":{\"token\":\"%s\"}}' \"$CLAUDE_CODE_OAUTH_TOKEN\"\n")
+}
+
+// fakeClaudeScript puts on PATH a `claude` that reads its input and runs body.
+func fakeClaudeScript(t *testing.T, body string) {
+	t.Helper()
 	bin := t.TempDir()
-	script := "#!/bin/sh\ncat >/dev/null\nprintf '{\"is_error\":false,\"structured_output\":{\"token\":\"%s\"}}' \"$CLAUDE_CODE_OAUTH_TOKEN\"\n"
+	script := "#!/bin/sh\ncat >/dev/null\n" + body
 	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +98,24 @@ func TestClaudeTokenFileMissingKeepsEnvironment(t *testing.T) {
 	}
 	if got != "from-env" {
 		t.Errorf("claude -p got token %q, want from-env", got)
+	}
+}
+
+// A failed `claude -p` names the reason it printed as the result of its JSON, not only its exit status (#590).
+func TestClaudeFailureNamesTheResult(t *testing.T) {
+	fakeClaudeScript(t, "printf '{\"is_error\":true,\"result\":\"Failed to authenticate: OAuth session expired\"}'\nexit 1\n")
+	_, err := claudeToken(t)
+	if err == nil || !strings.Contains(err.Error(), "Failed to authenticate: OAuth session expired") {
+		t.Errorf("err = %v, want the result of the JSON", err)
+	}
+}
+
+// Without that JSON the reason is stderr, as before.
+func TestClaudeFailureWithoutJSONNamesStderr(t *testing.T) {
+	fakeClaudeScript(t, "echo 'unknown option --json-schema' >&2\nexit 2\n")
+	_, err := claudeToken(t)
+	if err == nil || !strings.Contains(err.Error(), "unknown option --json-schema") {
+		t.Errorf("err = %v, want stderr", err)
 	}
 }
 
