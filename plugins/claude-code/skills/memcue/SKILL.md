@@ -30,6 +30,8 @@ Do not store: the progress of the task, what the repository, its git history or 
 (versions, paths of binaries, defaults of a config), multi-step procedures the user did not ask to remember (they belong in a skill or the docs), and
 your own guesses nothing confirmed.
 
+When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you finish if a later session in a fresh checkout would hit it again — even when the cause is in the repository's own files; what the repository shows is its documents, not a failure you found by running it.
+
 ## Remember
 
 Search first: if a stored fact says the same or an older version of it, correct that fact instead of adding a second

@@ -71,6 +71,23 @@ func TestSessionNoteCarriesTheMeasuredShelfText(t *testing.T) {
 	}
 }
 
+// The note carries the pitfall line measured in #566 word for word, after the shelf text, where the measured run had
+// it.
+func TestSessionNoteCarriesTheMeasuredPitfallLine(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "research", "scripts", "pitfall566", "candidate", "cc-note.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.TrimSpace(string(b))
+	at := strings.Index(sessionNote, want)
+	if at < 0 {
+		t.Fatalf("the session note lacks the measured pitfall line:\n%s", want)
+	}
+	if shelf := strings.Index(sessionNote, "Findings from outside sources"); shelf < 0 || shelf > at {
+		t.Errorf("the pitfall line comes before the shelf text")
+	}
+}
+
 // The longer note still leaves the card its room (#522): the whole text in one block stays under the 10,000
 // characters Claude Code keeps in the context, and each part of the split start within partBudget, with the note in
 // part 1.
