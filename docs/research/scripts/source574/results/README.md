@@ -21,7 +21,7 @@ host with the #531 stand ([`../../confirm531/stand/`](../../confirm531/stand/)) 
 - `cc-base`: `main` at `5933988` (product code that of `c9873c0`, the branch's base; the commit between them changes
   one research document), memcue `stand531-5933988`, image `9dd610e1c5f6`. Grid in `~/stand574-base`:
   `run.py grid --arms cc-base --repeats 3 --jobs 4 --budget 10`, finished 13:32 MSK.
-- `cc-cand`: branch `source-default-574` at `6550851`, memcue `stand531-6550851`, image `8f67b0dd1904`. The same grid
+- `cc-cand`: branch `source-default-574` at `6550851` (`43ef08f` after the rebase onto `main`, the same tree of product code), memcue `stand531-6550851`, image `8f67b0dd1904`. The same grid
   in `~/stand574-cand`, finished 13:34 MSK.
 - Both on Claude Code 2.1.312 and Opus 5.5. The fixtures are the copy in `~/stand566`, which matches the repository's
   apart from macOS `._*` metadata files, as in #566.
