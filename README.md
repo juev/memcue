@@ -1014,7 +1014,8 @@ on Opus, about $5 per million characters of transcript, and a review followed it
 
 A dream the session's model runs costs no call of its own: it is part of the session. A background dream (#569) is
 one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation;
-on Opus through `claude -p` the full passes of the author's Mac base cost $63.16 for 106, about $0.60 each
+a pass takes the work of up to four packets (`-j 4`). On Opus through `claude -p`, a background pass over a copy of
+the author's Mac base with 141 fresh facts made six calls and cost $2.58; the passes of a whole-base run cost $0.22–1.97
 ([dream-run-2026-10](docs/research/dream-run-2026-10.md)), and a pass with little fresh work less. One packet is about 20,000–36,000
 characters on the author's two bases, instructions included; a dream with no fresh fact and nothing to expand prints
 one line. While facts are owed a translation, its 40 facts add about 10,000 characters (64,583 against 54,000 on a
