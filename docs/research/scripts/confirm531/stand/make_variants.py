@@ -1,8 +1,8 @@
 """Build the base and candidate plugins of the #531 stand into a docker build context.
 
-Run: python3 -I make_variants.py REPO CONTEXT. REPO is the memcue checkout, CONTEXT a new directory. The base plugins
-are copies of the checkout's; the candidate ones add the text of confirm531/candidate/ the way a shipped change
-would: Claude Code gets a fourth SessionStart hook with the note and the skill gets its section, Hermes gets the block
+Run: python3 -I make_variants.py REPO CONTEXT [CANDIDATE]. REPO is the memcue checkout, CONTEXT a new directory,
+CANDIDATE the directory of the candidate text (default: REPO's confirm531/candidate/; #566 passes its own). The base
+plugins are copies of the checkout's; the candidate ones add the candidate text the way a shipped change would: Claude Code gets a fourth SessionStart hook with the note and the skill gets its section, Hermes gets the block
 after its memory note in the system prompt. Each insertion point must be found exactly once, or the build stops.
 """
 
@@ -30,7 +30,7 @@ def once(text: str, old: str, new: str, where: str) -> str:
 def main() -> None:
     repo, ctx = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
     ctx.mkdir(parents=True)  # a new directory: an existing one is an error, nothing is overwritten
-    cand = repo / "docs/research/scripts/confirm531/candidate"
+    cand = Path(sys.argv[3]).resolve() if len(sys.argv) > 3 else repo / "docs/research/scripts/confirm531/candidate"
 
     cc = repo / "plugins/claude-code"
     for arm in ("base", "cand"):

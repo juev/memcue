@@ -1,17 +1,19 @@
 #!/bin/sh
-# Build the #531 stand images on the docker host: build.sh REPO HOST.
-# REPO is the memcue checkout; HOST an ssh host with docker. The build context is assembled in a new local directory
-# and copied to HOST:stand531/ctx-<time>; the images are tagged stand531-cc and stand531-hermes there. Nothing is
-# deleted on either side.
+# Build the #531 stand images on the docker host: build.sh REPO HOST [CANDIDATE].
+# REPO is the memcue checkout; HOST an ssh host with docker; CANDIDATE the directory of the candidate text (default:
+# REPO's confirm531/candidate/, see make_variants.py). The build context is assembled in a new local directory and
+# copied to HOST:stand531/ctx-<time>; the images are tagged stand531-cc and stand531-hermes there. Nothing is deleted
+# on either side.
 set -eu
 repo=$1
 host=$2
+candidate=${3:-}
 claude_code_version=2.1.312
 hermes_image=nousresearch/hermes-agent@sha256:9c5561579f3ffdf333401797094ac3a743738d6c25d40f4331c7bf77b694238d
 stand=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 ctx=$(mktemp -d "${TMPDIR:-/tmp}/stand531-ctx-XXXXXX")/ctx
-python3 -I "$stand/make_variants.py" "$repo" "$ctx"
+python3 -I "$stand/make_variants.py" "$repo" "$ctx" ${candidate:+"$candidate"}
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -C "$repo" -trimpath \
 	-ldflags "-X main.version=stand531-$(git -C "$repo" rev-parse --short HEAD)" -o "$ctx/memcue" ./cmd/memcue
 cp "$stand/web_mcp.py" "$stand/seed.py" "$stand/agent_cc.sh" "$stand/agent_hermes.sh" "$stand/mcp-cc.json" \
