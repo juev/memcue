@@ -317,7 +317,7 @@ func bringTogether(tx *sql.Tx, id string, cached, file []Fact, path string, file
 		return nil
 	}
 	h := MergeHistories(cached, file)
-	if h.Added > 0 {
+	if h.Changed() {
 		if err := replaceTail(tx, id, h); err != nil {
 			return err
 		}

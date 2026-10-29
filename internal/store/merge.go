@@ -19,9 +19,9 @@ type MergeStats struct {
 
 // Merge takes the facts of the copy at otherPath into s, the way git's merge driver needs: the result is the union
 // of the versions of both. Where both copies added versions to the same fact since they last agreed, the versions
-// after the common ones are ordered by creation time (then author and content, so every machine gets the same
-// order) and numbered anew; the latest of them is current, except that a correction wins over a retirement made
-// without knowing it (see correctionLast). Nothing is lost: a correction made on one machine and a retirement made on
+// after the common ones are ordered by creation time (then author, content and the rest of the version, so every
+// machine gets the same order; see mergedBefore) and numbered anew; the latest of them is current, except that a
+// correction wins over a retirement made without knowing it (see correctionLast). Nothing is lost: a correction made on one machine and a retirement made on
 // another both stay in the history.
 //
 // Vectors are not merged: nothing reads them, and Open deletes the ones an older binary stored (#260).
@@ -51,7 +51,7 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 	var changed []string
 	for id, tv := range t {
 		h := MergeHistories(o[id], tv)
-		if h.Added == 0 {
+		if !h.Changed() {
 			continue
 		}
 		st.Added += h.Added
@@ -76,9 +76,15 @@ func (s *Store) Merge(otherPath string) (MergeStats, error) {
 type MergedHistory struct {
 	Versions []Fact // the merged history, numbered from 1
 	Common   int    // how many leading versions both sides shared; Versions after them are new or renumbered
-	Added    int    // versions of the other side this one lacked; 0 leaves this side as it is
+	Added    int    // versions of the other side this one lacked
 	Diverged bool   // both sides added versions since they last agreed
+	// Reordered: the other side lacked nothing new, but this side's versions after the common ones change order; with
+	// Added 0 and Reordered false this side stays as it is.
+	Reordered bool
 }
+
+// Changed says whether the merge changes this side's history.
+func (h MergedHistory) Changed() bool { return h.Added > 0 || h.Reordered }
 
 // MergeHistories merges the versions of one fact as this side (ours) and the other side (theirs) hold them, each in
 // version order: the rule of Merge, for the base and for the text history alike.
@@ -97,30 +103,54 @@ func MergeHistories(ours, theirs []Fact) MergedHistory {
 		}
 	}
 	h := MergedHistory{Versions: ours, Common: common, Added: len(tTail), Diverged: len(oTail) > 0 && len(tTail) > 0}
-	if len(tTail) == 0 {
+	if len(theirs) == common {
 		return h
 	}
 	tail := append(append([]Fact{}, oTail...), tTail...)
-	sort.SliceStable(tail, func(i, j int) bool {
-		a, b := tail[i], tail[j]
-		if !a.Created.Equal(b.Created) {
-			return a.Created.Before(b.Created)
-		}
-		if a.Author != b.Author {
-			return a.Author < b.Author
-		}
-		return a.Content < b.Content
-	})
+	sort.SliceStable(tail, func(i, j int) bool { return mergedBefore(tail[i], tail[j]) })
 	base := ""
 	if common > 0 {
 		base = ours[common-1].Content
 	}
 	tail = correctionLast(tail, base, oTail, theirs[common:])
+	if len(tTail) == 0 && slices.EqualFunc(tail, oTail, same) {
+		return h
+	}
+	// Both sides hold the same versions in another order, as two machines merged them before the order was total: the
+	// order of the rule replaces this side's, so every side ends with the same history.
+	h.Reordered = len(tTail) == 0
 	h.Versions = append(append([]Fact{}, ours[:common]...), tail...)
 	for i := common; i < len(h.Versions); i++ {
 		h.Versions[i].Version = i + 1
 	}
 	return h
+}
+
+// mergedBefore orders the versions after the common ones, the same on every side: by creation time, author and
+// content, and between versions that agree on all three, as a label written later (queries, a relabelled source)
+// keeps the creation time of the version it labels, the fuller version last, so the current one keeps every label
+// either side wrote: a version without a source before one with it, then fewer queries before more, then by the
+// written line, so no two writes tie.
+func mergedBefore(a, b Fact) bool {
+	if !a.Created.Equal(b.Created) {
+		return a.Created.Before(b.Created)
+	}
+	if a.Author != b.Author {
+		return a.Author < b.Author
+	}
+	if a.Content != b.Content {
+		return a.Content < b.Content
+	}
+	if (a.Source == "") != (b.Source == "") {
+		return a.Source == ""
+	}
+	if len(a.Queries) != len(b.Queries) {
+		return len(a.Queries) < len(b.Queries)
+	}
+	a.Version, b.Version = 0, 0
+	la, _ := encodeLine(a)
+	lb, _ := encodeLine(b)
+	return string(la) < string(lb)
 }
 
 // replaceTail rewrites the versions of id after the common ones with the merged ones.
