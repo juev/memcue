@@ -321,7 +321,7 @@ func TestDumpOneLinePerVersion(t *testing.T) {
 // both versions, and the correction is current (#544), its candidate state live like any other (#514).
 func TestMergeOfAnOlderCorrectionAndARetire(t *testing.T) {
 	b := filepath.Join(t.TempDir(), "facts.db")
-	m := Meta{Kind: "environment", Review: Candidate}
+	m := Meta{Kind: "environment", Source: "tool", Review: Candidate}
 	v1 := Fact{ID: "01JLEGACYCANDIDATE00000011", Version: 1, Content: "Кандидат про db1.", Keywords: []string{"db1"},
 		Origin: "x", Author: "mac", Created: t0, Meta: m}
 	olderCopy(t, b, v1)

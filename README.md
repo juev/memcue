@@ -852,6 +852,11 @@ The Claude Code note names the source of what the agent stores, and `add` withou
 Before, 5 of the 12 pitfalls Claude Code stored on the same scenarios got `source: user`, because the call left the
 flag out; with the change all 12 named `-source tool`, and capture and answers stayed the same
 ([source-default-574](docs/research/source-default-574-2026-10.md)). Hermes and DSH name the source on every call.
+A fact written before sources were labelled has none, and no one checked it as the user's words, so memcue relabels
+it itself (#582): when a base opens, every active fact without a source gets one version with `source: agent`, the
+rest of it unchanged, the time and the author of the version before it included, so two machines that relabel it
+apart merge as one. Nothing else changes: such a fact already stayed off the room of the user's rules on the card,
+and a fact the user states again is stored with `-source user`.
 
 Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
 saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,

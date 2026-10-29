@@ -37,13 +37,13 @@ func OpenText(dir, cache string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	s, err := Open(cache)
+	s, err := openFile(cache)
 	if err != nil {
 		aside := fmt.Sprintf("%s.unreadable-%d", cache, time.Now().Unix())
 		if renameErr := os.Rename(cache, aside); renameErr != nil {
 			return nil, err
 		}
-		if s, err = Open(cache); err != nil {
+		if s, err = openFile(cache); err != nil {
 			return nil, err
 		}
 	}
@@ -51,6 +51,10 @@ func OpenText(dir, cache string) (*Store, error) {
 	if err := s.syncText(); err != nil {
 		_ = s.Close()
 		return nil, fmt.Errorf("text history %s: %w", dir, err)
+	}
+	if err := s.agentSources(); err != nil {
+		_ = s.Close()
+		return nil, err
 	}
 	return s, nil
 }

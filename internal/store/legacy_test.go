@@ -96,9 +96,9 @@ func TestMergeOfARetireAndACorrectionKeepsTheCorrection(t *testing.T) {
 		name string
 		meta Meta
 	}{
-		{"approved", Meta{Kind: "environment"}},
-		{"legacy candidate", Meta{Kind: "environment", Review: Candidate}},
-		{"legacy provisional", Meta{Kind: "environment", Review: Provisional}},
+		{"approved", Meta{Kind: "environment", Source: "tool"}},
+		{"legacy candidate", Meta{Kind: "environment", Source: "tool", Review: Candidate}},
+		{"legacy provisional", Meta{Kind: "environment", Source: "tool", Review: Provisional}},
 	} {
 		for _, order := range []struct {
 			name             string

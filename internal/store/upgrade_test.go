@@ -68,7 +68,7 @@ func TestUpgradeFromSchema5(t *testing.T) {
 		provisionalID = "01JUPGRADE0000000000000008"
 	)
 	rows := []Fact{
-		row(approvedID, 1, "Approved zebra fact alpha.", Active, "", Meta{Kind: "environment"}),
+		row(approvedID, 1, "Approved zebra fact alpha.", Active, "", Meta{Kind: "environment", Source: "tool"}),
 		row(pendingID, 1, "Pending zebra candidate bravo.", Active, future, cand),
 		row(correctedID, 1, "Corrected zebra candidate charlie obsolete.", Active, "", cand),
 		row(correctedID, 2, "Corrected zebra candidate charlie renewed.", Active, "", cand),
@@ -80,7 +80,7 @@ func TestUpgradeFromSchema5(t *testing.T) {
 		row(wasApprovedID, 1, "Approved zebra candidate golf.", Active, "", cand),
 		row(wasApprovedID, 2, "Approved zebra candidate golf.", Active, "", Meta{Kind: "environment", Scope: "host:db1",
 			Source: "tool", Evidence: "ss -ltn"}),
-		row(provisionalID, 1, "Provisional zebra fact hotel.", Active, future, Meta{Review: Provisional}),
+		row(provisionalID, 1, "Provisional zebra fact hotel.", Active, future, Meta{Source: "tool", Review: Provisional}),
 	}
 	path := schema5Base(t, rows...)
 
