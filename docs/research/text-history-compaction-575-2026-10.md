@@ -1,8 +1,8 @@
 # Compacting the text history: what the merge needs, October 2026 (#575, step 1)
 
-Status: **research only; no change to the base format or the merge.** #575 asks which versions of a fact a compaction
-of the text history (#530) may drop, and what the base would weigh under each candidate rule. The rule is the owner's
-pick (step 2).
+Status: **research only; no change to the base format or the merge. Owner's decision 2026-10-29: no compaction for
+now; every fact file keeps its full history** (see [Decision](#decision)). #575 asks which versions of a fact a
+compaction of the text history (#530) may drop, and what the base would weigh under each candidate rule.
 
 In short:
 
@@ -27,8 +27,9 @@ In short:
   than 7 days ago, plus the latest, is 57.2%. A 14- or 30-day window keeps everything: the oldest version is from
   2026-10-19. The Hermes copy of the same base gives the same shares.
 
-The step 2 that follows from this: change the merge first (match versions by number, keep the numbers, take the base
-of a correction from the last shared version or from git's common ancestor), and only then a compaction rule.
+A compaction, if one is ever done, needs a change to the merge first. It would match versions by number, keep the
+numbers, and take the base of a correction from the last shared version or from git's common ancestor. Only then
+comes a rule.
 
 ## What reads older versions
 
@@ -147,6 +148,40 @@ These are the options the code suggests. None is measured; they are hypotheses f
 4. **A rule after that.** With options 1 and 2 in place, "the latest version" keeps 27.5% of the bytes. A window rule
    ("the latest and every version replaced less than N days ago") protects a machine that merges up to N days late,
    at the cost of the bytes of the last N days.
+
+## Step 2 as proposed, and a base without git
+
+The proposal discussed after step 1, not built and not measured:
+
+- **A three-way git driver.** It would read the ancestor `%O` and judge each side against it: a side corrected when
+  its text differs from the ancestor's, and retired when its latest version is retired. That needs no older versions
+  in the file, and on paper gives today's result in the #544 and #549 cases above.
+- **One version per file.** The file would keep only the current version, its number never decreasing. The history
+  would be `git log -p` on the fact file.
+- **Rollout.** First a release whose driver tolerates gaps, on every machine. Then `memcue migrate -compact` on one
+  machine, as `migrate -text` did in #530.
+- **Measurements it would need.** The replay against a prototype of the three-way merge. A fuzz of random edits and
+  merges on two or three machines. An end-to-end run in real git clones, one of them on 0.23.0. The cache build time
+  and the bytes a day's pull carries, on a copy of the base. A clone would not get smaller: git keeps the old
+  versions, and the compaction adds a commit.
+
+**A base without git** changes the picture:
+
+- **On one machine** nothing merges, but the file is the only history. A compaction would delete the one copy of a
+  fact's older text, the one a person needs to undo a wrong correction. `reopen` and the dream do not need it.
+- **Synced without git** (Syncthing and the like) is not supported today: a conflict copy is not merged. A merge of
+  such copies could only be two-way, with no ancestor, and the #549 rule needs the history in the file for that.
+
+So a compaction would apply only to a base in a git repository with the driver installed. memcue can tell this case
+apart (`git rev-parse --show-toplevel`, `cmd/memcue/facts.go:860`). Every other base would keep the format of today,
+and the merge would have to read both formats.
+
+## Decision
+
+The owner's decision, 2026-10-29: **no compaction for now; every fact file keeps its full history**, in git and
+outside it. This report and [`scripts/history575/`](scripts/history575/) stay as the record of what a compaction would
+need. If the size becomes a problem, start from the [step 2 proposal](#step-2-as-proposed-and-a-base-without-git) and
+its measurements.
 
 ## Limits
 
