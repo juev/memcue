@@ -97,6 +97,10 @@ process as `MEMCUE_MODEL`, `MEMCUE_API_URL` and `MEMCUE_API_KEY`, and a configur
 Left out, nothing is called. `apiKey` is a secret in a configuration file: keep that file out of version control, or
 keep `MEMCUE_API_KEY` in the environment that launches dsh instead.
 
+The same settings carry the dream (#569). When a dream is due, the `session-card` call starts one `memcue dream -run`
+pass in the background, on `apiUrl` when it is set and on `claude -p` when dsh sees `claude` on `PATH`; with neither,
+the base gets no dream from dsh. `MEMCUE_DREAM_BACKGROUND=0` in the environment that launches dsh turns it off.
+
 ## Configuration
 
 All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment are still the ambient fallbacks.

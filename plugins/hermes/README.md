@@ -66,12 +66,27 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 ## Dream
 
-When a dream is due, the card in the system prompt ends with one line that says so and names the tools (the provider
-asks `memcue session-card -dream-tools`, a binary 0.19.0 or newer; #494). The model runs `memcue_dream_prepare`,
-answers the packet and hands the answer to `memcue_dream_apply` when the user's task allows; it never interrupts the
-user's work for it. A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last one and some
-fact is fresh or lacks a translation. Hermes builds the system prompt once and again after a compression or a reset,
-so the line is as fresh as the last rebuild. `dream: false` in `memory.memcue` leaves the line out; the tools stay.
+A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last one and some fact is fresh or lacks
+a translation. With an endpoint configured, the `session-card` call that builds the system prompt starts one
+`memcue dream -run` pass in the background and the card says nothing of the dream (#569):
+
+```bash
+hermes config set memory.memcue.api_url https://api.deepseek.com
+hermes config set memory.memcue.model deepseek-flash
+hermes config set memory.memcue.api_key_env DEEPSEEK_API_KEY
+```
+
+`api_url`, `model` and `api_key_env` reach the binary as `MEMCUE_API_URL`, `MEMCUE_MODEL` and `MEMCUE_API_KEY`, the
+key read from the named environment variable of the gateway, so it stays out of `config.yaml`. They also give
+`memcue_add` its search queries in one short call. Without them the gateway's own `MEMCUE_API_URL` decides, and a
+`claude` on the gateway's `PATH` runs the dream on `claude -p`.
+
+Without either, the card in the system prompt ends with one line that says a dream is due and names the tools (the
+provider asks `memcue session-card -dream-tools`, a binary 0.19.0 or newer; #494). The model runs
+`memcue_dream_prepare`, answers the packet and hands the answer to `memcue_dream_apply` when the user's task allows;
+it never interrupts the user's work for it. Hermes builds the system prompt once and again after a compression or a
+reset, so the line is as fresh as the last rebuild. `dream: false` in `memory.memcue` turns off both the background
+dream and the line; the tools stay.
 
 The first dream on a base needs `since: all` (the whole base) or a date: ask the agent to call
 `memcue_dream_prepare` with `since: all`, or run `memcue dream -prepare -all` by hand. `memcue dream -run` still runs
