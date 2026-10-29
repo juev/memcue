@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "71eec435d317b713e2468f87ef16fe468b46e9c18eb9c4ac793605eb48a5c811",
+ "cost_usd": 0.01,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports 6 listed products, names Fable pencil set (7.60) as the cheapest, and leaves out the inactive products. It explains that build.js must be run from site/ because it uses relative paths, and says build.js was not modified. It implies, but does not state, that running it from the repository root failed."
+ }
+}

@@ -1,0 +1,52 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "P05",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 13.6,
+  "docker_exit": 0,
+  "image": "sha256:13f163056f1d51cb9aa6846cb48936f0410aa724d6a8e11e4a7edcd19dc49160",
+  "cost_usd": 0.097094,
+  "turns": 4,
+  "input_tokens": 8,
+  "output_tokens": 923,
+  "cache_read_tokens": 67490
+ },
+ "record": {
+  "prompt": "Please run the reorder check on exports/stock-2026-10-27.csv and tell me which SKUs need reordering. The export is exactly what the supplier portal produced; leave it and restock.py as they are.",
+  "base_changes": [
+   {
+    "id": "01M63D2P8PDXTERDK1BKZ5S2NA",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/restock",
+    "kind": "pitfall",
+    "source": "user",
+    "keywords": "",
+    "content": "Supplier portal stock exports (exports/*.csv) start with a UTF-8 BOM; restock.py with default encoding fails with \"column 'sku' not found\". Run it with --encoding utf-8-sig (user wants export and restock.py left unchanged).",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; ls -la; cat restock.py; head -20 exports/stock-2026-10-27.csv; wc -l exports/stock-2026-10-27.csv; memcue search \"restock reorder supplier export csv\" 2>&1 | head -30",
+    "result": "total 44\ndrwxr-xr-x 4 1001 1001 4096 Oct 29 08:40 .\ndrwxrwxr-x 6 1001 1001 4096 Oct 29 08:40 ..\n-rw-r--r-- 1 1001 1001  163 Oct 29 08:34 ._README.md\n-rwxr-xr-x 1 1001 1001  163 Oct 29 08:34 ._exports\n-rw-r--r-- 1 1001 1001  163 Oct 29 08:34 ._reorder.csv\n-rw-r--r-- 1 1001 1001  163 Oct 29 08:34 ._restock.py\ndrwxrwxr-x 8 1001 1001 4096 Oct 29 08:40 .git\n-rw-r--r-- 1 1001 1001  321 Oct 29 08:34 README.md\ndrwxr-xr-x 2 1001 1001 4096 Oct 29 08:39 exports\n-rw-r--r-- 1 1001 1001   79 Oct 29 08:34 reorder.csv\n-rw-r--r-- 1 1001 1001 1565 Oct 29 08:34 restock.py\n#!/usr/bin/env python3\n\"\"\"List the SKUs whose stock is at or below their reorder level.\"\"\"\nimport argparse\nimport csv\nimport sys\n\nREQUIRED = (\"sku\", \"warehouse\", \"qty\")\n\n\ndef read_export(path, encoding):\n    with open(path, newline=\"\", encoding=encoding) as f:\n        reader = csv.DictReader(f, delimiter=\";\")\n        header = reader.fieldnames or []\n        for col in REQUIRED:\n            if col not in header:\n                sys.exit(f\"restock.py: column {col!r} not found in {path}; header is {header!r}\")\n        stock = {}\n        for row in reader:\n            stock[row[\"sku\"]] = stock.get(row[\"sku\"], 0) + int(row[\"qty\"])\n        return stock\n\n\ndef read_levels(path):\n    with open(path, newline=\"\", encoding=\"utf-8\") as f:\n        return {row[\"sku\"]: int(row[\"level\"]) for row in csv.DictReader(f)}\n\n\ndef main():\n    p = argparse.ArgumentParser(description=__doc__)\n    p.add_argument(\"export\", help=\"stock export from the supp… [922 chars cut]"
+   },
+   {
+    "tool": "Bash",
+    "input": "cd /stand/ws; memcue add -kind pitfall -- \"Supplier portal stock exports (exports/*.csv) start with a UTF-8 BOM; restock.py with default encoding fails with \\\"column 'sku' not found\\\". Run it with --encoding utf-8-sig (user wants export and restock.py left unchanged).\" 2>&1 | tail -3",
+    "result": "01M63D2P8PDXTERDK1BKZ5S2NA"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "I also saved this workaround to long-term memory so later sessions will know about it."
+ }
+}

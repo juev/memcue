@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e42366e782df96f5cbb7aaecb10ed1506958d43c899635f762a88d3b263f43ab",
+ "cost_usd": 0.0375,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63D7CRMQ24ZYX8DH228Y2D7"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63D7CRMQ24ZYX8DH228Y2D7",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall records the UTF-8 BOM in the export, the 'sku' column error and the --encoding utf-8-sig fix without editing the export."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It names exactly the four SKUs BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure, and fixes it with --encoding utf-8-sig while leaving restock.py and the export unchanged."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "15bc3f1a671c5407e0dee8954e21c9616eea994c2b71f78f66f904cdabfa7f07",
+ "cost_usd": 0.0267,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 5437.50, says the first run failed because out/ did not exist, and says that running mkdir -p out without changing the script fixed it."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "c2152430fa9c5a6a0c7d8b9e38f359ff53af613f6ad6242e4223d8ea24def0b9",
+ "cost_usd": 0.0264,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports a total of 5437.50 and says the script failed because out/ did not exist. It also says creating out/, with the script left unchanged, fixed the run."
+ }
+}

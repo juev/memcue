@@ -1,0 +1,42 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "P04",
+  "repeat": "r3",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 30.4,
+  "docker_exit": 0,
+  "image": "sha256:822771ecd9cec424b34808319faa97ffde0f992ca115d4084e15806e3d7ddccc",
+  "cost_usd": 0.001856172,
+  "turns": 6,
+  "input_tokens": 57330,
+  "output_tokens": 772,
+  "cache_read_tokens": 49024
+ },
+ "record": {
+  "prompt": "Please compute the import duty for manifests/ship-0412.csv with duty.py and tell me the total. Don't change duty.py.",
+  "base_changes": [],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "duty.py import duty manifest ship"
+    },
+    "result": "{\"facts\": []}"
+   }
+  ],
+  "tools_in_order": [
+   "search_files",
+   "memcue_search",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal"
+  ],
+  "pages_read": [],
+  "final_answer": "Total import duty on manifests/ship-0412.csv: 473.74\n\nPer line (all five HS codes present in schedules/hs-2026.csv, run with DUTYBOOK=schedules/hs-2026.csv):\n\n  1  6109.10  cotton t-shirts   220.80   (12.0% of 1840.00)\n  2  6403.99  leather boots     209.24   (8.0% of 2615.50)\n  3  4202.92  duffel bags        32.55   (3.5% of 930.00)\n  4  8513.10  camping lamps      11.15   (2.7% of 412.80)\n  5  9503.00  wooden puzzles      0.00   (0.0% of 288.00)\n\nduty.py was not modified; the arithmetic was re-checked independently with the same per-line rounding (ROUND_HALF_UP to the cent) and matches."
+ }
+}

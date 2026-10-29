@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "c97b3ba37c82645b8fd64736d295f91dcbdfbcd579b31d70c710bf94a26c44e0",
+ "cost_usd": 0.0065,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the total 5437.50 and says the failure came from the missing out/ directory, which the script doesn't create; creating out/ fixed it and the script was left unchanged."
+ }
+}

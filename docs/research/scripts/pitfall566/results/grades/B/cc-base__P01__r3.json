@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "7bb6473a9adc59c80b06645375af02ec82786bec98d661e83233f60f6d264dc8",
+ "cost_usd": 0.0091,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 6 listed products with the Fable pencil set (7.60) as the cheapest. It explains that the build works only from site/ because the script resolves its files relative to the working directory, and it ran from site/ instead of editing build.js."
+ }
+}

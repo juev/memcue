@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "f13a1b24da4ff7dc8e3de3e7180d8b68183f53b71eaaeb8b9be69aa759a9caa3",
+ "cost_usd": 0.0098,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "partial",
+  "answer_reason": "It reports the correct total of 473.74 and notes that it ran with DUTYBOOK=schedules/hs-2026.csv, but it never says the script failed because DUTYBOOK was unset, so it meets the partial criterion of a correct total without explaining the failure."
+ }
+}

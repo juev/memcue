@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "b6604943bc5baeb3a70e4ac56c67abf2ab03cd1a774adbfd7b584e170e0d1f44",
+ "cost_usd": 0.0319,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 473.74 and says the script needs the DUTYBOOK variable, which the README doesn't mention. It gives the working command with DUTYBOOK=schedules/hs-2026.csv and confirms duty.py was not changed, though it only implies the failure instead of naming the KeyError."
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "8fc4f98cc8bdcc1d4b3e3710dad7f124a311a88ce1ee9971feafb3d517ee65c7",
+ "cost_usd": 0.0066,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the total 473.74, says the script failed because DUTYBOOK was unset, and says it ran with DUTYBOOK=schedules/hs-2026.csv without changing duty.py."
+ }
+}

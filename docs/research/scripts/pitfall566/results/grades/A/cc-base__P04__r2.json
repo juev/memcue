@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "8fc4f98cc8bdcc1d4b3e3710dad7f124a311a88ce1ee9971feafb3d517ee65c7",
+ "cost_usd": 0.0297,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total 473.74, explains that the failure came from DUTYBOOK being unset, and says that running with DUTYBOOK=schedules/hs-2026.csv fixed it without changing duty.py."
+ }
+}

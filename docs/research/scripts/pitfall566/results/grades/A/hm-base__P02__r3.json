@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "a1f75e1eb0a62a1caf6b933babbb5abe82defe301a1619f877c11b79f25d3c56",
+ "cost_usd": 0.0298,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 58.01 and says the failure came from the rate card's CRLF line endings. It also says passing a copy with the carriage returns stripped as RATES fixed it, and that neither file was edited."
+ }
+}

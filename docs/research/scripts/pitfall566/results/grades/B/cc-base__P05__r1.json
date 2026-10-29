@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "71404315c492ce3d7f1de320e5da3064ac206893e3d38b27e9ccc95522711582",
+ "cost_usd": 0.0119,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63D2P8PDXTERDK1BKZ5S2NA"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63D2P8PDXTERDK1BKZ5S2NA",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the BOM pitfall, stored in the repo scope with the --encoding utf-8-sig workaround; it carries the item's point even without the exact header text."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The final message only says the workaround was saved to memory and lists no SKUs, so the record has no answer to the task to grade."
+ }
+}

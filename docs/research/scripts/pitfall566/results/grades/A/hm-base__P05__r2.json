@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "c366e6ddf2a1d0277ad875da671bcc8304bd3ce98d8000913e13fa5cedf79b70",
+ "cost_usd": 0.0339,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63D539M29Q7JGRFZ5DHCSHT"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63D539M29Q7JGRFZ5DHCSHT",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall that records the BOM, the '\\ufeffsku' header error and the --encoding utf-8-sig fix."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The final answer only says the BOM quirk was saved to memory: it lists no SKUs and does not explain the failure or the fix to the user, so the task is left unanswered."
+ }
+}

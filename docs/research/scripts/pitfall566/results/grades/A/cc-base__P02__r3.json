@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "3f44dbcbff72a98fa364797e0aab2c91c22fa3722872d2ace6307e5cce1f7aca",
+ "cost_usd": 0.0387,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63D5DXD92AWASRK0CZ7D0SG"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63D5DXD92AWASRK0CZ7D0SG",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall naming the CRLF cause, the error message, the trailing \\r on the zone key, and the tr -d workaround passed as RATES."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the 58.01 total, names CRLF line endings as the cause, and says a CR-stripped copy passed as the second argument fixed it without editing the script or the rate card."
+ }
+}

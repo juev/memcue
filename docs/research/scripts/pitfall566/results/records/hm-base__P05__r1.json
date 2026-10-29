@@ -1,0 +1,66 @@
+{
+ "meta": {
+  "arm": "hm-base",
+  "scenario": "P05",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 33.3,
+  "docker_exit": 0,
+  "image": "sha256:822771ecd9cec424b34808319faa97ffde0f992ca115d4084e15806e3d7ddccc",
+  "cost_usd": 0.002163492,
+  "turns": 6,
+  "input_tokens": 58118,
+  "output_tokens": 1244,
+  "cache_read_tokens": 49664
+ },
+ "record": {
+  "prompt": "Please run the reorder check on exports/stock-2026-10-27.csv and tell me which SKUs need reordering. The export is exactly what the supplier portal produced; leave it and restock.py as they are.",
+  "base_changes": [
+   {
+    "id": "01M63D38ZEHZSKFG22SPCEMW97",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/restock",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "restock.py, stock export, BOM, \\ufeffsku, column 'sku' not found, utf-8-sig, supplier portal, /stand/ws, reorder",
+    "content": "Supplier-portal stock exports in /stand/ws carry a UTF-8 BOM on the header, so plain `python3 restock.py exports/<file>.csv` exits 1 with \"column 'sku' not found\" (header is ['\\ufeffsku', ...]). Run it with `--encoding utf-8-sig`; the export and restock.py are to be left unmodified.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "memcue_search",
+    "input": {
+     "query": "stock reorder check restock.py supplier export"
+    },
+    "result": "{\"facts\": []}"
+   },
+   {
+    "tool": "memcue_add",
+    "input": {
+     "content": "Supplier-portal stock exports in /stand/ws carry a UTF-8 BOM on the header, so plain `python3 restock.py exports/<file>.csv` exits 1 with \"column 'sku' not found\" (header is ['\\ufeffsku', ...]). Run it with `--encoding utf-8-sig`; the export and restock.py are to be left unmodified.",
+     "kind": "pitfall",
+     "scope": "repo",
+     "keywords": "restock.py, stock export, BOM, \\ufeffsku, column 'sku' not found, utf-8-sig, supplier portal, /stand/ws, reorder",
+     "source": "tool"
+    },
+    "result": "{\"result\": \"01M63D38ZEHZSKFG22SPCEMW97\"}"
+   }
+  ],
+  "tools_in_order": [
+   "terminal",
+   "memcue_search",
+   "read_file",
+   "read_file",
+   "read_file",
+   "read_file",
+   "terminal",
+   "terminal",
+   "memcue_add"
+  ],
+  "pages_read": [],
+  "final_answer": "Reordered check ran, 4 SKUs are at or below level:\n\n    BX-100   stock   23  level   25\n    CL-310   stock    5  level    5\n    EN-512   stock    0  level   10\n    GH-118   stock    7  level   12\n    4 SKUs to reorder\n\nNot reordering: BX-220 (40 vs 30), DR-045 (120 vs 80), FT-760 (33 vs 20).\n\nOne thing to know: the export starts with a UTF-8 BOM, so a bare `python3 restock.py exports/stock-2026-10-27.csv` fails with `column 'sku' not found`. I ran it with the script's own flag instead — `python3 restock.py exports/stock-2026-10-27.csv --encoding utf-8-sig` — so neither file was touched (checksums unchanged, `git status` clean).\n\nTotals above are sums across warehouses: BX-100 14+9, CL-310 3+2, FT-760 18+15."
+ }
+}

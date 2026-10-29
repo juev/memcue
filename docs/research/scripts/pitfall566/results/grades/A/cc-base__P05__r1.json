@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "71404315c492ce3d7f1de320e5da3064ac206893e3d38b27e9ccc95522711582",
+ "cost_usd": 0.0421,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63D2P8PDXTERDK1BKZ5S2NA"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63D2P8PDXTERDK1BKZ5S2NA",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall records the BOM in the supplier exports, the \"column 'sku' not found\" failure and the --encoding utf-8-sig workaround."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "unresolved",
+  "answer_reason": "The final answer only says the workaround was saved to memory; it names no SKUs and does not explain the failure, so the task was left without an answer."
+ }
+}

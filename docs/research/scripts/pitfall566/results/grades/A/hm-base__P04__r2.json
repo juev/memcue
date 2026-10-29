@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "37aa49aaca553897656cd2f1ad2731ace7b37dcedcdcab6ddd35d0eaaa55bd03",
+ "cost_usd": 0.0324,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total 473.74 and explains that duty.py needs DUTYBOOK, which the README never mentions. It also says that setting DUTYBOOK=schedules/hs-2026.csv, without editing duty.py, made the run succeed."
+ }
+}

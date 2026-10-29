@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "eee1bb79afdcc687797a9f29c1a390466cf2e7353bb4c054b3d6b6a698c14cd0",
+ "cost_usd": 0.0067,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer names exactly BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure, and says --encoding utf-8-sig fixed it without editing restock.py or the export."
+ }
+}
