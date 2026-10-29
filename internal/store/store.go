@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -173,6 +174,19 @@ type Store struct {
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
 // git never takes half of one.
 func Open(path string) (*Store, error) {
+	s, err := openFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.agentSources(); err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+// openFile is Open without agentSources, which OpenText runs only once the text is in the cache.
+func openFile(path string) (*Store, error) {
 	dsn, file, err := dataSource(path)
 	if err != nil {
 		return nil, err
@@ -724,11 +738,52 @@ func TodayAt(t time.Time) string { return t.Format(time.DateOnly) }
 
 // approved is m as a version written now stores it: a fact no longer waits for approval (#514), so neither state of an
 // older row is carried into a new version. The expiry is a field of its own and stays: a provisional fact keeps the
-// last day its TTL gave it until a correction changes that day.
+// last day its TTL gave it until a correction changes that day. A fact with no source is the agent's (#582): only the
+// user's own words carry user.
 func approved(m Meta) Meta {
 	m.Review = ""
+	if m.Source == "" {
+		m.Source = "agent"
+	}
 	return m
 }
+
+// agentSources gives every active fact whose latest version has no source a version with source agent (#582): such a
+// fact was written before sources were labelled, and no one checked it as the user's words. The version keeps the
+// creation time and the author of the one before it, so two machines that relabel a fact apart write the same version
+// and a merge keeps one of them. Everything else stays, the review state of an older row too: search ranks a
+// provisional fact of an older base after the others, and a label must not change what search returns. One statement
+// reads and writes, so parallel opens do not relabel a fact twice. The content does not change, so the index stays as
+// it is.
+//
+// Every search opens the base, and finding the facts reads every version of the history: tens of milliseconds on a
+// base of twenty thousand versions. A fact without a source comes only with versions this memcue did not write (git,
+// a merge, an older memcue), so the stamp sourcesStamp keeps how many versions the base had when the last look found
+// nothing, and an open looks again only when that number moved. A base of one SQLite file keeps the stamp only when
+// the look relabelled something, and otherwise looks on every open.
+func (s *Store) agentSources() error {
+	var n int
+	if err := s.db.QueryRow(`SELECT count(*) FROM facts`).Scan(&n); err != nil {
+		return fmt.Errorf("relabel facts without a source: %w", err)
+	}
+	if v, err := s.stamp(sourcesStamp); err != nil || v == strconv.Itoa(n) {
+		return err
+	}
+	relabelled, err := s.query(`INSERT INTO facts(`+columns+`) SELECT id, version + 1, content, keywords, origin,
+		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, queries FROM facts f
+		WHERE f.source = '' AND f.status = ? AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
+		RETURNING `+columns, Active)
+	if err != nil {
+		return fmt.Errorf("relabel facts without a source: %w", err)
+	}
+	s.textWritten(relabelled...)
+	if s.text == "" && len(relabelled) == 0 {
+		return nil // a base of one SQLite file is in git: an open that changes nothing must not change the file
+	}
+	return saveStamp(s.db, sourcesStamp, strconv.Itoa(n+len(relabelled)))
+}
+
+const sourcesStamp = "sources-rows" // versions of the base when agentSources last left no fact without a source
 
 // CardFacts returns the facts a session-start card carries: global rules and the rules and decisions whose scope is
 // one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
