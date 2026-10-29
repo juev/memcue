@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "dc8af501e77339637d7412d307b290e76628fdb5a5e74e7afd6eb68d6be54a75",
+ "cost_usd": 0.009,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JVY2ZBRC4YQRDFYH3SWHV"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JVY2ZBRC4YQRDFYH3SWHV",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall states the error, its cause (out/ is gitignored and the script doesn't create it) and the fix (mkdir -p out)."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total 5437.50, says the script failed because out/ was missing, and says creating out/ without editing the script fixed it."
+ }
+}

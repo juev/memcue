@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e619bd17584cf327947afbe668c233c590cbde69eb61378341880cee9a87189e",
+ "cost_usd": 0.0374,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KG0E17YB3N0GZ0KAJ2EM5"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KG0E17YB3N0GZ0KAJ2EM5",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This pitfall is stored in the repo scope. It records the BOM failure message and the --encoding utf-8-sig workaround, and it does not edit any files."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer names exactly BX-100, CL-310, EN-512 and GH-118. It explains that the BOM caused the failure and that --encoding utf-8-sig fixed it, with both files left untouched."
+ }
+}

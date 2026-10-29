@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "150a8030ec451bb0801d09750ce903b32c730d943b57ba95d858ce34f6606eb9",
+ "cost_usd": 0.0362,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJGGW9NAWFWQ1TMGQ8ZJY"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJGGW9NAWFWQ1TMGQ8ZJY",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the CRLF pitfall stored as a pitfall in the repo scope, with the error message and the tr workaround."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 58.01, says the cause is CRLF line endings in the rate card, and says a CR-stripped copy passed as the second argument fixed it without editing the script or the rate card."
+ }
+}

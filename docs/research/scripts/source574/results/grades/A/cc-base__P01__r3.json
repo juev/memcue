@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "a86037abaa07ac3cf001b199e2e98531cc3c615aac1f05290bdec8ae7fa37326",
+ "cost_usd": 0.0421,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 6 products with Fable pencil set (7.60) as the cheapest, and it explains that build.js resolves paths relative to the working directory, so it has to be run from site/, without editing build.js. It implies the failure from the repository root but never states it outright."
+ }
+}

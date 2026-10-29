@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e6cbd88f10fb3db3b823cf21f43f06c3d26fda8dbbfde19002656717c3c53963",
+ "cost_usd": 0.0468,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JT24NZ6FGCW77TNG671HY"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JT24NZ6FGCW77TNG671HY",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall names the CRLF cause, the error and the tr -d '\\r' workaround passed as the rates argument."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports a total of 58.01 and names CRLF line endings as the cause. It says the fix was passing a copy of the rates without carriage returns as the second argument, with the script and rate card left unedited."
+ }
+}

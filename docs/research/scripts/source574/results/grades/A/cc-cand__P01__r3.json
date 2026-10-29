@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "a3bee8690ce438998ff4640602546ab2f64ed97252e06157a2b977aca5071c63",
+ "cost_usd": 0.0302,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 6 products and the Fable pencil set (7.60) as cheapest, leaves build.js unchanged, and says the relative paths mean it must be run from site/. It implies the root failure rather than stating it outright."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "ea215cfa946e3e5a9d9932564dedf89d56bca3212f511f00e35c541400f1619e",
+ "cost_usd": 0.0437,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJ01CDR8YXHAHFX8EC45A"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJ01CDR8YXHAHFX8EC45A",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall: out/ is gitignored and the script does not create it, so run mkdir -p out first; this matches D1 in an ordinary scope."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports 5437.50, says the failure came from the missing git-ignored out/ directory, and fixed it with mkdir -p out without editing the script; the shown memory calls don't include the failing first run, but the third, unshown Bash call may account for it."
+ }
+}

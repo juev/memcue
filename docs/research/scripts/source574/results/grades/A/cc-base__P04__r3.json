@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e4b095e796b7ccde4db1c4eb833c05f751ae849a83d37c43e1f14e42ffd7bd75",
+ "cost_usd": 0.0397,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JWA8N6VWVDHHDFY7DQCE8"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JWA8N6VWVDHHDFY7DQCE8",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repository-scoped pitfall: the DUTYBOOK env var is required or the script fails with a KeyError, and it gives the working command."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports a total of 473.74, explains that DUTYBOOK was not set, and says setting it to schedules/hs-2026.csv worked with duty.py left unchanged."
+ }
+}

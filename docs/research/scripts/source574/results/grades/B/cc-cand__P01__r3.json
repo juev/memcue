@@ -1,0 +1,21 @@
+{
+ "pass": "B",
+ "record_sha256": "a3bee8690ce438998ff4640602546ab2f64ed97252e06157a2b977aca5071c63",
+ "cost_usd": 0.0089,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports 6 products and Fable pencil set (7.60) as cheapest, notes the inactive cheaper items are excluded, leaves build.js unchanged, and explains the relative-path requirement to run from site/."
+ }
+}

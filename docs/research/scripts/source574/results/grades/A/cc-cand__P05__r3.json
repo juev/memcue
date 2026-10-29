@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "3d439cc8190403a2787f11dd4f1d1b66bd0ac91ae69edd4fe16c34db6b10ab5e",
+ "cost_usd": 0.0355,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJWSRSJ6C8HTSW5K1SGSN"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJWSRSJ6C8HTSW5K1SGSN",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall stating the BOM cause, the 'sku' not-found error and the --encoding utf-8-sig fix, with no SKU data."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Names exactly BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure, and says --encoding utf-8-sig fixed it without editing the export or restock.py."
+ }
+}

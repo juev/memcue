@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "542e03df204df8d59bb3ed286be80b9e0ab529f24e7f25337bb559f00bd408ba",
+ "cost_usd": 0.0416,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJ1HDFK0SMA21T13XP6Z1"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJ1HDFK0SMA21T13XP6Z1",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Records the DUTYBOOK KeyError pitfall and the working command as a pitfall in the repo scope, as D1 asks."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports a total of 473.74, explains that duty.py needs DUTYBOOK, which the README doesn't mention, and says setting it to schedules/hs-2026.csv made the run work with duty.py unchanged."
+ }
+}

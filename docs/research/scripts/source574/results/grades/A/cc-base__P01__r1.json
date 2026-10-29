@@ -1,0 +1,21 @@
+{
+ "pass": "A",
+ "record_sha256": "a65a1e2dd56e5713922706025d74b3b4feadec9e48e295666bcd800a661758b5",
+ "cost_usd": 0.0441,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": false,
+    "place": null,
+    "fact_ids": []
+   }
+  ],
+  "changes": [],
+  "searched_memory": false,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the 6 products the build listed, names Fable pencil set (7.60) as the cheapest, and says build.js reads files relative to the current folder, so it was run from site/ without editing build.js; it does not say outright that the run from the repository root failed."
+ }
+}

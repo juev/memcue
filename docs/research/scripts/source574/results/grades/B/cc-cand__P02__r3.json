@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "150a8030ec451bb0801d09750ce903b32c730d943b57ba95d858ce34f6606eb9",
+ "cost_usd": 0.009,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJGGW9NAWFWQ1TMGQ8ZJY"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJGGW9NAWFWQ1TMGQ8ZJY",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This fact stores the CRLF pitfall with the error message and the tr workaround, scoped to the repo."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 58.01, names CRLF line endings as the cause, and says that passing a CR-stripped copy as the second argument fixed it without editing either file."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "2359dfa9eabc1e922ac5608cffed3d210deda9c4c379f3fafa0a4f91e12990df",
+ "cost_usd": 0.0382,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTBE4D3HFQAN0QX5REXQA"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTBE4D3HFQAN0QX5REXQA",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall says duty.py needs DUTYBOOK, fails with a KeyError without it, and gives the working command."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports the total of 473.74, says the failure came from DUTYBOOK being unset, and says setting it to schedules/hs-2026.csv fixed it without changing duty.py."
+ }
+}

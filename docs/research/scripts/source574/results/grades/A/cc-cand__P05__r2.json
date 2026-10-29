@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "14127f091a8823875308107ea78c39b54a97220217d9f50d6ebbc48d3b12143f",
+ "cost_usd": 0.0365,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJG0A7EN95RJ20STKVRPN"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJG0A7EN95RJ20STKVRPN",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall that names the BOM cause, the 'sku' column error and the --encoding utf-8-sig fix, and says not to edit the export or the script."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Names exactly BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure, and says --encoding utf-8-sig fixed it without editing the script or the export."
+ }
+}

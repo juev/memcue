@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "a141a3a11ea00738ab26ac5144ef3cf7c81298399da4ee8eb01074e806c3e798",
+ "cost_usd": 0.0358,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JT4TY42XPS38K798HGKNZ"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JT4TY42XPS38K798HGKNZ",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This pitfall fact is stored in the repository scope. It gives the error, the cause (out/ is gitignored and the script doesn't create it) and the fix, mkdir -p out."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total 5437.50 and says the script failed because out/ was missing. It also says creating out/ with mkdir -p fixed it and that the script was not changed."
+ }
+}
