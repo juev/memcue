@@ -1,164 +1,168 @@
-# Полка исследований: подтверждающий прогон на изолированном стенде, октябрь 2026 (#531)
+# The research shelf: a confirming run on an isolated stand, October 2026 (#531)
 
-Статус: **замер 2026-10-28 на синтетических данных, код продукта не менялся.** Продолжение
-[research-shelf-531](research-shelf-531-2026-10.md): тот прогон дал направление, но шёл не в песочнице, Hermes там
-эмулировался, а сценарии и candidate-текст писал один автор. Здесь все три недостатка закрыты.
+Status: **measured 2026-10-28 on synthetic data; no product code changed.** A follow-up to
+[research-shelf-531](research-shelf-531-2026-10.md): that run gave a direction, but it was not sandboxed, Hermes was
+emulated, and one author wrote both the scenarios and the candidate text. This run fixes all three.
 
-Коротко:
+In short:
 
-- **Claude Code с candidate-текстом сохраняет находки и находит их.** Сохранено 21 из 24 ожидаемых находок, все на
-  полке; у base — 12 из 24, и только 3 из них на полке. К полке, где она нужна, candidate обратился 24 раза из 24,
-  base — 15. Ответы: 57 верных из 57 против 52 верных, 2 частичных и 3 неверных у base. По сценариям candidate
-  нигде не хуже base и лучше в четырёх (S05, S09, S16, S17).
-- **Hermes на DeepSeek выигрывает меньше.** Candidate сохранил 13 из 24 находок (base — 3, и все не на полке), к
-  полке обратился 21 раз из 24 (base — 15). Ответы почти не изменились: 50/4/3 против 48/6/3. По сценариям картина
-  смешанная: четыре лучше (S08, S13, S14, S18), три хуже (S06, S10, S16).
-- **Цена candidate.** У Claude Code стоимость выше на 4 % ($5.77 против $5.53 за 57 прогонов), прогон в среднем
-  короче (30 с против 37 с). Лишних фактов немного: 6 полезных сверх ожидаемых в Claude Code и 7 в Hermes, шума
-  ноль. Запрещённых изменений у Claude Code candidate нет; у Hermes candidate 4 в трёх прогонах.
-- **Ловушку из работы не сохранил никто.** В S06 (скрипт падает в свежем клоне) ни один из 12 прогонов ничего не
-  записал, candidate-фраза про ловушки на это не повлияла.
-- По дороге найдены: отказ `memcue add` находке на полке о значении по умолчанию в чужой системе, загрузка
-  провайдера памяти Hermes только с toolset `memory`, и два артефакта стенда, которые исправлены и описаны ниже.
+- **Claude Code with the candidate text stores findings and finds them again.** It stored 21 of 24 expected
+  findings, all on the shelf; base stored 12 of 24, only 3 of them on the shelf. The candidate reached the shelf in
+  24 of 24 runs that needed it, base in 15. Answers: 57 of 57 correct, against 52 correct, 2 partial and 3 wrong for
+  base. Per scenario the candidate is never worse than base and better in four (S05, S09, S16, S17).
+- **Hermes on DeepSeek gains less.** The candidate stored 13 of 24 findings (base 3, none on the shelf) and reached
+  the shelf 21 times of 24 (base 15). Answers barely moved: 50/4/3 against 48/6/3. Per scenario the picture is mixed:
+  four better (S08, S13, S14, S18), three worse (S06, S10, S16).
+- **The candidate's cost.** For Claude Code the cost is 4% higher ($5.77 against $5.53 for 57 runs, `summary.py`),
+  and a run is shorter on average (30 s against 37 s). Few extra facts: 6 useful ones beyond the expected in Claude
+  Code and 7 in Hermes, no noise. The Claude Code candidate made no forbidden change; the Hermes candidate made 4 in
+  three runs.
+- **No arm stored a pitfall from the work.** In S06 (a script fails in a fresh clone) none of the 12 runs wrote
+  anything; the candidate's line about pitfalls changed nothing.
+- Found on the way: `memcue add` refuses a shelf finding about another system's config default, the Hermes CLI loads
+  its memory provider only with the `memory` toolset, and two stand artifacts, fixed and described below.
 
-Это одна сетка на 19 выдуманных сценариях по 3 повтора. Повторы одного сценария не независимы, поэтому разницы в
-несколько прогонов — направление, а не оценка частоты в настоящей работе.
+This is one grid over 19 invented scenarios with 3 repeats each. Repeats of a scenario are not independent, so a
+difference of a few runs is a direction, not a rate for real work.
 
-## Что изменилось по сравнению с первым прогоном
+## What changed since the first run
 
-| | первый прогон (#535) | этот прогон |
+| | first run (#535) | this run |
 |---|---|---|
-| Изоляция | `claude -p` с home пользователя, deny-list | контейнер на каждый прогон: без capabilities, свой home, смонтированы только каталог прогона и фикстуры (ro) |
-| Hermes | эмуляция под Claude | настоящий Hermes v0.22.5 из образа боевого, DeepSeek `deepseek-flash` |
-| Сценарии | писал автор candidate | писал отдельный агент, не видевший candidate; автор candidate не читал их до конца разметки |
-| Разметка | модели, автор досуживал | два независимых прохода Opus без инструментов, рукав скрыт; третий проход на расхождения |
-| Веб | MCP-заглушка, домены не зарезервированы | MCP-заглушка, только `*.example` |
+| Isolation | `claude -p` with the user's home, a deny list | one container per run: no capabilities, its own home, only the run directory and the fixtures (ro) mounted |
+| Hermes | emulated under Claude | real Hermes v0.22.5 from the live image, DeepSeek `deepseek-flash` |
+| Scenarios | written by the candidate's author | written by a separate agent that never saw the candidate; the candidate's author did not read them before grading ended |
+| Grading | models, adjudicated by the author | two independent Opus passes with no tools and the arm hidden; a third pass on disagreements |
+| Web | MCP stand-in, unreserved domains | MCP stand-in, `*.example` only |
 
-## Метод
+## Method
 
-Всё, что нужно для повтора, лежит в [`scripts/confirm531/`](scripts/confirm531/).
+Everything needed to repeat the run is in [`scripts/confirm531/`](scripts/confirm531/).
 
-- **Candidate-текст** ([`candidate/`](scripts/confirm531/candidate/)) написан и закоммичен до сценариев (sha256 в
-  истории ветки). Это прошлый candidate с пятью уточнениями отчёта и решениями владельца от 2026-10-28: Claude Code
-  называет полку; сохранять то, на чём держится вывод, и его ограничения; документ в репозитории не сохранять
-  (#547); перед опорой на находку сверить её версию или дату с тем, что в работе; ответ не выходит за находку и
-  помечает вывод как вывод. Срока жизни и нового kind нет.
-- **Сценарии** ([`fixtures/`](scripts/confirm531/fixtures/), схема — [`SCHEMA.md`](scripts/confirm531/SCHEMA.md)):
-  19 штук, 7 на сохранение и 12 на поиск, из них 2 цепочки (S13 читает базу, которую оставил S02 того же рукава и
-  повтора; S18 — базу S08). Полка нужна в 8 сценариях: S05, S07, S09, S11, S13, S14, S17, S18.
-- **Стенд** ([`stand/`](scripts/confirm531/stand/)): Docker на loffe. Образ Claude Code 2.1.312 с плагином memcue из
-  ветки, образ Hermes из того же digest, что боевой. Вариант candidate добавляет четвёртый хук SessionStart и раздел
-  в скилл (Claude Code) или блок после заметки memcue в системном промпте (Hermes). Модель Claude Code — Opus 5.5.
-- **Разметка**: [`extract.py`](scripts/confirm531/extract.py) делает выжимку прогона (промпт, изменения базы, вызовы
-  memcue, прочитанные страницы, ответ); [`grade.py`](scripts/confirm531/grade.py) отдаёт её свежему `claude -p`
-  (Opus 5.5) с [`grade_prompt.md`](scripts/confirm531/grade_prompt.md) и метками сценария. Проходы A и B совпали
-  полностью на 222 записях из 228, по вердикту ответа — на 224; шесть расхождений досудил проход C.
-  [`summary.py`](scripts/confirm531/summary.py) пересчитывает все числа ниже из сохранённых записей.
-- **Данные и происхождение** — [`results/README.md`](scripts/confirm531/results/README.md).
+- **Candidate text** ([`candidate/`](scripts/confirm531/candidate/)), written and committed before the scenarios
+  existed (sha256 in the branch history): the first candidate with the report's five refinements and the owner's
+  decisions of 2026-10-28. Claude Code names the shelf; store what the conclusion rests on and its limits; do not
+  store a document of the repository (#547); compare a finding's version or date with what the workspace uses before
+  relying on it; an answer says no more than the finding and marks an inference. No expiry and no new kind.
+- **Scenarios** ([`fixtures/`](scripts/confirm531/fixtures/), layout in [`SCHEMA.md`](scripts/confirm531/SCHEMA.md)):
+  19, 7 capture and 12 recall, two of them chains (S13 reads the base that S02 left in the same arm and repeat, S18
+  the base of S08). The shelf is needed in 8: S05, S07, S09, S11, S13, S14, S17, S18.
+- **Stand** ([`stand/`](scripts/confirm531/stand/)): Docker on a home server. A Claude Code 2.1.312 image with the
+  memcue plugin of the branch, and a Hermes image from the live digest. The candidate variant adds a fourth
+  SessionStart hook and a skill section (Claude Code), or a block after the memcue note in the system prompt (Hermes).
+  Claude Code runs Opus 5.5.
+- **Grading**: [`extract.py`](scripts/confirm531/extract.py) makes a compact record of a run (prompt, base changes,
+  memcue calls, pages read, answer); [`grade.py`](scripts/confirm531/grade.py) gives it to a fresh `claude -p`
+  (Opus 5.5) with [`grade_prompt.md`](scripts/confirm531/grade_prompt.md) and the scenario's labels. Passes A and B
+  agreed fully on 222 of 228 records, on the answer verdict on 224; pass C settled the six disagreements.
+  [`summary.py`](scripts/confirm531/summary.py) recomputes every number below from the kept records.
+- **Data and provenance**: [`results/README.md`](scripts/confirm531/results/README.md).
 
-## Результаты
+## Results
 
-Счёт по 57 прогонов в каждом рукаве (19 сценариев × 3).
+57 runs per arm (19 scenarios × 3).
 
 | | cc-base | cc-cand | hm-base | hm-cand |
 |---|---|---|---|---|
-| ожидаемые находки сохранены | 12/24 | 21/24 | 3/24 | 13/24 |
-| находки для полки — на полке | 3/21 | 21/21 | 0/21 | 13/21 |
-| находки для полки — в другом месте | 9/21 | 0/21 | 3/21 | 0/21 |
-| ловушка из работы (S06) сохранена | 0/3 | 0/3 | 0/3 | 0/3 |
-| изменения: ожидаемые / полезные сверх / шум / запрещённые | 8/0/0/1 | 16/6/0/0 | 1/3/0/0 | 9/7/0/4 |
-| прогоны, где сохранять было нечего, но сохранили | 0/42 | 4/42 | 1/42 | 6/42 |
-| искали в памяти | 46/57 | 49/57 | 39/57 | 40/57 |
-| обратились к полке, где она нужна | 15/24 | 24/24 | 15/24 | 21/24 |
-| нужный факт найден | 24/27 | 27/27 | 19/27 | 24/27 |
-| ответы: верно / частично / неверно | 52/2/3 | 57/0/0 | 48/6/3 | 50/4/3 |
-| из них цепочки | 6/0/0 | 6/0/0 | 2/4/0 | 5/1/0 |
-| среднее время прогона, с | 37 | 30 | 39 | 38 |
-| стоимость, $ по API-ценам | 5.53 | 5.77 | 0.13 | 0.13 |
+| expected findings stored | 12/24 | 21/24 | 3/24 | 13/24 |
+| shelf findings stored on the shelf | 3/21 | 21/21 | 0/21 | 13/21 |
+| shelf findings stored elsewhere | 9/21 | 0/21 | 3/21 | 0/21 |
+| pitfall from the work (S06) stored | 0/3 | 0/3 | 0/3 | 0/3 |
+| changes: expected / extra useful / noise / forbidden | 8/0/0/1 | 16/6/0/0 | 1/3/0/0 | 9/7/0/4 |
+| runs with nothing to store that stored | 0/42 | 4/42 | 1/42 | 6/42 |
+| searched memory | 46/57 | 49/57 | 39/57 | 40/57 |
+| reached the shelf when needed | 15/24 | 24/24 | 15/24 | 21/24 |
+| needed fact found | 24/27 | 27/27 | 19/27 | 24/27 |
+| answers: correct / partial / wrong | 52/2/3 | 57/0/0 | 48/6/3 | 50/4/3 |
+| of them chains | 6/0/0 | 6/0/0 | 2/4/0 | 5/1/0 |
+| mean seconds per run | 37 | 30 | 39 | 38 |
+| cost, $ at API prices | 5.53 | 5.77 | 0.13 | 0.13 |
 
-### Сохранение
+### Capture
 
-- Claude Code base сохраняет находки, но в область репозитория, а не на полку: 9 из 12 сохранённых. Поиск в том же
-  репозитории их находит, поэтому цепочки у base тоже верны (6 из 6). Из другого репозитория такие факты обычный
-  поиск не вернёт.
-- Hermes base почти ничего не сохраняет (3 из 24), и его цепочки слабее всех: 4 частичных ответа из 6.
-- «Сохранили, хотя было нечего» у candidate — в основном правка сида: в S15 факт уже лежал на полке, и агент
-  дописал в него детали вместо второй копии (разметчики сочли это полезным), в S14, S17 и S18 — отметка о повторной
-  проверке источника.
-- Запрещённые изменения: cc-base S02 r2 положил находку в область репозитория вместе с текстом README; hm-cand S04
-  r2 добавил новый факт полки, не сняв устаревший; S09 r3 сохранил собственную арифметику с выдуманным лимитом; S15
-  r3 завёл вторую копию находки и записал настройки репозитория.
-- Документы внутри репозитория (S10) не сохранил ни один рукав, как и требует #547.
+- Claude Code base does store findings, but in the repository's scope, not on the shelf: 9 of its 12. A search in the
+  same repository finds them, so base's chains are right too (6 of 6). From another repository an ordinary search
+  would not return them.
+- Hermes base stores almost nothing (3 of 24), and its chains are the weakest: 4 partial answers of 6.
+- "Stored with nothing to store" in the candidate arms is mostly an edit of a seeded fact: in S15 the finding was
+  already on the shelf, and the agent added details to it instead of a second copy (the graders counted that as
+  useful); in S14, S17 and S18 a note that the source was checked again.
+- Forbidden changes: cc-base S02 r2 put a finding in the repository scope together with README text; hm-cand S04 r2
+  added a new shelf fact without retiring the stale one; S09 r3 stored its own arithmetic with an invented limit; S15
+  r3 made a second copy of the finding and stored the repository's settings.
+- No arm stored anything from the documents inside the repository (S10), as #547 asks.
 
-### Поиск и ответы
+### Search and answers
 
-- Главная разница — сценарии, где обычный поиск что-то возвращает, а нужный факт лежит на полке. В S09 cc-base
-  обратился к полке в одном прогоне из трёх, а в двух выдумал общий лимит S3 в 10 000 частей вместо 5 000 и ответил
-  неверно. Candidate Claude Code прочитал полку во всех трёх прогонах. У Hermes оба рукава обратились к полке в двух
-  прогонах из трёх и по разу ответили неверно.
-- S17 (без подсказки, перефразировка): по одному неверному ответу у cc-base, hm-base и hm-cand, у cc-cand три
-  верных.
-- S16 (ничего не записано): base Claude Code в одном прогоне добавил общую оценку «около 1 МБ» — частичный ответ;
-  candidate Claude Code трижды прямо сказал, что сведений нет.
-- В S19 (нужен обычный факт о хосте) все рукава ответили верно; полка там не нужна, и Hermes к ней не обращался.
+- The main difference is where an ordinary search returns something while the needed fact is on the shelf. In S09
+  cc-base reached the shelf in one run of three; in the other two it invented the general S3 limit of 10,000 parts
+  instead of 5,000 and answered wrong. The Claude Code candidate read the shelf in all three. In Hermes both arms
+  reached the shelf in two runs of three and answered wrong once.
+- S17 (no cue, a paraphrase): one wrong answer each for cc-base, hm-base and hm-cand; three correct for cc-cand.
+- S16 (nothing recorded): Claude Code base added a generic "about 1 MB" guess in one run, a partial answer; the
+  Claude Code candidate said three times that nothing is known.
+- In S19 (an ordinary host fact is needed) every arm answered correctly; the shelf is not needed there, and Hermes did
+  not read it.
 
-## Находки по продукту
+## Product findings
 
-1. **`memcue add` отклоняет находку на полке о значении по умолчанию в чужой системе.** Проверка на «состояние
-   установки» срабатывает на признак `config default` при пустом kind или `environment`, в том числе для
-   `scope shelf:research`. На этом споткнулся засев (сид `flags`, S05); в прогонах агенты на неё не наткнулись.
-   Единственный отказ в прогонах — hm-base S14 r2, где агент сохранял закреплённую версию пакета, и это ровно то,
-   что проверка должна отсекать. Гипотеза, не проверено: агент, сохраняющий такую находку о чужой системе на полку,
-   получит отказ, хотя к состоянию его машин она отношения не имеет.
-2. **Hermes CLI грузит провайдер памяти только с toolset `memory`.** С `platform_toolsets.cli` без `memory` в
-   системном промпте нет заметки memcue и нет инструментов memcue, хотя плагин включён и провайдер выбран. Боевой
-   Hermes использует пресет `hermes-cli`, где `memory` есть, поэтому там это не проявляется.
-3. **Ловушки из работы не сохраняются.** S06 — один сценарий, но ни один из 12 прогонов не записал причину падения
-   скрипта, найденную запуском; candidate-фраза «ловушка идёт туда же, куда сейчас» этого не изменила.
+1. **`memcue add` refuses a shelf finding about another system's config default.** The installation-state check fires
+   on its `config default` signal with an empty or `environment` kind, also for `scope shelf:research`. Seeding hit it
+   (seed `flags`, S05); the agents did not in the runs. The one refusal in the runs is hm-base S14 r2, where the agent
+   stored a pinned package version, which is exactly what the check should stop. Hypothesis, not checked: an agent
+   that stores such a finding about another system on the shelf gets refused, although it has nothing to do with the
+   state of its own machines.
+2. **The Hermes CLI loads its memory provider only with the `memory` toolset.** With `platform_toolsets.cli` lacking
+   `memory`, the system prompt has no memcue note and the memcue tools are missing, although the plugin is enabled and
+   the provider is set. The live Hermes uses the `hermes-cli` preset, which includes `memory`, so it does not show
+   there.
+3. **Pitfalls from the work are not stored.** S06 is one scenario, but none of 12 runs wrote down the cause of a script
+   failure found by running it; the candidate's line "a pitfall goes where it goes today" did not change that.
 
-## Артефакты стенда и что с ними сделано
+## Stand artifacts and what was done
 
-- **Защита записи Hermes.** Образ задаёт `HERMES_WRITE_SAFE_ROOT=/opt/data`, и Hermes не мог писать файлы в рабочем
-  каталоге. Это задело 14 прогонов Hermes в S05, S09, S12, S16; в S09 агенты даже сохранили запрет как ловушку.
-  Все четыре сценария прогнаны в обоих рукавах Hermes заново с каталогом прогона как разрешённым; первые записи
-  лежат в `results/superseded/`.
-- **Засев через `add`.** Из-за находки 1 засев переведён на `memcue import`, образы пересобраны в 17:30 посреди
-  сетки; S05 r1 всех рукавов прогнан заново. Агент, тексты и плагины не менялись; id образа записан в каждой записи.
-- **Встроенные плагины Claude Code.** Во всех прогонах Claude Code загружены `cc-plugin-agents-md` и
-  `cc-plugin-plugin-authoring`, они входят в бинарник 2.1.312. Они одинаковы в обоих рукавах; их влияние не
-  измерялось.
+- **The Hermes write guard.** The image sets `HERMES_WRITE_SAFE_ROOT=/opt/data`, so Hermes could not write files in
+  the workspace. It hit 14 Hermes runs in S05, S09, S12 and S16; in S09 agents even stored the denial as a pitfall. All
+  four scenarios were run again in both Hermes arms with the run directory as the safe root; the first records are in
+  `results/superseded/`.
+- **Seeding through `add`.** Because of finding 1, seeding moved to `memcue import` and the images were rebuilt at
+  17:30, mid-grid; S05 r1 of every arm was run again. The agent, the texts and the plugins did not change; each record
+  keeps its image id.
+- **Built-in Claude Code plugins.** Every Claude Code run loaded `cc-plugin-agents-md` and
+  `cc-plugin-plugin-authoring`, bundled in the 2.1.312 binary. They are the same in both arms; their effect was not
+  measured.
 
-## Изоляция и приватность
+## Isolation and privacy
 
-- Каждый прогон — отдельный контейнер с uid хоста, без capabilities, с `no-new-privileges`, лимитами памяти, CPU и
-  процессов, в своей сети. Смонтированы только каталог прогона и фикстуры (только чтение); home хоста и живые базы
-  не видны (проверено пробным контейнером). В образе Hermes есть анонимный том `/opt/data` из `VOLUME`, он новый на
-  каждый контейнер и удаляется вместе с ним.
-- Секреты (токен `claude setup-token`, ключ DeepSeek) передавались через `--env-file` и были видны агенту в
-  окружении. [`stand/scan.py`](scripts/confirm531/stand/scan.py) искал их точные значения, home, имя пользователя и
-  имя машины в сырых прогонах, выжимках и оценках: совпадений ноль.
-- Всё, что видел агент, ушло провайдерам моделей: Anthropic (Claude Code и разметка) и DeepSeek (Hermes). Данные
-  выдуманы, путей хоста в записях нет.
+- Each run is its own container with the host's uid, no capabilities, `no-new-privileges`, memory, CPU and process
+  limits and its own network. Only the run directory and the fixtures (read-only) are mounted; the host's home and the
+  live bases are not visible (checked with a probe container). The Hermes image has an anonymous `/opt/data` volume
+  from `VOLUME`, new for every container and removed with it.
+- The secrets (a `claude setup-token` token, a DeepSeek key) came in through `--env-file` and were visible to the agent
+  in its environment. [`stand/scan.py`](scripts/confirm531/stand/scan.py) looked for their exact values, the home path,
+  the user name and the host name in the raw runs, the records and the grades: no match.
+- Everything an agent saw went to the model providers: Anthropic (Claude Code and grading) and DeepSeek (Hermes). The
+  data is invented, and the records hold no host paths.
 
-## Стоимость и время
+## Cost and time
 
-Сетка шла с 17:25 до 18:01 MSK, повтор S05 и цепочки до 18:03, перезапуск Hermes 18:36–18:50. По API-ценам: сетка
-$11.58 (Claude Code $11.30 по токену подписки, Hermes $0.29 на DeepSeek), перезапуск Hermes $0.06, разметка около
-$12.60 (проход A $8.87, B $2.32, C $0.08, разметка отложенных прогонов $1.33).
+The grid ran 17:25–18:01 MSK, the S05 rerun and the chains until 18:03, the Hermes rerun 18:36–18:50. At API prices:
+the grid $11.58 (Claude Code $11.30 on the subscription token, Hermes $0.29 on DeepSeek), the Hermes rerun $0.06,
+grading about $12.60 (pass A $8.87, B $2.32, C $0.08, grading of the superseded runs $1.33).
 
-## Ограничения
+## Limits
 
-- Одна сетка, 19 сценариев по 3 повтора; повторы одного сценария коррелируют. Разница в 5 верных ответах у Claude
-  Code — четыре сценария из девятнадцати.
-- Сценарии выдуманы одним агентом; в настоящей работе исследования длиннее, а полка больше.
-- Разметка — модели, человек ни одну метку не проверял.
-- Hermes шёл на `deepseek-flash`, а не на основной модели боевого Hermes.
-- Модель Claude Code одна (Opus 5.5); поведение других моделей не замерялось.
+- One grid, 19 scenarios with 3 repeats; repeats of a scenario correlate. The 5 extra correct answers in Claude Code
+  come from four scenarios of nineteen.
+- The scenarios were invented by one agent; real research sessions are longer and a real shelf is larger.
+- Grading is by models; no person checked a label.
+- Hermes ran on `deepseek-flash`, not on the live Hermes's main model.
+- One Claude Code model (Opus 5.5); other models were not measured.
 
-## Вывод
+## Conclusion
 
-Для Claude Code candidate-текст дал то, ради чего задумывался: находки ложатся на полку, к полке агент обращается,
-когда она нужна, и ни один ответ не стал хуже. Для Hermes на DeepSeek выигрыш в сохранении есть, а в ответах — нет;
-четыре запрещённых изменения показывают, что модель исполняет текст небрежнее. Следующий шаг — решение владельца,
-переносить ли candidate в тексты продукта (`cmd/memcue/session.go`, скилл, блок Hermes), отдельной задачей; находки
-1–3 — кандидаты в отдельные issue.
+For Claude Code the candidate text did what it was meant to: findings land on the shelf, the agent reaches the shelf
+when it is needed, and no answer got worse. For Hermes on DeepSeek capture improves and answers do not; four forbidden
+changes show the model follows the text less carefully. The next step is the owner's decision whether to move the
+candidate into the product texts (`cmd/memcue/session.go`, the skill, the Hermes block) as a separate task; findings
+1–3 are candidates for separate issues.
