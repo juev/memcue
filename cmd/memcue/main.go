@@ -114,6 +114,8 @@ environment:
   MEMCUE_API_URL  OpenAI-compatible endpoint for those calls instead of claude -p (with MEMCUE_API_KEY); add asks
                   for search queries only when it is set
   MEMCUE_API_KEY  key for MEMCUE_API_URL
+  MEMCUE_CLAUDE_TOKEN_FILE  file of a Claude Code OAuth token (claude setup-token) claude -p runs with; ~/ is the
+                  home directory, and a missing file leaves claude -p on its own login
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
@@ -134,6 +136,7 @@ func main() {
 		extract.Model = m
 	}
 	extract.API.URL, extract.API.Key = os.Getenv("MEMCUE_API_URL"), os.Getenv("MEMCUE_API_KEY")
+	extract.ClaudeTokenFile = os.Getenv("MEMCUE_CLAUDE_TOKEN_FILE")
 	var err error
 	switch os.Args[1] {
 	case "session-start":
