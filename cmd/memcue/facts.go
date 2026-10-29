@@ -818,7 +818,7 @@ func mergeFactFiles(ours, theirs string, out io.Writer) error {
 		return fmt.Errorf("%s holds %s, %s holds %s", ours, o[0].ID, theirs, t[0].ID)
 	}
 	h := store.MergeHistories(o, t)
-	if h.Added == 0 {
+	if !h.Changed() {
 		return nil
 	}
 	if err := store.WriteFactFile(ours, h.Versions); err != nil {
