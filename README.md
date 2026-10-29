@@ -44,13 +44,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.24.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.25.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.25.0 | 6 | 0.25.0 | 0.25.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.0 (`hermes-agent` 0.15.2) |
 | 0.24.0 | 6 | 0.24.0 | 0.24.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.24.0 (`hermes-agent` 0.15.2) |
 | 0.23.0 | 6 | 0.23.0 | 0.23.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.23.0 (`hermes-agent` 0.15.2) |
 | 0.22.1 | 6 | 0.22.1 | 0.22.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.22.1 (`hermes-agent` 0.15.2) |
@@ -251,6 +252,20 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.25.0: a fact without a source is relabelled as the agent's (#582)
+
+- **Facts without a source become the agent's** (#582). A fact written before sources were labelled has none, and
+  no one checked it as the user's words. The first open with 0.25.0 gives every such active fact one version with
+  `source: agent`, the rest of it unchanged, and git carries the new versions to the other machines; two machines
+  that relabel apart merge as one. Search and the session card stay the same. A version written without a source now
+  stores `agent` too. See [Use](#use).
+- **Parallel opens wait for each other** (#582). A transaction takes the write lock at its start, so opens at the
+  same moment (the three parts of the Claude Code session start on a new cache) no longer fail with `SQLITE_BUSY`.
+- No schema or format changed: the schema stays 6. From 0.24.0 or 0.23.0, replace the binary and the plugins. From
+  0.22.x, read [0.24.0](#0240-a-fact-without--source-is-the-agents-every-host-stores-a-failure-it-found-574-566-577)
+  for the default of `add -source`. From 0.21.x or older, follow
+  [0.22.0](#0220-the-text-history-a-correction-beats-a-parallel-retirement-530-552-544-549).
 
 ### 0.24.0: a fact without `-source` is the agent's, every host stores a failure it found (#574, #566, #577)
 
