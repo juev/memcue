@@ -128,7 +128,9 @@ func runAdd(args []string, out io.Writer) error {
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory, empty outside a repository)")
 	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory; an empty value is no project)")
 	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
-	source := fs.String("source", "user", "who said it: user, user_confirmed, tool, agent, note, memory")
+	// The default is the agent's: a fact stored without -source is most often an agent's own finding, and the user's
+	// words, the only source that reaches the session card, are named (#574).
+	source := fs.String("source", "agent", "who said it: user (the user's words), user_confirmed, tool (what a command showed), agent, note, memory")
 	kind := fs.String("kind", "", "rule, decision, pitfall, environment, procedure or event (an event expires, see MEMCUE_EVENT_TTL_DAYS)")
 	scope := fs.String("scope", "", "where it holds: global, repo (the working directory's project), host:<name>, repo:<key>, service:<name>, dir:<path>, shelf:<slug> (read only by a search that names it)")
 	shelf := fs.String("shelf", "", "put it on this shelf: the same as -scope shelf:<slug>")

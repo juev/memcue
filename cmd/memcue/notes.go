@@ -123,7 +123,7 @@ func printNotes(out io.Writer, r notesReport) error {
 		return err
 	}
 	if missing > 0 {
-		_, err := fmt.Fprintln(out, `move them with: memcue add -kind <kind> -scope <scope> -- "<text>"`)
+		_, err := fmt.Fprintln(out, `move them with: memcue add -kind <kind> -scope <scope> -source <user for the user's words, else tool or agent> -- "<text>"`)
 		return err
 	}
 	return nil

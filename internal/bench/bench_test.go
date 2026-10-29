@@ -213,10 +213,10 @@ type addOpts struct {
 	expires  string
 }
 
-// add stores a fact and returns its id, the one line add prints.
+// add stores a fact in the user's words and returns its id, the one line add prints.
 func add(t *testing.T, b *base, text string, o addOpts) string {
 	t.Helper()
-	args := []string{"add"}
+	args := []string{"add", "-source", "user"}
 	for _, f := range [][2]string{{"-scope", o.scope}, {"-kind", o.kind}, {"-keywords", o.keywords},
 		{"-expires", o.expires}} {
 		if f[1] != "" {
