@@ -80,6 +80,12 @@ _SHELF_NOTE = (
     'lead from an earlier reading: before relying on it, compare its version or date with what the workspace '
     'uses, and correct or retire it when it no longer holds. An answer built on a shelf fact says no more '
     'than the fact and its source state, and marks an inference as one.')
+# What the model is told about a failure it found by running something, measured in #566
+# (docs/research/pitfall-capture-566-2026-10.md); the Claude Code and DSH notes carry the same text.
+_FAILURE_NOTE = (
+    'When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you '
+    'finish if a later session in a fresh checkout would hit it again — even when the cause is in the '
+    "repository's own files; what the repository shows is its documents, not a failure you found by running it.")
 
 _CJK = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]")
 _CJK_HINT = "The facts are in Russian and English: search again with the query translated into one of them."
@@ -584,7 +590,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 "pitfall, a host, a service or a pointer that a later session will need, store it at once with "
                 "memcue_add. Search first, and correct a stored fact instead of adding a second copy. To fix a "
                 "stored fact, find it with memcue_search, then memcue_correct or memcue_retire."
-                + "\n\n" + _SHELF_NOTE + ("\n\n" + card if card else ""))
+                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + ("\n\n" + card if card else ""))
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the card: MEMORY.md and USER.md of this

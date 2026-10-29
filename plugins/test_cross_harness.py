@@ -58,5 +58,26 @@ class ShelfTextTest(unittest.TestCase):
         self.assertIn("- " + block + "\n", (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8"))
 
 
+class PitfallLineTest(unittest.TestCase):
+    """#566: every host carries the pitfall line measured there word for word. The Claude Code note is checked by a Go
+    test against the same file."""
+
+    def measured(self, name: str) -> str:
+        path = PLUGINS.parent / "docs" / "research" / "scripts" / "pitfall566" / "candidate" / name
+        return path.read_text(encoding="utf-8").strip()
+
+    def test_the_skill_carries_the_line(self):
+        skill = (PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("\n\n" + self.measured("cc-skill.md") + "\n", skill)
+
+    def test_hermes_and_dsh_carry_the_line(self):
+        line = self.measured("hermes-block.md")
+        source = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
+        assign = next(n for n in ast.parse(source).body if isinstance(n, ast.Assign)
+                      and getattr(n.targets[0], "id", "") == "_FAILURE_NOTE")
+        self.assertEqual(ast.literal_eval(assign.value), line)
+        self.assertIn("- " + line + "\n", (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -822,6 +822,14 @@ the other language, Russian or English, as one query that starts with `= `: sear
 search output show the fact as it was written (#392, #395); it gives a translation to 40 facts a dream (#396). Until
 then the keywords the agent writes in both languages are what a question in the other language finds.
 
+Every host also tells its model to store a failure it found by running something (#566): when a command fails and the
+agent fixes or works around it, the cause and the fix go in as a pitfall if a fresh checkout would hit it again, even
+when the cause is in the repository's own files. "What the repository shows" means its documents, not such a failure.
+On five synthetic troubleshooting scenarios ([pitfall-capture-566](docs/research/pitfall-capture-566-2026-10.md)),
+Claude Code (Opus 5.5) with this line stored the expected pitfall in 12 of 15 runs (3 without it), every failure it
+hit included; Hermes on `deepseek-flash` stored it in 6 of 15 (3). No run stored noise, and the answers did not get
+worse. DSH carries the Hermes wording and was not measured.
+
 Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
 saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,
 the size of a base, a restart time or PID, a line count, an mtime. A command reads each of these, and the stored copy
