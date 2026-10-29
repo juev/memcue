@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "586b4ae9c33c3f47610309aae13138f78a4d81242996671a21b70e1bf2a9f724",
+ "cost_usd": 0.0425,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTYN8BNPZDPN92NV3KSRS"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTYN8BNPZDPN92NV3KSRS",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall gives the DUTYBOOK KeyError cause and the run command with schedules/hs-2026.csv."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports 473.74 and blames the unset DUTYBOOK variable, which the README never names. It says setting DUTYBOOK to schedules/hs-2026.csv, without editing duty.py, gave the result, though it does not quote the KeyError."
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "a14b814db0c9a57d3f10305383539f3952dc98d493d58ac278068ae59566121e",
+ "cost_usd": 0.0327,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KHCBCV4RJN2205CZQGDDK"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KHCBCV4RJN2205CZQGDDK",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the out/ pitfall with its cause and the mkdir -p out fix, stored as a pitfall in the repository's scope."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, explains that the run failed because the git-ignored out/ was missing, and says that creating out/ fixed it while the script stayed unchanged."
+ }
+}

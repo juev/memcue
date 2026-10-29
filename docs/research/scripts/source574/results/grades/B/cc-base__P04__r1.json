@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "2359dfa9eabc1e922ac5608cffed3d210deda9c4c379f3fafa0a4f91e12990df",
+ "cost_usd": 0.0119,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTBE4D3HFQAN0QX5REXQA"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTBE4D3HFQAN0QX5REXQA",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This pitfall is stored in the repository scope. It covers the DUTYBOOK requirement, the KeyError and the working command."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total of 473.74. It explains that DUTYBOOK was unset, that setting it to schedules/hs-2026.csv fixed the run, and that duty.py was not edited."
+ }
+}

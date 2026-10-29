@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "e4b079f107659f7bf057c294ad99b8ab7bf30b4c711aea242f328e168deade50",
+ "cost_usd": 0.0334,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63KJG6M1V94HN9EHDD07QPB"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63KJG6M1V94HN9EHDD07QPB",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the repo-scoped pitfall fact: it gives the error, says out/ is gitignored and gives the mkdir -p out fix."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, explains that the run failed because the gitignored out/ folder was missing, and says creating out/ fixed it without editing the script."
+ }
+}

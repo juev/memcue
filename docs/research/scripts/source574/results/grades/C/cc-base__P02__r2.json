@@ -1,0 +1,30 @@
+{
+ "pass": "C",
+ "record_sha256": "1fb2f5500a0e0b84e419429d04f10ccf96616d16af600e7e86e4c0c3a4ae7341",
+ "cost_usd": 0.0092,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTY92NQGT5T30TTMEJSGR"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTY92NQGT5T30TTMEJSGR",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This pitfall fact is stored in the repo scope and gives the error, the CRLF cause, the trailing \\r on the last-column zone and the tr workaround passed as RATES."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": true,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 58.01, names CRLF line endings as the cause and says the fix was passing a copy without carriage returns as RATES, with neither file edited."
+ }
+}

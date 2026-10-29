@@ -1,0 +1,30 @@
+{
+ "pass": "B",
+ "record_sha256": "ea0029b2e7eaf8ce315aa223971008e11b68b07be94c983bc1ac85215a769fcf",
+ "cost_usd": 0.0093,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTM9ER9V9AP1CS1QW911Z"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTM9ER9V9AP1CS1QW911Z",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This repo-scoped pitfall records the BOM error, the header shown and the --encoding utf-8-sig workaround."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It names exactly BX-100, CL-310, EN-512 and GH-118, explains that the BOM caused the failure, and fixes it with --encoding utf-8-sig without editing the export or restock.py."
+ }
+}

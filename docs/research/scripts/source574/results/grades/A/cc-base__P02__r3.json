@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "5c16e9a29ccc29a64c5d856a02ee9e8bee598f95797fa2c9a26c22788ee8dff3",
+ "cost_usd": 0.0402,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JVZSG6PBH2BM0D008KZ5H"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JVZSG6PBH2BM0D008KZ5H",
+    "version": 1,
+    "verdict": "expected",
+    "note": "This is the CRLF pitfall stored as a pitfall in the repo scope. It names the error, gives the cause and gives the workaround of passing a stripped copy as the second argument."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "The answer reports the total of 58.01 and names CRLF line endings as the cause. It fixes the run by passing a copy with the carriage returns stripped as the rates argument, and leaves the script and the rate card unedited."
+ }
+}

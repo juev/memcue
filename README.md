@@ -832,6 +832,11 @@ Claude Code (Opus 5.5) with this line stored the expected pitfall in 12 of 15 ru
 hit included; Hermes on `deepseek-flash` stored it in 6 of 15 (3). No run stored noise, and the answers did not get
 worse. DSH carries the Hermes wording and was not measured.
 
+The Claude Code note names the source of what the agent stores, and `add` without `-source` stores `agent` (#574).
+Before, 5 of the 12 pitfalls Claude Code stored on the same scenarios got `source: user`, because the call left the
+flag out; with the change all 12 named `-source tool`, and capture and answers stayed the same
+([source-default-574](docs/research/source-default-574-2026-10.md)). Hermes and DSH name the source on every call.
+
 Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
 saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,
 the size of a base, a restart time or PID, a line count, an mtime. A command reads each of these, and the stored copy

@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "1fb2f5500a0e0b84e419429d04f10ccf96616d16af600e7e86e4c0c3a4ae7341",
+ "cost_usd": 0.0396,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JTY92NQGT5T30TTMEJSGR"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JTY92NQGT5T30TTMEJSGR",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Stores the CRLF pitfall and the tr workaround in the repository scope as a pitfall, which matches D1."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "Reports the 58.01 total, names the CRLF line endings as the cause, and says that passing a copy without carriage returns as RATES fixed it, with neither file edited."
+ }
+}

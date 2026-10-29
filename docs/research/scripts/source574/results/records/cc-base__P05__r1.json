@@ -1,0 +1,61 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "P05",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 20.4,
+  "docker_exit": 0,
+  "image": "sha256:9dd610e1c5f6335768f4052854f613bd541f5bee936cbc965d5ea8b55ba77573",
+  "cost_usd": 0.1271618,
+  "turns": 7,
+  "input_tokens": 12,
+  "output_tokens": 1266,
+  "cache_read_tokens": 108809
+ },
+ "record": {
+  "prompt": "Please run the reorder check on exports/stock-2026-10-27.csv and tell me which SKUs need reordering. The export is exactly what the supplier portal produced; leave it and restock.py as they are.",
+  "base_changes": [
+   {
+    "id": "01M63JTM9ER9V9AP1CS1QW911Z",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/restock",
+    "kind": "pitfall",
+    "source": "tool",
+    "keywords": "restock.py, BOM, utf-8-sig, encoding, supplier portal export, column sku not found, кодировка",
+    "content": "Supplier portal stock exports (e.g. exports/stock-2026-10-27.csv) start with a UTF-8 BOM, so 'python3 restock.py <export>' fails with \"column 'sku' not found ... header is ['\\ufeffsku', ...]\". Workaround without editing the export or restock.py: run 'python3 restock.py <export> --encoding utf-8-sig'.",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "memcue search \"restock BOM utf-8-sig export encoding\"",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository."
+   },
+   {
+    "tool": "Skill",
+    "input": {
+     "skill": "memcue:memcue"
+    },
+    "result": "Launching skill: memcue:memcue"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue search -in all \"restock.py BOM column sku not found\" ; memcue add -kind pitfall -source tool -scope repo -keywords \"restock.py, BOM, utf-8-sig, encoding, supplier portal export, column sku not found, кодировка\" -- \"Supplier portal stock exports (e.g. exports/stock-2026-10-27.csv) start with a UTF-8 BOM, so 'python3 restock.py <export>' fails with \\\"column 'sku' not found ... header is ['\\\\ufeffsku', ...]\\\". Workaround without editing the export or restock.py: run 'python3 restock.py <export> --encoding utf-8-sig'.\"",
+    "result": "No stored facts match.\n01M63JTM9ER9V9AP1CS1QW911Z"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Skill",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "Four SKUs need reordering:\n\n| SKU | Stock (all warehouses) | Reorder level |\n|---|---|---|\n| BX-100 | 23 (north 14 + south 9) | 25 |\n| CL-310 | 5 (north 3 + south 2) | 5 |\n| EN-512 | 0 | 10 |\n| GH-118 | 7 | 12 |\n\nBX-220 (40 vs 30), DR-045 (120 vs 80) and FT-760 (33 vs 20) are above their levels. I also checked the totals against the CSV by hand, and they match.\n\nThe plain `python3 restock.py exports/stock-2026-10-27.csv` command fails with `column 'sku' not found`. The export starts with an invisible byte-order mark (BOM), so the script reads the first column name as `'\\ufeffsku'` instead of `sku`. Instead of editing either file, I used the script's own encoding option: `python3 restock.py exports/stock-2026-10-27.csv --encoding utf-8-sig`. The export and `restock.py` are untouched.\n\nI've saved this workaround to memory so a later session won't trip over it. If the portal always adds the BOM, a permanent fix would be to make `utf-8-sig` the default encoding in `restock.py`. I haven't done that, since you asked me to leave the script as it is."
+ }
+}

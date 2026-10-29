@@ -1,0 +1,30 @@
+{
+ "pass": "A",
+ "record_sha256": "dc8af501e77339637d7412d307b290e76628fdb5a5e74e7afd6eb68d6be54a75",
+ "cost_usd": 0.0375,
+ "grade": {
+  "capture": [
+   {
+    "key": "D1",
+    "stored": true,
+    "place": "ordinary",
+    "fact_ids": [
+     "01M63JVY2ZBRC4YQRDFYH3SWHV"
+    ]
+   }
+  ],
+  "changes": [
+   {
+    "id": "01M63JVY2ZBRC4YQRDFYH3SWHV",
+    "version": 1,
+    "verdict": "expected",
+    "note": "Repo-scoped pitfall: out/ is gitignored and the script doesn't create it, so run mkdir -p out first."
+   }
+  ],
+  "searched_memory": true,
+  "named_shelf": false,
+  "needed_fact_found": "not_applicable",
+  "answer": "correct",
+  "answer_reason": "It reports 5437.50, says the failure came from the missing git-ignored out/ directory, and says creating out/ fixed it without changing the script."
+ }
+}

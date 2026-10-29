@@ -1,0 +1,53 @@
+{
+ "meta": {
+  "arm": "cc-base",
+  "scenario": "P04",
+  "repeat": "r1",
+  "chain_from": null,
+  "exit": "0",
+  "seconds": 29.7,
+  "docker_exit": 0,
+  "image": "sha256:9dd610e1c5f6335768f4052854f613bd541f5bee936cbc965d5ea8b55ba77573",
+  "cost_usd": 0.1165416,
+  "turns": 5,
+  "input_tokens": 10,
+  "output_tokens": 1222,
+  "cache_read_tokens": 87108
+ },
+ "record": {
+  "prompt": "Please compute the import duty for manifests/ship-0412.csv with duty.py and tell me the total. Don't change duty.py.",
+  "base_changes": [
+   {
+    "id": "01M63JTBE4D3HFQAN0QX5REXQA",
+    "version": 1,
+    "status": "active",
+    "scope": "repo:example.com/acme/duty-calc",
+    "kind": "pitfall",
+    "source": "user",
+    "keywords": "",
+    "content": "duty.py needs env var DUTYBOOK pointing to the tariff schedule (README does not mention it; without it: KeyError). Use DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<file>.csv",
+    "change": "added"
+   }
+  ],
+  "memory_calls": [
+   {
+    "tool": "Bash",
+    "input": "memcue search \"DUTYBOOK duty schedule\" 2>&1 | head -30; DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/ship-0412.csv",
+    "result": "No facts of this repository, this host or global match; -in all searches every repository.\n  1  6109.10  cotton t-shirts     220.80\n  2  6403.99  leather boots       209.24\n  3  4202.92  duffel bags          32.55\n  4  8513.10  camping lamps        11.15\n  5  9503.00  wooden puzzles        0.00\ntotal                              473.74"
+   },
+   {
+    "tool": "Bash",
+    "input": "memcue add -kind pitfall -- \"duty.py needs env var DUTYBOOK pointing to the tariff schedule (README does not mention it; without it: KeyError). Use DUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/<file>.csv\" 2>&1 | tail -3",
+    "result": "01M63JTBE4D3HFQAN0QX5REXQA"
+   }
+  ],
+  "tools_in_order": [
+   "Bash",
+   "Bash",
+   "Bash",
+   "Bash"
+  ],
+  "pages_read": [],
+  "final_answer": "The total import duty for `manifests/ship-0412.csv` is **473.74**.\n\n| Line | HS code | Item | Value | Rate | Duty |\n|---|---|---|---|---|---|\n| 1 | 6109.10 | cotton t-shirts | 1840.00 | 12.0% | 220.80 |\n| 2 | 6403.99 | leather boots | 2615.50 | 8.0% | 209.24 |\n| 3 | 4202.92 | duffel bags | 930.00 | 3.5% | 32.55 |\n| 4 | 8513.10 | camping lamps | 412.80 | 2.7% | 11.15 |\n| 5 | 9503.00 | wooden puzzles | 288.00 | 0.0% | 0.00 |\n| | | **Total** | | | **473.74** |\n\n`duty.py` reads the rates from a file named in the `DUTYBOOK` environment variable, which wasn't set. The README doesn't mention it either. I pointed it at `schedules/hs-2026.csv`, the only schedule in the repo:\n\n```\nDUTYBOOK=schedules/hs-2026.csv python3 duty.py manifests/ship-0412.csv\n```\n\nIf a different tariff schedule should apply to this shipment, tell me and I'll rerun it. I didn't change `duty.py`. I saved a note to memory that the script needs `DUTYBOOK` set, so later sessions won't have to work that out again."
+ }
+}
