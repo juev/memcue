@@ -31,7 +31,7 @@ scenarios those of #566 ([`scripts/pitfall566/fixtures/`](scripts/pitfall566/fix
 
 - **Arms**: Claude Code 2.1.312 on Opus 5.5, the shipped plugin (the stand's `base` variant) in both.
   - `cc-base`: product code of `main` (`c9873c0`), which already carries the #566 line.
-  - `cc-cand`: the branch of #574 (`6550851`): the new default of `add` and the new note and skill text.
+  - `cc-cand`: the branch of #574 (`6550851`, `43ef08f` after its rebase): the new default of `add` and the new note and skill text.
   Each arm has its own image, built from its own checkout, and its own stand root.
 - **Grading**: two Opus passes per record (`grade.py`). They differed on one field of one record, which a third pass
   settled. `summary.py` gives the table below. The source counts come from the records themselves
