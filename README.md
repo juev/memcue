@@ -957,7 +957,9 @@ Who runs it:
   in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
   otherwise. The start is stamped in `dream.started`, so a dream that fails is tried again an interval later, not at
   every session start; what the dream prints goes to `dream.out`, its record to `dream.log`. A held `dream.lock`
-  makes the background run leave quietly, so sessions started together run one dream.
+  makes the background run leave quietly, so sessions started together run one dream. `claude -p` runs with the
+  environment of the session that started it, so on a machine whose Claude Code login expires the dream fails;
+  `MEMCUE_CLAUDE_TOKEN_FILE` names a token from `claude setup-token` for it (#591).
 - **The session's model.** Without an endpoint and without `claude` on `PATH`, or with
   `MEMCUE_DREAM_BACKGROUND=0`, the session start says in one line that a dream is due instead. On Claude Code the
   agent then runs the `memcue-dream` skill when the user's task allows; it never interrupts a turn. On Hermes the card
@@ -1057,6 +1059,7 @@ uses.
 | `MEMCUE_MODEL` | model of `migrate`, the queries of `add` and `dream -run` | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |
 | `MEMCUE_API_KEY` | key for that endpoint | unset |
+| `MEMCUE_CLAUDE_TOKEN_FILE` | file of a Claude Code OAuth token from `claude setup-token`; every `claude -p` call of memcue runs with it as `CLAUDE_CODE_OAUTH_TOKEN`, for a machine whose own login expires. A leading `~/` is the home directory, so the value can sit in the `env` block of a `settings.json` shared between machines; a missing file leaves `claude -p` on its own login, and a file without a token is an error | unset |
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the search tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |

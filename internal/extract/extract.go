@@ -12,8 +12,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -102,6 +104,9 @@ func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input st
 		"--settings", `{"disableAllHooks": true}`, "--system-prompt", system, "--json-schema", schema,
 		"--output-format", "json")
 	cmd.Dir = dir // no project CLAUDE.md, no repository
+	if cmd.Env, err = claudeEnv(); err != nil {
+		return reply{}, err
+	}
 	cmd.Stdin = strings.NewReader(input)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
@@ -109,6 +114,45 @@ func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input st
 		return reply{}, fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return envelope(out.Bytes())
+}
+
+// ClaudeTokenFile is the file of a Claude Code OAuth token (MEMCUE_CLAUDE_TOKEN_FILE) that `claude -p` runs with
+// instead of its own login, which can expire on a machine nobody logs in to (#591).
+var ClaudeTokenFile string
+
+// claudeEnv is the environment of `claude -p`: memcue's own, nil, unless ClaudeTokenFile names a file, whose token
+// then replaces any CLAUDE_CODE_OAUTH_TOKEN. A leading ~/ is the home directory, since the env block of
+// settings.json expands nothing; a missing file is no token, since that block is shared with machines without one.
+func claudeEnv() ([]string, error) {
+	path := ClaudeTokenFile
+	if path == "" {
+		return nil, nil
+	}
+	if rest, ok := strings.CutPrefix(path, "~/"); ok {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("MEMCUE_CLAUDE_TOKEN_FILE: %w", err)
+		}
+		path = filepath.Join(home, rest)
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("MEMCUE_CLAUDE_TOKEN_FILE: %w", err)
+	}
+	token := strings.TrimSpace(string(b))
+	if token == "" {
+		return nil, fmt.Errorf("MEMCUE_CLAUDE_TOKEN_FILE: %s holds no token", path)
+	}
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "CLAUDE_CODE_OAUTH_TOKEN=") {
+			env = append(env, kv)
+		}
+	}
+	return append(env, "CLAUDE_CODE_OAUTH_TOKEN="+token), nil
 }
 
 // envelope takes the answer out of the JSON `claude -p` prints.
