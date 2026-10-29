@@ -44,13 +44,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.26.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.26.1`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.26.1 | 6 | 0.26.1 | 0.26.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.1 (`hermes-agent` 0.15.2) |
 | 0.26.0 | 6 | 0.26.0 | 0.26.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.0 (`hermes-agent` 0.15.2) |
 | 0.25.1 | 6 | 0.25.1 | 0.25.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.1 (`hermes-agent` 0.15.2) |
 | 0.25.0 | 6 | 0.25.0 | 0.25.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.0 (`hermes-agent` 0.15.2) |
@@ -254,6 +255,14 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.26.1: a failed claude -p call names its reason (#590)
+
+- **The reason of a failure** (#590). With `--output-format json`, a failed `claude -p` prints why as the result of
+  its JSON on stdout and leaves stderr empty, so a dream on a machine with an expired login logged
+  `claude: exit status 1:` and nothing else. The error now carries that result, and stderr when there is no JSON.
+- No schema or format changed. From 0.26.0, replace the binary and the plugins on every machine that syncs the base.
+  From 0.25.x, read [0.26.0](#0260-claude--p-runs-with-a-token-from-a-file-591) too.
 
 ### 0.26.0: claude -p runs with a token from a file (#591)
 
