@@ -40,14 +40,16 @@ const dreamAllStalls = 3
 // model to hand the packet to: it asks what the session start of Claude
 // Code asks before it says a dream is due, whether MEMCUE_DREAM_EVERY has passed and some fact is fresh or owed a
 // translation, and with nothing due makes no call. It needs MEMCUE_API_URL, so a long run never starts by surprise.
+// The background run a session start starts (#569) is that plain run, on claude -p without MEMCUE_API_URL: the
+// session start checked that one of them is there. It leaves quietly when another dream holds the lock.
 //
 // With all (#405) it finishes the base: no interval, packets one after another while a packet has facts to split,
 // expand or translate or some fact still lacks a translation. The merge sweep walks the base in a circle and never
 // runs out of groups, so it does not keep the loop going. It runs on the endpoint when MEMCUE_API_URL is set and on
 // claude -p otherwise, and stops on the first failed pass, after dreamAllStalls passes that change nothing, or after
 // dreamAllPasses.
-func runDreamOnce(out io.Writer, all bool, packets int) error {
-	if !all && extract.API.URL == "" {
+func runDreamOnce(out io.Writer, all, background bool, packets int) error {
+	if !all && !background && extract.API.URL == "" {
 		return fmt.Errorf("dream -run: %w", extract.ErrNoEndpoint)
 	}
 	dir, err := stateDir()
@@ -66,6 +68,9 @@ func runDreamOnce(out io.Writer, all bool, packets int) error {
 	}
 	unlock, err := lockDream(dir)
 	if err != nil {
+		if background && errors.Is(err, errDreamRunning) {
+			return nil
+		}
 		return err
 	}
 	defer unlock()

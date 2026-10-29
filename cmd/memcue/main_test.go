@@ -40,6 +40,13 @@ func env(t *testing.T) string {
 	oldExpand := expandFn
 	expandFn = func(string) (extract.ExpandResult, error) { return extract.ExpandResult{}, nil }
 	t.Cleanup(func() { expandFn = oldExpand })
+	// A background dream (#569) has its own tests; elsewhere the machine's claude must not decide whether the session
+	// start says a dream is due, and a session start must not start a process.
+	t.Setenv("MEMCUE_DREAM_BACKGROUND", "")
+	oldLook, oldSpawn := lookClaude, spawnDream
+	lookClaude = func() bool { return false }
+	spawnDream = func(string) error { return nil }
+	t.Cleanup(func() { lookClaude, spawnDream = oldLook, oldSpawn })
 	return dir
 }
 

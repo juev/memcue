@@ -163,22 +163,24 @@ func runDream(args []string, out io.Writer) error {
 	run := fs.Bool("run", false, "when a dream is due, send its packet to MEMCUE_API_URL and apply the answer (#401); "+
 		"with -all, packets until the base has no work left, on claude -p without MEMCUE_API_URL (#405)")
 	jobs := fs.Int("j", 4, "with -run, the packets of work sent to the model at once (#471)")
+	background := fs.Bool("background", false, "with -run, the dream a session start starts (#569): on claude -p "+
+		"without MEMCUE_API_URL, and nothing when another dream is running")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	jSet := false
 	fs.Visit(func(f *flag.Flag) { jSet = jSet || f.Name == "j" })
 	if *run {
-		if *applyFile != "" || *since != "" || *prep || *list {
-			return errors.New("-run takes no other flag than -all and -j")
+		if *applyFile != "" || *since != "" || *prep || *list || *background && *all {
+			return errors.New("-run takes no other flag than -all or -background, and -j")
 		}
 		if *jobs < 1 {
 			return fmt.Errorf("-j %d: at least one packet", *jobs)
 		}
-		return runDreamOnce(out, *all, *jobs)
+		return runDreamOnce(out, *all, *background, *jobs)
 	}
-	if jSet {
-		return errors.New("-j goes with -run")
+	if jSet || *background {
+		return errors.New("-j and -background go with -run")
 	}
 	if *applyFile != "" && (*since != "" || *all || *prep || *list) {
 		return errors.New("-apply takes no other flag")
@@ -1253,6 +1255,9 @@ func markDream(dir string, t time.Time) error {
 	return os.WriteFile(filepath.Join(dir, "dream.at"), []byte(t.UTC().Format(time.RFC3339Nano)+"\n"), 0o600)
 }
 
+// errDreamRunning is what lockDream says when another dream holds the lock.
+var errDreamRunning = errors.New("another dream is running")
+
 // lockDream keeps two dreams on one machine from deciding over the same facts; it does not wait.
 func lockDream(dir string) (func(), error) {
 	f, err := os.OpenFile(filepath.Join(dir, "dream.lock"), os.O_CREATE|os.O_RDWR, 0o600)
@@ -1261,7 +1266,7 @@ func lockDream(dir string) (func(), error) {
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
-		return nil, errors.New("another dream is running")
+		return nil, errDreamRunning
 	}
 	return func() { _ = f.Close() }, nil
 }
