@@ -111,9 +111,23 @@ func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input st
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
-		return reply{}, fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return reply{}, fmt.Errorf("claude: %w: %s", err, failure(out.Bytes(), stderr.Bytes()))
 	}
 	return envelope(out.Bytes())
+}
+
+// failure is why `claude -p` exited non-zero: with --output-format json it prints the reason as the result of its JSON
+// on stdout and leaves stderr empty, so a failed login came out as a bare exit status (#590). Without that JSON it is
+// stderr.
+func failure(stdout, stderr []byte) string {
+	var env struct {
+		IsError bool   `json:"is_error"`
+		Result  string `json:"result"`
+	}
+	if json.Unmarshal(stdout, &env) == nil && env.IsError && strings.TrimSpace(env.Result) != "" {
+		return strings.TrimSpace(env.Result)
+	}
+	return strings.TrimSpace(string(stderr))
 }
 
 // ClaudeTokenFile is the file of a Claude Code OAuth token (MEMCUE_CLAUDE_TOKEN_FILE) that `claude -p` runs with
