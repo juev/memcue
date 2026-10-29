@@ -356,6 +356,18 @@ class ProviderTest(unittest.TestCase):
         self.p.on_pre_compress([])
         self.assertIn("Всегда отвечай", self.p.system_prompt_block())
 
+    def test_the_shelf_text_follows_the_note_and_precedes_the_card(self):
+        """#567: the research-shelf text measured in #531 sits after the memory note and before the session card, where
+        the confirming run had it."""
+        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
+                    "Всегда отвечай пользователю по-русски.")
+        block = self.p.system_prompt_block()
+        note = block.index("To fix a stored fact")
+        shelf = block.index(memcue_provider._SHELF_NOTE)
+        card = block.index("memcue: rules and decisions")
+        self.assertLess(note, shelf)
+        self.assertLess(shelf, card)
+
     def test_the_note_and_the_schema_let_the_model_search_during_work(self):
         """#521: the model may search for a prior pitfall during work on a system and before it diagnoses an
         unexpected error, by its own choice; the guidance for questions about earlier sessions stays."""

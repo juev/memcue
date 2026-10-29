@@ -59,6 +59,18 @@ func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 	}
 }
 
+// The note carries the research-shelf text measured in #531 word for word (#567): a change to it is a change to what
+// was measured, and the report has to be read again.
+func TestSessionNoteCarriesTheMeasuredShelfText(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "research", "scripts", "confirm531", "candidate", "cc-note.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := strings.TrimSpace(string(b)); !strings.Contains(sessionNote, want) {
+		t.Errorf("the session note lacks the measured shelf text:\n%s", want)
+	}
+}
+
 // The longer note still leaves the card its room (#522): the whole text in one block stays under the 10,000
 // characters Claude Code keeps in the context, and each part of the split start within partBudget, with the note in
 // part 1.

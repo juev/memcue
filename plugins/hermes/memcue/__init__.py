@@ -57,6 +57,25 @@ logger = logging.getLogger(__name__)
 
 _RECALL_TIMEOUT = 5  # memcue answers in ~10 ms; anything slower is broken
 # Chinese, Japanese or Korean text finds facts only through the Latin names beside it (#410).
+# What the model is told about findings from outside sources, measured in #531
+# (docs/research/research-shelf-confirm-531-2026-10.md); the DSH note carries the same text.
+_SHELF_NOTE = (
+    "Findings from outside sources go on the research shelf. When you read a web page, another project's "
+    'documentation, a changelog, a paper or a benchmark that is not part of the repository, and find '
+    'something a later investigation of the same subject would need (a limit, a behaviour, a trade-off or a '
+    'limitation of a named system), store it at once with memcue_add and shelf research, naming the source '
+    '(document, version or date) in the fact. Store what your conclusion rests on and its limits, not every '
+    'detail of the page; store what the source states, not your conclusion for the task; say so when it is '
+    "only a vendor's or an anonymous claim, and leave out what nothing supports. A document in the repository"
+    ' is what the repository shows: do not store it. A pitfall, a host or a fact of this repository goes '
+    'where it goes today, not on the shelf. Search the shelf first (memcue_search with in shelf:research) and'
+    ' correct a fact that says the same or an older version. Ordinary search leaves the shelf out, and an '
+    'answer with facts does not say that the shelf has more: when a task returns to a system, library or '
+    'question that may have been researched before, also search with in shelf:research. A shelf fact is a '
+    'lead from an earlier reading: before relying on it, compare its version or date with what the workspace '
+    'uses, and correct or retire it when it no longer holds. An answer built on a shelf fact says no more '
+    'than the fact and its source state, and marks an inference as one.')
+
 _CJK = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]")
 _CJK_HINT = "The facts are in Russian and English: search again with the query translated into one of them."
 _WRITE_TIMEOUT = 15
@@ -557,7 +576,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 "pitfall, a host, a service or a pointer that a later session will need, store it at once with "
                 "memcue_add. Search first, and correct a stored fact instead of adding a second copy. To fix a "
                 "stored fact, find it with memcue_search, then memcue_correct or memcue_retire."
-                + ("\n\n" + card if card else ""))
+                + "\n\n" + _SHELF_NOTE + ("\n\n" + card if card else ""))
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the card: MEMORY.md and USER.md of this

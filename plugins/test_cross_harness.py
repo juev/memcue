@@ -5,6 +5,7 @@ one plugin: an installed Hermes plugin is plugins/hermes/memcue alone and has no
 fails the run.
 """
 
+import ast
 import unittest
 from pathlib import Path
 
@@ -34,6 +35,27 @@ class CaptureExclusionsTest(unittest.TestCase):
                      PLUGINS.parent / "cmd" / "memcue" / "session.go"):
             with self.subTest(path=path.name):
                 self.assertIn("what the repository", path.read_text(encoding="utf-8"))
+
+
+class ShelfTextTest(unittest.TestCase):
+    """#567: every host carries the research-shelf text measured in #531 word for word, so the report still describes
+    what ships. The Claude Code note is checked by a Go test against the same file."""
+
+    def measured(self, name: str) -> str:
+        path = PLUGINS.parent / "docs" / "research" / "scripts" / "confirm531" / "candidate" / name
+        return path.read_text(encoding="utf-8").strip()
+
+    def test_the_skill_carries_its_section(self):
+        skill = (PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(self.measured("cc-skill.md"), skill)
+
+    def test_hermes_and_dsh_carry_the_block(self):
+        block = self.measured("hermes-block.md")
+        source = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
+        assign = next(n for n in ast.parse(source).body if isinstance(n, ast.Assign)
+                      and getattr(n.targets[0], "id", "") == "_SHELF_NOTE")
+        self.assertEqual(ast.literal_eval(assign.value), block)
+        self.assertIn("- " + block + "\n", (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
