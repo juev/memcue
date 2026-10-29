@@ -133,12 +133,20 @@ func TestAddIsSearchableAtOnce(t *testing.T) {
 		}
 	}
 
+	// Without -source the fact is the agent's, and the user's words are named (#574).
 	out.Reset()
-	if err := runAdd([]string{"Пользователь пишет коммиты по-английски."}, &out); err != nil {
+	if err := runAdd([]string{"Сборка демо идёт из каталога site/."}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if f := storedFact(t, strings.TrimSpace(out.String())); f.Review != "" || f.Source != "agent" {
+		t.Errorf("add without -source %+v", f)
+	}
+	out.Reset()
+	if err := runAdd([]string{"-source", "user", "Пользователь пишет коммиты по-английски."}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if f := storedFact(t, strings.TrimSpace(out.String())); f.Review != "" || f.Source != "user" {
-		t.Errorf("explicit add %+v", f)
+		t.Errorf("add -source user %+v", f)
 	}
 	if err := runAdd([]string{"-source", "boss", "x"}, &bytes.Buffer{}); err == nil {
 		t.Error("an unknown source was accepted")

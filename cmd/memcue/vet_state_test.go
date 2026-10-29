@@ -10,12 +10,13 @@ import (
 // add and the agent's rule that quotes a version are stored (#475).
 func TestAddRefusesAgentState(t *testing.T) {
 	env(t)
-	// What the agent saw in a tool's output is checked like what it concluded (#494).
-	for _, source := range []string{"agent", "tool"} {
-		err := runAdd([]string{"-source", source, "-kind", "environment", "--",
-			"The gateway was restarted 2026-10-19 23:30:02 (PID 46005)."}, &bytes.Buffer{})
+	// What the agent saw in a tool's output is checked like what it concluded (#494), and so is a fact that names no
+	// source: it is the agent's (#574).
+	for _, source := range [][]string{{"-source", "agent"}, {"-source", "tool"}, nil} {
+		err := runAdd(append(source, "-kind", "environment", "--",
+			"The gateway was restarted 2026-10-19 23:30:02 (PID 46005)."), &bytes.Buffer{})
 		if err == nil || !strings.Contains(err.Error(), "installation state (restart)") {
-			t.Fatalf("%s state: err = %v, want a refusal naming the restart", source, err)
+			t.Fatalf("%v state: err = %v, want a refusal naming the restart", source, err)
 		}
 	}
 	for _, args := range [][]string{

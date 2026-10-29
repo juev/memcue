@@ -57,6 +57,17 @@ func TestSessionStartTellsWhereMemoryIs(t *testing.T) {
 			t.Errorf("note lacks %q", want)
 		}
 	}
+	// The agent that omits -source stores its finding as the user's words no longer (#574): the note names the source
+	// of the user's words and of a pitfall, and says what a fact without one is.
+	for _, want := range []string{
+		"`-source user` for the user's words",
+		"a fact without `-source` is stored as yours (`agent`)",
+		"`memcue add -kind pitfall -source tool -keywords",
+	} {
+		if !strings.Contains(ctx, want) {
+			t.Errorf("note lacks %q", want)
+		}
+	}
 }
 
 // The note carries the research-shelf text measured in #531 word for word (#567): a change to it is a change to what

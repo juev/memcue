@@ -23,14 +23,18 @@ when you learn it, not at the end of the session.
 - **Events the next days need**: a release rolled out, an outage, a host taken down: `-kind event`. An event expires
   after a week (`MEMCUE_EVENT_TTL_DAYS`) unless `-expires` gives a date.
 
-Rules and decisions take `-source user` (the default): they are the user's words, and only they reach the session
-card, which carries the global rules and the decisions of the repository even when a prompt shares no word with them.
+Rules and decisions take `-source user`: they are the user's words, and only they reach the session card, which
+carries the global rules and the decisions of the repository even when a prompt shares no word with them. Name the
+source every time: a fact without `-source` is stored as yours (`agent`), and what a command or a file showed is
+`-source tool`.
 
 Do not store: the progress of the task, what the repository, its git history or a command shows, installation state
 (versions, paths of binaries, defaults of a config), multi-step procedures the user did not ask to remember (they belong in a skill or the docs), and
 your own guesses nothing confirmed.
 
 When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you finish if a later session in a fresh checkout would hit it again — even when the cause is in the repository's own files; what the repository shows is its documents, not a failure you found by running it.
+
+Store it with `memcue add -kind pitfall -source tool -keywords "<words>" -- "<cause and fix>"`.
 
 ## Remember
 
@@ -39,7 +43,7 @@ one.
 
 ```bash
 memcue search -in all "<words of the fact>"
-memcue add -kind rule -scope global -keywords "word1, word2, синоним, english word" -- "<fact>"
+memcue add -kind rule -scope global -source user -keywords "word1, word2, синоним, english word" -- "<fact>"
 ```
 
 - One statement in one to three sentences; a rule goes with its reason.

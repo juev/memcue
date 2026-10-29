@@ -787,7 +787,9 @@ a `rule` or `decision` scoped to the session's repository, and its source is not
 (`MEMCUE_CARD_BUDGET`). `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
-says otherwise: what happened in one run is not the knowledge a later session needs:
+says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
+the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, the only source that
+reaches the session card, and what a command showed takes `-source tool`:
 
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (-json: {"facts", "hints"}; at most -n, default 5)
@@ -797,8 +799,8 @@ memcue search -in shelf:research rate limit  # facts read from pages and documen
 memcue search -in all,shelf:research rate limit  # places are a union: every fact off the shelves and that shelf
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
-memcue add -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
-memcue add -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
+memcue add -source user -keywords "demo, postgres" -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
+memcue add -source user -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
 memcue correct -expires 2026-10-28 ID "…"   # -no-expires clears it
 memcue correct ID "The demo database is PostgreSQL 18 on port 55433."
 memcue correct ID -- "…"             # a lone -- after the ID is a separator, as in add; -- -- keeps a leading "--"
