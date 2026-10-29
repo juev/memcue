@@ -803,7 +803,9 @@ then the keywords the agent writes in both languages are what a question in the 
 Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
 saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,
 the size of a base, a restart time or PID, a line count, an mtime. A command reads each of these, and the stored copy
-is stale after the next release or restart (#475); a fact in the user's words is stored as said.
+is stale after the next release or restart (#475); a fact in the user's words is stored as said. A fact for a shelf
+(`-shelf` or `-scope shelf:<slug>`) skips the check: it says what an outside source states about another system, not
+the state of the user's machines (#565).
 
 What goes stale later is handled in two places. A fact a newer one replaced meets it in the dream, which groups
 similar facts and lets the session's model retire or merge the old one ([Dream](#dream)); a fact found wrong in use is
