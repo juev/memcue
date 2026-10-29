@@ -5,8 +5,9 @@ with ``memcue_search`` before it answers from earlier sessions (#361), and the s
 decisions of the repository) is part of the system prompt, which Hermes builds once and rebuilds after a compression
 or a reset (#363), but not for a cron run. The model keeps the memory itself (#494): it stores a rule, a correction,
 a decision, a pitfall or an external pointer with ``memcue_add`` when it learns it, and fixes a fact with
-``memcue_correct`` or ``memcue_retire``; nothing is extracted from the session afterwards. When a dream is due the
-system prompt says so, and the model runs it with ``memcue_dream_prepare`` and ``memcue_dream_apply``. Every write of
+``memcue_correct`` or ``memcue_retire``; nothing is extracted from the session afterwards. When a dream is due and
+an endpoint is configured, the session card's call starts it in the background (#569); without one the system prompt
+says so, and the model runs it with ``memcue_dream_prepare`` and ``memcue_dream_apply``. Every write of
 the built-in memory tool is mirrored into the base as a live fact (#440: add → ``memcue add``, replace → ``memcue
 correct``, remove → ``memcue retire``), with the origin ``hermes-memory``, a kind (``rule`` for a user preference or
 an order, ``pitfall`` for a failure, ``environment`` otherwise) and a scope (``global`` for a user preference,
@@ -21,7 +22,11 @@ Config, all optional (``memory.memcue`` in config.yaml):
   session_card: put the session card (global rules and repository decisions) in the system prompt (default true)
   session_card_chars: most characters of the session card (passed as MEMCUE_CARD_BUDGET; default 0 keeps the
           binary's 3500); the binary drops the oldest user-stated rule first and counts what it left out
-  dream: say in the system prompt when a dream is due (default true)
+  dream: run a due dream, in the background on the endpoint below or else by the model on the system prompt's hint
+          (default true)
+  api_url, model, api_key_env: the OpenAI-compatible endpoint a background dream and the search queries of
+          ``memcue_add`` go to, its model, and the environment variable holding its key (passed as MEMCUE_API_URL,
+          MEMCUE_MODEL and MEMCUE_API_KEY; default: unset, so the gateway's environment decides)
   facts:  the fact base (default: $MEMCUE_FACTS, else the text history $HERMES_HOME/memcue/facts once
           `memcue migrate -text` wrote it, else $HERMES_HOME/memcue/facts.db; share one with Claude Code by pointing
           both at it)
@@ -391,6 +396,9 @@ class MemcueMemoryProvider(MemoryProvider):
         self._card_chars = _bounded_int(self._config.get("session_card_chars"), 0, 0, 100_000)
         self._lock = threading.Lock()
         self._host = str(self._config.get("host") or "")
+        self._api_url = str(self._config.get("api_url") or "")
+        self._model = str(self._config.get("model") or "")
+        self._api_key_env = str(self._config.get("api_key_env") or "")
         self._usage_log = _on(self._config.get("usage_log"))
         self._state_dir = _expand_path(str(self._config.get("state_dir") or ""))
         self._delivered: dict[str, list[dict[str, Any]]] = {}  # session -> facts its searches returned this turn
@@ -611,7 +619,8 @@ class MemcueMemoryProvider(MemoryProvider):
             payload["session_id"] = scope
         cmd = ["session-card"]
         if self._dream and self._dreams and _version_at_least(self._version, _DREAM_TOOLS):
-            cmd.append("-dream-tools")  # with no extraction left, the card's hint is what starts a dream (#494)
+            # Without an endpoint for a background dream (#569), the card's hint is what starts a dream (#494).
+            cmd.append("-dream-tools")
         ok, out = self._run(cmd, stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
         if not ok or not out:
             self._warn_card_failure(session, out)
@@ -632,6 +641,14 @@ class MemcueMemoryProvider(MemoryProvider):
             env["MEMCUE_HOST"] = self._host
         if self._card_chars > 0:
             env["MEMCUE_CARD_BUDGET"] = str(self._card_chars)
+        if self._api_url:
+            env["MEMCUE_API_URL"] = self._api_url
+        if self._model:
+            env["MEMCUE_MODEL"] = self._model
+        if self._api_key_env:
+            env["MEMCUE_API_KEY"] = os.environ.get(self._api_key_env, "")
+        if not self._dream:
+            env["MEMCUE_DREAM_BACKGROUND"] = "0"
         try:
             r = subprocess.run([binary] + args, input=stdin, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=timeout, env=env, check=False)
