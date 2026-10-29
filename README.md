@@ -44,13 +44,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.25.1`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.26.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.26.0 | 6 | 0.26.0 | 0.26.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.0 (`hermes-agent` 0.15.2) |
 | 0.25.1 | 6 | 0.25.1 | 0.25.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.1 (`hermes-agent` 0.15.2) |
 | 0.25.0 | 6 | 0.25.0 | 0.25.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.0 (`hermes-agent` 0.15.2) |
 | 0.24.0 | 6 | 0.24.0 | 0.24.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.24.0 (`hermes-agent` 0.15.2) |
@@ -253,6 +254,16 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.26.0: claude -p runs with a token from a file (#591)
+
+- **A token for `claude -p`** (#591). A background dream runs `claude -p` with the environment of the session that
+  started it, so on a machine whose Claude Code login expired every dream failed. `MEMCUE_CLAUDE_TOKEN_FILE` names a
+  file with a token from `claude setup-token`, and every `claude -p` call of memcue runs with it as
+  `CLAUDE_CODE_OAUTH_TOKEN`. A leading `~/` is the home directory and a missing file leaves `claude -p` on its own
+  login, so one value can sit in the `env` block of a `settings.json` that machines share.
+- No schema or format changed. From 0.25.x, replace the binary and the plugins on every machine that syncs the base.
+  From 0.24.0 or older, read [0.25.0](#0250-a-fact-without-a-source-is-relabelled-as-the-agents-582) too.
 
 ### 0.25.1: versions that tie merge in one order (#587)
 
