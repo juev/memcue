@@ -75,6 +75,9 @@ func runSessionStartPart(in io.Reader, out io.Writer, part int) error {
 			card = ""
 		}
 	}
+	if part <= 1 { // the parts run at once; one of them starts the dream
+		startDream()
+	}
 	var hints []string
 	for _, hint := range []string{autoMemoryHint(), dreamHint(), upkeepHint(h.CWD)} {
 		if hint != "" {
@@ -201,14 +204,15 @@ func dreamHint() string {
 }
 
 // dreamToolsHint is dreamHint for a host whose model has the dream as two tools, Hermes (#494): with no extraction
-// left, the hint is the only thing that starts a dream there.
+// left and no background dream (#569), the hint is the only thing that starts a dream there.
 func dreamToolsHint() string {
 	return dreamHintTo("call memcue_dream_prepare and answer its packet with memcue_dream_apply")
 }
 
-// dreamHintTo is the dream hint that names how the model runs the dream.
+// dreamHintTo is the dream hint that names how the model runs the dream. A dream the session start hands to the
+// background (#569) needs no hint.
 func dreamHintTo(how string) string {
-	if !factsBase().exists() {
+	if dreamBackground() || !factsBase().exists() {
 		return "" // no base yet: the hint must not create one
 	}
 	dir, err := stateDir()
@@ -246,6 +250,7 @@ func runSessionCardWith(in io.Reader, out io.Writer, dreamTools bool) error {
 	if card != "" {
 		logCard(h, ids, len([]rune(card)), excluded, 0, fit)
 	}
+	startDream()
 	hints := []string{upkeepHint(h.CWD)}
 	if dreamTools {
 		hints = append(hints, dreamToolsHint())

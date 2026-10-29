@@ -98,7 +98,7 @@ commands:
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   facts     list the active facts
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
-  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all] [-j N]
+  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all|-background] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
@@ -119,8 +119,9 @@ environment:
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
   MEMCUE_CARD_BUDGET  most characters of the session card (default 3500); the oldest user-stated rule is
                   dropped first
-  MEMCUE_DREAM_EVERY  how long after a dream the session start says the next one is due (default 1h; dream.log in
-                  the state directory)
+  MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 1h; dream.log in the state directory)
+  MEMCUE_DREAM_BACKGROUND  0 keeps the session start from running a due dream in the background, on the endpoint
+                  or on claude -p; it then says the dream is due instead
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes memcue notes reads by default
 `
 
