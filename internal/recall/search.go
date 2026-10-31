@@ -263,10 +263,27 @@ func Search(s *store.Store, q Query) ([]store.Hit, error) {
 		return nil, err
 	}
 	terms := text.Terms(q.Text)
-	// Twice the room: the database cuts a run of equal scores in its own order, before the tie order could see it.
-	hits, err := s.SearchFiltered(terms, 2*q.N, f)
-	if err != nil {
-		return nil, err
+	message := q.floor() > 0 && IsMessage(q) && !q.AllWords
+	// The database cuts a run of equal scores in its own order, before the tie order could see it. While the last row
+	// it returned ties the fact that takes the N-th place, the run may go on past the cut and hide a fact the tie order
+	// puts ahead, so the room doubles until the run ends inside it or the matches run out.
+	var hits []store.Hit
+	for limit := 2 * q.N; ; limit *= 2 {
+		if hits, err = s.SearchFiltered(terms, limit, f); err != nil {
+			return nil, err
+		}
+		last, kept := -1, 0
+		for i, h := range hits {
+			if !message || holds(terms, h.Stems) >= messageTerms {
+				if kept++; kept == q.N {
+					last = i
+					break
+				}
+			}
+		}
+		if len(hits) < limit || last < 0 || hits[len(hits)-1].BM25 != hits[last].BM25 {
+			break
+		}
 	}
 	sort.SliceStable(hits, func(i, j int) bool {
 		if hits[i].BM25 != hits[j].BM25 {
@@ -279,7 +296,7 @@ func Search(s *store.Store, q Query) ([]store.Hit, error) {
 	})
 	// A message holds many common words, so a fact that shares only one of them with it is about something else
 	// (#417). The wide net of -min-score 0 keeps every fact the words fit, as before.
-	if floor := q.floor(); floor > 0 && IsMessage(q) && !q.AllWords {
+	if message {
 		kept := hits[:0]
 		for _, h := range hits {
 			if holds(terms, h.Stems) >= messageTerms {

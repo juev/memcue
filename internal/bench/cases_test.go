@@ -117,6 +117,29 @@ var cases = []benchCase{
 		expect: expect{order: [][2]string{{"own", "global"}}},
 	},
 	{
+		id: "host-before-project-at-limit", stratum: rule,
+		note: "README: \"On equal scores a fact of the current host comes first, then one learnt in the session's " +
+			"project, then a global one\". Three facts with the same text are added project, global, host; with " +
+			"room for all of them the host fact comes first, and `-n 1` must keep that order rather than cut " +
+			"before the host tie-break.",
+		setup: func(t *testing.T, w *world) {
+			w.add(t, "own", queueFact, addOpts{cwd: w.repo(t, "acme-widget").dir})
+			w.add(t, "global", queueFact, addOpts{scope: "global"})
+			w.add(t, "host", queueFact, addOpts{scope: "host:bench-host"})
+		},
+		action: inRepo("acme-widget", "очередь acme-jobs redis", searchOpts{n: "1"}),
+		expect: expect{found: []string{"host"}, notFound: []string{"own", "global"}, also: func(t *testing.T, w *world, a answer) {
+			d := search(t, w.b, "очередь acme-jobs redis", searchOpts{cwd: w.repo(t, "acme-widget").dir, n: "20"})
+			if len(d.hits) == 0 || d.hits[0].ID != w.id(t, "host") {
+				t.Errorf("-n 20 served %s, want the host fact first: the case tests nothing", w.names(d.ids()))
+			}
+			if len(a.hits) != 1 || a.hits[0].ID != w.id(t, "host") {
+				t.Errorf("-n 1 served %s, -n 20 served %s: the limit cuts before the current host's fact is "+
+					"put ahead of the project's", w.names(a.ids()), w.names(d.ids()))
+			}
+		}},
+	},
+	{
 		id: "retired-fact-is-nowhere", stratum: rule,
 		note: "README: `memcue retire ID` — no longer recalled; history keeps it. The widest search does not serve it.",
 		setup: func(t *testing.T, w *world) {

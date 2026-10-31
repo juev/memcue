@@ -84,6 +84,28 @@ func TestSearchCutKeepsTheTieWinner(t *testing.T) {
 	}
 }
 
+// A run of equal scores longer than any fixed room still yields to the tie order: the host's fact, stored last behind
+// eleven copies, is the one served whatever the room asked for.
+func TestSearchCutKeepsTheTieWinnerOfALongRun(t *testing.T) {
+	s := emptyBase(t)
+	for i := range 12 {
+		sc := ""
+		if i == 11 {
+			sc = "host:mac"
+		}
+		if _, err := s.AddWith("Брокер nats слушает 4222.", []string{"nats"}, "x 2026-09-10", "",
+			store.Meta{Scope: sc}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range []int{1, 3} {
+		got, err := Search(s, Query{Text: "nats", Host: "mac", N: n, MinScore: MinScore})
+		if err != nil || len(got) != n || got[0].Scope != "host:mac" {
+			t.Errorf("n %d: got %+v %v, want %d facts, the host's first", n, got, err, n)
+		}
+	}
+}
+
 // A query of one word finds its fact: the agent wrote it, and the term floors of Recall would silence it.
 func TestSearchHasNoGates(t *testing.T) {
 	s := setup(t)
