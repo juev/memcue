@@ -502,7 +502,7 @@ export function apply(ctx, config) {
 			origin: { type: 'string', description: 'Where the fact was learnt. Defaults to the repository of the session workspace and today.' },
 			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD (for a one-off reminder).' },
 			kind: { type: 'string', description: 'Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event (what happened that the next days need; expires after a week unless expires is given). A rule or decision the user stated goes on the session card.' },
-			source: { type: 'string', description: 'Optional who said it: user (the user\'s words; the default for rule and decision, and the only source that reaches the session card), user_confirmed, tool (seen in a tool\'s output) or agent (the default otherwise).' },
+			source: { type: 'string', description: 'Optional who said it: user (the user\'s words; the default for rule and decision; a global decision reaches the session card only with it), user_confirmed, tool (seen in a tool\'s output) or agent (the default otherwise).' },
 			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo, because a global one the user stated is on every session card.' },
 			shelf: { type: 'string', description: 'Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with in shelf:<name>. For what was read from outside sources; omit scope when you pass it.' },
 		},
@@ -513,7 +513,7 @@ export function apply(ctx, config) {
 			const kind = String(args.kind ?? '').trim()
 			const source = String(args.source ?? '').trim() || (kind === 'rule' || kind === 'decision' ? 'user' : 'agent')
 			if (!ADD_SOURCES.includes(source)) return { stored: false, message: `memcue: source must be one of: ${ADD_SOURCES.join(', ')}` }
-			// A rule or decision in the user's words reaches the session card only with the user's source (#494).
+			// A global decision reaches the session card only with the user's source (#600).
 			const flags = ['add', '-source', source, '-cwd', sessionCwd(exec)]
 			if (args.origin) flags.push('-origin', String(args.origin))
 			if (args.keywords) flags.push('-keywords', String(args.keywords))

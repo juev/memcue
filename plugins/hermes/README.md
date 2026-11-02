@@ -28,8 +28,8 @@ memcue fact base:
 - **The model keeps its memory itself** (#494). The system prompt block and `memcue_add` tell it to store a rule or a
   correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it learns
   it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the session
-  afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, the only source
-  that reaches the session card; `tool` is what a tool's output showed, `agent` anything else, and memcue refuses
+  afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, and a global
+  decision reaches the session card only from the user; `tool` is what a tool's output showed, `agent` anything else, and memcue refuses
   installation state from either (#475).
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset forgets what the old session's searches returned.

@@ -851,8 +851,9 @@ a `rule` or `decision` scoped to the session's repository, and its source is not
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
-the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, the only source that
-reaches the session card, and what a command showed takes `-source tool`:
+the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
+showed takes `-source tool`. The card carries global rules and the rules and decisions of the session's project
+whatever their source, the user's first, and a global decision only from the user (#600):
 
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (-json: {"facts", "hints"}; at most -n, default 5)

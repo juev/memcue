@@ -12,8 +12,8 @@ fact base:
 - **The model keeps its memory itself** (#494). The system-prompt section and `memcue_add` tell it to store a rule or
   a correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it
   learns it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the
-  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, the only
-  source that reaches the session card; `tool` is what a tool's output showed, `agent` anything else, and memcue
+  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, and a global
+  decision reaches the session card only from the user; `tool` is what a tool's output showed, `agent` anything else, and memcue
   refuses installation state from either (#475).
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
 - **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact;

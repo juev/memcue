@@ -356,9 +356,9 @@ ADD_SCHEMA = _schema(
      "kind": "Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event "
              "(what happened that the next days need; expires after a week unless expires is given). A rule or "
              "decision the user stated goes on the session card.",
-     "source": "Optional who said it: user (the user's words; the default for rule and decision, and the only "
-               "source that reaches the session card), user_confirmed, tool (seen in a tool's output) or agent (the "
-               "default otherwise).",
+     "source": "Optional who said it: user (the user's words; the default for rule and decision; a global "
+               "decision reaches the session card only with it), user_confirmed, tool (seen in a tool's output) or "
+               "agent (the default otherwise).",
      "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo, because a global one the user stated is on every session card.",
      "shelf": "Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with "
               "in shelf:<name>. For what was read from outside sources; omit scope when you pass it."},
@@ -1019,7 +1019,7 @@ class MemcueMemoryProvider(MemoryProvider):
             source = arg("source") or ("user" if arg("kind") in ("rule", "decision") else "agent")
             if source not in _ADD_SOURCES:
                 return tool_error("source must be one of: " + ", ".join(_ADD_SOURCES))
-            # A rule or decision in the user's words reaches the session card only with the user's source (#494).
+            # A global decision reaches the session card only with the user's source (#600).
             cmd = ["add", "-source", source, "-cwd", self._workspace]
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]

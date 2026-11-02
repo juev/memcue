@@ -501,7 +501,7 @@ test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
 	}, exec)
 	assert.equal(result.stored, true)
 	const text = await waitForLog('arg: add ')
-	// A rule is the user's words by default: only that source reaches the session card (#494).
+	// A rule is the user's words by default (#494).
 	assert.match(text, /arg: add -source user -cwd \/repo\/demo -keywords new, fact -expires 2026-10-21 -kind rule -scope global -- A new fact\./)
 })
 
