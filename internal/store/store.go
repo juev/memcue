@@ -790,8 +790,8 @@ func (s *Store) agentSources() ([]Fact, error) {
 
 const sourcesStamp = "sources-rows" // versions of the base when agentSources last left no fact without a source
 
-// CardFacts returns the facts a session-start card carries: global rules and the rules and decisions whose scope is
-// one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
+// CardFacts returns the facts a session-start card carries: global rules, the global decisions the user stated, and the
+// rules and decisions whose scope is one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
 // goes first because the date says little on a migrated base, where most rules share the day of the migration (#229).
 // It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. A fact
 // whose source is memory is left out and counted in mirrors: it mirrors a note of the host's built-in memory, which
@@ -812,6 +812,11 @@ func (s *Store) CardFacts(scopes []string, today string) (facts []Fact, mirrors 
 		}
 		switch {
 		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
+		case f.Kind == "decision" && strings.EqualFold(f.Scope, "global") &&
+			(f.Source == "user" || f.Source == "user_confirmed"):
+			// A global decision the user made constrains every later session the way a rule does; a search for it is
+			// a question the agent does not think to ask (#600). A global decision of the agent's own stays off the
+			// card: it is a conclusion, not an instruction the user gave.
 		case (f.Kind == "decision" || f.Kind == "rule") && slices.ContainsFunc(scopes, func(sc string) bool {
 			return sc != "" && strings.EqualFold(f.Scope, sc)
 		}):

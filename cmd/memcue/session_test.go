@@ -235,7 +235,8 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	add("Правило только на маке.", "rule", "host:mac", "user", "")
 	decision := add("Решение: мержить squash в shop.", "decision", "repo:example.com/team/shop", "user", "")
 	add("Решение чужого репозитория.", "decision", "repo:other", "user", "")
-	add("Глобальное решение.", "decision", "global", "user", "")
+	globalDecision := add("Глобальное решение.", "decision", "global", "user", "")
+	add("Глобальный вывод агента.", "decision", "global", "agent", "")
 	add("Ловушка в shop.", "pitfall", "repo:example.com/team/shop", "tool", "")
 	newest := add("Правило: не пушить в main.", "rule", "global", "user", "")
 	_ = s.Close()
@@ -244,14 +245,14 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	if !strings.Contains(ctx, "memcue add") || !strings.Contains(ctx, "rules and decisions from the base") {
 		t.Fatalf("no note or card: %q", ctx)
 	}
-	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "Global rules (learnt",
+	for _, want := range []string{"по-русски", "не пушить в main", "мержить squash", "Глобальное решение", "Global rules and decisions (learnt",
 		"Rules and decisions of repo:example.com/team/shop (learnt",
 		time.Now().UTC().Format(time.DateOnly)} {
 		if !strings.Contains(ctx, want) {
 			t.Errorf("card lacks %q: %q", want, ctx)
 		}
 	}
-	for _, unwanted := range []string{"только на маке", "чужого репозитория", "Глобальное решение", "Ловушка в shop"} {
+	for _, unwanted := range []string{"только на маке", "чужого репозитория", "Глобальный вывод агента", "Ловушка в shop"} {
 		if strings.Contains(ctx, unwanted) {
 			t.Errorf("card carries %q: %q", unwanted, ctx)
 		}
@@ -268,8 +269,8 @@ func TestSessionStartCardCarriesRulesAndRepoDecisions(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(b), &rec); err != nil {
 		t.Fatalf("card.log %q: %v", b, err)
 	}
-	wantIDs := map[string]bool{newest.ID: true, old.ID: true, decision.ID: true}
-	if len(rec.Facts) != 3 || rec.Tier != "example.com/team/shop" || rec.Source != "startup" || rec.Session != "s1" || rec.Chars == 0 {
+	wantIDs := map[string]bool{newest.ID: true, old.ID: true, decision.ID: true, globalDecision.ID: true}
+	if len(rec.Facts) != 4 || rec.Tier != "example.com/team/shop" || rec.Source != "startup" || rec.Session != "s1" || rec.Chars == 0 {
 		t.Errorf("card record %+v", rec)
 	}
 	for _, id := range rec.Facts {
@@ -833,6 +834,24 @@ func TestRenderCardWithinTheBudgetIsUnchanged(t *testing.T) {
 	}
 	if !slices.Equal(ids, []string{"u1", "a1", "u2"}) || fit.Omitted != 0 {
 		t.Errorf("ids %v, fit %+v", ids, fit)
+	}
+}
+
+// A global group that carries a decision says so in its heading; a group of rules alone keeps the shorter one (#600).
+func TestRenderCardNamesGlobalDecisions(t *testing.T) {
+	day := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	facts := []store.Fact{
+		{ID: "u1", Content: "Commit messages are in English.", Created: day,
+			Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}},
+		{ID: "u2", Content: "SFTPGo is updated by hand once a month.", Created: day,
+			Meta: store.Meta{Kind: "decision", Scope: "global", Source: "user"}},
+	}
+	card, ids, _, _, err := renderCard(facts, cardBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(card, "\nGlobal rules and decisions (learnt 2026-10-20):\n") || !slices.Equal(ids, []string{"u1", "u2"}) {
+		t.Errorf("card:\n%s\nids %v", card, ids)
 	}
 }
 

@@ -1120,6 +1120,36 @@ func TestCardFactsCarryRepositoryRules(t *testing.T) {
 	}
 }
 
+// A global decision the user stated is on the card in every repository, like a global rule; a global decision of the
+// agent's own is not (#600).
+func TestCardFactsCarryStatedGlobalDecisions(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, source string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "decision", Scope: "global", Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	stated := add("SFTPGo is updated by hand once a month, outside the nightly updater.", "user")
+	confirmed := add("The fact base lives in its own private repository.", "user_confirmed")
+	agents := add("The updater probably skips pinned images.", "agent")
+	for _, scopes := range [][]string{nil, {"repo:shop"}} {
+		got, _, err := s.CardFacts(scopes, "2026-10-20")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := make([]string, 0, len(got))
+		for _, f := range got {
+			ids = append(ids, f.ID)
+		}
+		if !slices.Contains(ids, stated.ID) || !slices.Contains(ids, confirmed.ID) || slices.Contains(ids, agents.ID) {
+			t.Errorf("scopes %v: card ids %v, want %s and %s, not %s", scopes, ids, stated.ID, confirmed.ID, agents.ID)
+		}
+	}
+}
+
 // Relabel writes the labels as a new version that keeps the content and the creation time, and refuses a fact that
 // changed since the caller read it.
 func TestRelabelKeepsContentAndDate(t *testing.T) {

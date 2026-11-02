@@ -4,8 +4,9 @@ Long-term memory for Claude Code. memcue keeps a base of short, self-contained f
 through hooks:
 
 - **At session start, and again after a compaction or `/clear`** it tells the agent to search memcue before it
-  answers a question that may depend on earlier sessions, and sends a card: global rules and the rules and decisions
-  of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is how a rule the
+  answers a question that may depend on earlier sessions, and sends a card: global rules, the global decisions you
+  stated, and the rules and decisions of the current repository, the ones you stated first, within about 1.2 thousand
+  tokens. The card is how a rule the
   agent would not think to search for still reaches it.
 - **When the agent needs something from earlier sessions** it runs `memcue search` itself, with its own words:
   synonyms, the system's name, both languages. Nothing is injected with a prompt (#361): the agent's own queries
@@ -932,7 +933,9 @@ about 28,000 characters, does the card leave lines out. The last part then says 
 and `card.log` counts them as `left`. `session-start` without `-part` prints the whole text in one block, as before.
 
 Every rule and decision the user stated (`source` `user` or `user_confirmed`) is on the card, each cut to 400
-characters (#363): since the agent searches itself, the card is the only memory it gets unasked. Where it holds them
+characters (#363): since the agent searches itself, the card is the only memory it gets unasked. A global decision
+gets there only when the user stated it, and its group is then headed "Global rules and decisions"; before #600 no
+global decision reached the card, and a session that did not think to search acted against it. Where it holds them
 depends on the host. At the Claude Code session start they sit outside the budget, bounded only by the three parts
 (#480, #495). On `session-card`, which Hermes and DSH put in the system prompt of every turn, they share the budget
 (`MEMCUE_CARD_BUDGET`, 3,500 by default): the oldest go first, and a cut card ends with a line that counts the rest

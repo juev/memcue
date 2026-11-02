@@ -7,7 +7,7 @@ fact base:
   `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
   system's name and both languages if the first try finds nothing.
 - **At the first prompt and after every compaction** `memcue session-card` supplies the card of global rules and
-  repository decisions as a user-role notice. The card is a view of the base, not a copy. A failed card is not
+  decisions and the repository's decisions as a user-role notice. The card is a view of the base, not a copy. A failed card is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
 - **The model keeps its memory itself** (#494). The system-prompt section and `memcue_add` tell it to store a rule or
   a correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it

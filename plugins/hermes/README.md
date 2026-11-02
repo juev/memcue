@@ -9,7 +9,7 @@ memcue fact base:
   decides that may help: on starting with a specific host, service or repository, and before it diagnoses an
   unexpected error, with a short query naming the system and the problem, checking the result against the current
   state (#521). It is a hint, not a rule: no search runs on its own.
-- **The session card** (global rules, the rules the user stated and the decisions of the current repository) is part
+- **The session card** (global rules, the rules and global decisions the user stated and the decisions of the current repository) is part
   of the system prompt, through the same `memcue session-card` call Claude Code and DSH use (#363). Hermes caches the
   system prompt and rebuilds it after a compression or a reset, and each rebuild asks for a fresh card; a cron run
   gets none, and `session_card: false` turns it off. `session_card_chars` (passed as `MEMCUE_CARD_BUDGET`; default 0

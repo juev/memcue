@@ -24,7 +24,7 @@ when you learn it, not at the end of the session.
   after a week (`MEMCUE_EVENT_TTL_DAYS`) unless `-expires` gives a date.
 
 Rules and decisions take `-source user`: they are the user's words, and only they reach the session card, which
-carries the global rules and the decisions of the repository even when a prompt shares no word with them. Name the
+carries the global rules and decisions and the decisions of the repository even when a prompt shares no word with them. Name the
 source every time: a fact without `-source` is stored as yours (`agent`), and what a command or a file showed is
 `-source tool`.
 

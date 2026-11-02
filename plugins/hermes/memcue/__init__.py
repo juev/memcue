@@ -1,8 +1,8 @@
 """memcue memory provider for Hermes Agent.
 
 Runs the ``memcue`` binary (github.com/juev/memcue): no facts come with a message; the model searches the base itself
-with ``memcue_search`` before it answers from earlier sessions (#361), and the session card (global rules and the
-decisions of the repository) is part of the system prompt, which Hermes builds once and rebuilds after a compression
+with ``memcue_search`` before it answers from earlier sessions (#361), and the session card (global rules and decisions, and
+the decisions of the repository) is part of the system prompt, which Hermes builds once and rebuilds after a compression
 or a reset (#363), but not for a cron run. The model keeps the memory itself (#494): it stores a rule, a correction,
 a decision, a pitfall or an external pointer with ``memcue_add`` when it learns it, and fixes a fact with
 ``memcue_correct`` or ``memcue_retire``; nothing is extracted from the session afterwards. When a dream is due and
@@ -19,7 +19,7 @@ Config, all optional (``memory.memcue`` in config.yaml):
   binary: path to memcue (default: found on PATH)
   host: name of this machine for fact scope and the search tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
-  session_card: put the session card (global rules and repository decisions) in the system prompt (default true)
+  session_card: put the session card (global rules and decisions, repository decisions) in the system prompt (default true)
   session_card_chars: most characters of the session card (passed as MEMCUE_CARD_BUDGET; default 0 keeps the
           binary's 3500); the binary drops the oldest user-stated rule first and counts what it left out
   dream: run a due dream, in the background on the endpoint below or else by the model on the system prompt's hint
@@ -610,7 +610,7 @@ class MemcueMemoryProvider(MemoryProvider):
         return entries
 
     def _card_text(self) -> str:
-        """The session card: global rules, the rules the user stated and the decisions of the current repository. A
+        """The session card: global rules, the rules and global decisions the user stated and the decisions of the current repository. A
         card is a view of the base: the next one reflects corrections and retirements. A cron run gets none: it is a
         background task, not a session of a user."""
         if not self._session_card or self._context == "cron" or not self._binary_ok():
