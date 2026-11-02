@@ -6,7 +6,8 @@ description: Tidy long-term memory (memcue dream). Use when the session start sa
 # memcue: the dream
 
 A dream splits compound facts, gives facts without search queries their queries, translates facts into the other
-language, and retires or corrects duplicates and outdated facts. You do it; memcue prepares the work and checks your
+language, retires or corrects duplicates and outdated facts, and moves a global fact that holds in one project to
+that project. You do it; memcue prepares the work and checks your
 answer.
 
 Never interrupt the user's work for it: finish or pause at a natural point first.
@@ -20,7 +21,7 @@ the background and says nothing (#569). The session start names the dream only w
    memcue dream -prepare
    ```
 
-   It prints the instructions, the four tasks with their rules and the data. "nothing for the dream" means you are
+   It prints the instructions, the five tasks with their rules and the data. "nothing for the dream" means you are
    done.
 2. Follow the instructions: write one JSON answer to a temporary file (`mktemp`), with `packet` exactly as printed.
 3. Apply it:
@@ -32,7 +33,7 @@ the background and says nothing (#569). The session start names the dream only w
    It prints what it changed and what it refused, with the reason. An answer to an older packet is refused whole:
    run `-prepare` again.
 4. Tell the user in one or two lines what changed: facts split, given queries, translated, retired,
-   corrected.
+   corrected, moved to a project.
 
 A packet is bounded; when the session start still says facts wait, the next packet takes the rest.
 

@@ -51,8 +51,9 @@ memcue fact base:
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
   tools below.
 - **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
-  instructions and the facts to split, give search queries, translate and review in groups (`since: all` for the first dream
-  on a base), the second takes the JSON answer and reports what memcue applied and refused. See [Dream](#dream).
+  instructions and the facts to split, give search queries, translate, review in groups and check the scope of
+  (`since: all` for the first dream on a base), the second takes the JSON answer and reports what memcue applied and
+  refused. See [Dream](#dream).
 ## Candidates
 
 A mirrored memory write and a fact written by `memcue_add` are indexed at once, and `memcue_correct` writes a new

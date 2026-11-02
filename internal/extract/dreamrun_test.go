@@ -50,11 +50,11 @@ func TestDreamSchemaIsTheAnswer(t *testing.T) {
 	if err := json.Unmarshal([]byte(dreamSchema), &schema); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"packet", "splits", "expansions", "actions", "translations"}
+	want := []string{"packet", "splits", "expansions", "actions", "translations", "scopes"}
 	if strings.Join(schema.Required, ",") != strings.Join(want, ",") || len(schema.Properties) != len(want) {
 		t.Errorf("schema requires %q with %d properties, want %q", schema.Required, len(schema.Properties), want)
 	}
-	for _, field := range []string{`"by"`, `"kind"`, `"parts"`, `"translation"`, `"queries"`} {
+	for _, field := range []string{`"by"`, `"kind"`, `"parts"`, `"translation"`, `"queries"`, `"scope"`} {
 		if !strings.Contains(dreamSchema, field) {
 			t.Errorf("schema lacks %s", field)
 		}

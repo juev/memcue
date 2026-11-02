@@ -238,3 +238,163 @@ func TestDreamTakesBackAPromotionWithinOneRepository(t *testing.T) {
 		t.Errorf("a fact global before the promotion %+v, want it global", f)
 	}
 }
+
+// scopeBase stores a fact of a project and two global facts: one about that project, one that holds everywhere.
+func scopeBase(t *testing.T) (project, one, everywhere store.Fact) {
+	t.Helper()
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	add := func(content, scope string) store.Fact {
+		f, err := s.AddWith(content, []string{"k"}, "example.com/me/shop 2026-10-19", "", store.Meta{Kind: "rule", Scope: scope})
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(3 * time.Millisecond)
+		return f
+	}
+	project = add("В репозитории shop релиз собирает make release.", "repo:example.com/me/shop")
+	one = add("В репозитории shop CI нет намеренно: проверки гоняются локально.", "global")
+	everywhere = add("Коммиты пишутся по-английски.", "global")
+	return project, one, everywhere
+}
+
+// The dream checks the scope of every global fact once, a packet at a time after a cursor, and moves the ones the
+// model names a project for to that project, keeping their creation time (#607). The project must be one the base
+// knows, and the fact one the packet gave.
+func TestDreamMovesAGlobalFactOfOneProject(t *testing.T) {
+	dir := env(t)
+	project, one, everywhere := scopeBase(t)
+	var sent []string
+	scopeFn = func(in string) ([]extract.Rescope, error) {
+		sent = append(sent, in)
+		return []extract.Rescope{
+			{ID: one.ID, Scope: "repo:example.com/me/shop", Reason: "names shop"},
+			{ID: everywhere.ID, Scope: "repo:example.com/me/nowhere", Reason: "made up"},
+			{ID: project.ID, Scope: "repo:example.com/me/shop", Reason: "not given"},
+		}, nil
+	}
+	t.Cleanup(func() { scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil } })
+	var out bytes.Buffer
+	if err := dreamModel([]string{"-since", "2099-01-01"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(sent) != 1 || !strings.Contains(sent[0], `"projects":["repo:example.com/me/shop"]`) ||
+		!strings.Contains(sent[0], one.ID) || !strings.Contains(sent[0], everywhere.ID) || strings.Contains(sent[0], project.ID) {
+		t.Fatalf("scope input %q", sent)
+	}
+	s, _ := store.Open(factsPath())
+	moved, _ := s.Get(one.ID)
+	kept, _ := s.Get(everywhere.ID)
+	_ = s.Close()
+	if moved.Scope != "repo:example.com/me/shop" || !moved.Created.Equal(one.Created) {
+		t.Errorf("fact of one project %+v, want it in repo:example.com/me/shop with its creation time", moved)
+	}
+	if kept.Scope != "global" {
+		t.Errorf("a fact moved to a project the base does not know: %+v", kept)
+	}
+	for _, want := range []string{
+		"project " + one.ID + " repo:example.com/me/shop: names shop",
+		"refused scope " + everywhere.ID + ": repo:example.com/me/nowhere is not a project of the base",
+		"refused scope " + project.ID + ": not a fact of the packet",
+		"1 moved to a project",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("out lacks %q:\n%s", want, out.String())
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "state", "memcue", "dream.scope")); strings.TrimSpace(string(b)) != everywhere.ID {
+		t.Errorf("cursor %q, want %s", b, everywhere.ID)
+	}
+
+	// The next dream gives only a global fact stored since.
+	s, _ = store.Open(factsPath())
+	later, err := s.AddWith("Ветки создаются только в worktree.", []string{"k"}, "", "", store.Meta{Kind: "rule", Scope: "global"})
+	_ = s.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent = nil
+	if err := dreamModel([]string{"-since", "2099-01-01"}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if len(sent) != 1 || !strings.Contains(sent[0], later.ID) || strings.Contains(sent[0], everywhere.ID) {
+		t.Errorf("second dream gave %q, want only %s", sent, later.ID)
+	}
+}
+
+// A fact corrected between the packet and the answer is refused: the model judged the old text. A version that only
+// gave it search queries is not a change.
+func TestDreamRefusesTheScopeOfAChangedFact(t *testing.T) {
+	env(t)
+	_, one, everywhere := scopeBase(t)
+	scopeFn = func(string) ([]extract.Rescope, error) {
+		return []extract.Rescope{
+			{ID: one.ID, Scope: "repo:example.com/me/shop", Reason: "names shop"},
+			{ID: everywhere.ID, Scope: "repo:example.com/me/shop", Reason: "names shop"},
+		}, nil
+	}
+	t.Cleanup(func() { scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil } })
+	path, err := prepareAnswer([]string{"-since", "2099-01-01"}, io.Discard)
+	if err != nil || path == "" {
+		t.Fatal(path, err)
+	}
+	s, _ := store.Open(factsPath())
+	if _, err := s.SetQueries(one.ID, one.Version, []string{"ci shop"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(everywhere.ID, "Коммиты и PR пишутся по-английски.", []string{"k"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	var out bytes.Buffer
+	if err := runDream([]string{"-apply", path}, &out); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = store.Open(factsPath())
+	defer func() { _ = s.Close() }()
+	if f, _ := s.Get(one.ID); f.Scope != "repo:example.com/me/shop" {
+		t.Errorf("a fact that only got queries was not moved: %+v\n%s", f, out.String())
+	}
+	if f, _ := s.Get(everywhere.ID); f.Scope != "global" || !strings.Contains(out.String(), "refused scope "+everywhere.ID+": changed since the packet") {
+		t.Errorf("a corrected fact %+v\n%s", f, out.String())
+	}
+}
+
+// dream -run -all checks the scope of every global fact, a call of its own for them, and the loop goes on while
+// global facts wait (#607).
+func TestDreamRunAllChecksEveryGlobalFact(t *testing.T) {
+	env(t)
+	_, one, everywhere := scopeBase(t)
+	old := packetScope
+	packetScope = 1
+	t.Cleanup(func() { packetScope = old })
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	var given []string
+	scopeFn = func(in string) ([]extract.Rescope, error) {
+		given = append(given, in)
+		if strings.Contains(in, one.ID) {
+			return []extract.Rescope{{ID: one.ID, Scope: "repo:example.com/me/shop", Reason: "names shop"}}, nil
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil } })
+	fakeDreamRun(t, nil)
+	var out bytes.Buffer
+	if err := runDream([]string{"-run", "-all"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(given) != 2 || !strings.Contains(strings.Join(given, " "), everywhere.ID) {
+		t.Errorf("scope calls %q", given)
+	}
+	if f := storedFact(t, one.ID); f.Scope != "repo:example.com/me/shop" {
+		t.Errorf("fact of one project %+v\n%s", f, out.String())
+	}
+	if f := storedFact(t, everywhere.ID); f.Scope != "global" {
+		t.Errorf("fact that holds everywhere %+v", f)
+	}
+}

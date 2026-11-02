@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -281,4 +283,98 @@ func reopenDuplicate(s *store.Store, aliases *projectAliases, id, project string
 	}
 	_, err = s.Restore(id)
 	return err == nil, err
+}
+
+// knownProjects are the projects a dream may move a global fact to (#607): the scopes projectOf gives the active
+// facts, a key of a remote or a dir: path, sorted. A name memcue gave a clone before #343 is left out: migrate -repos
+// moves its facts onto the key.
+func knownProjects(active []store.Fact) []string {
+	seen := map[string]bool{}
+	for _, f := range active {
+		if p := projectOf(f); p != "" && isKey(strings.TrimPrefix(p, "repo:")) {
+			seen[p] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+// renderScopeInput is the JSON the scope task reads: the projects of the base, and the id, kind, origin and text of
+// each global fact.
+func renderScopeInput(facts []store.Fact, projects []string) (string, error) {
+	type item struct {
+		ID     string `json:"id"`
+		Kind   string `json:"kind,omitempty"`
+		Origin string `json:"origin,omitempty"`
+		Text   string `json:"text"`
+	}
+	items := make([]item, len(facts))
+	for i, f := range facts {
+		items[i] = item{ID: f.ID, Kind: f.Kind, Origin: f.Origin, Text: f.Content}
+	}
+	if projects == nil {
+		projects = []string{}
+	}
+	b, err := json.Marshal(map[string]any{"projects": projects, "facts": items})
+	return string(b), err
+}
+
+// applyRescopes moves the global facts of a checked answer to their project, keeping the creation time. A fact retired
+// since the packet, changed in more than its labels, or no longer global is refused: the model judged another text or
+// another scope.
+func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]int, rec *dreamRecord, out io.Writer) error {
+	for _, r := range rescopes {
+		cur, err := s.Get(r.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": "+err.Error())
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		same := cur.Version == r.Version
+		if !same && cur.Status == store.Active {
+			if same, err = onlyLabelsSince(s, r.ID, r.Version); err != nil {
+				return err
+			}
+		}
+		switch {
+		case cur.Status != store.Active:
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": retired since the packet")
+			continue
+		case !same:
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": changed since the packet")
+			continue
+		case !strings.EqualFold(cur.Scope, "global"):
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": no longer global, "+cur.Scope)
+			continue
+		}
+		f, err := s.Relabel(cur.ID, cur.Version, cur.Kind, r.Scope, cur.Expires)
+		if err != nil {
+			return err
+		}
+		if saw[f.ID] == cur.Version {
+			saw[f.ID] = f.Version
+		}
+		rec.Rescoped = append(rec.Rescoped, f.ID+" "+r.Scope)
+		if _, err := fmt.Fprintf(out, "project %s %s: %s\n", f.ID, r.Scope, r.Reason); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// readScopeCursor reads the id of the last global fact a dream gave to check the scope of; no file is the start.
+func readScopeCursor(dir string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "dream.scope"))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	return strings.TrimSpace(string(b)), err
+}
+
+func writeScopeCursor(dir, id string) error {
+	if id == "" {
+		return nil
+	}
+	return os.WriteFile(filepath.Join(dir, "dream.scope"), []byte(id+"\n"), 0o600)
 }

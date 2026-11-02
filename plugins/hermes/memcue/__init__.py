@@ -373,8 +373,8 @@ RETIRE_SCHEMA = _schema(
     {"id": "Fact ID from memcue_search."}, ["id"])
 DREAM_PREPARE_SCHEMA = _schema(
     "memcue_dream_prepare", "Start tidying long-term memory (the memcue dream): returns the instructions and the facts "
-    "to split, to give search queries, to translate and to review in groups. Answer it with memcue_dream_apply. "
-    "'nothing for the dream' means there is nothing to do.",
+    "to split, to give search queries, to translate, to review in groups and global facts to check the scope of. "
+    "Answer it with memcue_dream_apply. 'nothing for the dream' means there is nothing to do.",
     {"since": "Optional: 'all' reviews every fact, a date (YYYY-MM-DD) the facts written since; the default is "
               "the facts new since the last dream. The first dream on a base needs one of them."}, [])
 DREAM_APPLY_SCHEMA = _schema(

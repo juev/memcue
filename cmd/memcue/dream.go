@@ -63,6 +63,9 @@ var (
 	// packetTranslate is the facts a dream translates (#396): 40 kept every answer in one call when #395 measured
 	// a whole base, and a base of 3 000 facts is done in about 75 dreams.
 	packetTranslate = 40
+	// packetScope is the global facts a dream checks the scope of (#607): a base of 500 of them is done in about 17
+	// dreams, and a fact stored global later is checked by the next one.
+	packetScope = 30
 )
 
 // The merge sweep groups facts the dream has already seen, so a duplicate pair that predates the last dream is
@@ -86,6 +89,8 @@ type dreamRecord struct {
 	// Reopened the duplicates retired for them that were learnt in another project (#607).
 	Unpromoted []string `json:"unpromoted,omitempty"`
 	Reopened   []string `json:"reopened,omitempty"`
+	// Rescoped are the global facts the dream moved to the one project they hold in, as "ID SCOPE" (#607).
+	Rescoped []string `json:"rescoped,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
 	// Translated counts the facts that got their translation (#396).
@@ -127,6 +132,17 @@ type dreamPlan struct {
 	Translations []dreamPlanTranslation `json:"translations,omitempty"`
 	Groups       []dreamPlanGroup       `json:"groups"`
 	Merge        string                 `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
+	// Rescopes are the global facts to move to one project, with the version the model read (#607).
+	Rescopes []dreamPlanRescope `json:"rescopes,omitempty"`
+	// ScopeCursor is the last global fact the packet gave to check, kept once the plan is carried out.
+	ScopeCursor string `json:"scope_cursor,omitempty"`
+}
+
+type dreamPlanRescope struct {
+	ID      string `json:"id"`
+	Version int    `json:"version"`
+	Scope   string `json:"scope"`
+	Reason  string `json:"reason"`
 }
 
 type dreamPlanExpansion struct {
@@ -327,7 +343,12 @@ type dreamPacket struct {
 	Expand map[string]int `json:"expand"`
 	// Translate are the facts owed a translation (#396), which no other part of the packet changes.
 	Translate map[string]int   `json:"translate,omitempty"`
-	Groups    []map[string]int `json:"groups"`
+	// Scope are the global facts to check the scope of, and Projects the scopes the model may move them to: the
+	// projects the active facts of the base hold in (#607).
+	Scope       map[string]int   `json:"scope,omitempty"`
+	Projects    []string         `json:"projects,omitempty"`
+	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
+	Groups      []map[string]int `json:"groups"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
 	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
 	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
@@ -341,6 +362,7 @@ type dreamAnswer struct {
 	Expansions   []extract.Expansion  `json:"expansions"`
 	Actions      []extract.Action     `json:"actions"`
 	Translations []extract.Translated `json:"translations"`
+	Scopes       []extract.Rescope    `json:"scopes"`
 }
 
 const packetFile = "dream.packet.json"
@@ -473,9 +495,40 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 			owed = append(owed, f)
 		}
 	}
+	// Global facts get their scope checked a packet at a time, in the order of their ids, after a cursor (#607); a fact
+	// stored global later has a larger id and is checked by a later packet. A fact a split or a group action may
+	// change stops the walk until a packet without it: the cursor never passes a fact it did not give.
+	scopeCursor, err := readScopeCursor(dir)
+	if err != nil {
+		return rec, work, err
+	}
+	inGroup := map[string]bool{}
+	for _, g := range groups {
+		for _, f := range g {
+			inGroup[f.ID] = true
+		}
+	}
+	var scoped []store.Fact
+	for _, f := range active {
+		if len(scoped) == packets*packetScope {
+			break
+		}
+		if f.ID <= scopeCursor || !strings.EqualFold(f.Scope, "global") {
+			continue
+		}
+		if isBatch[f.ID] || inGroup[f.ID] {
+			break
+		}
+		scoped = append(scoped, f)
+	}
+	var projects []string
+	if len(scoped) > 0 {
+		projects = knownProjects(active)
+		scopeCursor = scoped[len(scoped)-1].ID
+	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
 		Split: versions(batch), Expand: versions(bare), Translate: versions(owed), Deferred: deferred, Merge: cursor,
-		Swept: swept}
+		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeCursor: scopeCursor}
 	for _, f := range fresh {
 		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
@@ -488,7 +541,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 	for _, g := range groups {
 		p.Groups = append(p.Groups, versions(g))
 	}
-	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 {
+	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 && len(scoped) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
 		return rec, work, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
@@ -497,8 +550,9 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 		return rec, work, err
 	}
 	rec.Packet = p.ID
-	work = dreamWork{id: p.ID, split: batch, expand: bare, translate: owed, groups: groups, fresh: isBatch}
-	text, err := renderPacket(p.ID, batch, bare, owed, groups, isBatch)
+	work = dreamWork{id: p.ID, split: batch, expand: bare, translate: owed, groups: groups, fresh: isBatch,
+		scope: scoped, projects: projects}
+	text, err := renderPacket(p.ID, batch, bare, owed, scoped, projects, groups, isBatch)
 	if err != nil {
 		return rec, work, err
 	}
@@ -506,8 +560,10 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 	return rec, work, err
 }
 
-// renderPacket is the text the model reads: the instructions, the groups, and the facts to split, expand and translate.
-func renderPacket(id string, split, expand, translate []store.Fact, groups [][]store.Fact, fresh map[string]bool) (string, error) {
+// renderPacket is the text the model reads: the instructions, the groups, the facts to split, expand and translate,
+// and the global facts to check the scope of with the projects they may move to.
+func renderPacket(id string, split, expand, translate, scope []store.Fact, projects []string, groups [][]store.Fact,
+	fresh map[string]bool) (string, error) {
 	splitIn, err := renderSplitInput(split)
 	if err != nil {
 		return "", err
@@ -520,11 +576,16 @@ func renderPacket(id string, split, expand, translate []store.Fact, groups [][]s
 	if err != nil {
 		return "", err
 	}
+	scopeIn, err := renderScopeInput(scope, projects)
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
 	b.WriteString(extract.DreamInstructions(id))
 	b.WriteString("\n## Данные: разделение\n\n```json\n" + splitIn + "\n```\n")
 	b.WriteString("\n## Данные: поисковые запросы\n\n```json\n" + expandIn + "\n```\n")
 	b.WriteString("\n## Данные: перевод\n\n```json\n" + translateIn + "\n```\n")
+	b.WriteString("\n## Данные: область\n\n```json\n" + scopeIn + "\n```\n")
 	b.WriteString("\n## Данные: группы\n\n")
 	if len(groups) == 0 {
 		b.WriteString("Групп нет.\n")
@@ -605,6 +666,24 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 		translated[tr.ID] = true
 		plan.Translations = append(plan.Translations, dreamPlanTranslation{ID: tr.ID, Version: v, Translation: t})
 	}
+	plan.ScopeCursor = p.ScopeCursor
+	rescoped := map[string]bool{}
+	for _, r := range a.Scopes {
+		v, ok := p.Scope[r.ID]
+		sc := projectOf(store.Fact{Scope: strings.TrimSpace(r.Scope)})
+		switch {
+		case !ok:
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": not a fact of the packet to check the scope of")
+		case rescoped[r.ID]:
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": second answer about the fact")
+		case !slices.Contains(p.Projects, sc):
+			rec.Refused = append(rec.Refused, "scope "+r.ID+": "+strings.TrimSpace(r.Scope)+" is not a project of the base")
+		default:
+			rescoped[r.ID] = true
+			plan.Rescopes = append(plan.Rescopes, dreamPlanRescope{ID: r.ID, Version: v, Scope: sc,
+				Reason: strings.TrimSpace(r.Reason)})
+		}
+	}
 	groups := make([][]store.Fact, len(p.Groups))
 	for i, g := range p.Groups {
 		for _, id := range slices.Sorted(maps.Keys(g)) {
@@ -625,8 +704,8 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	applied.Grouped = groupRecords(p, a.Actions, applied.Actions)
 	if err == nil {
 		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d translated, %d retired or corrected, "+
-			"%d refused\n", len(applied.Splits), applied.Expanded, applied.Translated, len(applied.Actions),
-			len(applied.Refused))
+			"%d moved to a project, %d refused\n", len(applied.Splits), applied.Expanded, applied.Translated,
+			len(applied.Actions), len(applied.Rescoped), len(applied.Refused))
 	}
 	if err == nil {
 		err = os.Remove(filepath.Join(dir, packetFile))
@@ -845,12 +924,16 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 			}
 		}
 	}
+	if err := applyRescopes(s, plan.Rescopes, saw, &rec, out); err != nil {
+		return rec, err
+	}
 	for _, r := range rec.Refused {
 		if _, err := fmt.Fprintf(out, "refused %s\n", r); err != nil {
 			return rec, err
 		}
 	}
-	return rec, errors.Join(writeDreamSeen(dir, saw), writeMergeCursor(dir, plan.Merge), markDream(dir, plan.Start))
+	return rec, errors.Join(writeDreamSeen(dir, saw), writeMergeCursor(dir, plan.Merge),
+		writeScopeCursor(dir, plan.ScopeCursor), markDream(dir, plan.Start))
 }
 
 // onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,

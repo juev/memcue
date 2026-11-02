@@ -998,14 +998,15 @@ Who runs it:
   (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
   surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
-  once: the fresh facts with the groups, the facts to expand and the facts to translate each go in their own calls of
-  one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
+  once: the fresh facts with the groups, the facts to expand, the facts to translate and the global facts to check the
+  scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
   model writing its answer, so a pass of a base far behind does the work of four packets in about a third of the time
   of one; a pass with little work makes one or two calls. `dream.log` records the calls, the time of the packet, the
   calls and the apply, and the tokens of each pass (#471,
   [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)).
 
-A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand and 40 to translate. The fresh facts it leaves out are not counted
+A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand, 40 to translate and 30 global facts to check the
+scope of. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
 
 What the answer may do:
@@ -1025,6 +1026,14 @@ What the answer may do:
   first, so a base is translated over a few dozen dreams without a command of its own (#396). A fact another part of the packet may
   change — fresh, without queries, or in a group — waits for a later packet, and a fact changed since the packet is
   refused, since its translation would describe the old text.
+- **Move a global fact to its project** (#607): a fact stored `global` reaches a search from every repository and,
+  as a rule, every session card, so it must hold in every repository and on every host. The packet gives the global
+  facts a few dozen at a time, in the order of their ids after the cursor in `dream.scope`, with the projects of the
+  base: the `repo:` keys and `dir:` paths its active facts hold in. The model names the project of a fact that holds in
+  one; memcue refuses a project the base does not have, and a fact changed since the packet in more than its labels.
+  The fact keeps its creation time. Each global fact is checked once a machine; one stored global later has a larger id
+  and is checked by the next dream. A fact a split or a group of the packet may change stops the walk until a later
+  packet. The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
