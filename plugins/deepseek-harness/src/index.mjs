@@ -503,7 +503,7 @@ export function apply(ctx, config) {
 			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD (for a one-off reminder).' },
 			kind: { type: 'string', description: 'Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event (what happened that the next days need; expires after a week unless expires is given). A rule or decision the user stated goes on the session card.' },
 			source: { type: 'string', description: 'Optional who said it: user (the user\'s words; the default for rule and decision, and the only source that reaches the session card), user_confirmed, tool (seen in a tool\'s output) or agent (the default otherwise).' },
-			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project.' },
+			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo, because a global one the user stated is on every session card.' },
 			shelf: { type: 'string', description: 'Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with in shelf:<name>. For what was read from outside sources; omit scope when you pass it.' },
 		},
 		output: factResult,

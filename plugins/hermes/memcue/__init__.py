@@ -359,7 +359,7 @@ ADD_SCHEMA = _schema(
      "source": "Optional who said it: user (the user's words; the default for rule and decision, and the only "
                "source that reaches the session card), user_confirmed, tool (seen in a tool's output) or agent (the "
                "default otherwise).",
-     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule of every project.",
+     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo, because a global one the user stated is on every session card.",
      "shelf": "Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with "
               "in shelf:<name>. For what was read from outside sources; omit scope when you pass it."},
     ["content"])

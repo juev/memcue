@@ -14,7 +14,9 @@ when you learn it, not at the end of the session.
 - **Rules and corrections of the user**, with the reason when the user gave one: `-kind rule`, `-scope global` unless
   the user ties it to one repository (`-scope repo`).
 - **Decisions of the user** on goals, scope and approach that the code and the git history do not show:
-  `-kind decision -scope repo`.
+  `-kind decision -scope repo`. `-scope global` only for a decision that holds in every repository and on every host:
+  a global decision the user stated is on every session card, so one about a single project or task costs every
+  session its room.
 - **Pitfalls** found by an error or a check: what happens, why, and the workaround: `-kind pitfall -source tool`.
 - **Environment outside the repository**: hosts and what runs there, services, where logs and data live, ids and
   addresses of external systems: `-kind environment -source tool` with `-scope host:<name>` or `-scope service:<name>`.
