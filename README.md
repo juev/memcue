@@ -1036,7 +1036,9 @@ What the answer may do:
   one; memcue refuses a project the base does not have, and a fact changed since the packet in more than its labels.
   The fact keeps its creation time. Each global fact is checked once a machine; one stored global later has a larger id
   and is checked by the next dream. A fact corrected since the packet, by a group of the same packet among others, is
-  refused, and the cursor stops before it, so a later packet gives it again. The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
+  refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
+  of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
+  to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
