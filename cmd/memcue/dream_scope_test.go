@@ -443,3 +443,35 @@ func TestDreamRunAllDoesNotStallOnScopeChecks(t *testing.T) {
 		}
 	}
 }
+
+// A project is one some fact was learnt in: a scope only set on facts learnt elsewhere, such as a remote of the
+// Claude config directory, which is the global tier, is seen by no session and is not offered (#607).
+func TestDreamOffersOnlyProjectsFactsWereLearntIn(t *testing.T) {
+	env(t)
+	_, one, _ := scopeBase(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddWith("Хук конфига срабатывает на Stop.", []string{"k"}, "_global 2026-10-19", "",
+		store.Meta{Kind: "rule", Scope: "repo:example.com/me/config"}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	var sent string
+	scopeFn = func(in string) ([]extract.Rescope, error) {
+		sent = in
+		return []extract.Rescope{{ID: one.ID, Scope: "repo:example.com/me/config", Reason: "config"}}, nil
+	}
+	t.Cleanup(func() { scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil } })
+	var out bytes.Buffer
+	if err := dreamModel([]string{"-since", "2099-01-01"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sent, `"projects":["repo:example.com/me/shop"]`) {
+		t.Errorf("projects offered %q", sent)
+	}
+	if f := storedFact(t, one.ID); f.Scope != "global" {
+		t.Errorf("moved to a scope no session sees: %+v\n%s", f, out.String())
+	}
+}

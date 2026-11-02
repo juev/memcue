@@ -285,15 +285,19 @@ func reopenDuplicate(s *store.Store, aliases *projectAliases, id, project string
 	return err == nil, err
 }
 
-// knownProjects are the projects a dream may move a global fact to (#607): the scopes projectOf gives the active
-// facts, a key of a remote or a dir: path, sorted. A name memcue gave a clone before #343 is left out: migrate -repos
-// moves its facts onto the key.
+// knownProjects are the projects a dream may move a global fact to (#607): the projects some active fact was learnt
+// in, by the key its origin names, a remote or a dir: path, sorted. A scope no session ran in is left out: a scope
+// set by hand to the key of a repository whose checkout memcue names otherwise (the Claude config directory is the
+// global tier, whatever its remotes) is seen by no session, and a fact moved there would be lost to every one. A name
+// memcue gave a clone before #343 is left out too: migrate -repos moves its facts onto the key.
 func knownProjects(active []store.Fact) []string {
 	seen := map[string]bool{}
 	for _, f := range active {
-		if p := projectOf(f); p != "" && isKey(strings.TrimPrefix(p, "repo:")) {
-			seen[p] = true
+		k := originKey(f.Origin)
+		if k == "" || k == tier.Global || !isKey(k) {
+			continue
 		}
+		seen[projectScope(k)] = true
 	}
 	return slices.Sorted(maps.Keys(seen))
 }

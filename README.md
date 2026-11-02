@@ -1030,7 +1030,9 @@ What the answer may do:
 - **Move a global fact to its project** (#607): a fact stored `global` reaches a search from every repository and,
   as a rule, every session card, so it must hold in every repository and on every host. The packet gives the global
   facts a few dozen at a time, in the order of their ids after the cursor in `dream.scope`, with the projects of the
-  base: the `repo:` keys and `dir:` paths its active facts hold in. The model names the project of a fact that holds in
+  base: the `repo:` keys and `dir:` paths its active facts were learnt in, by their origin. A scope no session ran in
+  is not offered: the Claude config directory is the global tier whatever its remotes, so a fact moved to the scope of
+  its remote would be seen by no session. The model names the project of a fact that holds in
   one; memcue refuses a project the base does not have, and a fact changed since the packet in more than its labels.
   The fact keeps its creation time. Each global fact is checked once a machine; one stored global later has a larger id
   and is checked by the next dream. A fact corrected since the packet, by a group of the same packet among others, is
