@@ -1043,6 +1043,12 @@ clone before #343 when no other clone on the machine had it. memcue learns them 
 dream made the fact that stayed global (#346); none of the nine facts it promoted in the author's base held
 everywhere.
 
+The first dream of a machine after #607 takes those promotions back, once: every fact `dream.log` of the machine lists
+under `promoted` goes back to the project scope it had before it became global, keeping its creation time, and the
+duplicate retired for it comes back when it was learnt in another project. A fact that is no longer global, or had no
+project scope before, stays as it is. What was taken back is a line of `dream.log` with `unpromoted` and `reopened`;
+`dream.unpromoted` in the state directory marks the machine as done.
+
 The checks:
 
 - An answer to another packet is refused whole: a second `-prepare` replaced the packet it was for.

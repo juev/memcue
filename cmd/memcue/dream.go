@@ -82,6 +82,10 @@ type dreamRecord struct {
 	Splits  []extract.Split  `json:"splits,omitempty"` // compound facts replaced by their parts
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
+	// Unpromoted are the facts the promotion of #346 made global that went back to their project, as "ID SCOPE", and
+	// Reopened the duplicates retired for them that were learnt in another project (#607).
+	Unpromoted []string `json:"unpromoted,omitempty"`
+	Reopened   []string `json:"reopened,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
 	// Translated counts the facts that got their translation (#396).
@@ -358,6 +362,11 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 		return rec, work, err
 	}
 	defer func() { _ = s.Close() }()
+	if !list {
+		if err := unpromote(dir, s); err != nil {
+			return rec, work, err
+		}
+	}
 	active, err := s.Active()
 	if err != nil {
 		return rec, work, err

@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/store"
@@ -140,4 +146,139 @@ func (p *projectAliases) crossing(s *store.Store, a extract.Action) (string, err
 		return "", nil
 	}
 	return fmt.Sprintf("a duplicate learnt in %s, %s in %s: each project keeps its copy", from, a.By, to), nil
+}
+
+// unpromotedFile marks a machine whose dream log was walked for the facts the old promotion made global (#607).
+const unpromotedFile = "dream.unpromoted"
+
+// unpromote takes back what the promotion of #346 did, once a machine: every fact a dream of this machine made global
+// goes back to the project it held in, keeping its creation time, and the duplicate retired for it comes back when it
+// was learnt in another project, since a fact of two repositories is two facts (#607). dream.log of the machine is
+// the record of what was promoted, and gets a line of what was taken back. A fact no longer global, or one that had no
+// project scope before it became global, is left as it is.
+func unpromote(dir string, s *store.Store) error {
+	if _, err := os.Stat(filepath.Join(dir, unpromotedFile)); err == nil {
+		return nil
+	}
+	log := filepath.Join(dir, "dream.log")
+	pairs, err := promotions(log)
+	if err != nil {
+		return err
+	}
+	aliases := &projectAliases{}
+	rec := dreamRecord{Time: time.Now().UTC().Format(time.RFC3339)}
+	for _, pr := range pairs {
+		back, err := demote(s, aliases, pr.by)
+		if err != nil {
+			return err
+		}
+		if back != "" {
+			rec.Unpromoted = append(rec.Unpromoted, pr.by+" "+back)
+		}
+		by, err := s.Get(pr.by)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return err
+		}
+		ok, err := reopenDuplicate(s, aliases, pr.gone, projectOf(by))
+		if err != nil {
+			return err
+		}
+		if ok {
+			rec.Reopened = append(rec.Reopened, pr.gone)
+		}
+	}
+	if len(rec.Unpromoted)+len(rec.Reopened) > 0 {
+		if err := appendJSON(log, rec); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(filepath.Join(dir, unpromotedFile), []byte(rec.Time+"\n"), 0o600)
+}
+
+type promotion struct{ gone, by string }
+
+// promotions reads the duplicate retirements of dream.log whose survivor a dream made global, in the log's order.
+func promotions(path string) ([]promotion, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []promotion
+	for line := range strings.Lines(string(b)) {
+		var r struct {
+			Actions  []extract.Action `json:"actions"`
+			Promoted []string         `json:"promoted"`
+		}
+		if json.Unmarshal([]byte(line), &r) != nil || len(r.Promoted) == 0 {
+			continue
+		}
+		for _, a := range r.Actions {
+			if a.Op == "retire" && a.Kind == "duplicate" && slices.Contains(r.Promoted, a.By) {
+				out = append(out, promotion{gone: a.ID, by: a.By})
+			}
+		}
+	}
+	return out, nil
+}
+
+// demote moves a fact made global back to the project scope it had right before, and returns that scope, or "" when
+// it leaves the fact alone: retired, not global now, or global with no project scope before. When the scope before was
+// a name memcue gave a clone before #343 and an earlier version had a key of the same repository, the key is the one
+// restored.
+func demote(s *store.Store, aliases *projectAliases, id string) (string, error) {
+	cur, err := s.Get(id)
+	if errors.Is(err, store.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil || cur.Status != store.Active || !strings.EqualFold(cur.Scope, "global") {
+		return "", err
+	}
+	hist, err := s.History(id)
+	if err != nil {
+		return "", err
+	}
+	i := len(hist) - 1
+	for i > 0 && strings.EqualFold(hist[i-1].Scope, "global") {
+		i--
+	}
+	if i == 0 {
+		return "", nil
+	}
+	back := hist[i-1].Scope
+	p := projectOf(store.Fact{Scope: back})
+	if p == "" {
+		return "", nil
+	}
+	if !isKey(strings.TrimPrefix(p, "repo:")) {
+		for j := i - 2; j >= 0; j-- {
+			k := projectOf(store.Fact{Scope: hist[j].Scope})
+			if k != "" && isKey(strings.TrimPrefix(k, "repo:")) && aliases.same(p, k) {
+				back = hist[j].Scope
+				break
+			}
+		}
+	}
+	_, err = s.Relabel(cur.ID, cur.Version, cur.Kind, back, cur.Expires)
+	return back, err
+}
+
+// reopenDuplicate brings back a duplicate the promotion retired when it is still retired and was learnt in another
+// project than project, where the fact it was retired for holds now.
+func reopenDuplicate(s *store.Store, aliases *projectAliases, id, project string) (bool, error) {
+	cur, err := s.Get(id)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil || cur.Status != store.Retired {
+		return false, err
+	}
+	from := projectOf(cur)
+	if from == "" || project == "" || aliases.same(from, project) {
+		return false, nil
+	}
+	_, err = s.Restore(id)
+	return err == nil, err
 }
