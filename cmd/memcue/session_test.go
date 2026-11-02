@@ -843,7 +843,7 @@ func TestRenderCardNamesGlobalDecisions(t *testing.T) {
 	facts := []store.Fact{
 		{ID: "u1", Content: "Commit messages are in English.", Created: day,
 			Meta: store.Meta{Kind: "rule", Scope: "global", Source: "user"}},
-		{ID: "u2", Content: "SFTPGo is updated by hand once a month.", Created: day,
+		{ID: "u2", Content: "Service X is updated by hand once a month.", Created: day,
 			Meta: store.Meta{Kind: "decision", Scope: "global", Source: "user"}},
 	}
 	card, ids, _, _, err := renderCard(facts, cardBudget)

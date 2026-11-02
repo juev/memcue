@@ -1132,9 +1132,9 @@ func TestCardFactsCarryStatedGlobalDecisions(t *testing.T) {
 		}
 		return f
 	}
-	stated := add("SFTPGo is updated by hand once a month, outside the nightly updater.", "user")
-	confirmed := add("The fact base lives in its own private repository.", "user_confirmed")
-	agents := add("The updater probably skips pinned images.", "agent")
+	stated := add("Service X is updated by hand once a month, outside the nightly job.", "user")
+	confirmed := add("Releases of project Y wait for the parallel task.", "user_confirmed")
+	agents := add("The nightly job probably skips pinned versions.", "agent")
 	for _, scopes := range [][]string{nil, {"repo:shop"}} {
 		got, _, err := s.CardFacts(scopes, "2026-10-20")
 		if err != nil {
