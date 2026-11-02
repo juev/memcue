@@ -1033,11 +1033,15 @@ What the answer may do:
   the old text. With `queries` in the action the new ones are written at once; without them the next packet asks for
   them.
 
-A duplicate learnt in another project than the fact that stays makes that fact global (#346): a fact learnt twice,
-independently, in two projects holds in both, so it should not count as one project's fact in recall. memcue decides
-this from the two facts' scopes and origins, not the model. `-apply` prints `global <id>` and lists the fact under
-`promoted` in `dream.log`. In the author's dream log, 15 of the 21 duplicates retired before this change crossed
-projects.
+A duplicate learnt in another project than the fact that stays is kept (#607): a fact that holds in two repositories
+is two facts, one in each, and no fact becomes global because two projects learnt it. memcue decides this from the
+two facts' scopes and origins, not the model, and refuses the retirement along with a correction of the fact that
+stays in the same group, which would merge the other project's copy into it. Two keys of one repository are one
+project: the remotes of one clone, the `dir:` path of a checkout that has a remote now, and the name memcue gave a
+clone before #343 when no other clone on the machine had it. memcue learns them from the clones of the machine, as
+`migrate -repos` does; a name it cannot place counts as a project of its own, so both copies stay. Before #607 the
+dream made the fact that stayed global (#346); none of the nine facts it promoted in the author's base held
+everywhere.
 
 The checks:
 

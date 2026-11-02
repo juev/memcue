@@ -18,7 +18,6 @@ import (
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
-	"github.com/juev/memcue/internal/tier"
 )
 
 // A dream is a pass over the facts written since the last one: each new fact is grouped with the stored facts close
@@ -83,8 +82,6 @@ type dreamRecord struct {
 	Splits  []extract.Split  `json:"splits,omitempty"` // compound facts replaced by their parts
 	Actions []extract.Action `json:"actions,omitempty"`
 	Refused []string         `json:"refused,omitempty"` // actions dropped by the checks, with why
-	// Promoted are the facts that became global: a duplicate of them was learnt in another project (#346).
-	Promoted []string `json:"promoted,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
 	// Translated counts the facts that got their translation (#396).
@@ -618,9 +615,9 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	applied.Groups = len(p.Groups) // the groups the model reviewed, not only those it acted on
 	applied.Grouped = groupRecords(p, a.Actions, applied.Actions)
 	if err == nil {
-		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d translated, %d retired or corrected, %d promoted, "+
+		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d translated, %d retired or corrected, "+
 			"%d refused\n", len(applied.Splits), applied.Expanded, applied.Translated, len(applied.Actions),
-			len(applied.Promoted), len(applied.Refused))
+			len(applied.Refused))
 	}
 	if err == nil {
 		err = os.Remove(filepath.Join(dir, packetFile))
@@ -698,6 +695,7 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 	}
 	defer func() { _ = s.Close() }()
 	saw := maps.Clone(plan.Seen)
+	aliases := &projectAliases{}
 	// Splits go first, so a group the model saw with the compound fact in it is refused below as changed. The parts
 	// are not marked seen: the next dream groups them with their neighbours, which this plan never did.
 	for _, sp := range plan.Splits {
@@ -801,9 +799,27 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 				break
 			}
 		}
+		// A duplicate learnt in another project stays, and so does the fact it was retired for, as it was: a
+		// correction of that fact in the same group would merge the other project's copy into it (#607).
+		crossing := map[string]string{}
+		if changed == "" {
+			for _, a := range g.Actions {
+				why, err := aliases.crossing(s, a)
+				if err != nil {
+					return rec, err
+				}
+				if why != "" {
+					crossing[a.ID], crossing[a.By] = why, why
+				}
+			}
+		}
 		for _, a := range g.Actions {
 			if changed != "" {
 				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": group changed since the packet ("+changed+")")
+				continue
+			}
+			if why, ok := crossing[a.ID]; ok && (a.Op == "correct" || a.Op == "retire" && a.Kind == "duplicate") {
+				rec.Refused = append(rec.Refused, a.Op+" "+a.ID+": "+why)
 				continue
 			}
 			f, err := apply(s, a)
@@ -816,9 +832,6 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 			}
 			rec.Actions = append(rec.Actions, a)
 			if _, err := fmt.Fprintf(out, "%s %s: %s\n", a.Op, a.ID, a.Reason); err != nil {
-				return rec, err
-			}
-			if err := promote(s, a, saw, &rec, out); err != nil {
 				return rec, err
 			}
 		}
@@ -1097,7 +1110,11 @@ func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {
 			if fresh[f.ID] {
 				mark = ", новый"
 			}
-			fmt.Fprintf(&b, "- id %s (origin: %s; записан %s%s; ключи: %s)\n  %s\n", f.ID, f.Origin,
+			where := ""
+			if f.Scope != "" {
+				where = "; scope: " + f.Scope
+			}
+			fmt.Fprintf(&b, "- id %s (origin: %s%s; записан %s%s; ключи: %s)\n  %s\n", f.ID, f.Origin, where,
 				f.Created.Format(time.DateOnly), mark, strings.Join(f.Keywords, ", "),
 				strings.Join(strings.Fields(f.Content), " "))
 		}
@@ -1156,53 +1173,6 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 		}
 	}
 	return ok, refused
-}
-
-// promote makes the fact a duplicate was retired for global when the two were learnt in different projects: a fact
-// learnt twice, independently, in two projects holds in both, so it is no project's fact (#346). The code decides
-// this, not the model, which only said that one fact covers the other. The
-// survivor is read now, not as the group showed it: an earlier action of the batch may have corrected it.
-func promote(s *store.Store, a extract.Action, saw map[string]int, rec *dreamRecord, out io.Writer) error {
-	if a.Op != "retire" || a.Kind != "duplicate" || a.By == "" {
-		return nil
-	}
-	gone, err := s.Get(a.ID)
-	if err != nil {
-		return err
-	}
-	by, err := s.Get(a.By)
-	if err != nil {
-		return err
-	}
-	from, to := projectOf(gone), projectOf(by)
-	if from == "" || to == "" || from == to || by.Status != store.Active {
-		return nil
-	}
-	f, err := s.Relabel(by.ID, by.Version, by.Kind, "global", by.Expires)
-	if err != nil {
-		return err
-	}
-	saw[f.ID] = f.Version
-	rec.Promoted = append(rec.Promoted, by.ID)
-	_, err = fmt.Fprintf(out, "global %s: a duplicate was learnt in %s, it in %s\n", by.ID, from, to)
-	return err
-}
-
-// projectOf is the project a fact holds in: its repo: or dir: scope, or, with no scope, the project its origin names.
-// A global fact, one of a host or a service, and one learnt nowhere in particular (the Claude config directory, an
-// empty origin) have none.
-func projectOf(f store.Fact) string {
-	sc := strings.ToLower(f.Scope)
-	switch {
-	case strings.HasPrefix(sc, "repo:") || strings.HasPrefix(sc, "dir:"):
-		return sc
-	case sc != "":
-		return ""
-	}
-	if k := originKey(f.Origin); k != "" && k != tier.Global {
-		return tier.Scope(k)
-	}
-	return ""
 }
 
 // apply makes one checked action and returns the version it wrote. A correction drops the queries of the old text;

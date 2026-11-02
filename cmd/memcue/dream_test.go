@@ -71,7 +71,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	if len(*calls) != 1 {
 		t.Fatalf("calls %d", len(*calls))
 	}
-	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 0 translated, 1 retired or corrected, 0 promoted, 0 refused") {
+	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 0 translated, 1 retired or corrected, 0 refused") {
 		t.Errorf("summary missing: %q", out.String())
 	}
 	sent := (*calls)[0]
@@ -622,8 +622,9 @@ func TestDreamApplyPlanWithProvisionalNeighbour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Learnt in the provisional fact's project: a duplicate of another project stays (#607).
 	approved, err := s.AddWith("Postgres демо-базы слушает порт 5432 на db1.", []string{"postgres", "порт"},
-		"x 2026-10-19", "", store.Meta{})
+		"hermes 2026-10-19", "", store.Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
