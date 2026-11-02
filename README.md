@@ -1033,8 +1033,8 @@ What the answer may do:
   base: the `repo:` keys and `dir:` paths its active facts hold in. The model names the project of a fact that holds in
   one; memcue refuses a project the base does not have, and a fact changed since the packet in more than its labels.
   The fact keeps its creation time. Each global fact is checked once a machine; one stored global later has a larger id
-  and is checked by the next dream. A fact a split or a group of the packet may change stops the walk until a later
-  packet. The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
+  and is checked by the next dream. A fact corrected since the packet, by a group of the same packet among others, is
+  refused, and the cursor stops before it, so a later packet gives it again. The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -325,10 +326,10 @@ func TestDreamMovesAGlobalFactOfOneProject(t *testing.T) {
 	}
 }
 
-// A fact corrected between the packet and the answer is refused: the model judged the old text. A version that only
-// gave it search queries is not a change.
+// A fact corrected between the packet and the answer is refused: the model judged the old text, and the cursor stops
+// before it, so the next packet gives it again. A version that only gave it search queries is not a change.
 func TestDreamRefusesTheScopeOfAChangedFact(t *testing.T) {
-	env(t)
+	dir := env(t)
 	_, one, everywhere := scopeBase(t)
 	scopeFn = func(string) ([]extract.Rescope, error) {
 		return []extract.Rescope{
@@ -360,6 +361,9 @@ func TestDreamRefusesTheScopeOfAChangedFact(t *testing.T) {
 	}
 	if f, _ := s.Get(everywhere.ID); f.Scope != "global" || !strings.Contains(out.String(), "refused scope "+everywhere.ID+": changed since the packet") {
 		t.Errorf("a corrected fact %+v\n%s", f, out.String())
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "state", "memcue", "dream.scope")); strings.TrimSpace(string(b)) != one.ID {
+		t.Errorf("cursor %q, want it before the corrected fact, at %s", b, one.ID)
 	}
 }
 
@@ -396,5 +400,46 @@ func TestDreamRunAllChecksEveryGlobalFact(t *testing.T) {
 	}
 	if f := storedFact(t, everywhere.ID); f.Scope != "global" {
 		t.Errorf("fact that holds everywhere %+v", f)
+	}
+}
+
+// A pass that only checks the scope of global facts, and moves none, is not a stall: dream -run -all goes on until
+// every global fact was given (#607).
+func TestDreamRunAllDoesNotStallOnScopeChecks(t *testing.T) {
+	env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for i := range 5 {
+		f, err := s.AddWith(fmt.Sprintf("Общее правило номер %d для любой работы.", i), []string{"k"}, "", "",
+			store.Meta{Kind: "rule", Scope: "global"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, f.ID)
+		time.Sleep(3 * time.Millisecond)
+	}
+	_ = s.Close()
+	old := packetScope
+	packetScope = 1
+	t.Cleanup(func() { packetScope = old })
+	fakeExpand(t, nil)
+	fakeDream(t, func(string) []extract.Action { return nil })
+	translateAll(t)
+	var given []string
+	scopeFn = func(in string) ([]extract.Rescope, error) { given = append(given, in); return nil, nil }
+	t.Cleanup(func() { scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil } })
+	fakeDreamRun(t, nil)
+	var out bytes.Buffer
+	if err := runDream([]string{"-run", "-all", "-j", "1"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(given, " ")
+	for _, id := range ids {
+		if !strings.Contains(all, id) {
+			t.Errorf("%s never given to check\n%s", id, out.String())
+		}
 	}
 }

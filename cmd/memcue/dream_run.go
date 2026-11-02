@@ -95,7 +95,8 @@ func runDreamOnce(out io.Writer, all, background bool, packets int) error {
 		if err != nil {
 			return err
 		}
-		if rec.Translated+rec.Expanded+len(rec.Splits)+len(rec.Actions) == 0 {
+		// A pass that checked the scope of global facts moved its cursor, even when it moved no fact (#607).
+		if rec.Translated+rec.Expanded+len(rec.Splits)+len(rec.Actions)+rec.ScopeChecked == 0 {
 			stalls++
 		} else {
 			stalls = 0

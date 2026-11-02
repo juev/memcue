@@ -320,8 +320,9 @@ func renderScopeInput(facts []store.Fact, projects []string) (string, error) {
 
 // applyRescopes moves the global facts of a checked answer to their project, keeping the creation time. A fact retired
 // since the packet, changed in more than its labels, or no longer global is refused: the model judged another text or
-// another scope.
-func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]int, rec *dreamRecord, out io.Writer) error {
+// another scope. It returns the smallest id of a fact refused as changed, which the next packet should give again.
+func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]int, rec *dreamRecord,
+	out io.Writer) (changedFirst string, err error) {
 	for _, r := range rescopes {
 		cur, err := s.Get(r.ID)
 		if errors.Is(err, store.ErrNotFound) {
@@ -329,12 +330,12 @@ func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]i
 			continue
 		}
 		if err != nil {
-			return err
+			return "", err
 		}
 		same := cur.Version == r.Version
 		if !same && cur.Status == store.Active {
 			if same, err = onlyLabelsSince(s, r.ID, r.Version); err != nil {
-				return err
+				return "", err
 			}
 		}
 		switch {
@@ -343,6 +344,9 @@ func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]i
 			continue
 		case !same:
 			rec.Refused = append(rec.Refused, "scope "+r.ID+": changed since the packet")
+			if changedFirst == "" || r.ID < changedFirst {
+				changedFirst = r.ID
+			}
 			continue
 		case !strings.EqualFold(cur.Scope, "global"):
 			rec.Refused = append(rec.Refused, "scope "+r.ID+": no longer global, "+cur.Scope)
@@ -350,17 +354,17 @@ func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]i
 		}
 		f, err := s.Relabel(cur.ID, cur.Version, cur.Kind, r.Scope, cur.Expires)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if saw[f.ID] == cur.Version {
 			saw[f.ID] = f.Version
 		}
 		rec.Rescoped = append(rec.Rescoped, f.ID+" "+r.Scope)
 		if _, err := fmt.Fprintf(out, "project %s %s: %s\n", f.ID, r.Scope, r.Reason); err != nil {
-			return err
+			return "", err
 		}
 	}
-	return nil
+	return changedFirst, nil
 }
 
 // readScopeCursor reads the id of the last global fact a dream gave to check the scope of; no file is the start.

@@ -89,8 +89,10 @@ type dreamRecord struct {
 	// Reopened the duplicates retired for them that were learnt in another project (#607).
 	Unpromoted []string `json:"unpromoted,omitempty"`
 	Reopened   []string `json:"reopened,omitempty"`
-	// Rescoped are the global facts the dream moved to the one project they hold in, as "ID SCOPE" (#607).
-	Rescoped []string `json:"rescoped,omitempty"`
+	// Rescoped are the global facts the dream moved to the one project they hold in, as "ID SCOPE", of ScopeChecked
+	// global facts the packet gave (#607).
+	Rescoped     []string `json:"rescoped,omitempty"`
+	ScopeChecked int      `json:"scope_checked,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
 	// Translated counts the facts that got their translation (#396).
@@ -134,8 +136,11 @@ type dreamPlan struct {
 	Merge        string                 `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
 	// Rescopes are the global facts to move to one project, with the version the model read (#607).
 	Rescopes []dreamPlanRescope `json:"rescopes,omitempty"`
-	// ScopeCursor is the last global fact the packet gave to check, kept once the plan is carried out.
-	ScopeCursor string `json:"scope_cursor,omitempty"`
+	// ScopeCursor is the last global fact the packet gave to check, kept once the plan is carried out; ScopeFrom the
+	// cursor the packet started from and ScopeGiven the facts it gave, for a cursor that has to go back.
+	ScopeCursor string   `json:"scope_cursor,omitempty"`
+	ScopeFrom   string   `json:"scope_from,omitempty"`
+	ScopeGiven  []string `json:"scope_given,omitempty"`
 }
 
 type dreamPlanRescope struct {
@@ -347,6 +352,7 @@ type dreamPacket struct {
 	// projects the active facts of the base hold in (#607).
 	Scope       map[string]int   `json:"scope,omitempty"`
 	Projects    []string         `json:"projects,omitempty"`
+	ScopeFrom   string           `json:"scope_from,omitempty"`   // the scope cursor the packet started from
 	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
 	Groups      []map[string]int `json:"groups"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
@@ -496,39 +502,30 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 		}
 	}
 	// Global facts get their scope checked a packet at a time, in the order of their ids, after a cursor (#607); a fact
-	// stored global later has a larger id and is checked by a later packet. A fact a split or a group action may
-	// change stops the walk until a packet without it: the cursor never passes a fact it did not give.
-	scopeCursor, err := readScopeCursor(dir)
+	// stored global later has a larger id and is checked by a later packet. A fact a group of the packet corrects is
+	// refused at apply, and the cursor goes back to before it, so a later packet gives it again.
+	scopeFrom, err := readScopeCursor(dir)
 	if err != nil {
 		return rec, work, err
-	}
-	inGroup := map[string]bool{}
-	for _, g := range groups {
-		for _, f := range g {
-			inGroup[f.ID] = true
-		}
 	}
 	var scoped []store.Fact
 	for _, f := range active {
 		if len(scoped) == packets*packetScope {
 			break
 		}
-		if f.ID <= scopeCursor || !strings.EqualFold(f.Scope, "global") {
-			continue
+		if f.ID > scopeFrom && strings.EqualFold(f.Scope, "global") {
+			scoped = append(scoped, f)
 		}
-		if isBatch[f.ID] || inGroup[f.ID] {
-			break
-		}
-		scoped = append(scoped, f)
 	}
 	var projects []string
+	scopeCursor := scopeFrom
 	if len(scoped) > 0 {
 		projects = knownProjects(active)
 		scopeCursor = scoped[len(scoped)-1].ID
 	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
 		Split: versions(batch), Expand: versions(bare), Translate: versions(owed), Deferred: deferred, Merge: cursor,
-		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeCursor: scopeCursor}
+		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor}
 	for _, f := range fresh {
 		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
@@ -666,7 +663,8 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 		translated[tr.ID] = true
 		plan.Translations = append(plan.Translations, dreamPlanTranslation{ID: tr.ID, Version: v, Translation: t})
 	}
-	plan.ScopeCursor = p.ScopeCursor
+	plan.ScopeCursor, plan.ScopeFrom, plan.ScopeGiven = p.ScopeCursor, p.ScopeFrom, slices.Sorted(maps.Keys(p.Scope))
+	rec.ScopeChecked = len(p.Scope)
 	rescoped := map[string]bool{}
 	for _, r := range a.Scopes {
 		v, ok := p.Scope[r.ID]
@@ -924,8 +922,19 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 			}
 		}
 	}
-	if err := applyRescopes(s, plan.Rescopes, saw, &rec, out); err != nil {
+	changedFirst, err := applyRescopes(s, plan.Rescopes, saw, &rec, out)
+	if err != nil {
 		return rec, err
+	}
+	scopeCursor := plan.ScopeCursor
+	if changedFirst != "" {
+		// The cursor stops before the first fact changed since the packet: the next packet gives it again.
+		scopeCursor = plan.ScopeFrom
+		for _, id := range plan.ScopeGiven {
+			if id < changedFirst {
+				scopeCursor = id
+			}
+		}
 	}
 	for _, r := range rec.Refused {
 		if _, err := fmt.Fprintf(out, "refused %s\n", r); err != nil {
@@ -933,7 +942,7 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 		}
 	}
 	return rec, errors.Join(writeDreamSeen(dir, saw), writeMergeCursor(dir, plan.Merge),
-		writeScopeCursor(dir, plan.ScopeCursor), markDream(dir, plan.Start))
+		writeScopeCursor(dir, scopeCursor), markDream(dir, plan.Start))
 }
 
 // onlyLabelsSince reports whether every version of the fact after seen changed nothing but its search queries, kind,
