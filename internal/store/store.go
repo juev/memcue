@@ -724,7 +724,7 @@ func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *
 		s.now().UTC(), Active, s.author
 	if content != cur.Content {
 		f.Queries = nil // they were written for the old text; the caller asks for new ones, the dream as a fallback
-		f.Channel = "" // the dream judged the old text and reads the new one (#625)
+		f.Channel = ""  // the dream judged the old text and reads the new one (#625)
 	}
 	if expires != nil {
 		if err := ValidExpiry(*expires); err != nil {

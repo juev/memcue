@@ -67,7 +67,10 @@ func TestTextHistoryFollowsEveryWrite(t *testing.T) {
 		func() error { _, err := s.Retag(f.ID, 4, "y 2026-10-20", "repo:y"); return err },
 		func() error { _, err := s.Retire(f.ID); return err },
 		func() error { _, err := s.Restore(f.ID); return err },
-		func() error { _, err := s.SplitFact(g.ID, 1, []string{"Порт db2 — 6543", "Бэкап db2 в 3:00"}); return err },
+		func() error {
+			_, err := s.SplitFact(g.ID, 1, []string{"Порт db2 — 6543", "Бэкап db2 в 3:00"})
+			return err
+		},
 	}
 	for i, step := range steps {
 		if err := step(); err != nil {

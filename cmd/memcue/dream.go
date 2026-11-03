@@ -360,13 +360,13 @@ type dreamPacket struct {
 	Split  map[string]int `json:"split"`
 	Expand map[string]int `json:"expand"`
 	// Translate are the facts owed a translation (#396), which no other part of the packet changes.
-	Translate map[string]int   `json:"translate,omitempty"`
+	Translate map[string]int `json:"translate,omitempty"`
 	// Scope are the global facts to check the scope of, and Projects the scopes the model may move them to: the
 	// projects the active facts of the base hold in (#607).
-	Scope       map[string]int   `json:"scope,omitempty"`
-	Projects    []string         `json:"projects,omitempty"`
-	ScopeFrom   string           `json:"scope_from,omitempty"`   // the scope cursor the packet started from
-	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
+	Scope       map[string]int `json:"scope,omitempty"`
+	Projects    []string       `json:"projects,omitempty"`
+	ScopeFrom   string         `json:"scope_from,omitempty"`   // the scope cursor the packet started from
+	ScopeCursor string         `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
 	// Channel are the global rules and decisions to label by channel (#625).
 	Channel map[string]int   `json:"channel,omitempty"`
 	Groups  []map[string]int `json:"groups"`
