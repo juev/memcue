@@ -39,7 +39,10 @@ def answers(data, pid):
                         for c in e["message"]["content"] if c.get("type") == "tool_use")
             meta = json.load(open(path.replace(".jsonl", ".meta.json")))
             r = res[-1] if res else {}
-            out[(arm, rep)] = {"text": (r.get("result") or "")[:4000], "turns": r.get("num_turns"),
+            card = set()
+            for line in meta.get("card", []):
+                card.update(json.loads(line).get("facts") or [])
+            out[(arm, rep)] = {"card": len(card), "text": (r.get("result") or "")[:4000], "turns": r.get("num_turns"),
                                "cost": r.get("total_cost_usd"), "tools": tools, "seconds": meta["seconds"],
                                # the agent's own searches; the memory-recall hook's are -json -kind pitfall,environment
                                "searches": sum(1 for s in meta.get("search", [])
@@ -98,9 +101,8 @@ def cmd_report(data):
     ps = json.load(open(os.path.join(data, "prompts.json")))
     g1 = json.load(open(os.path.join(data, "grades-1.json")))
     g2 = json.load(open(os.path.join(data, "grades-2.json")))
-    cards = json.load(open(os.path.join(data, "cards.json")))
     rows = {a: {"score": [], "wrong": 0, "asks": 0, "past": 0, "turns": [], "tools": [], "cost": [], "sec": [],
-                "searches": [], "errors": 0} for a in ARMS}
+                "searches": [], "errors": 0, "card": []} for a in ARMS}
     per, same, flips, pairs = {}, 0, 0, 0
     for p in ps:
         pid = p["id"]
@@ -123,17 +125,16 @@ def cmd_report(data):
             r["sec"].append(a["seconds"])
             r["searches"].append(a["searches"])
             r["errors"] += a["error"]
+            r["card"].append(a["card"])
             per.setdefault(pid, {}).setdefault(arm, []).append(score)
     print(f"grader vs itself: same score {same}/{pairs}, 0<->2 flips {flips}\n")
     print("arm      runs score  2s  0s wrong asks past turns tools  cost$  sec searched searches/run errors card")
     for arm, r in rows.items():
         s = r["score"]
-        chars = st.mean(c[arm]["chars"] for c in cards.values())
-        facts = st.mean(len(c[arm]["ids"]) for c in cards.values())
         print(f"{arm:8s} {len(s):4d} {st.mean(s):.2f} {s.count(2):3d} {s.count(0):3d} {r['wrong']:5d} {r['asks']:4d}"
               f" {r['past']:4d} {st.mean(r['turns']):5.1f} {st.mean(r['tools']):5.1f} {sum(r['cost']):6.2f}"
               f" {st.median(r['sec']):4.0f} {sum(x > 0 for x in r['searches']):8d} {st.mean(r['searches']):12.1f}"
-              f" {r['errors']:6d} {facts:.0f} facts, {chars:.0f} chars")
+              f" {r['errors']:6d} {st.mean(r['card']):.0f} facts, runs without a card {r['card'].count(0)}")
     diffs, lost, won = [], [], []
     for pid, d in sorted(per.items()):
         if "current" in d and "trim" in d:

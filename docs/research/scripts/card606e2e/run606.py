@@ -49,8 +49,13 @@ def install_bin(data):
         shutil.copytree(os.path.join(H, "shim"), SHIM)
     if not os.path.isdir(SHIM_SEARCH):
         shutil.copytree(os.path.join(H, "search"), SHIM_SEARCH)
+    # Once, and through a rename: a binary copied over itself while other runs execute it is killed by macOS
+    # (Killed: 9), and the first full run lost its memory in 22 of 160 sessions that way.
     for src, name in ((os.path.join(data, "memcue-606"), "memcue-bin"), (os.path.join(data, "keep.txt"), "keep")):
-        shutil.copy2(src, os.path.join(BIN, name))
+        dst = os.path.join(BIN, name)
+        if not os.path.exists(dst):
+            shutil.copy2(src, dst + ".tmp")
+            os.replace(dst + ".tmp", dst)
 ARMS = ("current", "trim")
 
 
