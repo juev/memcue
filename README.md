@@ -4,10 +4,10 @@ Long-term memory for Claude Code. memcue keeps a base of short, self-contained f
 through hooks:
 
 - **At session start, and again after a compaction or `/clear`** it tells the agent to search memcue before it
-  answers a question that may depend on earlier sessions, and sends a card: global rules, the global decisions you
-  stated, and the rules and decisions of the current repository, the ones you stated first, within about 1.2 thousand
-  tokens. The card is how a rule the
-  agent would not think to search for still reaches it.
+  answers a question that may depend on earlier sessions, and sends a card: the global rules and decisions the dream
+  labelled as behaviour (#625), the global rules and decisions you stated that no dream has read yet, and the rules
+  and decisions of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is
+  how a rule the agent would not think to search for still reaches it.
 - **When the agent needs something from earlier sessions** it runs `memcue search` itself, with its own words:
   synonyms, the system's name, both languages. Nothing is injected with a prompt (#361): the agent's own queries
   answered more questions right than facts matched to the prompt's words (see [Results](#results)). A search returns
@@ -868,15 +868,22 @@ with `memcue add` or stored by `memcue import` is indexed at once; nothing waits
 [Candidates](#candidates)). A search returns it when it fits: by default a search in a repository reads that
 repository's, this host's and the global facts, and one outside a repository reads every fact; a shelf is read only
 by a search that names it; an expired fact only with `-expired`; and at most `-n` facts (5 by default) above the
-`-min-score` floor come back. The session card carries a fact only if it is active and unexpired, a global `rule`, or
-a `rule` or `decision` scoped to the session's repository, and its source is not `memory`; it fits the card budget
+`-min-score` floor come back. The session card carries a fact only if it is active and unexpired, a global `rule` or
+`decision` whose `channel` is `behaviour` or, until a dream labels it, one you stated, or a `rule` or `decision`
+scoped to the session's repository, and its source is not `memory`; it fits the card budget
 (`MEMCUE_CARD_BUDGET`). `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
 the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
-showed takes `-source tool`. The card carries global rules and the rules and decisions of the session's project
-whatever their source, the user's first, and a global decision only from the user (#600):
+showed takes `-source tool`. The card carries the rules and decisions of the session's project whatever their source,
+the user's first, and from global only the rules and decisions the dream labelled `behaviour` (#625): how to work
+or answer, with no moment at which the agent would think to search for it. Neither the kind nor the source tells
+such a rule from the rest, so the dream reads each global rule and decision once and labels it with one of the
+channels of [the #606 measurement](docs/research/card-trim-606-2026-11.md) (`behaviour`, `repository`, `file`,
+`command`, `knowledge`, `outdated`); a correction of the text drops the label. Until the dream has read it, a global
+rule or decision you stated (`-source user`) is on the card, so a rule just stated is not lost, and one of the agent's
+own waits for its label; a global fact of another channel is found by search:
 
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (-json: {"facts", "hints"}; at most -n, default 5)
@@ -996,7 +1003,8 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 
 1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
    the instructions, the fresh facts to split, the facts without search queries to expand, the facts without a
-   translation to translate, and the groups to review.
+   translation to translate, the global facts to check the scope of, the global rules and decisions to label by
+   channel, and the groups to review.
    It keeps the packet in the state directory.
 2. The model answers in one JSON object, with the packet's id.
 3. `memcue dream -apply FILE` checks the answer against the packet and carries out what passes. It prints and logs
@@ -1029,15 +1037,15 @@ Who runs it:
   (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
   surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
-  once: the fresh facts with the groups, the facts to expand, the facts to translate and the global facts to check the
-  scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
+  once: the fresh facts with the groups, the facts to expand, the facts to translate, the global facts to check the
+  scope of and the global rules and decisions to label each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
   model writing its answer, so a pass of a base far behind does the work of four packets in about a third of the time
   of one; a pass with little work makes one or two calls. `dream.log` records the calls, the time of the packet, the
   calls and the apply, and the tokens of each pass (#471,
   [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)).
 
-A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand, 40 to translate and 30 global facts to check the
-scope of. The fresh facts it leaves out are not counted
+A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand, 40 to translate, 30 global facts to check the
+scope of and 30 global rules and decisions to label. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
 
 What the answer may do:
@@ -1069,6 +1077,14 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
+- **Label a global rule or decision by channel** (#625): the card takes from global only the facts labelled
+  `behaviour`, and nothing but a reading of the text tells a rule of behaviour from a fact to look up (see
+  [Use](#use)). The packet gives the global rules and decisions without a label, the newest first, with their kind,
+  source and text; the model answers one of `behaviour`, `repository`, `file`, `command`, `knowledge` or `outdated`
+  for each, and memcue writes it as a version that keeps the creation time. A fact corrected since the packet, or
+  retired, is refused and, still without a label, offered again; a fresh fact waits for the next packet, since a
+  split of this one would retire it. A label stays through a move to a project and through search queries, and a
+  correction of the text drops it, so the dream reads the new text. `dream.log` lists the labels under `labelled`.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
