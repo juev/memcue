@@ -5,7 +5,8 @@ memcue fact base:
 
 - **No facts come with a message** (#361). The system prompt block tells the model to search the base with
   `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
-  system's name and both languages if the first try finds nothing. It also lets the model search during work, when it
+  system's name and both languages if the first try finds nothing, and to go on to Hermes's own `session_search`
+  when memcue has nothing: a passage of an earlier session is history, not a fact (#621). It also lets the model search during work, when it
   decides that may help: on starting with a specific host, service or repository, and before it diagnoses an
   unexpected error, with a short query naming the system and the problem, checking the result against the current
   state (#521). It is a hint, not a rule: no search runs on its own.
