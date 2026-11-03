@@ -99,6 +99,38 @@ func TestSessionNoteCarriesTheMeasuredPitfallLine(t *testing.T) {
 	}
 }
 
+// The note ends with the response-preference line of #613 word for word: an agreement to change how the agent answers
+// is a rule of the user's, global unless the user limits it to the project. The #601 reminder it grew from was the
+// note's last bullet, and the comparison ran it there; the split start carries it in part 1 with the rest of the note.
+func TestSessionNoteCarriesThePreferenceLine(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "research", "scripts", "preference613", "candidate", "cc-note.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "- " + strings.TrimSpace(string(b))
+	if !strings.HasSuffix(sessionNote, "\n"+want) {
+		t.Fatalf("the session note does not end with the preference line:\n%s", want)
+	}
+	env(t)
+	for _, part := range []int{0, 1} { // the whole note in one block, and the first part of the split start
+		var out bytes.Buffer
+		if err := runSessionStartPart(strings.NewReader(`{"session_id":"s","cwd":""}`), &out, part); err != nil {
+			t.Fatal(err)
+		}
+		var h struct {
+			Out struct {
+				Context string `json:"additionalContext"`
+			} `json:"hookSpecificOutput"`
+		}
+		if err := json.Unmarshal(out.Bytes(), &h); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(h.Out.Context, want) {
+			t.Errorf("session-start part %d does not deliver the preference line", part)
+		}
+	}
+}
+
 // The longer note still leaves the card its room (#522): the whole text in one block stays under the 10,000
 // characters Claude Code keeps in the context, and each part of the split start within partBudget, with the note in
 // part 1.

@@ -898,6 +898,13 @@ Claude Code (Opus 5.5) with this line stored the expected pitfall in 12 of 15 ru
 hit included; Hermes on `deepseek-flash` stored it in 6 of 15 (3). No run stored noise, and the answers did not get
 worse. DSH carries the Hermes wording and was not measured.
 
+The Claude Code note also tells its model that an agreement to change how it answers is a standing rule of the user's
+(#613): stored at once as the user's rule, global unless the user limits it to the project, while a format asked for
+one task or a passing mood is not stored. On the frozen scenarios of #601 and a project-limited control, the line
+raised stored preferences from 14 to 20 of 20 and preferences followed in a fresh session elsewhere from 12 to 20,
+with the project-limited preference kept in its repository and nothing stored for the controls
+([preference-capture-613](docs/research/preference-capture-613-2026-11.md)). Hermes and DSH do not carry it yet.
+
 The Claude Code note names the source of what the agent stores, and `add` without `-source` stores `agent` (#574).
 Before, 5 of the 12 pitfalls Claude Code stored on the same scenarios got `source: user`, because the call left the
 flag out; with the change all 12 named `-source tool`, and capture and answers stayed the same
