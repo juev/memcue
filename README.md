@@ -1165,6 +1165,10 @@ Measured while building memcue; details and method in [docs/evaluation.md](docs/
   that searched memcue itself scored 1.08 of 2, against 0.89 with facts injected with the prompt and 0.76 with no
   memory; the edge over injection is +0.19 per prompt, 95% interval [+0.03, +0.37]. Only Opus in Claude Code was
   measured ([docs/research/pull-2026-10.md](docs/research/pull-2026-10.md)).
+- **The session card trimmed to behaviour (#606):** on 40 real prompts, each run twice and graded blind, a card of
+  behaviour rules and the repository's stated rules and decisions (37 facts instead of 61) scored 1.16 of 2 against
+  1.26 for the full card, losing 13 prompts and winning 5; −0.09 per prompt, 95% interval [−0.20, +0.01]. The card
+  stays as it is ([docs/research/card-trim-606-2026-11.md](docs/research/card-trim-606-2026-11.md)).
 - **Recall on 100 unseen real prompts (the injection before #361):** 33 % of injected facts useful and 38 % noise, against 4 % useful and 87 %
   noise for the holographic memory plugin's prefetch on a comparable set. Useful facts reached 12 of the 41 prompts
   that needed memory: lexical search misses prompts that share no rare words with the fact.
