@@ -53,13 +53,15 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.27.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.28.0`; the fact-base schema is 7 (see [Upgrade](#upgrade)). An older memcue sets a version-7 cache
+of a text history aside and builds its own from the text; a version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.28.0 | 7 | 0.28.0 | 0.28.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.28.0 (`hermes-agent` 0.15.2) |
 | 0.27.0 | 6 | 0.27.0 | 0.27.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.27.0 (`hermes-agent` 0.15.2) |
 | 0.26.1 | 6 | 0.26.1 | 0.26.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.1 (`hermes-agent` 0.15.2) |
 | 0.26.0 | 6 | 0.26.0 | 0.26.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.0 (`hermes-agent` 0.15.2) |
@@ -267,6 +269,27 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.28.0: the card takes global facts by the channel the dream labels, and a search over the session history (#625, #621)
+
+- **A fact carries a channel** (#625): one of the classes of the #606 measurement (`behaviour`, `repository`, `file`,
+  `command`, `knowledge`, `outdated`) a dream labels a global rule or decision with, as a version that keeps the
+  creation time; a correction of the text drops it. **The card takes from global only the facts labelled
+  `behaviour`**, and a global rule or decision the user stated that no dream has labelled yet, so a rule just stated
+  is not lost before the next dream; a global fact of the agent's own waits for its label, and one of another channel
+  is found by search. The repository part is unchanged. On an existing base the global part of the card shrinks to the
+  stated facts until the first dream labels the rest, 30 a dream; on the author's base one dream labelled 69 facts,
+  32 of them `behaviour`. The dream packet has a sixth task for it, and `dream.log` lists the labels under `labelled`.
+- **`memcue sessions`** (#621): a word search over the text of this machine's earlier Claude Code sessions, with no
+  index, for what an empty `memcue search` missed; the user's and the agent's text only, never tool output. The Claude
+  Code note and the memcue skill send an empty search there; the Hermes note sends it to Hermes's own
+  `session_search`; DSH gets its own reader in #630.
+- **Schema 7.** The column `channel` is in the cache and in the text history (`"channel"` on a line, omitted when
+  empty). The cache of a text history built by an older memcue is set aside at the first open
+  (`facts.db.schema6-<time>`) and built again from the text, since a cache that read the files without the field
+  would, merged by versions, count a labelled version twice. An older memcue sets a version-7 cache aside and builds
+  its own; a version it writes of a labelled fact carries no label, and the next dream labels the fact again. Replace
+  the binary and the plugins on every machine that syncs the base.
 
 ### 0.27.0: a global fact of one project moves to that project (#607)
 
