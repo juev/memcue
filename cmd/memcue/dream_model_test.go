@@ -12,7 +12,7 @@ import (
 	"github.com/juev/memcue/internal/extract"
 )
 
-// The session's model in the tests: the five functions answer the parts of a packet the way the model would, and
+// The session's model in the tests: the six functions answer the parts of a packet the way the model would, and
 // dreamModel plays the session that runs the memcue-dream skill: -prepare, the answers, -apply.
 
 // dreamReply is the model's answer to the groups of a packet.
@@ -29,6 +29,8 @@ var (
 	translateFn = func(string) ([]extract.Translated, error) { return nil, nil }
 	// scopeFn answers the global facts a packet gives to check the scope of (#607); by default all hold everywhere.
 	scopeFn = func(string) ([]extract.Rescope, error) { return nil, nil }
+	// channelFn answers the global rules and decisions a packet gives to label (#625); by default none is labelled.
+	channelFn = func(string) ([]extract.Channel, error) { return nil, nil }
 )
 
 // dreamModel prepares a packet with args, answers it with the functions above and applies the answer; out gets what
@@ -66,7 +68,7 @@ func prepareAnswer(args []string, out io.Writer) (string, error) {
 	return path, writeJSONFile(path, answer)
 }
 
-// answerPacket reads the parts of a printed packet and asks the five functions about them.
+// answerPacket reads the parts of a printed packet and asks the six functions about them.
 func answerPacket(text string) (dreamAnswer, error) {
 	var a dreamAnswer
 	dir, err := stateDir()
@@ -109,6 +111,13 @@ func answerPacket(text string) (dreamAnswer, error) {
 			return a, err
 		}
 		a.Scopes = r
+	}
+	if in := packetBlock(text, "## Данные: канал"); hasFacts(in) {
+		r, err := channelFn(in)
+		if err != nil {
+			return a, err
+		}
+		a.Channels = r
 	}
 	if i := strings.Index(text, "## Данные: группы\n\n"); i >= 0 {
 		groups := text[i+len("## Данные: группы\n\n"):]

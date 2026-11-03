@@ -96,7 +96,7 @@ func runDreamOnce(out io.Writer, all, background bool, packets int) error {
 			return err
 		}
 		// A pass that checked the scope of global facts moved its cursor, even when it moved no fact (#607).
-		if rec.Translated+rec.Expanded+len(rec.Splits)+len(rec.Actions)+rec.ScopeChecked == 0 {
+		if rec.Translated+rec.Expanded+len(rec.Splits)+len(rec.Actions)+rec.ScopeChecked+len(rec.Labelled) == 0 {
 			stalls++
 		} else {
 			stalls = 0
@@ -174,7 +174,7 @@ func dreamPass(dir string, packets int, out io.Writer) (dreamRecord, int, error)
 	if err := json.Unmarshal(b, &p); err != nil {
 		return rec, 0, fmt.Errorf("%s: %w", packetFile, err)
 	}
-	work := len(p.Split) + len(p.Expand) + len(p.Translate) + len(p.Scope)
+	work := len(p.Split) + len(p.Expand) + len(p.Translate) + len(p.Scope) + len(p.Channel)
 	calls, err := w.calls()
 	if err != nil {
 		return rec, work, err
@@ -223,42 +223,48 @@ type dreamWork struct {
 	fresh                    map[string]bool // the facts of the groups the dream reviews as new
 	scope                    []store.Fact    // the global facts to check the scope of (#607)
 	projects                 []string        // the projects they may move to
+	channel                  []store.Fact    // the global rules and decisions to label by channel (#625)
 }
 
 // calls cuts the work into packets of the usual bounds, one task kind a call: fresh facts with groups, which need the
-// model's judgement and their neighbours, then the facts to expand, the facts to translate and the global facts to
-// check the scope of (#607). Every call is a whole packet with its instructions and the other data sections empty,
-// so the model reads it as it reads one packet.
+// model's judgement and their neighbours, then the facts to expand, the facts to translate, the global facts to
+// check the scope of (#607) and the global rules and decisions to label (#625). Every call is a whole packet with
+// its instructions and the other data sections empty, so the model reads it as it reads one packet.
 func (w dreamWork) calls() ([]string, error) {
 	var out []string
-	add := func(split, expand, translate, scope []store.Fact, groups [][]store.Fact) error {
+	add := func(split, expand, translate, scope, channel []store.Fact, groups [][]store.Fact) error {
 		projects := w.projects
 		if len(scope) == 0 {
 			projects = nil
 		}
-		text, err := renderPacket(w.id, split, expand, translate, scope, projects, groups, w.fresh)
+		text, err := renderPacket(w.id, split, expand, translate, scope, projects, channel, groups, w.fresh)
 		out = append(out, text)
 		return err
 	}
 	for i := 0; i < len(w.split) || i/packetFresh*packetGroups < len(w.groups); i += packetFresh {
 		k := i / packetFresh * packetGroups
-		if err := add(w.split[min(i, len(w.split)):min(i+packetFresh, len(w.split))], nil, nil, nil,
+		if err := add(w.split[min(i, len(w.split)):min(i+packetFresh, len(w.split))], nil, nil, nil, nil,
 			w.groups[min(k, len(w.groups)):min(k+packetGroups, len(w.groups))]); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.expand, packetExpand) {
-		if err := add(nil, c, nil, nil, nil); err != nil {
+		if err := add(nil, c, nil, nil, nil, nil); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.translate, packetTranslate) {
-		if err := add(nil, nil, c, nil, nil); err != nil {
+		if err := add(nil, nil, c, nil, nil, nil); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.scope, packetScope) {
-		if err := add(nil, nil, nil, c, nil); err != nil {
+		if err := add(nil, nil, nil, c, nil, nil); err != nil {
+			return nil, err
+		}
+	}
+	for c := range slices.Chunk(w.channel, packetChannel) {
+		if err := add(nil, nil, nil, nil, c, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -300,6 +306,7 @@ func askAll(calls []string) (extract.DreamReply, error) {
 		joined.Actions = append(joined.Actions, a.Actions...)
 		joined.Translations = append(joined.Translations, a.Translations...)
 		joined.Scopes = append(joined.Scopes, a.Scopes...)
+		joined.Channels = append(joined.Channels, a.Channels...)
 	}
 	if err := errors.Join(errs...); err != nil {
 		return r, err
