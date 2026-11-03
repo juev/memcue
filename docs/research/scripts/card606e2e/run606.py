@@ -56,7 +56,8 @@ def install_bin(data):
         if not os.path.exists(dst):
             shutil.copy2(src, dst + ".tmp")
             os.replace(dst + ".tmp", dst)
-ARMS = ("current", "trim")
+# The second arm is the card with MEMCUE_CARD_KEEP=keep.txt: trim in #606, select in #623 (E2E_ARMS=current,select).
+ARMS = tuple(os.environ.get("E2E_ARMS", "current,trim").split(","))
 
 
 def sh(*cmd, **kw):
@@ -148,7 +149,7 @@ def setup(data, p, arm, work):
     senv = {"MEMCUE_FACTS": base, "MEMCUE_STATE_DIR": state, "MEMCUE_BIN": binary, "MEMCUE_REAL": binary,
             "MEMCUE_DREAM_BACKGROUND": "0", "MEMCUE_AUTO_INSTALL": "0",
             "PATH": SHIM_SEARCH + ":" + SHIM + ":" + os.environ["PATH"]}
-    if arm == "trim":
+    if arm != "current":
         senv["MEMCUE_CARD_KEEP"] = os.path.join(BIN, "keep")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("MEMCUE_", "CLAUDECODE"))}
     env.update(senv)

@@ -9,8 +9,9 @@
 import json, os, random, re, statistics as st, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 
-ARMS = ("current", "trim")
-REPS = (1, 2)
+ARMS = tuple(os.environ.get("E2E_ARMS", "current,trim").split(","))  # the second arm is compared with current
+REPS = tuple(int(r) for r in os.environ.get("E2E_REPS", "1,2").split(","))
+CAND = ARMS[1]
 PROMPT = """Ты оцениваешь ответы агента на реплику пользователя. Агент работал в режиме планирования: только читал
 репозиторий, без сети и без записи. Дан эталон — ответ, который пользователь получил в настоящей сессии (там у агента
 были все инструменты; эталон может быть неполон). Ответы прогонов помечены буквами, источник скрыт.
@@ -137,15 +138,15 @@ def cmd_report(data):
               f" {r['errors']:6d} {st.mean(r['card']):.0f} facts, runs without a card {r['card'].count(0)}")
     diffs, lost, won = [], [], []
     for pid, d in sorted(per.items()):
-        if "current" in d and "trim" in d:
-            x = st.mean(d["trim"]) - st.mean(d["current"])
+        if "current" in d and CAND in d:
+            x = st.mean(d[CAND]) - st.mean(d["current"])
             diffs.append(x)
             (won if x > 0 else lost if x < 0 else []).append((pid, x))
     lo, hi = boot(diffs)
-    print(f"\ntrim vs current by prompt (mean of two reps): {len(won)} / {len(diffs) - len(won) - len(lost)} / "
+    print(f"\n{CAND} vs current by prompt (mean of the reps): {len(won)} / {len(diffs) - len(won) - len(lost)} / "
           f"{len(lost)}; mean diff {st.mean(diffs):+.2f}, 95% bootstrap [{lo:+.2f}, {hi:+.2f}]")
-    print(f"prompts trim lost: {[(pid, round(x, 2)) for pid, x in lost]}")
-    print(f"prompts trim won:  {[(pid, round(x, 2)) for pid, x in won]}")
+    print(f"prompts {CAND} lost: {[(pid, round(x, 2)) for pid, x in lost]}")
+    print(f"prompts {CAND} won:  {[(pid, round(x, 2)) for pid, x in won]}")
     print("\nrep-to-rep spread (prompts where the two reps of one arm differ):")
     for arm in ARMS:
         n = sum(1 for d in per.values() if len(d.get(arm, [])) == 2 and d[arm][0] != d[arm][1])
