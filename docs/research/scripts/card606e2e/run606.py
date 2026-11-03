@@ -7,7 +7,8 @@
     run606.py cards --data DATA                      # the facts each prompt's card carries, from session-start
 
 DATA holds prompts.json (the chosen prompts), keep.txt (the fact ids the trimmed card keeps), memcue-606 (memcue of
-main with card-keep.patch) and gets snap/, runs/ and cards.json. The two arms differ only in the card: current is the
+main with card-keep.patch, built with -X main.version= the plugin's version, or the plugin warns at every session
+start that the binary is older and the agent goes digging) and gets snap/, runs/ and cards.json. The two arms differ only in the card: current is the
 card of main; trim is the same card with MEMCUE_CARD_KEEP=keep.txt. Everything else is the live setup of a session:
 the memcue plugin with its session-start note, the agent's own `memcue search` over the snapshot (shim-pull lets
 search through and logs it), the user's settings and hooks. Writes are impossible: plan mode, read-only tools, shims

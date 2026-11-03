@@ -17,7 +17,7 @@ for a in "$@"; do
   esac
 done
 case "$sub" in
-  push|commit|merge|rebase|reset|checkout|switch|pull|fetch|clone|cherry-pick|revert|am|apply|stash|tag|worktree|clean|restore|rm|mv|add|branch|remote|config|gc|update-ref|notes|submodule)
+  push|commit|merge|rebase|reset|checkout|switch|pull|fetch|ls-remote|archive|clone|cherry-pick|revert|am|apply|stash|tag|worktree|clean|restore|rm|mv|add|branch|remote|config|gc|update-ref|notes|submodule)
     echo "git $sub: not available in this session" >&2; exit 126;;
 esac
 exec /usr/bin/git "$@"
