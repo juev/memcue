@@ -1,0 +1,23 @@
+diff --git i/cmd/memcue/session.go w/cmd/memcue/session.go
+index 0701ee9..0d11297 100644
+--- i/cmd/memcue/session.go
++++ w/cmd/memcue/session.go
+@@ -315,6 +315,18 @@ func sessionCardWith(cwd string, statedRoom int) (string, []string, int, cardFit
+ 	if err != nil {
+ 		return "", nil, 0, cardFit{}, err
+ 	}
++	// #606 research only: MEMCUE_CARD_KEEP names a file of fact ids, one a line; the card carries only those.
++	if keepFile := os.Getenv("MEMCUE_CARD_KEEP"); keepFile != "" {
++		b, err := os.ReadFile(keepFile)
++		if err != nil {
++			return "", nil, 0, cardFit{}, err
++		}
++		keep := map[string]bool{}
++		for _, id := range strings.Fields(string(b)) {
++			keep[id] = true
++		}
++		facts = slices.DeleteFunc(facts, func(f store.Fact) bool { return !keep[f.ID] })
++	}
+ 	card, ids, repeats, fit, err := renderCardWith(facts, cardRoom(), statedRoom)
+ 	return card, ids, mirrors + repeats, fit, err
+ }
