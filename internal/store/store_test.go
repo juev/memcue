@@ -1431,6 +1431,9 @@ func TestCardFactsPutStatedRulesFirst(t *testing.T) {
 	stated := add("Stated rule.", "user")
 	confirmed := add("Confirmed rule.", "user_confirmed")
 	written := add("Written rule.", "tool")
+	if _, err := s.SetChannel(written.ID, written.Version, Behaviour); err != nil {
+		t.Fatal(err)
+	}
 	got, _, err := s.CardFacts(nil, "2026-10-20")
 	if err != nil {
 		t.Fatal(err)
@@ -1586,5 +1589,105 @@ func TestSearchFilteredShelf(t *testing.T) {
 				t.Errorf("got %q, want %q", g, c.want)
 			}
 		})
+	}
+}
+
+// The global part of the card is the facts a dream labelled behaviour (#625): a global rule or decision of another
+// channel stays off the card and is found by search; one the user stated reaches the card until a dream labels it,
+// one of the agent's own waits for its label; the repository part takes its rules and decisions whatever the label.
+func TestCardFactsTakeGlobalFactsByChannel(t *testing.T) {
+	s, _ := open(t)
+	add := func(content, kind, scope, source, channel string) Fact {
+		t.Helper()
+		f, err := s.AddWith(content, []string{"proxy"}, "test 2026-10-20", "", Meta{Kind: kind, Scope: scope, Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if channel != "" {
+			if f, err = s.SetChannel(f.ID, f.Version, channel); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return f
+	}
+	behaviour := add("Commit messages are written in English.", "rule", "global", "agent", Behaviour)
+	decided := add("Merge a closed task yourself after green CI.", "decision", "global", "user", Behaviour)
+	knowledge := add("The proxy listens on port 8080.", "rule", "global", "user", "knowledge")
+	outdated := add("The first proxy update has not happened yet.", "decision", "global", "user", "outdated")
+	statedBare := add("Measure before filing a task.", "rule", "global", "user", "")
+	confirmedBare := add("Ask once before a force push.", "decision", "global", "user_confirmed", "")
+	agentBare := add("Pull before a rebase.", "rule", "global", "agent", "")
+	repoRule := add("In shop, release only after the parallel task is merged.", "rule", "repo:shop", "agent", "repository")
+	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	card := make([]string, 0, len(got))
+	for _, f := range got {
+		card = append(card, f.ID)
+	}
+	for _, f := range []Fact{behaviour, decided, statedBare, confirmedBare, repoRule} {
+		if !slices.Contains(card, f.ID) {
+			t.Errorf("card lacks %q (%s %s %s %q)", f.Content, f.Kind, f.Scope, f.Source, f.Channel)
+		}
+	}
+	for _, f := range []Fact{knowledge, outdated, agentBare} {
+		if slices.Contains(card, f.ID) {
+			t.Errorf("card carries %q (%s %s %s %q)", f.Content, f.Kind, f.Scope, f.Source, f.Channel)
+		}
+	}
+	found := ids(t, s, "proxy")
+	if _, ok := found[knowledge.ID]; !ok {
+		t.Errorf("search found %v, want the fact off the card %s too", found, knowledge.ID)
+	}
+	if _, ok := found[outdated.ID]; !ok {
+		t.Errorf("search found %v, want the fact off the card %s too", found, outdated.ID)
+	}
+}
+
+// SetChannel writes the label as a new version that keeps the content and the creation time, takes only a known
+// channel, and refuses a fact that changed since the caller read it or was retired; a correction of the text drops
+// the label, so the dream reads the new text (#625).
+func TestSetChannelKeepsContentAndDate(t *testing.T) {
+	s, _ := open(t)
+	f, err := s.AddWith("Write the commit messages in English.", []string{"commit"}, "test 2026-10-20", "",
+		Meta{Kind: "rule", Scope: "global", Source: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetChannel(f.ID, f.Version, "card"); err == nil {
+		t.Error("an unknown channel was accepted")
+	}
+	got, err := s.SetChannel(f.ID, f.Version, Behaviour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != f.Version+1 || got.Channel != Behaviour || got.Content != f.Content || got.Kind != f.Kind ||
+		got.Scope != f.Scope || got.Source != f.Source || !got.Created.Equal(f.Created) {
+		t.Errorf("labelled %+v from %+v", got, f)
+	}
+	if _, err := s.SetChannel(f.ID, f.Version, "knowledge"); !errors.Is(err, ErrChanged) {
+		t.Errorf("a stale version: %v, want ErrChanged", err)
+	}
+	same, err := s.Correct(f.ID, got.Content, []string{"commit", "english"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same.Channel != Behaviour {
+		t.Errorf("a correction that keeps the text dropped the channel: %+v", same)
+	}
+	changed, err := s.Correct(f.ID, "Write the commit messages in English, the body too.", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed.Channel != "" {
+		t.Errorf("a correction of the text kept the channel: %+v", changed)
+	}
+	r, err := s.Retire(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetChannel(f.ID, r.Version, Behaviour); !errors.Is(err, ErrRetired) {
+		t.Errorf("a retired fact: %v, want ErrRetired", err)
 	}
 }

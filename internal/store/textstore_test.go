@@ -313,3 +313,39 @@ func TestMergeRewritesTheFactFiles(t *testing.T) {
 	}
 	textMatches(t, s)
 }
+
+// A cache an older memcue built from the text lacks the channel of the labelled versions (#625): opened by this
+// memcue, it is set aside and built again, so the labelled version is read whole and not merged as a second one.
+func TestCacheOfAnOlderSchemaIsBuiltAgain(t *testing.T) {
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	s := openTextAt(t, dir, cache, "mac", t0)
+	f, err := s.AddWith("Commit messages are written in English.", []string{"commit"}, "x", "",
+		Meta{Kind: "rule", Scope: "global", Source: "user"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetChannel(f.ID, f.Version, Behaviour); err != nil {
+		t.Fatal(err)
+	}
+	want := dump(t, s)
+	// What the older memcue leaves: the rows without the column, under its schema version.
+	for _, q := range []string{`ALTER TABLE facts DROP COLUMN channel`, `PRAGMA user_version = 6`} {
+		if _, err := s.db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+
+	s = openTextAt(t, dir, cache, "mac", t0)
+	defer func() { _ = s.Close() }()
+	if got := dump(t, s); got != want {
+		t.Errorf("rebuilt cache:\n%s\nwant\n%s", got, want)
+	}
+	hist, err := s.History(f.ID)
+	if err != nil || len(hist) != 2 || hist[1].Channel != Behaviour {
+		t.Errorf("history %+v (%v), want the two versions with the label on the second", hist, err)
+	}
+	if aside, _ := filepath.Glob(cache + ".schema6-*"); len(aside) != 1 {
+		t.Errorf("older cache set aside: %v", aside)
+	}
+}

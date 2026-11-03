@@ -30,6 +30,9 @@ func TestTextRoundTripKeepsEveryField(t *testing.T) {
 	if _, err := s.Relabel(plain.ID, 3, "pitfall", "global", ""); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.SetChannel(plain.ID, 4, "knowledge"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.Retire(plain.ID); err != nil {
 		t.Fatal(err)
 	}

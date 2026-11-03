@@ -129,8 +129,8 @@ func MergeHistories(ours, theirs []Fact) MergedHistory {
 // mergedBefore orders the versions after the common ones, the same on every side: by creation time, author and
 // content, and between versions that agree on all three, as a label written later (queries, a relabelled source)
 // keeps the creation time of the version it labels, the fuller version last, so the current one keeps every label
-// either side wrote: a version without a source before one with it, then fewer queries before more, then by the
-// written line, so no two writes tie.
+// either side wrote: a version without a source before one with it, then fewer queries before more, then a version
+// without a channel before one with it (#625), then by the written line, so no two writes tie.
 func mergedBefore(a, b Fact) bool {
 	if !a.Created.Equal(b.Created) {
 		return a.Created.Before(b.Created)
@@ -146,6 +146,9 @@ func mergedBefore(a, b Fact) bool {
 	}
 	if len(a.Queries) != len(b.Queries) {
 		return len(a.Queries) < len(b.Queries)
+	}
+	if (a.Channel == "") != (b.Channel == "") {
+		return a.Channel == ""
 	}
 	a.Version, b.Version = 0, 0
 	la, _ := encodeLine(a)

@@ -32,10 +32,18 @@ const (
 
 // OpenText opens the base whose history is the text at dir, with its cache at cache. A cache that does not open (a
 // newer schema, a damaged file) is set aside and built again from the text: it holds nothing the text lacks once the
-// last open brought them together.
+// last open brought them together. So is a cache of an older schema: the memcue that filled it read the files without
+// the fields added since (channel, #625), and merged by versions its copy of such a version and the file's would
+// count as two.
 func OpenText(dir, cache string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
+	}
+	if v, err := cacheSchema(cache); err == nil && v > 0 && v < schemaVersion {
+		aside := fmt.Sprintf("%s.schema%d-%d", cache, v, time.Now().Unix())
+		if err := os.Rename(cache, aside); err != nil {
+			return nil, err
+		}
 	}
 	s, err := openFile(cache)
 	if err != nil {
@@ -53,6 +61,25 @@ func OpenText(dir, cache string) (*Store, error) {
 		return nil, fmt.Errorf("text history %s: %w", dir, err)
 	}
 	return s, nil
+}
+
+// cacheSchema is the schema version of the cache file at path as it is, 0 for a file that is not there.
+func cacheSchema(path string) (int, error) {
+	if _, err := os.Stat(path); err != nil {
+		return 0, nil
+	}
+	dsn, _, err := readOnlyDataSource(path)
+	if err != nil {
+		return 0, err
+	}
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = db.Close() }()
+	var v int
+	err = db.QueryRow(`PRAGMA user_version`).Scan(&v)
+	return v, err
 }
 
 // Text is the directory of the text history, empty for a base that is one SQLite file.

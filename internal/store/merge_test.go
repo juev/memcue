@@ -446,3 +446,21 @@ func TestMergeCarriesQueries(t *testing.T) {
 	}
 	_ = s.Close()
 }
+
+// Two versions that agree on everything a merge orders by but the channel keep the labelled one last (#625): a
+// machine that labelled a fact and one that relabelled it without the label (an older memcue, which drops it) both
+// keep the creation time, and the current version must keep the label.
+func TestMergeKeepsTheChannelLast(t *testing.T) {
+	base := Fact{ID: "01JCHANNEL0000000000000001", Version: 1, Content: "Commit messages are written in English.",
+		Created: t0, Status: Active, Author: "mac", Meta: Meta{Kind: "rule", Scope: "global", Source: "user"}}
+	labelled := base
+	labelled.Version, labelled.Channel = 2, Behaviour
+	relabelled := base
+	relabelled.Version, relabelled.Kind = 2, "decision"
+	for _, sides := range [][2][]Fact{{{base, labelled}, {base, relabelled}}, {{base, relabelled}, {base, labelled}}} {
+		h := MergeHistories(sides[0], sides[1])
+		if len(h.Versions) != 3 || h.Versions[2].Channel != Behaviour || h.Versions[1].Channel != "" {
+			t.Errorf("merged %+v, want the labelled version last", h.Versions)
+		}
+	}
+}

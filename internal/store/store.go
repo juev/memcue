@@ -35,6 +35,9 @@ import (
 // holds is indexed and found. The rows stay as they were written; opening a version-5 base only rebuilds the index. An
 // older memcue must refuse such a base: it would hide those facts again, and its index check would take them out of
 // the index that this one put them in, on every sync between the two.
+// Version 7 adds the channel of a fact (channel), the label a dream gives a global fact (#625). The cache of a text
+// history built by an older memcue read the files without it, so OpenText sets such a cache aside and builds it again:
+// merged by versions, the cache's copy of a labelled version and the file's would count as two.
 // Version 5 adds the search queries of a fact (queries) to what the index holds. An older memcue must refuse such a
 // base: its merge and its writes would drop the queries, and its rebuild would leave them out of the index.
 // Version 4 adds fact_vectors: the optional vectors of the active facts, one per model tag, kept next to the facts
@@ -45,7 +48,7 @@ import (
 // derived index once. Version 2 first made ticket keys exact and added the columns after version 1 (expires, kind,
 // scope, source, evidence, review, prompt_version); an older memcue refuses a newer base instead of reading
 // candidates as active facts.
-const schemaVersion = 6
+const schemaVersion = 7
 
 const schema = `
 CREATE TABLE IF NOT EXISTS facts (
@@ -137,7 +140,22 @@ type Meta struct {
 	Evidence      string // the words of the source the fact rests on, verbatim
 	Review        string // empty for a fact written now; Candidate or Provisional in rows written before #514
 	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
+	// Channel is how the fact should reach the agent, as a dream labelled it (#625): Behaviour for a fact the card
+	// carries, one of the other channels for a fact search or a moment of work brings; empty until a dream read it,
+	// and again after its text changed.
+	Channel string
 }
+
+// The channels a dream labels a global fact with (#625), the classes of the #606 measurement: behaviour is how to
+// work or answer, with no moment at which the agent would think to search for it; repository is a rule of one
+// repository; file matters when editing a file, command when running a program; knowledge is looked up when a task
+// needs it; outdated is a state that no longer guides work. Only Behaviour admits a global fact to the card.
+const (
+	Behaviour = "behaviour"
+)
+
+// Channels are the labels a dream may give, in the order the model reads them.
+var Channels = []string{Behaviour, "repository", "file", "command", "knowledge", "outdated"}
 
 // FactInput is one new fact for AddBatch: the same fields AddWith takes, without the generated id, author or time.
 type FactInput struct {
@@ -341,6 +359,7 @@ var added = []addedColumn{
 	{"review", "TEXT", "''"},
 	{"prompt_version", "INTEGER", "0"},
 	{"queries", "TEXT", "''"},
+	{"channel", "TEXT", "''"},
 }
 
 // factColumns names the columns the facts table of db has.
@@ -705,6 +724,7 @@ func (s *Store) CorrectExpiring(id, content string, keywords []string, expires *
 		s.now().UTC(), Active, s.author
 	if content != cur.Content {
 		f.Queries = nil // they were written for the old text; the caller asks for new ones, the dream as a fallback
+		f.Channel = "" // the dream judged the old text and reads the new one (#625)
 	}
 	if expires != nil {
 		if err := ValidExpiry(*expires); err != nil {
@@ -776,7 +796,8 @@ func (s *Store) agentSources() ([]Fact, error) {
 		return nil, err
 	}
 	relabelled, err := s.query(`INSERT INTO facts(`+columns+`) SELECT id, version + 1, content, keywords, origin,
-		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, queries FROM facts f
+		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, queries, channel
+		FROM facts f
 		WHERE f.source = '' AND f.status = ? AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
 		RETURNING `+columns, Active)
 	if err != nil {
@@ -790,7 +811,8 @@ func (s *Store) agentSources() ([]Fact, error) {
 
 const sourcesStamp = "sources-rows" // versions of the base when agentSources last left no fact without a source
 
-// CardFacts returns the facts a session-start card carries: global rules, the global decisions the user stated, and the
+// CardFacts returns the facts a session-start card carries: the global rules and decisions a dream labelled behaviour
+// (#625), the global rules and decisions the user stated that no dream has labelled yet, and the
 // rules and decisions whose scope is one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
 // goes first because the date says little on a migrated base, where most rules share the day of the migration (#229).
 // It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. A fact
@@ -810,13 +832,15 @@ func (s *Store) CardFacts(scopes []string, today string) (facts []Fact, mirrors 
 		if Expired(f.Expires, today) {
 			continue
 		}
+		stated := f.Source == "user" || f.Source == "user_confirmed"
 		switch {
-		case f.Kind == "rule" && strings.EqualFold(f.Scope, "global"):
-		case f.Kind == "decision" && strings.EqualFold(f.Scope, "global") &&
-			(f.Source == "user" || f.Source == "user_confirmed"):
-			// A global decision the user made constrains every later session the way a rule does; a search for it is
-			// a question the agent does not think to ask (#600). A global decision of the agent's own stays off the
-			// card: it is a conclusion, not an instruction the user gave.
+		case (f.Kind == "rule" || f.Kind == "decision") && strings.EqualFold(f.Scope, "global") &&
+			(f.Channel == Behaviour || f.Channel == "" && stated):
+			// The card exists for a rule the agent would not think to search for, and neither the kind nor the
+			// source of a global fact tells such a rule from the rest (#625): the dream reads each global rule and
+			// decision and labels the ones of behaviour. Until it has, a rule or decision the user just stated is on
+			// the card, so it is not lost before the next dream (#600); a global fact of the agent's own waits for
+			// its label, and one labelled another channel is found by search.
 		case (f.Kind == "decision" || f.Kind == "rule") && slices.ContainsFunc(scopes, func(sc string) bool {
 			return sc != "" && strings.EqualFold(f.Scope, sc)
 		}):
@@ -862,6 +886,28 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	}
 	f := cur
 	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
+	return s.write(f)
+}
+
+// SetChannel adds a version of an active fact with the channel a dream labelled it with (#625); the content and
+// everything else stay, the creation time too, as for Relabel. channel must be one of Channels. Like Relabel, it
+// refuses a fact edited since version (ErrChanged) and a retired fact.
+func (s *Store) SetChannel(id string, version int, channel string) (Fact, error) {
+	if !slices.Contains(Channels, channel) {
+		return Fact{}, fmt.Errorf("channel %q is not one of %s", channel, strings.Join(Channels, ", "))
+	}
+	cur, err := s.Get(id)
+	if err != nil {
+		return Fact{}, err
+	}
+	if cur.Version != version {
+		return Fact{}, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
+	}
+	if cur.Status == Retired {
+		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
+	}
+	f := cur
+	f.Version, f.Author, f.Channel = cur.Version+1, s.author, channel
 	return s.write(f)
 }
 
@@ -1038,9 +1084,10 @@ func (s *Store) write(f Fact) (Fact, error) {
 
 // insert writes one version as it is.
 func insert(tx *sql.Tx, f Fact) error {
-	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
+	_, err := tx.Exec(`INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
 		f.Content, strings.Join(f.Keywords, ", "), f.Origin, f.Created.Format(time.RFC3339Nano), f.Status, f.Author,
-		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion, strings.Join(f.Queries, ", "))
+		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion, strings.Join(f.Queries, ", "),
+		f.Channel)
 	return err
 }
 
@@ -1124,13 +1171,14 @@ func (s *Store) Rebuild() error {
 	return tx.Commit()
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version, queries`
+const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version, queries, channel`
 
 func scan(row interface{ Scan(...any) error }) (Fact, error) {
 	var f Fact
 	var keywords, created, queries string
 	if err := row.Scan(&f.ID, &f.Version, &f.Content, &keywords, &f.Origin, &created, &f.Status, &f.Author,
-		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion, &queries); err != nil {
+		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion, &queries,
+		&f.Channel); err != nil {
 		return Fact{}, err
 	}
 	if keywords != "" {
@@ -1365,7 +1413,8 @@ func (s *Store) SearchFiltered(terms []string, limit int, f Filter) ([]Hit, erro
 		var h Hit
 		var stems, keywords, created, queries string
 		if err := rows.Scan(&stems, &h.BM25, &h.ID, &h.Version, &h.Content, &keywords, &h.Origin, &created, &h.Status,
-			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion, &queries); err != nil {
+			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion, &queries,
+			&h.Channel); err != nil {
 			return nil, err
 		}
 		if keywords != "" {

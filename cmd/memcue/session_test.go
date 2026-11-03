@@ -319,8 +319,12 @@ func TestSessionStartCardStaysWithinBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 20; i++ {
-		if _, err := s.AddWith(fmt.Sprintf("Правило %d: %s", i, strings.Repeat("слово ", 80)), nil, "test 2026-10-20",
-			"", store.Meta{Kind: "rule", Scope: "global", Source: "agent"}); err != nil {
+		f, err := s.AddWith(fmt.Sprintf("Правило %d: %s", i, strings.Repeat("слово ", 80)), nil, "test 2026-10-20",
+			"", store.Meta{Kind: "rule", Scope: "global", Source: "agent"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SetChannel(f.ID, f.Version, store.Behaviour); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -350,8 +354,12 @@ func TestSessionCardBoundsTheStatedRules(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		for _, src := range []string{"user", "agent"} {
 			text := fmt.Sprintf("Правило %s-%d: %s", src, i, strings.Repeat("слово ", 50))
-			if _, err := s.AddWith(text, nil, "test 2026-10-20", "",
-				store.Meta{Kind: "rule", Scope: "global", Source: src}); err != nil {
+			f, err := s.AddWith(text, nil, "test 2026-10-20", "",
+				store.Meta{Kind: "rule", Scope: "global", Source: src})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.SetChannel(f.ID, f.Version, store.Behaviour); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -479,8 +487,12 @@ func TestSessionCardLogsTheExcludedFacts(t *testing.T) {
 		{"Правило карты — тесты гонять перед коммитом!", "agent"},
 		{"Заметка встроенной памяти о сервере.", "memory"},
 	} {
-		if _, err := s.AddWith(f.text, nil, "test 2026-10-20", "",
-			store.Meta{Kind: "rule", Scope: "global", Source: f.source}); err != nil {
+		added, err := s.AddWith(f.text, nil, "test 2026-10-20", "",
+			store.Meta{Kind: "rule", Scope: "global", Source: f.source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SetChannel(added.ID, added.Version, store.Behaviour); err != nil {
 			t.Fatal(err)
 		}
 	}

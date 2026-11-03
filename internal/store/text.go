@@ -36,6 +36,7 @@ type textLine struct {
 	Review        string   `json:"review,omitempty"`
 	PromptVersion int      `json:"prompt_version,omitempty"`
 	Queries       []string `json:"queries,omitempty"`
+	Channel       string   `json:"channel,omitempty"`
 }
 
 // FactPath is the file of the fact id in the text history at dir.
@@ -49,7 +50,7 @@ func encodeLine(f Fact) ([]byte, error) {
 	l := textLine{ID: f.ID, Version: f.Version, Created: f.Created.UTC().Format(time.RFC3339Nano), Status: f.Status,
 		Author: f.Author, Content: f.Content, Keywords: asStored(f.Keywords), Origin: f.Origin, Expires: f.Expires,
 		Kind: f.Kind, Scope: f.Scope, Source: f.Source, Evidence: f.Evidence, Review: f.Review,
-		PromptVersion: f.PromptVersion, Queries: asStored(f.Queries)}
+		PromptVersion: f.PromptVersion, Queries: asStored(f.Queries), Channel: f.Channel}
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
@@ -86,7 +87,7 @@ func decodeLine(b []byte) (Fact, error) {
 	return Fact{ID: l.ID, Version: l.Version, Content: l.Content, Keywords: l.Keywords, Origin: l.Origin,
 		Created: created.UTC(), Status: l.Status, Author: l.Author, Expires: l.Expires, Queries: l.Queries,
 		Meta: Meta{Kind: l.Kind, Scope: l.Scope, Source: l.Source, Evidence: l.Evidence, Review: l.Review,
-			PromptVersion: l.PromptVersion}}, nil
+			PromptVersion: l.PromptVersion, Channel: l.Channel}}, nil
 }
 
 // ParseFacts reads the versions of one fact file, in version order. A line repeated as it is counts once: two
