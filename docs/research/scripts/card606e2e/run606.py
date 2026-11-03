@@ -87,52 +87,42 @@ def snapshot(data, p):
     return d
 
 
+def default_branch(root):
+    head = subprocess.run(["git", "-C", root, "symbolic-ref", "-q", "refs/remotes/origin/HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+    if head:
+        return head.rsplit("/", 1)[-1]
+    for b in ("main", "master"):
+        if subprocess.run(["git", "-C", root, "rev-parse", "-q", "--verify", f"refs/heads/{b}"],
+                          capture_output=True).returncode == 0:
+            return b
+    return "main"
+
+
 def clone(p, dst):
+    """The repository as of the prompt, and nothing later: an empty repository that fetches only the history of the
+    prompt's commit and of the default branch's last commit before it. A clone of the whole repository (--shared, or
+    with its refs cut back) still carried the later objects, and an agent read today's commits out of them."""
     root = p["root"]
     rel = os.path.relpath(os.path.realpath(p["cwd"]), os.path.realpath(sh("git", "-C", p["cwd"], "rev-parse",
                                                                           "--show-toplevel")))
     commit = sh("git", "-C", root, "rev-list", "-1", f"--before={p['time']}", "--all")
+    default = default_branch(root)
+    tip = sh("git", "-C", root, "rev-list", "-1", f"--before={p['time']}", default) or commit
     target = os.path.join(dst, os.path.basename(root.rstrip("/")).lstrip(".") or "repo")
-    sh("git", "clone", "-q", "--shared", "--no-checkout", root, target)
+    sh("git", "init", "-q", "-b", default, target)
+    sh("git", "-C", target, "fetch", "-q", "--no-tags", "--upload-pack",
+       "git -c uploadpack.allowAnySHA1InWant=true upload-pack", root, commit, tip)
+    sh("git", "-C", target, "update-ref", f"refs/heads/{default}", tip)
+    sh("git", "-C", target, "update-ref", f"refs/remotes/origin/{default}", tip)
     sh("git", "-C", target, "checkout", "-q", "--detach", commit)
-    trim_refs(target, p["time"])
+    sh("git", "-C", target, "reflog", "expire", "--expire=now", "--all")
     for line in sh("git", "-C", root, "remote", "-v").splitlines():  # memcue keys a session by its remotes
         name, url = line.split()[:2]
         sh("git", "-C", target, "config", f"remote.{name}.url", url)
     cwd = os.path.normpath(os.path.join(target, rel))
     os.makedirs(cwd, exist_ok=True)
     return cwd, commit
-
-
-def trim_refs(repo, at):
-    """The clone's refs as they were at the prompt: a branch back to its last commit before it, a later tag gone."""
-    refs = sh("git", "-C", repo, "for-each-ref", "--format=%(refname) %(creatordate:unix)",
-              "refs/heads", "refs/remotes", "refs/tags").splitlines()
-    limit = int(sh("date", "-j", "-u", "-f", "%Y-%m-%dT%H:%M:%S", at[:19], "+%s"))
-    # Only the default branch stays, local and remote, under its own name.
-    head = subprocess.run(["git", "-C", repo, "symbolic-ref", "-q", "refs/remotes/origin/HEAD"], capture_output=True,
-                          text=True).stdout.strip()
-    default = head.rsplit("/", 1)[-1] if head else next(
-        (b for b in ("main", "master") if subprocess.run(["git", "-C", repo, "rev-parse", "-q", "--verify",
-                                                         f"refs/remotes/origin/{b}"]).returncode == 0), "main")
-    keep = {f"refs/heads/{default}", f"refs/remotes/origin/{default}"}
-    for line in refs:
-        ref, created = line.rsplit(" ", 1)
-        if ref.endswith("/HEAD"):
-            continue
-        if ref.startswith("refs/tags/"):
-            if int(created or 0) > limit:
-                sh("git", "-C", repo, "update-ref", "-d", ref)
-            continue
-        if ref not in keep:  # another branch's name can tell what came later, such as an experiment's own
-            sh("git", "-C", repo, "update-ref", "-d", ref)
-            continue
-        old = sh("git", "-C", repo, "rev-list", "-1", f"--before={at}", ref)
-        if old:
-            sh("git", "-C", repo, "update-ref", ref, old)
-        else:
-            sh("git", "-C", repo, "update-ref", "-d", ref)
-    sh("git", "-C", repo, "reflog", "expire", "--expire=now", "--all")
 
 
 def workdir(key):
@@ -256,6 +246,8 @@ def main():
                 arms = list(ARMS)
                 rnd.shuffle(arms)
                 jobs += [(pid, arm, rep) for arm in arms]
+
+        install_bin(data)  # once: four jobs copying it at once raced
 
         def go(j):
             try:
