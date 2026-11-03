@@ -161,6 +161,9 @@ func (s *Stats) add(o Stats) {
 // of tool results costs one read and no copy a line.
 func readFile(path string, st *Stats) ([]Message, error) {
 	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil // deleted since the walk: Claude Code drops old transcripts at its start
+	}
 	if err != nil {
 		return nil, err
 	}

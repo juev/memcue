@@ -163,3 +163,22 @@ func TestSearchNewestFirstWithinTheTime(t *testing.T) {
 		t.Errorf("stop words alone found %+v", res.Hits)
 	}
 }
+
+// A transcript deleted between the walk and its reading is no error: Claude Code drops old transcripts at its own
+// start, and a search that meets the gap goes on with the rest.
+func TestReadClaudeSkipsAFileDeletedSinceTheWalk(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "s1.jsonl", entry("user", "a widget message", 1, nil))
+	write(t, root, "s2.jsonl", entry("user", "another widget message", 2, map[string]any{"uuid": "u2"}))
+	if err := os.Remove(filepath.Join(root, "p", "s2.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	// A dangling symlink reads as a file that is not there once the walk listed it.
+	if err := os.Symlink(filepath.Join(root, "p", "s2.jsonl"), filepath.Join(root, "p", "s3.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	msgs, st, err := ReadClaude(root)
+	if err != nil || len(msgs) != 1 || st.Files != 1 {
+		t.Errorf("messages %+v, stats %+v, err %v", msgs, st, err)
+	}
+}
