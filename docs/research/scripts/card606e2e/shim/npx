@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "npx: not available in this session" >&2
+exit 126

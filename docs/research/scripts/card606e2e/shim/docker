@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "docker: not available in this session" >&2
+exit 126

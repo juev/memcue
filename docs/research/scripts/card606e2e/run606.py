@@ -21,8 +21,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 H = os.path.dirname(os.path.abspath(__file__))
 E2E = os.path.join(H, "..", "e2e")
-SHIM = os.path.join(E2E, "shim")  # ssh, glab, gh, mutating git and the like fail inside a run
-SHIM_SEARCH = os.path.join(E2E, "shim-pull")  # memcue: search only, logged
+# Everything a run sees on PATH and in its environment lives under a neutral directory: the first runs read the
+# experiment off the path of the shims and of the data directory.
+BIN = "/private/tmp/cw/bin"
+SHIM = os.path.join(BIN, "shim")  # ssh, glab, gh, mutating git and the like fail inside a run
+SHIM_SEARCH = os.path.join(BIN, "search")  # memcue: search only, logged
+HOME = os.path.expanduser("~")
+# The live repositories, the live base and this experiment's data hold what was learnt after the prompt: the file
+# tools may not read them. Bash still can; run_one counts the runs whose commands named them.
+LIVE_PATHS = [f"{HOME}/src", f"{HOME}/research", f"{HOME}/.claude/memory", f"{HOME}/.local/state/memcue"]
 CLAUDE_BIN = shutil.which("claude")
 LIVE = os.path.expanduser("~/.claude/memory/facts")
 CLAUDE = os.path.expanduser("~/.claude")
@@ -30,7 +37,19 @@ TOOLS = "Read,Grep,Glob,Bash"
 DENY = ["Bash(ssh *)", "Bash(scp *)", "Bash(rsync *)", "Bash(glab *)", "Bash(gh *)", "Bash(atlassian *)",
         "Bash(curl *)", "Bash(wget *)", "Bash(claude *)", "Bash(docker *)", "Bash(git push *)",
         "Bash(git commit *)", "Bash(git merge *)", "Bash(git rebase *)", "Bash(git reset *)", "Bash(git checkout *)",
-        "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)"]
+        "Bash(git pull *)", "Bash(git fetch *)", "Bash(rm *)", "Bash(sqlite3 *)", "Bash(brew *)", "Bash(sudo *)",
+        *[f"{tool}(/{p}/**)" for p in LIVE_PATHS for tool in ("Read", "Grep", "Glob")]]
+
+
+def install_bin(data):
+    """The shims, the binary and the keep list under BIN, once."""
+    os.makedirs(BIN, exist_ok=True)
+    if not os.path.isdir(SHIM):
+        shutil.copytree(os.path.join(H, "shim"), SHIM)
+    if not os.path.isdir(SHIM_SEARCH):
+        shutil.copytree(os.path.join(H, "search"), SHIM_SEARCH)
+    for src, name in ((os.path.join(data, "memcue-606"), "memcue-bin"), (os.path.join(data, "keep.txt"), "keep")):
+        shutil.copy2(src, os.path.join(BIN, name))
 ARMS = ("current", "trim")
 
 
@@ -89,6 +108,13 @@ def trim_refs(repo, at):
     refs = sh("git", "-C", repo, "for-each-ref", "--format=%(refname) %(creatordate:unix)",
               "refs/heads", "refs/remotes", "refs/tags").splitlines()
     limit = int(sh("date", "-j", "-u", "-f", "%Y-%m-%dT%H:%M:%S", at[:19], "+%s"))
+    # Only the default branch stays, local and remote, under its own name.
+    head = subprocess.run(["git", "-C", repo, "symbolic-ref", "-q", "refs/remotes/origin/HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+    default = head.rsplit("/", 1)[-1] if head else next(
+        (b for b in ("main", "master") if subprocess.run(["git", "-C", repo, "rev-parse", "-q", "--verify",
+                                                         f"refs/remotes/origin/{b}"]).returncode == 0), "main")
+    keep = {f"refs/heads/{default}", f"refs/remotes/origin/{default}"}
     for line in refs:
         ref, created = line.rsplit(" ", 1)
         if ref.endswith("/HEAD"):
@@ -96,6 +122,9 @@ def trim_refs(repo, at):
         if ref.startswith("refs/tags/"):
             if int(created or 0) > limit:
                 sh("git", "-C", repo, "update-ref", "-d", ref)
+            continue
+        if ref not in keep:  # another branch's name can tell what came later, such as an experiment's own
+            sh("git", "-C", repo, "update-ref", "-d", ref)
             continue
         old = sh("git", "-C", repo, "rev-list", "-1", f"--before={at}", ref)
         if old:
@@ -118,12 +147,13 @@ def setup(data, p, arm, work):
     base = os.path.join(work, "facts")
     shutil.copytree(snapshot(data, p), base)
     state = os.path.join(work, "state")
-    binary = os.path.join(data, "memcue-606")
+    install_bin(data)
+    binary = os.path.join(BIN, "memcue-bin")
     senv = {"MEMCUE_FACTS": base, "MEMCUE_STATE_DIR": state, "MEMCUE_BIN": binary, "MEMCUE_REAL": binary,
             "MEMCUE_DREAM_BACKGROUND": "0", "MEMCUE_AUTO_INSTALL": "0",
             "PATH": SHIM_SEARCH + ":" + SHIM + ":" + os.environ["PATH"]}
     if arm == "trim":
-        senv["MEMCUE_CARD_KEEP"] = os.path.join(data, "keep.txt")
+        senv["MEMCUE_CARD_KEEP"] = os.path.join(BIN, "keep")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("MEMCUE_", "CLAUDECODE"))}
     env.update(senv)
     settings = {"autoMemoryEnabled": False, "enabledPlugins": {"memcue@memcue": True}, "env": senv}
@@ -150,6 +180,14 @@ def run_one(data, pid, arm, rep):
                            timeout=1500)
     meta = {"pid": pid, "arm": arm, "rep": rep, "exit": r.returncode, "stderr": r.stderr[-2000:], "commit": commit,
             "cwd": cwd, "seconds": round(time.time() - start, 1)}
+    cmds = []
+    for line in open(out + ".tmp"):
+        e = json.loads(line) if line.strip().startswith("{") else {}
+        for c in (e.get("message") or {}).get("content") or [] if e.get("type") == "assistant" else []:
+            if isinstance(c, dict) and c.get("type") == "tool_use" and c.get("name") == "Bash":
+                cmds.append(c["input"].get("command", ""))
+    meta["live_bash"] = [c for c in cmds if any(p in c for p in LIVE_PATHS) or "~/src" in c or "~/research" in c
+                         or "~/.claude/memory" in c]
     for name in ("search", "card"):
         lp = os.path.join(state, f"{name}.log")
         if os.path.exists(lp):

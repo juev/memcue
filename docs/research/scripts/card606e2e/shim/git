@@ -1,0 +1,23 @@
+#!/bin/sh
+# read-only git: a mutating subcommand is refused, and so is any argument naming the live repositories or data,
+# which hold what was learnt after the prompt. Options with a value (-C, -c, --git-dir, --work-tree) skip it.
+for a in "$@"; do
+  case "$a" in
+    "$HOME"/src*|"$HOME"/research*|"$HOME"/.claude/memory*|"$HOME"/.local/state/memcue*)
+      echo "fatal: cannot access '$a'" >&2; exit 128;;
+  esac
+done
+skip=0; sub=""
+for a in "$@"; do
+  if [ $skip = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -C|-c|--git-dir|--work-tree|--namespace) skip=1;;
+    -*) ;;
+    *) sub="$a"; break;;
+  esac
+done
+case "$sub" in
+  push|commit|merge|rebase|reset|checkout|switch|pull|fetch|clone|cherry-pick|revert|am|apply|stash|tag|worktree|clean|restore|rm|mv|add|branch|remote|config|gc|update-ref|notes|submodule)
+    echo "git $sub: not available in this session" >&2; exit 126;;
+esac
+exec /usr/bin/git "$@"
