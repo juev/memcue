@@ -25,6 +25,24 @@ class RecallDuringWorkTest(unittest.TestCase):
                 self.assertNotIn("unexpected error", text)
 
 
+class HistoryFallbackTest(unittest.TestCase):
+    def test_each_host_sends_an_empty_search_to_its_own_history(self):
+        """#621: after an empty search, Claude Code runs memcue sessions over its transcripts, in the note and in the
+        skill; Hermes has its own session_search; DSH keeps its sessions in its own journal, which nothing reads yet
+        (#630), so its note names neither."""
+        go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
+        skill = (PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md").read_text(encoding="utf-8")
+        for text in (go, skill):
+            self.assertIn("memcue sessions", text)
+            self.assertIn("history, not a fact", text)
+        hermes = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
+        self.assertIn("session_search", hermes)
+        self.assertNotIn("memcue sessions", hermes)
+        dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
+        self.assertNotIn("memcue_sessions", dsh)
+        self.assertNotIn("session_search", dsh)
+
+
 class CaptureExclusionsTest(unittest.TestCase):
     def test_every_host_leaves_out_what_the_repository_shows(self):
         """#547: a document in the repository is what the repository shows, and every host tells its model not to store

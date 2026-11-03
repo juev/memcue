@@ -379,6 +379,14 @@ class ProviderTest(unittest.TestCase):
         self.assertLess(shelf, pitfall)
         self.assertLess(pitfall, card)
 
+    def test_the_note_sends_an_empty_search_to_the_session_history(self):
+        """#621: Hermes keeps its own session history and searches it with session_search, so an empty memcue_search
+        goes on there; memcue builds nothing for it, and a passage found is a lead, not a fact."""
+        text = self.p.system_prompt_block()
+        self.assertIn("When memcue_search finds nothing, search the history of earlier sessions with session_search", text)
+        self.assertIn("history, not a fact", text)
+        self.assertNotIn("memcue sessions", text)
+
     def test_the_note_and_the_schema_let_the_model_search_during_work(self):
         """#521: the model may search for a prior pitfall during work on a system and before it diagnoses an
         unexpected error, by its own choice; the guidance for questions about earlier sessions stays."""

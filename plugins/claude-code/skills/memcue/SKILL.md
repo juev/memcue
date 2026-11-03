@@ -55,6 +55,14 @@ memcue add -kind rule -scope global -source user -keywords "word1, word2, син
   fact, a search in the other language finds it only through these words.
 - The origin is the repository of the working directory and today's date; pass `-origin` only to name another.
 
+## When search finds nothing
+
+The agent of an earlier session may have forgotten to store what you need, and it is often still in that session's
+transcript. Run `memcue sessions "<words>"` with the words of the empty search: it reads the text of this machine's
+earlier Claude Code sessions, with no index, and prints the newest passages that hold the words, each with its date and
+session. A passage is history, not a fact: check it against the current state, and store what holds with `memcue add`
+so the next session finds it by search.
+
 ## Correct or forget
 
 Find the fact first; `search` prints IDs, best match first. `-in all` looks in every repository: by default search
