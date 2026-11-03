@@ -218,7 +218,7 @@ func (q Query) ResolveRepos(known, tiers []string) (Query, error) {
 }
 
 // inRepo reports whether a session with these project keys works in a repository: a key other than a directory
-// (dir:<path>) names one, the global tier of the Claude config directory included.
+// (dir:<path>) names one, the Claude config directory included.
 func inRepo(project []string) bool {
 	return slices.ContainsFunc(project, func(k string) bool { return k != "" && !strings.HasPrefix(k, "dir:") })
 }

@@ -212,13 +212,15 @@ func TestTemporaryDirectoryNamesNothing(t *testing.T) {
 	}
 }
 
-func TestClaudeDirectoryIsGlobal(t *testing.T) {
+// The Claude config directory is a repository like any other, named by its remotes (#617), and it has no old name:
+// the facts learnt there before carry Global and stay global.
+func TestClaudeDirectoryIsARepository(t *testing.T) {
 	isolate(t)
 	root := repo(t, filepath.Join(t.TempDir(), ".claude"), "origin", "git@example.com:me/claude.git")
-	if got := Of(root, root); got != Global {
-		t.Errorf("got %q", got)
+	if got := Keys(root, root); len(got) != 1 || got[0] != "example.com/me/claude" {
+		t.Errorf("keys %q", got)
 	}
-	if got := Legacy(root, root); got != Global {
+	if got := Legacy(root, root); got != "" {
 		t.Errorf("legacy %q", got)
 	}
 }

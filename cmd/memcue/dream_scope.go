@@ -18,8 +18,8 @@ import (
 )
 
 // projectOf is the project a fact holds in: its repo: or dir: scope, or, with no scope, the project its origin names.
-// A global fact, one of a host or a service, and one learnt nowhere in particular (the Claude config directory, an
-// empty origin) have none. A repo: key is lowercased as tier.Normalize writes it; a dir: path keeps its case.
+// A global fact, one of a host or a service, and one learnt nowhere in particular (the old global tier of the Claude
+// config directory, an empty origin) have none. A repo: key is lowercased as tier.Normalize writes it; a dir: path keeps its case.
 func projectOf(f store.Fact) string {
 	low := strings.ToLower(f.Scope)
 	switch {
@@ -287,8 +287,9 @@ func reopenDuplicate(s *store.Store, aliases *projectAliases, id, project string
 
 // knownProjects are the projects a dream may move a global fact to (#607): the projects some active fact was learnt
 // in, by the key its origin names, a remote or a dir: path, sorted. A scope no session ran in is left out: a scope
-// set by hand to the key of a repository whose checkout memcue names otherwise (the Claude config directory is the
-// global tier, whatever its remotes) is seen by no session, and a fact moved there would be lost to every one. A name
+// set by hand to the key of a repository whose checkout memcue names otherwise (the Claude config directory before
+// #617, which was the global tier whatever its remotes) is seen by no session, and a fact moved there would be lost
+// to every one. A name
 // memcue gave a clone before #343 is left out too: migrate -repos moves its facts onto the key.
 func knownProjects(active []store.Fact) []string {
 	seen := map[string]bool{}

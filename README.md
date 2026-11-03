@@ -208,7 +208,9 @@ comes from where the session works, read from the files and never by running git
 - **Outside git** the project is the `module` of the nearest `go.mod`, or else `dir:<working directory>`.
 - **No working directory** is no project: a host passes an empty `cwd` for such a session (`-cwd ""` to `add`). The Hermes plugin does so for a session outside git (#347); a session Hermes gives no `cwd`
   takes the directory Hermes falls back to (#354).
-- **The Claude config directory** is the global tier; **a temporary directory** names nothing.
+- **The Claude config directory** is a repository like any other, named by its remotes (#617): a fact learnt there
+  about the config holds in the config repository and reaches a session there, not every session. The facts learnt
+  there before #617 carry the origin `_global` and stay global. **A temporary directory** names nothing.
 
 The agent chooses only whether a fact holds in the repository (`-scope repo`), everywhere or on a host; memcue writes
 the key. A fact written with no scope gets the project its origin names, and `global` when the origin names none
@@ -1031,8 +1033,8 @@ What the answer may do:
   as a rule, every session card, so it must hold in every repository and on every host. The packet gives the global
   facts a few dozen at a time, in the order of their ids after the cursor in `dream.scope`, with the projects of the
   base: the `repo:` keys and `dir:` paths its active facts were learnt in, by their origin. A scope no session ran in
-  is not offered: the Claude config directory is the global tier whatever its remotes, so a fact moved to the scope of
-  its remote would be seen by no session. The model names the project of a fact that holds in
+  is not offered: a scope set by hand to a remote whose checkout memcue names otherwise would be seen by no session.
+  Before #617 the Claude config directory was such a checkout. The model names the project of a fact that holds in
   one; memcue refuses a project the base does not have, and a fact changed since the packet in more than its labels.
   The fact keeps its creation time. Each global fact is checked once a machine; one stored global later has a larger id
   and is checked by the next dream. A fact corrected since the packet, by a group of the same packet among others, is

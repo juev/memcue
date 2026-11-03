@@ -1,8 +1,9 @@
 // Package tier names the project a working directory belongs to (#343). A git repository is named by its remotes,
 // normalized to host/path (git@example.com:owner/name.git → example.com/owner/name), read from the repository's
 // config without running git. A repository with no remote is named by the path of its main worktree, a directory
-// outside git by the module of the nearest go.mod or else by its own path, and the Claude config directory is the
-// global tier. A temporary directory names nothing.
+// outside git by the module of the nearest go.mod or else by its own path. The Claude config directory is a
+// repository like any other (#617); Global is the origin the facts learnt there before it was carry, and they stay
+// global. A temporary directory names nothing.
 package tier
 
 import (
@@ -21,8 +22,8 @@ const DirPrefix = "dir:"
 
 // Of returns the key facts learnt in dir are written with: the key of the remote named origin, or of the only
 // remote; the path of the main worktree for a repository without one; the go.mod module or the path itself outside
-// git; Global for the Claude config directory; "" for a temporary directory. claudeDir is the Claude config directory
-// (~/.claude).
+// git; "" for a temporary directory. claudeDir is the Claude config directory (~/.claude); since #617 it is named by
+// its remotes as any repository, and Legacy gives it no old name.
 func Of(dir, claudeDir string) string {
 	keys := Keys(dir, claudeDir)
 	if len(keys) == 0 {
@@ -46,9 +47,6 @@ func Keys(dir, claudeDir string) []string {
 	repo, ok := locate(dir)
 	if !ok {
 		return outside(dir)
-	}
-	if claudeDir != "" && sameDir(repo.main, claudeDir) {
-		return []string{Global}
 	}
 	remotes := repo.remotes()
 	names := make([]string, 0, len(remotes))
@@ -99,8 +97,9 @@ func Scope(key string) string {
 }
 
 // Legacy returns the name memcue gave dir before #343: the basename of the main worktree, "<parent>-<name>" for a
-// dot-named one (forgekeep/.github → forgekeep-github), Global for the Claude config directory, "" outside git. The
-// migration maps the facts written under those names onto the keys.
+// dot-named one (forgekeep/.github → forgekeep-github), "" outside git and for the Claude config directory: the facts
+// learnt there before #617 carry Global and stay global, so it has no old name to move them from. The migration maps
+// the facts written under those names onto the keys.
 func Legacy(dir, claudeDir string) string {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
@@ -111,7 +110,7 @@ func Legacy(dir, claudeDir string) string {
 		return ""
 	}
 	if claudeDir != "" && sameDir(repo.main, claudeDir) {
-		return Global
+		return ""
 	}
 	base := filepath.Base(repo.main)
 	if strings.HasPrefix(base, ".") {

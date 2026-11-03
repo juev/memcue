@@ -79,7 +79,8 @@ All ten moved facts went to the project their text names. The 21 left global:
 
 A fact of the first row reads like "the review hook of the agent's config fires on two triggers". Sessions in the
 config directory see the global tier and nothing narrower, so such a fact has no scope a session there would see. The
-check leaves them global; giving the config directory a project of its own is a separate question.
+check leaves them global; giving the config directory a project of its own is a separate question, settled by #617:
+the config directory is now a repository named by its remotes, and these facts moved to it.
 
 A fact of the second row reads like "repository B has no CI on purpose" where no session of the base ran in B. The
 check cannot offer a project it has no key for, and keeps the fact global.
