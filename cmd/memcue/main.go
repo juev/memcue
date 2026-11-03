@@ -92,6 +92,7 @@ commands:
   session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
   session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
+  sessions  passages of earlier Claude Code sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   correct   new version of a fact: memcue correct [-keywords K] [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT
   retire    take a fact out of recall: memcue retire ID
@@ -157,6 +158,8 @@ func main() {
 		_, _ = io.Copy(io.Discard, os.Stdin)
 	case "search":
 		err = runSearch(os.Args[2:], os.Stdout)
+	case "sessions":
+		err = runSessions(os.Args[2:], os.Stdout)
 	case "add":
 		err = runAdd(os.Args[2:], os.Stdout)
 	case "correct":

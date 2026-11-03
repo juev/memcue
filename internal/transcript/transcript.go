@@ -1,6 +1,7 @@
 // Package transcript reads what memcue needs of a Claude Code session transcript (JSON lines): the working directory
-// the session ran in, which names the project of the built-in memory notes migrate turns into facts. Nothing reads a
-// session's text any more: the agent writes its facts itself (#494).
+// the session ran in, which names the project of the built-in memory notes migrate turns into facts. The agent writes
+// its facts itself (#494); the text of a session is read only by memcue sessions (internal/history, #621), a word
+// search for what an earlier session forgot to store.
 package transcript
 
 import (
