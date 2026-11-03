@@ -1,0 +1,16 @@
+{
+  "frozen": "2026-11-03, before the first grid run of #613; the scenarios of #601 are read from preference601/fixtures",
+  "scenarios": [
+    {
+      "id": "P1",
+      "kind": "project",
+      "workspace": "changelog",
+      "turn1": "Turn the changes in changes.md into release-note bullets for our users.",
+      "turn2": "Good. One thing for this repository: every release-note bullet here starts with its ticket id in square brackets, like [SHOP-41], because our release script parses that. Other projects of mine don't do this. Can you redo them?",
+      "probe": {
+        "workspace": "gardenlog",
+        "prompt": "Turn the changes in changes.md into release-note bullets for our users."
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "P1": {
+    "purpose": "The user sets a format for release-note bullets in this one repository and says other projects do not use it.",
+    "preference": "In this repository (changelog, Shopfront), every release-note bullet starts with its ticket id in square brackets, such as [SHOP-41].",
+    "expected_scope": "repo",
+    "polarity": "Ticket id in square brackets first, in this repository only. A fact that makes it a rule for every project is too broad.",
+    "acknowledged_if": "The second answer redoes the bullets with the ticket id in square brackets first.",
+    "probe_applied_if": "The probe answer, in another repository whose changes have no ticket ids, starts its bullets with ticket ids in square brackets or invents ticket ids.",
+    "probe_partial_if": "The probe answer mentions ticket ids or asks for them without putting them into the bullets."
+  }
+}

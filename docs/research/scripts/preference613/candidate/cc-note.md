@@ -1,0 +1,1 @@
+When you agree to change how you answer the user, the agreement is a standing rule of the user's: store it at once with `-kind rule -source user`, do not only acknowledge it. It holds everywhere (`-scope global`) unless the user limits it to this project (`-scope repo`); a format asked for one task only, or a passing mood, is not a rule to store.
