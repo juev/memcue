@@ -45,13 +45,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.26.1`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
+This release is `0.27.0`; the fact-base schema is 6 (see [Upgrade](#upgrade)). A version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
 same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.27.0 | 6 | 0.27.0 | 0.27.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.27.0 (`hermes-agent` 0.15.2) |
 | 0.26.1 | 6 | 0.26.1 | 0.26.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.1 (`hermes-agent` 0.15.2) |
 | 0.26.0 | 6 | 0.26.0 | 0.26.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.0 (`hermes-agent` 0.15.2) |
 | 0.25.1 | 6 | 0.25.1 | 0.25.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.25.1 (`hermes-agent` 0.15.2) |
@@ -258,6 +259,26 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.27.0: a global fact of one project moves to that project (#607)
+
+- **Dream checks the scope of global facts** (#607). A new task of the dream packet gives the global facts after a
+  cursor (`dream.scope` in the state directory), 30 a packet, with the projects some fact was learnt in. The model names
+  the project of a fact that holds in one, and memcue moves it there, keeping its creation time. A project no fact was
+  learnt in is refused, so a fact cannot move where no session sees it.
+- **The promotions of #346 are taken back** (#607). The first dream of a machine reads its `dream.log` for the facts a
+  dream made global, moves each back to the project it had, and reopens the duplicate retired for it when that
+  duplicate was learnt in another project. `dream.unpromoted` marks the machine as done. From now on a fact that holds
+  in two repositories stays two facts, one in each.
+- **The Claude config directory is a repository** (#617). A fact learnt in it is stored in the scope of its remote and
+  reaches only sessions there. Facts stored under `_global` before keep that origin and stay global.
+- **Global decisions the user stated reach the card** (#600), and the session note of every host says which sources
+  reach it (#607). The Claude Code note also stores an agreement on how to answer as the user's rule (#613).
+- **Search keeps the scope order at the limit** (#599): with `-n 1`, a fact of the current host wins a tie over one of
+  the project and one that is global, as with a larger limit.
+- No schema or format changed. Replace the binary and the plugins on every machine that syncs the base. From 0.25.x,
+  read [0.26.1](#0261-a-failed-claude--p-call-names-its-reason-590) and
+  [0.26.0](#0260-claude--p-runs-with-a-token-from-a-file-591) too.
 
 ### 0.26.1: a failed claude -p call names its reason (#590)
 
