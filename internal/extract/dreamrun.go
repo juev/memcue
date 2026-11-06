@@ -35,7 +35,7 @@ var ErrNoEndpoint = errors.New("no MEMCUE_API_URL: the dream runs on the session
 
 // DreamAnswer sends a dream packet to a model and returns its answer for memcue dream -apply with what the call cost:
 // the configured endpoint when MEMCUE_API_URL is set (#401), `claude -p` on Model otherwise (#405). The `claude -p`
-// call has no tools and no hooks, so the model answers the packet and cannot carry it out itself.
+// call has no tools, no hooks and no MCP servers, so the model answers the packet and cannot carry it out itself.
 //
 // Unlike the other calls of an endpoint it lets the model reason. A dream retires and rewrites facts with nobody to
 // review them, and on two live packets deepseek-flash without reasoning retired a fact its "duplicate" did not cover,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -46,6 +47,28 @@ func claudeToken(t *testing.T) (string, error) {
 		t.Fatal(err)
 	}
 	return got.Token, nil
+}
+
+// A `claude -p` call loads no MCP server (#660): an empty config, made strict right after it, so the user's servers
+// stay out and the flag that follows is not read as one more config file.
+func TestClaudeCallLoadsNoMCPServers(t *testing.T) {
+	args := filepath.Join(t.TempDir(), "args")
+	fakeClaudeScript(t, "printf '%s\\n' \"$@\" > '"+args+"'\nprintf '{\"is_error\":false,\"structured_output\":{}}'\n")
+	if _, err := callModel(context.Background(), Endpoint{Model: "m"}, "system", "{}", "", "input"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Split(strings.TrimSpace(string(b)), "\n")
+	i := slices.Index(got, "--mcp-config")
+	if i < 0 || i+2 >= len(got) || got[i+1] != `{"mcpServers":{}}` || got[i+2] != "--strict-mcp-config" {
+		t.Errorf("args %q, want an empty --mcp-config followed by --strict-mcp-config", got)
+	}
+	if j := slices.Index(got, "--tools"); j < 0 || got[j+1] != "" {
+		t.Errorf("args %q lost --tools \"\"", got)
+	}
 }
 
 // The token of MEMCUE_CLAUDE_TOKEN_FILE reaches `claude -p` and replaces one of the environment (#591).

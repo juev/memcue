@@ -90,6 +90,12 @@ func call(ctx context.Context, system, schema, shape, input string) (reply, erro
 	return callModel(ctx, Endpoint{URL: API.URL, Model: Model, Key: API.Key}, system, schema, shape, input)
 }
 
+// claudeNoMCP keeps the user's MCP servers out of a `claude -p` call (#660): `--tools ""` turns their tools off but
+// leaves the servers' context in the prompt, about 32,500 of the 43,400 input tokens of a call that says nothing
+// (docs/research/dream-cost-643-2026-11.md). `--strict-mcp-config` follows the empty config, which also ends the list
+// of files `--mcp-config` takes. The setting sources stay: they hold the user's thinking and effort settings.
+var claudeNoMCP = []string{"--mcp-config", `{"mcpServers":{}}`, "--strict-mcp-config"}
+
 // callModel runs the model once on ep: the endpoint when it has a URL, `claude -p` on ep.Model otherwise.
 func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input string) (reply, error) {
 	if ep.URL != "" {
@@ -100,9 +106,10 @@ func callModel(ctx context.Context, ep Endpoint, system, schema, shape, input st
 		return reply{}, err
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	cmd := exec.CommandContext(ctx, "claude", "-p", "--model", ep.Model, "--tools", "", "--no-session-persistence",
-		"--settings", `{"disableAllHooks": true}`, "--system-prompt", system, "--json-schema", schema,
-		"--output-format", "json")
+	args := append([]string{"-p", "--model", ep.Model, "--tools", "", "--no-session-persistence",
+		"--settings", `{"disableAllHooks": true}`}, claudeNoMCP...)
+	args = append(args, "--system-prompt", system, "--json-schema", schema, "--output-format", "json")
+	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Dir = dir // no project CLAUDE.md, no repository
 	if cmd.Env, err = claudeEnv(); err != nil {
 		return reply{}, err
