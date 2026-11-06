@@ -2,9 +2,11 @@ package store
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -351,4 +353,54 @@ func TestCacheOfAnOlderSchemaIsBuiltAgain(t *testing.T) {
 	if aside, _ := filepath.Glob(cache + ".schema6-*"); len(aside) != 1 {
 		t.Errorf("older cache set aside: %v", aside)
 	}
+}
+
+// A cache build stopped midway leaves no cache, so no read-only open fails on a hot journal of it, and the next open
+// builds it from the start (#635). The build here stops on a damaged fact file, the way a caller's timeout stops it
+// on a large base; the leftovers of a killed build, a half-built file and its journal, go before the next build.
+func TestAStoppedCacheBuildLeavesNoCache(t *testing.T) {
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	active, _, _, _, _ := unlabelled(t, dir)
+	good, err := os.ReadFile(FactPath(dir, active.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(FactPath(dir, active.ID), []byte("{not json\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if s, err := OpenText(dir, cache); err == nil {
+		_ = s.Close()
+		t.Fatal("a build over a damaged file succeeded")
+	}
+	if _, err := os.Stat(cache); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a stopped build left a cache: %v", err)
+	}
+	if s, err := OpenReadOnly(cache); err == nil {
+		_ = s.Close()
+		t.Fatal("a read-only open found a cache")
+	} else if strings.Contains(err.Error(), "readonly") {
+		t.Fatalf("a read-only open met a hot journal: %v", err)
+	}
+	if err := os.WriteFile(cache+".build-journal", []byte("a journal of a killed build"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(FactPath(dir, active.ID), good, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := openTextAt(t, dir, cache, "laptop", t0)
+	textMatches(t, s)
+	if got, err := s.Get(active.ID); err != nil || got.Content != "Порт db1 — 5433" {
+		t.Errorf("built cache: %+v %v", got, err)
+	}
+	_ = s.Close()
+	for _, name := range []string{cache + ".build", cache + ".build-journal"} {
+		if _, err := os.Stat(name); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s left behind: %v", name, err)
+		}
+	}
+	r, err := OpenReadOnly(cache)
+	if err != nil {
+		t.Fatalf("read-only open of the built cache: %v", err)
+	}
+	_ = r.Close()
 }

@@ -45,11 +45,17 @@ func OpenText(dir, cache string) (*Store, error) {
 			return nil, err
 		}
 	}
+	if err := buildCache(dir, cache); err != nil {
+		return nil, fmt.Errorf("text history %s: %w", dir, err)
+	}
 	s, err := openFile(cache)
 	if err != nil {
 		aside := fmt.Sprintf("%s.unreadable-%d", cache, time.Now().Unix())
 		if renameErr := os.Rename(cache, aside); renameErr != nil {
 			return nil, err
+		}
+		if err := buildCache(dir, cache); err != nil {
+			return nil, fmt.Errorf("text history %s: %w", dir, err)
 		}
 		if s, err = openFile(cache); err != nil {
 			return nil, err
@@ -61,6 +67,51 @@ func OpenText(dir, cache string) (*Store, error) {
 		return nil, fmt.Errorf("text history %s: %w", dir, err)
 	}
 	return s, nil
+}
+
+// buildCache builds the cache at cache from the text history when there is none (#635). It builds under another
+// name and renames the file into place once the build has committed: a caller's timeout that kills a build of
+// seconds then leaves no cache, and the next open builds it again, where a build in place left a hot journal that
+// every read-only open failed on. Parallel first opens build once: the others wait on the lock and find the cache.
+func buildCache(dir, cache string) error {
+	if _, err := os.Stat(cache); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	lock := cache + ".lock"
+	if err := os.MkdirAll(filepath.Dir(cache), 0o700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(lock, os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) }()
+	if _, err := os.Stat(cache); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return err // built by another process while this one waited
+	}
+	build := cache + ".build"
+	for _, name := range []string{build, build + "-journal", build + "-wal", build + "-shm"} {
+		if err := os.Remove(name); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err // a build stopped midway: start again
+		}
+	}
+	s, err := openFile(build)
+	if err != nil {
+		return err
+	}
+	s.text, s.textLock = dir, lock
+	if err := s.syncTextLocked(); err != nil {
+		_ = s.Close()
+		return err
+	}
+	if err := s.Close(); err != nil {
+		return err
+	}
+	return os.Rename(build, cache)
 }
 
 // cacheSchema is the schema version of the cache file at path as it is, 0 for a file that is not there.
@@ -199,6 +250,11 @@ func (s *Store) syncText() error {
 		return err
 	}
 	defer unlock()
+	return s.syncTextLocked()
+}
+
+// syncTextLocked is syncText for a caller that holds the lock of the text.
+func (s *Store) syncTextLocked() error {
 	// The times are read before the files: a directory git changes during the reading keeps a newer time than the
 	// stamp, and the next open reads it again.
 	dirs, err := textDirs(s.text)
