@@ -17,7 +17,7 @@ func TestLegacyProvisionalIsLive(t *testing.T) {
 	future := TodayAt(time.Now().AddDate(0, 1, 0))
 	past := TodayAt(time.Now().AddDate(0, -1, 0))
 	s, _ := open(t)
-	prov := Meta{Kind: "rule", Scope: "global", Source: "tool", Review: Provisional, Channel: Behaviour}
+	prov := Meta{Kind: "rule", Scope: "global", Source: "tool", Review: Provisional, Channel: behaviour}
 	const (
 		liveID    = "01JPROVISIONAL000000000001"
 		expiredID = "01JPROVISIONAL000000000002"

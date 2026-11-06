@@ -454,12 +454,12 @@ func TestMergeKeepsTheChannelLast(t *testing.T) {
 	base := Fact{ID: "01JCHANNEL0000000000000001", Version: 1, Content: "Commit messages are written in English.",
 		Created: t0, Status: Active, Author: "mac", Meta: Meta{Kind: "rule", Scope: "global", Source: "user"}}
 	labelled := base
-	labelled.Version, labelled.Channel = 2, Behaviour
+	labelled.Version, labelled.Channel = 2, behaviour
 	relabelled := base
 	relabelled.Version, relabelled.Kind = 2, "decision"
 	for _, sides := range [][2][]Fact{{{base, labelled}, {base, relabelled}}, {{base, relabelled}, {base, labelled}}} {
 		h := MergeHistories(sides[0], sides[1])
-		if len(h.Versions) != 3 || h.Versions[2].Channel != Behaviour || h.Versions[1].Channel != "" {
+		if len(h.Versions) != 3 || h.Versions[2].Channel != behaviour || h.Versions[1].Channel != "" {
 			t.Errorf("merged %+v, want the labelled version last", h.Versions)
 		}
 	}

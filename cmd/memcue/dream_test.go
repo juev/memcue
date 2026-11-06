@@ -71,7 +71,7 @@ func TestDreamGroupsCopiesAndRetiresOne(t *testing.T) {
 	if len(*calls) != 1 {
 		t.Fatalf("calls %d", len(*calls))
 	}
-	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 0 translated, 1 retired or corrected, 0 moved to a project, 0 labelled, 0 refused") {
+	if !strings.Contains(out.String(), "dream: 0 split, 0 expanded, 0 translated, 1 retired or corrected, 0 moved to a project, 0 refused") {
 		t.Errorf("summary missing: %q", out.String())
 	}
 	sent := (*calls)[0]

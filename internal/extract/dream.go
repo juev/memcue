@@ -26,20 +26,11 @@ var dreamPrompt string
 //go:embed scope_prompt.md
 var scopePrompt string
 
-//go:embed channel_prompt.md
-var channelPrompt string
-
 // Rescope moves a global fact that holds in one project to that project's scope (#607).
 type Rescope struct {
 	ID     string `json:"id"`
 	Scope  string `json:"scope"`
 	Reason string `json:"reason"`
-}
-
-// Channel labels a global rule or decision with how it should reach the agent (#625).
-type Channel struct {
-	ID      string `json:"id"`
-	Channel string `json:"channel"`
 }
 
 // answerShape is the one answer a packet takes, with the packet id the model must echo.
@@ -51,18 +42,16 @@ const answerShape = "## Форма ответа\n\n" +
 	` "expansions": [{"id": "…", "queries": ["…", "…"]}],` + "\n" +
 	` "actions": [{"op": "retire|correct", "id": "…", "content": "…", "keywords": ["…"], "queries": ["…"], "by": "…", "kind": "duplicate|outdated", "reason": "…"}],` + "\n" +
 	` "translations": [{"id": "…", "translation": "…"}],` + "\n" +
-	` "scopes": [{"id": "…", "scope": "…", "reason": "…"}],` + "\n" +
-	` "channels": [{"id": "…", "channel": "behaviour|repository|file|command|knowledge|outdated"}]}` + "\n" +
+	` "scopes": [{"id": "…", "scope": "…", "reason": "…"}]}` + "\n" +
 	"```\n\n" +
 	"- `splits` — задача 1, только по фактам из «Данные: разделение».\n" +
 	"- `expansions` — задача 2, только по фактам из «Данные: поисковые запросы»; разделённые факты сюда не включай.\n" +
 	"- `actions` — задача 3, только по фактам из «Данные: группы». У `correct` дай и `queries` для нового текста по " +
 	"правилам задачи 2: старые запросы снимаются вместе со старым текстом.\n" +
 	"- `translations` — задача 4, только по фактам из «Данные: перевод».\n" +
-	"- `scopes` — задача 5, только по фактам из «Данные: область»; `scope` — из её `projects`.\n" +
-	"- `channels` — задача 6, по каждому факту из «Данные: канал».\n"
+	"- `scopes` — задача 5, только по фактам из «Данные: область»; `scope` — из её `projects`.\n"
 
-// DreamInstructions is the text a dream packet starts with: what to do, the six tasks with their rules, and the
+// DreamInstructions is the text a dream packet starts with: what to do, the five tasks with their rules, and the
 // form of the answer to packet id.
 func DreamInstructions(id string) string {
 	var b strings.Builder
@@ -72,7 +61,6 @@ func DreamInstructions(id string) string {
 	b.WriteString("\n## Задача 3. Группы похожих фактов\n\n" + dreamPrompt)
 	b.WriteString("\n## Задача 4. Перевод\n\n" + translatePrompt)
 	b.WriteString("\n## Задача 5. Где верен факт\n\n" + scopePrompt)
-	b.WriteString("\n## Задача 6. Канал факта\n\n" + channelPrompt)
 	b.WriteString("\n" + strings.ReplaceAll(answerShape, "%s", id))
 	return b.String()
 }

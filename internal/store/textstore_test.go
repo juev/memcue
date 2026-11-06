@@ -329,7 +329,7 @@ func TestCacheOfAnOlderSchemaIsBuiltAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.SetChannel(f.ID, f.Version, Behaviour); err != nil {
+	if _, err := s.setChannel(f.ID, f.Version, behaviour); err != nil {
 		t.Fatal(err)
 	}
 	want := dump(t, s)
@@ -347,7 +347,7 @@ func TestCacheOfAnOlderSchemaIsBuiltAgain(t *testing.T) {
 		t.Errorf("rebuilt cache:\n%s\nwant\n%s", got, want)
 	}
 	hist, err := s.History(f.ID)
-	if err != nil || len(hist) != 2 || hist[1].Channel != Behaviour {
+	if err != nil || len(hist) != 2 || hist[1].Channel != behaviour {
 		t.Errorf("history %+v (%v), want the two versions with the label on the second", hist, err)
 	}
 	if aside, _ := filepath.Glob(cache + ".schema6-*"); len(aside) != 1 {

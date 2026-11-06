@@ -117,18 +117,15 @@ func dreamHintTo(how string) string {
 		return ""
 	}
 	n, owed, last, err := dreamDue(dir, dreamEveryFromEnv(dreamEvery))
-	if err != nil || n == 0 && owed.none() {
+	if err != nil || n == 0 && owed == 0 {
 		return ""
 	}
 	var what []string
 	if n > 0 {
 		what = append(what, fmt.Sprintf("%d facts wait for the dream", n))
 	}
-	if owed.translation > 0 {
-		what = append(what, fmt.Sprintf("%d facts lack a translation", owed.translation))
-	}
-	if owed.channel > 0 {
-		what = append(what, fmt.Sprintf("%d global rules and decisions lack a channel", owed.channel))
+	if owed > 0 {
+		what = append(what, fmt.Sprintf("%d facts lack a translation", owed))
 	}
 	return fmt.Sprintf("memcue: %s (last dream %s). When the user's task allows, %s to tidy the memory; never "+
 		"interrupt the user's work for it.", strings.Join(what, ", "), last.Local().Format("2006-01-02 15:04"), how)

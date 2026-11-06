@@ -66,9 +66,6 @@ var (
 	// packetScope is the global facts a dream checks the scope of (#607): a base of 500 of them is done in about 17
 	// dreams, and a fact stored global later is checked by the next one.
 	packetScope = 30
-	// packetChannel is the global rules and decisions a dream labels by channel (#625), the newest first: a base of
-	// 150 of them is done in five dreams, and a fact stored global later is labelled by the next one.
-	packetChannel = 30
 )
 
 // The merge sweep groups facts the dream has already seen, so a duplicate pair that predates the last dream is
@@ -96,8 +93,6 @@ type dreamRecord struct {
 	// global facts the packet gave (#607).
 	Rescoped     []string `json:"rescoped,omitempty"`
 	ScopeChecked int      `json:"scope_checked,omitempty"`
-	// Labelled are the global rules and decisions the dream gave their channel, as "ID CHANNEL" (#625).
-	Labelled []string `json:"labelled,omitempty"`
 	// Expanded counts the facts that got search queries.
 	Expanded int `json:"expanded,omitempty"`
 	// Translated counts the facts that got their translation (#396).
@@ -146,14 +141,6 @@ type dreamPlan struct {
 	ScopeCursor string   `json:"scope_cursor,omitempty"`
 	ScopeFrom   string   `json:"scope_from,omitempty"`
 	ScopeGiven  []string `json:"scope_given,omitempty"`
-	// Channels are the global rules and decisions to label, with the version the model read (#625).
-	Channels []dreamPlanChannel `json:"channels,omitempty"`
-}
-
-type dreamPlanChannel struct {
-	ID      string `json:"id"`
-	Version int    `json:"version"`
-	Channel string `json:"channel"`
 }
 
 type dreamPlanRescope struct {
@@ -303,52 +290,41 @@ func freshFacts(s *store.Store, active []store.Fact, from time.Time, seen map[st
 	return fresh, nil
 }
 
-// dreamOwed is what the active facts still owe a dream besides being read: a translation (#396), a channel (#625).
-type dreamOwed struct {
-	translation, channel int
-}
-
-func (o dreamOwed) none() bool { return o.translation == 0 && o.channel == 0 }
-
-// dreamDue says, when a dream is due, how many facts are fresh and what the active facts are owed: the interval since
-// the last one has passed and some fact is fresh or owed something. A global rule or decision without a channel stays
-// off the card until a dream labels it (#625), so it makes a dream due on its own (#634). The first call on a machine
-// only marks the base, so the facts it already had are not swept by surprise (memcue dream -prepare -all does that).
-func dreamDue(dir string, every time.Duration) (fresh int, owed dreamOwed, last time.Time, err error) {
+// dreamDue says, when a dream is due, how many facts are fresh and how many are owed a translation (#396): the
+// interval since the last one has passed and some fact is either. The first call on a machine only marks the base, so
+// the facts it already had are not swept by surprise (memcue dream -prepare -all does that).
+func dreamDue(dir string, every time.Duration) (fresh, owed int, last time.Time, err error) {
 	last, ok := lastDream(dir)
 	if !ok {
 		unlock, err := lockDream(dir)
 		if err != nil {
-			return 0, owed, time.Time{}, nil // a dream is running: it marks the base itself
+			return 0, 0, time.Time{}, nil // a dream is running: it marks the base itself
 		}
 		defer unlock()
 		if _, ok := lastDream(dir); ok {
-			return 0, owed, time.Time{}, nil
+			return 0, 0, time.Time{}, nil
 		}
-		return 0, owed, time.Time{}, markBase(dir)
+		return 0, 0, time.Time{}, markBase(dir)
 	}
 	if time.Since(last) < every {
-		return 0, owed, last, nil
+		return 0, 0, last, nil
 	}
 	seen, err := readDreamSeen(dir)
 	if err != nil {
-		return 0, owed, last, err
+		return 0, 0, last, err
 	}
 	s, err := openBase()
 	if err != nil {
-		return 0, owed, last, err
+		return 0, 0, last, err
 	}
 	defer func() { _ = s.Close() }()
 	active, err := s.Active()
 	if err != nil {
-		return 0, owed, last, err
+		return 0, 0, last, err
 	}
 	for _, f := range active {
 		if owesTranslation(f) {
-			owed.translation++
-		}
-		if owesChannel(f) {
-			owed.channel++
+			owed++
 		}
 	}
 	fr, err := freshFacts(s, active, last, seen)
@@ -374,13 +350,11 @@ type dreamPacket struct {
 	Translate map[string]int `json:"translate,omitempty"`
 	// Scope are the global facts to check the scope of, and Projects the scopes the model may move them to: the
 	// projects the active facts of the base hold in (#607).
-	Scope       map[string]int `json:"scope,omitempty"`
-	Projects    []string       `json:"projects,omitempty"`
-	ScopeFrom   string         `json:"scope_from,omitempty"`   // the scope cursor the packet started from
-	ScopeCursor string         `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
-	// Channel are the global rules and decisions to label by channel (#625).
-	Channel map[string]int   `json:"channel,omitempty"`
-	Groups  []map[string]int `json:"groups"`
+	Scope       map[string]int   `json:"scope,omitempty"`
+	Projects    []string         `json:"projects,omitempty"`
+	ScopeFrom   string           `json:"scope_from,omitempty"`   // the scope cursor the packet started from
+	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
+	Groups      []map[string]int `json:"groups"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
 	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
 	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
@@ -395,7 +369,6 @@ type dreamAnswer struct {
 	Actions      []extract.Action     `json:"actions"`
 	Translations []extract.Translated `json:"translations"`
 	Scopes       []extract.Rescope    `json:"scopes"`
-	Channels     []extract.Channel    `json:"channels"`
 }
 
 const packetFile = "dream.packet.json"
@@ -550,20 +523,9 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 		projects = knownProjects(active)
 		scopeCursor = scoped[len(scoped)-1].ID
 	}
-	// Global rules and decisions without a channel get one a packet at a time, the newest first (#625): a rule
-	// stored global before the last dream is labelled by this one, and a base is done over a few. A fresh fact waits
-	// for the next packet, since a split of this one would retire it; a labelled fact is not offered again. A fact
-	// a group corrects is refused at apply and offered again.
-	var unlabelled []store.Fact
-	for i := len(active) - 1; i >= 0 && len(unlabelled) < packets*packetChannel; i-- {
-		if f := active[i]; !isBatch[f.ID] && owesChannel(f) {
-			unlabelled = append(unlabelled, f)
-		}
-	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
 		Split: versions(batch), Expand: versions(bare), Translate: versions(owed), Deferred: deferred, Merge: cursor,
-		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor,
-		Channel: versions(unlabelled)}
+		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor}
 	for _, f := range fresh {
 		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
@@ -576,8 +538,7 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 	for _, g := range groups {
 		p.Groups = append(p.Groups, versions(g))
 	}
-	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 && len(scoped) == 0 &&
-		len(unlabelled) == 0 {
+	if len(batch) == 0 && len(bare) == 0 && len(groups) == 0 && len(owed) == 0 && len(scoped) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
 		return rec, work, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
@@ -587,8 +548,8 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 	}
 	rec.Packet = p.ID
 	work = dreamWork{id: p.ID, split: batch, expand: bare, translate: owed, groups: groups, fresh: isBatch,
-		scope: scoped, projects: projects, channel: unlabelled}
-	text, err := renderPacket(p.ID, batch, bare, owed, scoped, projects, unlabelled, groups, isBatch)
+		scope: scoped, projects: projects}
+	text, err := renderPacket(p.ID, batch, bare, owed, scoped, projects, groups, isBatch)
 	if err != nil {
 		return rec, work, err
 	}
@@ -597,10 +558,9 @@ func prepare(dir string, from time.Time, seen map[string]int, list bool, packets
 }
 
 // renderPacket is the text the model reads: the instructions, the groups, the facts to split, expand and translate,
-// the global facts to check the scope of with the projects they may move to, and the global rules and decisions to
-// label by channel.
-func renderPacket(id string, split, expand, translate, scope []store.Fact, projects []string, channel []store.Fact,
-	groups [][]store.Fact, fresh map[string]bool) (string, error) {
+// and the global facts to check the scope of with the projects they may move to.
+func renderPacket(id string, split, expand, translate, scope []store.Fact, projects []string, groups [][]store.Fact,
+	fresh map[string]bool) (string, error) {
 	splitIn, err := renderSplitInput(split)
 	if err != nil {
 		return "", err
@@ -617,17 +577,12 @@ func renderPacket(id string, split, expand, translate, scope []store.Fact, proje
 	if err != nil {
 		return "", err
 	}
-	channelIn, err := renderChannelInput(channel)
-	if err != nil {
-		return "", err
-	}
 	var b strings.Builder
 	b.WriteString(extract.DreamInstructions(id))
 	b.WriteString("\n## Данные: разделение\n\n```json\n" + splitIn + "\n```\n")
 	b.WriteString("\n## Данные: поисковые запросы\n\n```json\n" + expandIn + "\n```\n")
 	b.WriteString("\n## Данные: перевод\n\n```json\n" + translateIn + "\n```\n")
 	b.WriteString("\n## Данные: область\n\n```json\n" + scopeIn + "\n```\n")
-	b.WriteString("\n## Данные: канал\n\n```json\n" + channelIn + "\n```\n")
 	b.WriteString("\n## Данные: группы\n\n")
 	if len(groups) == 0 {
 		b.WriteString("Групп нет.\n")
@@ -727,22 +682,6 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 				Reason: strings.TrimSpace(r.Reason)})
 		}
 	}
-	labelled := map[string]bool{}
-	for _, c := range a.Channels {
-		v, ok := p.Channel[c.ID]
-		ch := strings.ToLower(strings.TrimSpace(c.Channel))
-		switch {
-		case !ok:
-			rec.Refused = append(rec.Refused, "channel "+c.ID+": not a fact of the packet to label")
-		case labelled[c.ID]:
-			rec.Refused = append(rec.Refused, "channel "+c.ID+": second answer about the fact")
-		case !slices.Contains(store.Channels, ch):
-			rec.Refused = append(rec.Refused, "channel "+c.ID+": "+strings.TrimSpace(c.Channel)+" is not a channel")
-		default:
-			labelled[c.ID] = true
-			plan.Channels = append(plan.Channels, dreamPlanChannel{ID: c.ID, Version: v, Channel: ch})
-		}
-	}
 	groups := make([][]store.Fact, len(p.Groups))
 	for i, g := range p.Groups {
 		for _, id := range slices.Sorted(maps.Keys(g)) {
@@ -763,9 +702,8 @@ func applyAnswer(dir, path string, out io.Writer) (dreamRecord, error) {
 	applied.Grouped = groupRecords(p, a.Actions, applied.Actions)
 	if err == nil {
 		_, err = fmt.Fprintf(out, "dream: %d split, %d expanded, %d translated, %d retired or corrected, "+
-			"%d moved to a project, %d labelled, %d refused\n", len(applied.Splits), applied.Expanded,
-			applied.Translated, len(applied.Actions), len(applied.Rescoped), len(applied.Labelled),
-			len(applied.Refused))
+			"%d moved to a project, %d refused\n", len(applied.Splits), applied.Expanded,
+			applied.Translated, len(applied.Actions), len(applied.Rescoped), len(applied.Refused))
 	}
 	if err == nil {
 		err = os.Remove(filepath.Join(dir, packetFile))
@@ -986,9 +924,6 @@ func applyPlan(dir string, plan dreamPlan, rec dreamRecord, out io.Writer) (drea
 	}
 	changedFirst, err := applyRescopes(s, plan.Rescopes, saw, &rec, out)
 	if err != nil {
-		return rec, err
-	}
-	if err := applyChannels(s, plan.Channels, saw, &rec, out); err != nil {
 		return rec, err
 	}
 	scopeCursor := plan.ScopeCursor

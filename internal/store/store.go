@@ -139,22 +139,10 @@ type Meta struct {
 	Evidence      string // the words of the source the fact rests on, verbatim
 	Review        string // empty for a fact written now; Candidate or Provisional in rows written before #514
 	PromptVersion int    // version of the note prompt that produced a migrated fact; 0 for other facts
-	// Channel is how the fact should reach the agent, as a dream labelled it (#625): Behaviour for a fact the card
-	// carries, one of the other channels for a fact search or a moment of work brings; empty until a dream read it,
-	// and again after its text changed.
+	// Channel is the label a dream gave a global rule or decision for the session card (#625), such as behaviour.
+	// No dream writes it since the card went (#656); older versions keep theirs, and a correction drops it.
 	Channel string
 }
-
-// The channels a dream labels a global fact with (#625), the classes of the #606 measurement: behaviour is how to
-// work or answer, with no moment at which the agent would think to search for it; repository is a rule of one
-// repository; file matters when editing a file, command when running a program; knowledge is looked up when a task
-// needs it; outdated is a state that no longer guides work. Only Behaviour admits a global fact to the card.
-const (
-	Behaviour = "behaviour"
-)
-
-// Channels are the labels a dream may give, in the order the model reads them.
-var Channels = []string{Behaviour, "repository", "file", "command", "knowledge", "outdated"}
 
 // FactInput is one new fact for AddBatch: the same fields AddWith takes, without the generated id, author or time.
 type FactInput struct {
@@ -830,28 +818,6 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	}
 	f := cur
 	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
-	return s.write(f)
-}
-
-// SetChannel adds a version of an active fact with the channel a dream labelled it with (#625); the content and
-// everything else stay, the creation time too, as for Relabel. channel must be one of Channels. Like Relabel, it
-// refuses a fact edited since version (ErrChanged) and a retired fact.
-func (s *Store) SetChannel(id string, version int, channel string) (Fact, error) {
-	if !slices.Contains(Channels, channel) {
-		return Fact{}, fmt.Errorf("channel %q is not one of %s", channel, strings.Join(Channels, ", "))
-	}
-	cur, err := s.Get(id)
-	if err != nil {
-		return Fact{}, err
-	}
-	if cur.Version != version {
-		return Fact{}, fmt.Errorf("%w: %s is at version %d, not %d", ErrChanged, id, cur.Version, version)
-	}
-	if cur.Status == Retired {
-		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
-	}
-	f := cur
-	f.Version, f.Author, f.Channel = cur.Version+1, s.author, channel
 	return s.write(f)
 }
 

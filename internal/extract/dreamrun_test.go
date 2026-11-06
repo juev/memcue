@@ -41,7 +41,7 @@ func TestDreamAnswerSendsThePacket(t *testing.T) {
 }
 
 // The schema `claude -p` holds a dream answer to is the answer -apply reads: every part, and the fields an action and a
-// split need.
+// split need. The channel task of #625 went with the card (#656).
 func TestDreamSchemaIsTheAnswer(t *testing.T) {
 	var schema struct {
 		Required   []string                   `json:"required"`
@@ -50,14 +50,16 @@ func TestDreamSchemaIsTheAnswer(t *testing.T) {
 	if err := json.Unmarshal([]byte(dreamSchema), &schema); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"packet", "splits", "expansions", "actions", "translations", "scopes", "channels"}
+	want := []string{"packet", "splits", "expansions", "actions", "translations", "scopes"}
 	if strings.Join(schema.Required, ",") != strings.Join(want, ",") || len(schema.Properties) != len(want) {
 		t.Errorf("schema requires %q with %d properties, want %q", schema.Required, len(schema.Properties), want)
 	}
-	for _, field := range []string{`"by"`, `"kind"`, `"parts"`, `"translation"`, `"queries"`, `"scope"`, `"channel"`,
-		`"behaviour"`} {
+	for _, field := range []string{`"by"`, `"kind"`, `"parts"`, `"translation"`, `"queries"`, `"scope"`} {
 		if !strings.Contains(dreamSchema, field) {
 			t.Errorf("schema lacks %s", field)
 		}
+	}
+	if strings.Contains(dreamSchema, "channel") || strings.Contains(DreamInstructions("p"), "канал") {
+		t.Error("the dream still asks for channels")
 	}
 }
