@@ -229,7 +229,7 @@ func TestDreamHintNamesTheFactsOwedATranslation(t *testing.T) {
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := markDream(state, time.Now().Add(-2*time.Hour)); err != nil {
+	if err := markDream(state, time.Now().Add(-dreamEvery-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if err := writeDreamSeen(state, map[string]int{}); err != nil {

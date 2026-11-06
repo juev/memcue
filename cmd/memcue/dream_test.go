@@ -340,7 +340,7 @@ func TestDreamDueOnlyAfterTheIntervalWithAFreshFact(t *testing.T) {
 	}
 	for _, v := range []string{"", "soon", "10s"} {
 		t.Setenv("MEMCUE_DREAM_EVERY", v)
-		if got := dreamEveryFromEnv(dreamEvery); got != time.Hour {
+		if got := dreamEveryFromEnv(dreamEvery); got != 24*time.Hour { // a day by default (#665)
 			t.Errorf("MEMCUE_DREAM_EVERY=%q gives %v", v, got)
 		}
 	}
@@ -685,7 +685,7 @@ func TestSessionCardNamesTheDreamTools(t *testing.T) {
 	if _, _, _, err := dreamDue(state, time.Hour); err != nil { // the first check marks the base
 		t.Fatal(err)
 	}
-	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
+	if err := markDream(state, time.Now().Add(-dreamEvery-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",

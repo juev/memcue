@@ -168,7 +168,7 @@ func TestSessionStartCarriesTheDreamHint(t *testing.T) {
 		t.Errorf("hint on the first start: %s", got)
 	}
 	addFact(t, "Gradle в demo-app собирается через make build.", "gradle", "make")
-	if err := markDream(state, time.Now().Add(-2*time.Hour)); err != nil {
+	if err := markDream(state, time.Now().Add(-dreamEvery-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if got := start(); !strings.Contains(got, "1 facts wait for the dream") || !strings.Contains(got, "memcue-dream") {

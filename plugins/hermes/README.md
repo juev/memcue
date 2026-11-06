@@ -65,7 +65,7 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 ## Dream
 
-A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last one and some fact is fresh or lacks
+A dream is due once `MEMCUE_DREAM_EVERY` (default `24h`, #665) has passed since the last one and some fact is fresh or lacks
 a translation. With an endpoint configured, the `session-card` call that builds the system prompt starts one
 `memcue dream -run` pass in the background and the hints say nothing of the dream (#569):
 

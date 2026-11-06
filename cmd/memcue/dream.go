@@ -49,8 +49,11 @@ var groupNeighbours = func() recall.Params {
 }()
 
 const (
-	maxGroup   = 6         // facts in one group: a chain of neighbours longer than that is cut
-	dreamEvery = time.Hour // default of MEMCUE_DREAM_EVERY
+	maxGroup = 6 // facts in one group: a chain of neighbours longer than that is cut
+	// dreamEvery is the default of MEMCUE_DREAM_EVERY: a day (#665). Over one day, what search returned did not change
+	// measurably with the dream or without it (#661), and every pass pays the fixed cost of its calls and sweeps 200
+	// facts whether anything is fresh or not (#643), so a day's facts go to the model in one or two passes.
+	dreamEvery = 24 * time.Hour
 )
 
 // The bounds of one packet keep the context a session spends on a dream small: the fresh facts it reviews, the groups

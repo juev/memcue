@@ -23,7 +23,7 @@ func dreamDueNow(t *testing.T, dir string) string {
 	if _, _, _, err := dreamDue(state, time.Hour); err != nil { // the first check marks the base
 		t.Fatal(err)
 	}
-	if err := markDream(state, time.Now().Add(-61*time.Minute)); err != nil {
+	if err := markDream(state, time.Now().Add(-dreamEvery-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	addFact(t, "Workflow nightly-sync.yml в example/nightly-sync ночью подписывает bot на все свои репозитории, кроме форков.",

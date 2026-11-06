@@ -1037,7 +1037,7 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 
 Who runs it:
 
-- **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has
+- **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `24h`, #665) has
   passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks
   the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
   dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
@@ -1178,7 +1178,7 @@ uses.
 | `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |
 | `MEMCUE_NUMBER_TERMS` | versions, dates, ports and addresses are indexed as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)); `0` keeps the old word-only index, and a base indexed word-only is rebuilt on the first open without it | on |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
-| `MEMCUE_DREAM_EVERY` | how long after a dream the next one is due (a Go duration, at least `1m`) | `1h` |
+| `MEMCUE_DREAM_EVERY` | how long after a dream the next one is due (a Go duration, at least `1m`) | `24h` |
 | `MEMCUE_DREAM_BACKGROUND` | `0` keeps the session start from running a due dream in the background; it then says the dream is due instead | on |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes `memcue notes` reads | `$CLAUDE_CONFIG_DIR/memory` |
 | `XDG_STATE_HOME` | where `memcue/search.log` and `memcue/dream.log` are kept | `~/.local/state` |

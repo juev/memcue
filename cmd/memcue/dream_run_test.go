@@ -71,7 +71,7 @@ func dreamedHoursAgo(t *testing.T, dir string) {
 	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := markDream(dir+"/state/memcue", time.Now().Add(-2*time.Hour)); err != nil {
+	if err := markDream(dir+"/state/memcue", time.Now().Add(-dreamEvery-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 }
