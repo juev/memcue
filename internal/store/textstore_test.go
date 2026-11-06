@@ -404,3 +404,102 @@ func TestAStoppedCacheBuildLeavesNoCache(t *testing.T) {
 	}
 	_ = r.Close()
 }
+
+// A version the cache committed while its file could not take it is written to the text before a cache of an older
+// schema is set aside (#640): the new cache is built from the text, and the version would be lost otherwise.
+func TestASetAsideCacheGivesTheTextWhatItLacks(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	s := openTextAt(t, dir, cache, "mac", t0)
+	kept, err := s.AddWith("Порт db1 — 5432", []string{"db1"}, "x 2026-10-19", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the files cannot take the next write: it reaches the cache only
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	bucket := filepath.Dir(FactPath(dir, kept.ID))
+	if err := os.Chmod(bucket, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	onlyCache, err := s.AddWith("Caddy слушает порт 8443", []string{"caddy"}, "x 2026-10-19", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrected, err := s.Correct(kept.ID, "Порт db1 — 5433", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bucket, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if file, _ := ReadFactFile(FactPath(dir, onlyCache.ID)); len(file) != 0 {
+		t.Fatalf("the write reached the text: %+v", file)
+	}
+	// the cache was written by an older memcue: the next open sets it aside
+	if _, err := s.db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion-1)); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	s = openTextAt(t, dir, cache, "laptop", t0)
+	defer func() { _ = s.Close() }()
+	if got, err := s.Get(onlyCache.ID); err != nil || got.Content != onlyCache.Content {
+		t.Errorf("the fact only the old cache held: %+v %v", got, err)
+	}
+	if got, err := s.Get(kept.ID); err != nil || got.Version != corrected.Version || got.Content != "Порт db1 — 5433" {
+		t.Errorf("the correction only the old cache held: %+v %v", got, err)
+	}
+	textMatches(t, s)
+}
+
+// A write whose file failed stays owed after a later write succeeds (#640): the later write used to save the count of
+// the cache, the next open then saw the files as complete, and the version stayed in the cache only, out of git and
+// off the other machines.
+func TestAFailedFileWriteIsNotHiddenByALaterOne(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes into a read-only directory")
+	}
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	s := openTextAt(t, dir, cache, "mac", t0)
+	kept, err := s.AddWith("Порт db1 — 5432", []string{"db1"}, "x 2026-10-19", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	bucket := filepath.Dir(FactPath(dir, kept.ID))
+	if err := os.Chmod(bucket, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	// a new fact needs a new file and fails; a correction appends to the file it has and succeeds
+	lost, err := s.AddWith("Caddy слушает порт 8443", []string{"caddy"}, "x 2026-10-19", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(kept.ID, "Порт db1 — 5433", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bucket, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if file, _ := ReadFactFile(FactPath(dir, lost.ID)); len(file) != 0 {
+		t.Fatalf("the failed write reached the text: %+v", file)
+	}
+	_ = s.Close()
+	s = openTextAt(t, dir, cache, "laptop", t0)
+	defer func() { _ = s.Close() }()
+	if file, err := ReadFactFile(FactPath(dir, lost.ID)); err != nil || len(file) != 1 || file[0].Content != lost.Content {
+		t.Errorf("the next open did not write the failed version: %+v %v", file, err)
+	}
+	textMatches(t, s)
+}

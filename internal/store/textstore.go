@@ -28,6 +28,7 @@ import (
 const (
 	textDirsStamp = "text-dirs" // JSON object: directory name → modification time in nanoseconds
 	textRowsStamp = "text-rows" // versions of the cache known to be in the files
+	textRowsDirty = "dirty"     // a write to the files failed since the last open brought them together
 )
 
 // OpenText opens the base whose history is the text at dir, with its cache at cache. A cache that does not open (a
@@ -40,9 +41,8 @@ func OpenText(dir, cache string) (*Store, error) {
 		return nil, err
 	}
 	if v, err := cacheSchema(cache); err == nil && v > 0 && v < schemaVersion {
-		aside := fmt.Sprintf("%s.schema%d-%d", cache, v, time.Now().Unix())
-		if err := os.Rename(cache, aside); err != nil {
-			return nil, err
+		if err := setAside(dir, cache, v); err != nil {
+			return nil, fmt.Errorf("text history %s: %w", dir, err)
 		}
 	}
 	if err := buildCache(dir, cache); err != nil {
@@ -81,15 +81,11 @@ func buildCache(dir, cache string) error {
 	if err := os.MkdirAll(filepath.Dir(cache), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(lock, os.O_RDWR|os.O_CREATE, 0o600)
+	unlock, err := lockFile(lock)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		return err
-	}
-	defer func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) }()
+	defer unlock()
 	if _, err := os.Stat(cache); err == nil || !errors.Is(err, os.ErrNotExist) {
 		return err // built by another process while this one waited
 	}
@@ -112,6 +108,75 @@ func buildCache(dir, cache string) error {
 		return err
 	}
 	return os.Rename(build, cache)
+}
+
+// setAside moves a cache of the older schema v out of the way, to be built again from the text (#625). A version the
+// cache committed but its file did not get (the append after the commit failed, #640) is in no file yet: the next
+// open of the same schema would write it, and setting the cache aside would lose it. So the versions the files lack
+// go into them first, under the lock of the text.
+func setAside(dir, cache string, v int) error {
+	unlock, err := lockFile(cache + ".lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if now, err := cacheSchema(cache); err != nil || now != v {
+		return err // set aside by another process while this one waited
+	}
+	if err := rescueVersions(dir, cache); err != nil {
+		return err
+	}
+	return os.Rename(cache, fmt.Sprintf("%s.schema%d-%d", cache, v, time.Now().Unix()))
+}
+
+// rescueVersions appends to the fact files the versions the cache at cache holds past the last version of each file.
+// It reads every file rather than trust the stamp textRowsStamp: an older memcue saved the count after a write that
+// succeeded even when an earlier one had failed, so its stamp can claim versions no file holds (#640). A set-aside
+// happens once an upgrade, while the build that follows reads every file anyway. A version numbered at or below a
+// file's last one stays out: a file that git changed since holds a history only a merge could bring together, and
+// this memcue would not merge with a cache of another schema. A cache it cannot read (a hot journal) is set aside as
+// before and kept next to the new one: an open must not fail on it.
+func rescueVersions(dir, cache string) error {
+	r, err := OpenReadOnly(cache)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = r.Close() }()
+	all, err := r.Rows()
+	if err != nil {
+		return err
+	}
+	byID := map[string][]Fact{}
+	var ids []string
+	for _, f := range all {
+		if _, ok := byID[f.ID]; !ok {
+			ids = append(ids, f.ID)
+		}
+		byID[f.ID] = append(byID[f.ID], f)
+	}
+	for _, id := range ids {
+		path := FactPath(dir, id)
+		file, err := ReadFactFile(path)
+		if err != nil {
+			return err
+		}
+		last := 0
+		for _, f := range file {
+			last = max(last, f.Version)
+		}
+		var missing []Fact
+		for _, f := range byID[id] {
+			if f.Version > last {
+				missing = append(missing, f)
+			}
+		}
+		if len(missing) > 0 {
+			if err := appendFacts(path, missing); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // cacheSchema is the schema version of the cache file at path as it is, 0 for a file that is not there.
@@ -139,7 +204,12 @@ func (s *Store) Text() string { return s.text }
 // lockText holds the files of the base for this process until the returned function runs: an append and the
 // rewrite of the same file by another process must not interleave.
 func (s *Store) lockText() (func(), error) {
-	f, err := os.OpenFile(s.textLock, os.O_RDWR|os.O_CREATE, 0o600)
+	return lockFile(s.textLock)
+}
+
+// lockFile holds an exclusive lock on the file at path, created when missing, until the returned function runs.
+func lockFile(path string) (func(), error) {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -153,15 +223,18 @@ func (s *Store) lockText() (func(), error) {
 	}, nil
 }
 
-// textWritten appends the versions the cache has just committed to their files. A failure leaves the stamp behind,
-// and the next open writes what is missing; the write itself has already succeeded, and repeating it would store a
-// second fact.
+// textWritten appends the versions the cache has just committed to their files. A failure marks the stamp dirty, and
+// the next open writes what is missing; the write itself has already succeeded, and repeating it would store a second
+// fact. A later write that succeeds leaves a dirty stamp as it is: saving its count would tell the next open that the
+// files hold every version, the one that failed included (#640).
 func (s *Store) textWritten(versions ...Fact) {
 	if s.text == "" || len(versions) == 0 {
 		return
 	}
+	dirty := func() { _ = saveStamp(s.db, textRowsStamp, textRowsDirty) }
 	unlock, err := s.lockText()
 	if err != nil {
+		dirty()
 		return
 	}
 	defer unlock()
@@ -175,8 +248,12 @@ func (s *Store) textWritten(versions ...Fact) {
 	}
 	for _, id := range ids {
 		if err := appendFacts(FactPath(s.text, id), byID[id]); err != nil {
+			dirty()
 			return
 		}
+	}
+	if v, err := s.stamp(textRowsStamp); err != nil || v == textRowsDirty {
+		return
 	}
 	_ = s.saveTextRows()
 }
