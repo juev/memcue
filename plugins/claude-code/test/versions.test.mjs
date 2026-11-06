@@ -27,7 +27,7 @@ test('the README compatibility table names the same release', async () => {
 	assert.match(readme, /0\.28\.0 \(`hermes-agent` 0\.15\.2\)/)
 })
 
-test('the README describes the per-base state and the Hermes card', async () => {
+test('the README describes the per-base state, and the Hermes README no card', async () => {
 	const readme = await readFile(new URL('README.md', root), 'utf8')
 	assert.match(readme, /MEMCUE_STATE_DIR/)
 	assert.match(readme, /per-base subdirectory/)
@@ -36,8 +36,8 @@ test('the README describes the per-base state and the Hermes card', async () => 
 	assert.ok(!readme.includes('no separate card'), 'README still says Hermes has no card')
 
 	const hermes = await readFile(new URL('plugins/hermes/README.md', root), 'utf8')
-	assert.match(hermes, /session_card/)
-	assert.match(hermes, /session card/i)
+	assert.match(hermes, /No card of rules/)
+	assert.doesNotMatch(hermes, /MEMCUE_CARD_BUDGET/, 'the Hermes README still names the card budget (#656)')
 })
 
 test('the docs and the CLI help name the per-base state directory, not the flat pause path', async () => {

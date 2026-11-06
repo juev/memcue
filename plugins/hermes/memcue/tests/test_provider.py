@@ -163,7 +163,7 @@ class ProviderTest(unittest.TestCase):
         self.assertFalse(p.is_available())
         self.assertIn("absolute", p.unavailable_reason())
 
-    def test_an_older_binary_turns_the_card_off(self):
+    def test_an_older_binary_turns_the_hints_off(self):
         stub = Path(self.home, "old-memcue")
         stub.write_text("#!/bin/sh\ncase \"$1\" in\n  version) printf '{\"version\":\"0.3.0\"}\\n' ;;\n"
                         "  hook) printf '{}\\n' ;;\nesac\nexit 0\n", encoding="utf-8")
@@ -171,7 +171,7 @@ class ProviderTest(unittest.TestCase):
         p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
         p.initialize("s1", hermes_home=self.home)
         self.assertFalse(p._binary_ok())
-        self.assertEqual(p._card_text(), "")
+        self.assertEqual(p._hints_text(), "")
 
     def test_the_current_binary_is_compatible(self):
         self.assertTrue(self.p._binary_ok())
@@ -191,10 +191,10 @@ class ProviderTest(unittest.TestCase):
         p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "facts": base})
         p.initialize("s1", hermes_home=self.home)
         block = p.system_prompt_block()
-        self.assertIn("memcue_search", block)  # the note stays without the card
+        self.assertIn("memcue_search", block)  # the note stays without the hints
         self.assertNotIn("memcue: rules and decisions", block)
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 1)
-        # Hermes asks again only when it rebuilds the system prompt; that rebuild asks for the card again.
+        # Hermes asks again only when it rebuilds the system prompt; that rebuild asks for the hints again.
         p.system_prompt_block()
         self.assertEqual(counter.read_text(encoding="utf-8").count("x"), 2)
 
@@ -344,40 +344,35 @@ class ProviderTest(unittest.TestCase):
         subprocess.run(cmd + ["--", content], check=True, capture_output=True,
                        env=dict(os.environ, MEMCUE_FACTS=self.p._facts))
 
-    def test_session_card_is_in_the_system_prompt_not_in_the_prefetch(self):
+    def test_no_card_in_the_system_prompt(self):
+        """No card of rules (#656): the user's stated rule stays in the base, before and after a compression; the note
+        has the model search the rules and decisions at the start of a task instead, and the search tool says so."""
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
                     "Всегда отвечай пользователю по-русски.")
         block = self.p.system_prompt_block()
         self.assertIn("memcue_search", block)
-        self.assertIn("memcue: rules and decisions", block)
-        self.assertIn("Всегда отвечай", block)
+        self.assertNotIn("Всегда отвечай", block)
+        self.assertNotIn("memcue: rules and decisions", block)
+        self.assertIn("No card of rules comes with this prompt", block)
+        self.assertIn("call memcue_search with kind rule,decision and the words of the task", block)
+        self.assertIn("Skip it when the user's message and the repository's files hold everything", block)
+        self.assertIn("search with kind rule,decision", memcue_provider.SEARCH_SCHEMA["description"])
         self.assertEqual(self.p.prefetch("любой вопрос", session_id="s1"), "")
-        # A rebuild after a compression carries the card again, as a view of the base.
         self.p.on_pre_compress([])
-        self.assertIn("Всегда отвечай", self.p.system_prompt_block())
-
-    def test_the_shelf_text_follows_the_note_and_precedes_the_card(self):
-        """#567: the research-shelf text measured in #531 sits after the memory note and before the session card, where
-        the confirming run had it."""
-        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Всегда отвечай пользователю по-русски.")
+        self.assertNotIn("Всегда отвечай", self.p.system_prompt_block())
+    def test_the_shelf_text_follows_the_note(self):
+        """#567: the research-shelf text measured in #531 sits after the memory note, where the confirming run had it."""
         block = self.p.system_prompt_block()
         note = block.index("To fix a stored fact")
         shelf = block.index(memcue_provider._SHELF_NOTE)
-        card = block.index("memcue: rules and decisions")
         self.assertLess(note, shelf)
-        self.assertLess(shelf, card)
 
-    def test_the_pitfall_line_follows_the_shelf_text_and_precedes_the_card(self):
-        """#566: the pitfall line sits between the shelf text and the session card, where the measured run had it."""
-        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Всегда отвечай пользователю по-русски.")
+    def test_the_pitfall_line_follows_the_shelf_text(self):
+        """#566: the pitfall line follows the shelf text, where the measured run had it; no card follows it (#656)."""
         block = self.p.system_prompt_block()
         shelf = block.index(memcue_provider._SHELF_NOTE)
         pitfall = block.index(memcue_provider._FAILURE_NOTE)
-        card = block.index("memcue: rules and decisions")
         self.assertLess(shelf, pitfall)
-        self.assertLess(pitfall, card)
 
     def test_the_note_sends_an_empty_search_to_the_session_history(self):
         """#621: Hermes keeps its own session history and searches it with session_search, so an empty memcue_search
@@ -398,7 +393,8 @@ class ProviderTest(unittest.TestCase):
                 self.assertIn("unexpected error", text)
                 self.assertIn("short query naming the system and the problem", text)
                 self.assertIn("against the current state", text)
-                self.assertIn("before answering" if text is search else "Before you answer", text)
+                self.assertIn("before answering" if text is search else "when the answer or the next step may depend",
+                              text)
                 self.assertIn("earlier sessions", text)
                 for word in ("must", "always", "every tool"):
                     self.assertNotIn(word, text.lower())
@@ -433,61 +429,9 @@ class ProviderTest(unittest.TestCase):
         p.handle_tool_call("memcue_search", {"query": "vega-3 ssh"})  # the model's own call is the one that searches
         self.assertIn("search", calls.read_text(encoding="utf-8").split())
 
-    def _notes_and_rules(self) -> list:
-        """Memory notes and the card rules of #456 next to them: copies of a note, and rules in the same words that
-        negate a note or add a condition to it. Returns the rules."""
-        memories = Path(self.home) / "memories"
-        memories.mkdir()
-        (memories / "MEMORY.md").write_text(
-            "Изменения скиллов агента пушить напрямую в ветку main репозитория скиллов, без отдельных веток и ревью.\n§\n"
-            "Перед каждым коммитом гонять полный набор тестов проекта.\n", encoding="utf-8")
-        (memories / "USER.md").write_text(
-            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
-        rules = ["Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.",
-                 "Перед каждым коммитом гонять полный набор тестов проекта.",
-                 "Изменения скиллов агента никогда не пушить напрямую в ветку main репозитория скиллов: только через "
-                 "отдельную ветку и ревью.",
-                 "Полный набор тестов гонять перед коммитом, только если правка задевает пакет store.",
-                 "Сначала вся работа заводится задачами (issue), и только потом выполняется."]
-        for content in rules:
-            self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--", content)
-        return rules
-
-    def test_the_card_keeps_what_the_memory_notes_say(self):
-        """The plugin drops no card line (#456): a copy of a memory note, a rule in the same words that negates a note
-        or adds a condition to it, and a rule the notes do not carry all reach the prompt, whether Hermes injects its
-        memory or not. The block is the memory note, a blank line and the card exactly as memcue renders it."""
-        rules = self._notes_and_rules()
-        card = self.p._card_text()
-        self.assertEqual(sum(line.startswith("- ") for line in card.splitlines()), len(rules))
-        blocks = []
-        for flags in ((True, True), (True, False), (False, True), (False, False)):
-            with self.subTest(flags=flags), \
-                    unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
-                block = self.p.system_prompt_block()
-                self.assertTrue(block.startswith("# Long-term memory (memcue)\n"))
-                self.assertTrue(block.endswith("\n\n" + card))
-                self.assertEqual(block.count("memcue: rules and decisions"), 1)
-                for content in rules:
-                    self.assertIn(content, block)
-                blocks.append(block)
-        self.assertEqual(len(set(blocks)), 1)
-
-    def test_a_card_of_copies_only_is_a_card(self):
-        """A card whose every line repeats a memory note still goes in whole (#456)."""
-        memories = Path(self.home) / "memories"
-        memories.mkdir()
-        (memories / "USER.md").write_text(
-            "- Мержит PR сразу после зелёных проверок и не ждёт отдельного подтверждения.\n", encoding="utf-8")
-        self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
-                    "Пользователь мержит PR сразу после зелёных проверок, отдельного подтверждения не ждёт.")
-        block = self.p.system_prompt_block()
-        self.assertIn("memcue: rules and decisions", block)
-        self.assertIn("Пользователь мержит PR сразу после зелёных проверок", block)
-
     def test_a_memory_hermes_turned_off_is_no_note(self):
         """memory.memory_enabled and memory.user_profile_enabled turn the built-in memory off and leave its files (#494):
-        a file Hermes no longer injects is not warned about. The card is the same either way (#456)."""
+        a file Hermes no longer injects is not warned about."""
         memories = Path(self.home) / "memories"
         memories.mkdir()
         (memories / "MEMORY.md").write_text(
@@ -498,7 +442,6 @@ class ProviderTest(unittest.TestCase):
         for flags, injected in (((True, True), True), ((False, True), False)):
             with self.subTest(flags=flags), \
                     unittest.mock.patch.object(memcue_provider, "_builtin_memory_flags", return_value=flags):
-                self.assertIn("в навыках были только процедуры", self.p.system_prompt_block())
                 p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
                 if injected:
                     with self.assertLogs("memcue_provider", level="WARNING") as logs:
@@ -629,15 +572,15 @@ class ProviderTest(unittest.TestCase):
             "content": finding, "source": "tool", "shelf": "research"}))
         self.assertNotIn("error", stored)
 
-    def test_a_stated_rule_reaches_the_card(self):
-        """A rule or decision is the user's words by default, and only those reach the session card (#494); another
-        source is passed as given, and an unknown one is refused."""
+    def test_a_rule_is_the_users_words_by_default(self):
+        """A rule or decision is the user's words by default (#494), found by search and not put in the prompt (#656);
+        another source is passed as given, and an unknown one is refused."""
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Всегда пиши коммиты по-английски.", "kind": "rule", "scope": "global"}))
         fact_id = added["result"].split()[0]
         line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
         self.assertIn("source=user", line)
-        self.assertIn("Всегда пиши коммиты", self.p.system_prompt_block())
+        self.assertNotIn("Всегда пиши коммиты", self.p.system_prompt_block())
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Контейнер demo пишет логи в /var/log/demo.", "kind": "environment", "source": "tool"}))
         fact_id = added["result"].split()[0]
@@ -645,8 +588,8 @@ class ProviderTest(unittest.TestCase):
         self.assertIn("source=tool", line)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {"content": "x", "source": "boss"})))
 
-    def test_the_card_asks_for_the_dream_tools(self):
-        """With no extraction, the card's hint is what starts a dream in Hermes (#494): the card asks memcue to name
+    def test_the_hints_ask_for_the_dream_tools(self):
+        """With no extraction, the hint is what starts a dream in Hermes (#494): session-card asks memcue to name
         the dream tools, unless dream is off or the binary predates the flag."""
         for version, config, want in (("0.19.0", {}, True), ("0.18.1", {}, False), ("0.19.0", {"dream": False}, False)):
             with self.subTest(version=version, config=config):
@@ -1125,24 +1068,19 @@ class ProviderTest(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(out, "mac")
 
-    def test_session_card_chars_is_forwarded_to_memcue(self):
-        # The binary places the card's lines (#487): the plugin passes the budget on and cuts nothing itself.
+    def test_no_card_budget_reaches_memcue(self):
+        """The card and its budget went (#656): an old session_card_chars in the config passes nothing on."""
         script = Path(self.home) / "budget.sh"
         script.write_text("#!/bin/sh\nprintf '%s' \"${MEMCUE_CARD_BUDGET-unset}\"\n", encoding="utf-8")
         script.chmod(0o755)
         env = dict(os.environ)
         env.pop("MEMCUE_CARD_BUDGET", None)
         with unittest.mock.patch.dict(os.environ, env, clear=True):
-            for value, want in [("1200", "1200"), (None, "unset"), ("0", "unset"), ("-5", "unset"), ("x", "unset")]:
-                config = {"binary": str(script)}
-                if value is not None:
-                    config["session_card_chars"] = value
-                p = memcue_provider.MemcueMemoryProvider(config)
-                p.initialize("s1", hermes_home=self.home, agent_context="primary")
-                ok, out = p._run([])
-                self.assertTrue(ok)
-                self.assertEqual(out, want, value)
-
+            p = memcue_provider.MemcueMemoryProvider({"binary": str(script), "session_card_chars": "1200"})
+            p.initialize("s1", hermes_home=self.home, agent_context="primary")
+            ok, out = p._run([])
+            self.assertTrue(ok)
+            self.assertEqual(out, "unset")
     def test_endpoint_config_is_forwarded_to_memcue(self):
         """The endpoint of a background dream (#569): the URL and the model as configured, the key from the named
         environment variable, and dream: false turns the background dream off."""

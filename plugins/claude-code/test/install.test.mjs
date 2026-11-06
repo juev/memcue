@@ -96,7 +96,7 @@ test('MEMCUE_AUTO_INSTALL=0 downloads nothing', { skip: !os || !arch }, () => {
 	assert.match(out, /MEMCUE_AUTO_INSTALL=0/)
 })
 
-test('a later part of the card installs nothing and says nothing without a current binary (#480)', { skip: !os || !arch }, () => {
+test('a later part of an older plugin installs nothing and says nothing without a current binary (#480)', { skip: !os || !arch }, () => {
 	const { env, bin, installed } = setup()
 	assert.equal(run(env, ['session-start', '-part', '2'], '{}'), '')
 	assert.equal(existsSync(installed), false, 'only part 1 may install')

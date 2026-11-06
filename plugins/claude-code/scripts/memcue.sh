@@ -119,8 +119,8 @@ note() {
 
 cmd=${1:-}
 bin=$(resolve)
-# The card comes in parts, one hook each, and the hooks run at once (#480): part 1 installs and tells what is missing,
-# the others print nothing unless a current binary is already there.
+# A plugin before #656 declared three parts, one hook each, run at once (#480): part 1 installs and tells what is
+# missing, the others print nothing unless a current binary is already there. This plugin asks for part 1 only.
 if [ "$cmd" = session-start ] && [ "${2:-}" = -part ] && [ "${3:-}" != 1 ]; then
 	{ [ -n "$bin" ] && current "$bin"; } || exit 0
 	exec "$bin" "$@"
@@ -141,7 +141,7 @@ if [ "$cmd" = session-start ]; then
 		exit 0
 	fi
 	if ! current "$bin"; then
-		note "memcue: the binary is older than $version; update memcue to get the session card and the facts again after a compaction."
+		note "memcue: the binary is older than $version; update memcue to get the current memory note."
 		exit 0
 	fi
 fi

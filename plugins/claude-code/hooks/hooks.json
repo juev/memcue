@@ -1,5 +1,5 @@
 {
-  "description": "memcue: the note to search and keep memory, and the session card, at session start",
+  "description": "memcue: the note to search and keep memory, at session start",
   "hooks": {
     "SessionStart": [
       {
@@ -8,24 +8,6 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 1 || true",
             "timeout": 90
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 2 || true",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/memcue.sh\" session-start -part 3 || true",
-            "timeout": 30
           }
         ]
       }

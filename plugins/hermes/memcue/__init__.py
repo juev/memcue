@@ -1,12 +1,13 @@
 """memcue memory provider for Hermes Agent.
 
 Runs the ``memcue`` binary (github.com/juev/memcue): no facts come with a message; the model searches the base itself
-with ``memcue_search`` before it answers from earlier sessions (#361), and the session card (global rules and decisions, and
-the decisions of the repository) is part of the system prompt, which Hermes builds once and rebuilds after a compression
-or a reset (#363), but not for a cron run. The model keeps the memory itself (#494): it stores a rule, a correction,
+with ``memcue_search`` when an answer may depend on earlier sessions (#361), and the user's rules and decisions at the
+start of a task: no card of them comes with the system prompt since #656. The system prompt, which Hermes builds once
+and rebuilds after a compression or a reset (#363), carries the note and the hints of the binary, but not for a cron
+run. The model keeps the memory itself (#494): it stores a rule, a correction,
 a decision, a pitfall or an external pointer with ``memcue_add`` when it learns it, and fixes a fact with
 ``memcue_correct`` or ``memcue_retire``; nothing is extracted from the session afterwards. When a dream is due and
-an endpoint is configured, the session card's call starts it in the background (#569); without one the system prompt
+an endpoint is configured, the hints' call starts it in the background (#569); without one the system prompt
 says so, and the model runs it with ``memcue_dream_prepare`` and ``memcue_dream_apply``. Every write of
 the built-in memory tool is mirrored into the base as a live fact (#440: add → ``memcue add``, replace → ``memcue
 correct``, remove → ``memcue retire``), with the origin ``hermes-memory``, a kind (``rule`` for a user preference or
@@ -19,9 +20,6 @@ Config, all optional (``memory.memcue`` in config.yaml):
   binary: path to memcue (default: found on PATH)
   host: name of this machine for fact scope and the search tie-break (passed as MEMCUE_HOST; default: the
           environment's MEMCUE_HOST, else the host name; set it where a container's host name is unstable)
-  session_card: put the session card (global rules and decisions, repository decisions) in the system prompt (default true)
-  session_card_chars: most characters of the session card (passed as MEMCUE_CARD_BUDGET; default 0 keeps the
-          binary's 3500); the binary drops the oldest user-stated rule first and counts what it left out
   dream: run a due dream, in the background on the endpoint below or else by the model on the system prompt's hint
           (default true)
   api_url, model, api_key_env: the OpenAI-compatible endpoint a background dream and the search queries of
@@ -101,7 +99,7 @@ _RULE_WORDS = ("всегда", "никогда", "не ", "только", "сн�
                "before you")
 _PITFALL_NOTE = re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, _PITFALL_WORDS)) + ")", re.IGNORECASE)
 _RULE_NOTE = re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, _RULE_WORDS)) + ")", re.IGNORECASE)
-_WARN_EVERY = 600  # seconds between two "session card failed" warnings of a session
+_WARN_EVERY = 600  # seconds between two "session hints failed" warnings of a session
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_@./:-]{6,}")
 _MIN_BINARY = "0.4.0"  # session-card appeared here
 _SCOPED_SEARCH = "0.8.0"  # search -cwd and -session appeared here (#361); an older binary searches without them
@@ -317,7 +315,8 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
-    "or retiring it. During work you may also search, when you decide it helps: on starting with a specific host, "
+    "or retiring it. No card of the user's rules comes with the prompt: at the start of a task, search with kind "
+    "rule,decision and the words of the task. During work you may also search, when you decide it helps: on starting with a specific host, "
     "service or repository, and before diagnosing an unexpected error or result, with a short query naming the "
     "system and the problem; check what comes back against the current state. The facts are in Russian and English: write the query in one of them. Only the facts that fit come back: fewer than limit means the rest fell below the score floor (min_score 0) or outside the scope (in all), not that the words are wrong; none means the base has nothing on them, so try other words or the other language. By default it searches "
     "the whole base — a chat is not about one repository — except the shelf, and leaves out expired facts; the "
@@ -355,12 +354,10 @@ ADD_SCHEMA = _schema(
      "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
                 "omit for a fact that stays true.",
      "kind": "Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event "
-             "(what happened that the next days need; expires after a week unless expires is given). A rule or "
-             "decision the user stated goes on the session card.",
-     "source": "Optional who said it: user (the user's words; the default for rule and decision; a global "
-               "decision reaches the session card only with it), user_confirmed, tool (seen in a tool's output) or "
-               "agent (the default otherwise).",
-     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo, because a global one the user stated is on every session card.",
+             "(what happened that the next days need; expires after a week unless expires is given).",
+     "source": "Optional who said it: user (the user's words; the default for rule and decision), "
+               "user_confirmed, tool (seen in a tool's output) or agent (the default otherwise).",
+     "scope": "Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo.",
      "shelf": "Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with "
               "in shelf:<name>. For what was read from outside sources; omit scope when you pass it."},
     ["content"])
@@ -397,10 +394,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._context = "primary"
         self._dreams = True
         self._generation = 0  # grows with every compression: the facts of an earlier context may come again
-        self._session_card = _on(self._config.get("session_card", True))
         self._dream = _on(self._config.get("dream", True))
         self._search_facts = _bounded_int(self._config.get("search_facts"), _SEARCH_FACTS, 1, 50)
-        self._card_chars = _bounded_int(self._config.get("session_card_chars"), 0, 0, 100_000)
         self._lock = threading.Lock()
         self._host = str(self._config.get("host") or "")
         self._api_url = str(self._config.get("api_url") or "")
@@ -414,7 +409,7 @@ class MemcueMemoryProvider(MemoryProvider):
         self._bin: Optional[str] = None  # the binary chosen without a configured one
         self._installing: Optional[threading.Thread] = None
         self._warned_compat = False
-        self._warned_card: dict[str, float] = {}  # session -> when its last card failure was reported
+        self._warned_hints: dict[str, float] = {}  # session -> when its last hints failure was reported
         self._warned_memory = False
 
     @property
@@ -476,8 +471,8 @@ class MemcueMemoryProvider(MemoryProvider):
         self._installing.start()
 
     def _binary_ok(self) -> bool:
-        """Whether the binary has session-card. A plugin installed from this repository runs beside a binary
-        installed separately, so check once and say why instead of failing the card silently."""
+        """Whether the binary has session-card, which gives the hints. A plugin installed from this repository runs
+        beside a binary installed separately, so check once and say why instead of failing the hints silently."""
         if self._compat is not None:
             return self._compat
         self._compat = True
@@ -496,7 +491,7 @@ class MemcueMemoryProvider(MemoryProvider):
             self._compat = False
             if not self._warned_compat:
                 self._warned_compat = True
-                logger.warning("memcue %s is older than %s: the session card is off, search still works; update "
+                logger.warning("memcue %s is older than %s: the hints are off, search still works; update "
                                "memcue", version or "unknown", _MIN_BINARY)
         return self._compat
 
@@ -572,16 +567,19 @@ class MemcueMemoryProvider(MemoryProvider):
             logger.debug("memcue base marker: %s", e)
 
     def system_prompt_block(self) -> str:
-        """The memory note and the session card. Hermes caches the system prompt and asks again only when it rebuilds
-        it, after a compression or a reset, so the card is built here and needs no redelivery of its own (#363). The
-        card goes in as memcue renders it: a line that repeats the memory block next to it stays, since a text rule
-        that drops copies also drops another rule in the same words (#456)."""
-        card = self._card_text()
+        """The memory note and the hints of the binary. Hermes caches the system prompt and asks again only when it
+        rebuilds it, after a compression or a reset (#363). No card of rules comes with it (#656): the note has the
+        model search the user's rules and decisions at the start of a task, as measured in #647."""
+        hints = self._hints_text()
         return ("# Long-term memory (memcue)\n"
-                "Before you answer a question that may depend on earlier sessions (past decisions, how a host, "
-                "service or repository is set up, how something was done before, what did not work), search the base "
-                "with memcue_search, several times with synonyms, the system name and both languages if the first try "
-                "finds nothing. When memcue_search finds nothing, search the history of earlier sessions with "
+                "Search the base with memcue_search when the answer or the next step may depend on what an earlier "
+                "session knew: what the user decided or asked for, how a host, service or repository is set up, how "
+                "something was done before, what failed. Skip it when the user's message and the repository's files "
+                "hold everything the task needs. Search several times with synonyms, the system name and both "
+                "languages if the first try finds nothing. No card of rules comes with this prompt: the user's rules "
+                "and decisions from earlier sessions stay in the base. Before you start a task, and again when it "
+                "turns to another system, call memcue_search with kind rule,decision and the words of the task (in "
+                "global for the rules that hold everywhere) and follow what applies. When memcue_search finds nothing, search the history of earlier sessions with "
                 "session_search and the same words: a passage of an earlier session is history, not a fact, so check "
                 "it against the current state, and store what holds with memcue_add. During work, search when you decide it may help: on starting with a specific host, "
                 "service or repository where earlier context may matter, and before you diagnose an unexpected error "
@@ -593,10 +591,10 @@ class MemcueMemoryProvider(MemoryProvider):
                 "pitfall, a host, a service or a pointer that a later session will need, store it at once with "
                 "memcue_add. Search first, and correct a stored fact instead of adding a second copy. To fix a "
                 "stored fact, find it with memcue_search, then memcue_correct or memcue_retire."
-                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + ("\n\n" + card if card else ""))
+                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + ("\n\n" + hints if hints else ""))
 
     def _memory_notes(self) -> list[str]:
-        """The entries of the built-in memory that the prompt carries next to the card: MEMORY.md and USER.md of this
+        """The entries of the built-in memory that the prompt carries next to the note: MEMORY.md and USER.md of this
         Hermes home, one entry per bullet or paragraph. A missing file is no entry, and so is a file Hermes no longer
         injects: memory.memory_enabled and memory.user_profile_enabled turn the two off, and the files stay (#494)."""
         home = Path(self._state).parent
@@ -612,11 +610,11 @@ class MemcueMemoryProvider(MemoryProvider):
             entries += [e.strip() for e in re.split(r"\n\s*\n|§", text) if e.strip()]
         return entries
 
-    def _card_text(self) -> str:
-        """The session card: global rules, the rules and global decisions the user stated and the decisions of the current repository. A
-        card is a view of the base: the next one reflects corrections and retirements. A cron run gets none: it is a
-        background task, not a session of a user."""
-        if not self._session_card or self._context == "cron" or not self._binary_ok():
+    def _hints_text(self) -> str:
+        """The hints of session-card: what this machine owes an upgrade and, without a background dream, that a dream
+        is due. Empty output is the usual answer: nothing to say. A cron run gets none: it is a background task, not a
+        session of a user."""
+        if self._context == "cron" or not self._binary_ok():
             return ""
         if not self._facts or not Path(self._facts).exists():
             return ""
@@ -628,11 +626,13 @@ class MemcueMemoryProvider(MemoryProvider):
             payload["session_id"] = scope
         cmd = ["session-card"]
         if self._dream and self._dreams and _version_at_least(self._version, _DREAM_TOOLS):
-            # Without an endpoint for a background dream (#569), the card's hint is what starts a dream (#494).
+            # Without an endpoint for a background dream (#569), the hint is what starts a dream (#494).
             cmd.append("-dream-tools")
         ok, out = self._run(cmd, stdin=json.dumps(payload), timeout=_RECALL_TIMEOUT)
-        if not ok or not out:
-            self._warn_card_failure(session, out)
+        if not ok:
+            self._warn_hints_failure(session, out)
+            return ""
+        if not out:
             return ""
         try:
             return json.loads(out)["hookSpecificOutput"]["additionalContext"].strip()
@@ -648,8 +648,6 @@ class MemcueMemoryProvider(MemoryProvider):
         env = dict(os.environ, MEMCUE_FACTS=self._facts)
         if self._host:
             env["MEMCUE_HOST"] = self._host
-        if self._card_chars > 0:
-            env["MEMCUE_CARD_BUDGET"] = str(self._card_chars)
         if self._api_url:
             env["MEMCUE_API_URL"] = self._api_url
         if self._model:
@@ -684,16 +682,16 @@ class MemcueMemoryProvider(MemoryProvider):
         return scope
 
     def prefetch(self, query: str, *, session_id: str = "") -> str:
-        """Nothing comes with a message: the model searches the base itself (#361), and the card is in the system
-        prompt (#363)."""
+        """Nothing comes with a message: the model searches the base itself (#361), its rules and decisions included
+        (#656)."""
         return ""
 
-    def _warn_card_failure(self, session: str, reason: str) -> None:
-        """A failed card is a missing set of rules, not a broken turn: say it once every ten minutes at most."""
+    def _warn_hints_failure(self, session: str, reason: str) -> None:
+        """Failed hints are a missing reminder, not a broken turn: say it once every ten minutes at most."""
         now = time.monotonic()
-        if now - self._warned_card.get(session, 0.0) >= _WARN_EVERY:
-            self._warned_card[session] = now
-            logger.warning("memcue session card failed (session %s): %s", session or "-", reason)
+        if now - self._warned_hints.get(session, 0.0) >= _WARN_EVERY:
+            self._warned_hints[session] = now
+            logger.warning("memcue session hints failed (session %s): %s", session or "-", reason)
 
     def _below_floor(self, cmd: list[str], controls: list[str], facts: list[Any], query: str) -> tuple[list[Any], str]:
         """Whether the score floor is what made an answer thin. A single fact is the case where a floor hides the
@@ -791,7 +789,7 @@ class MemcueMemoryProvider(MemoryProvider):
                           rewound: bool = False, **kwargs) -> None:
         """Rebind when Hermes rotates the session id without teardown (/new, /reset, /branch, /resume).
 
-        Keeping the old _session_id would scope the next card and searches to the wrong session; reset must also drop
+        Keeping the old _session_id would scope the next hints and searches to the wrong session; reset must also drop
         the facts the old session's searches returned.
         """
         if not new_session_id:
@@ -837,9 +835,8 @@ class MemcueMemoryProvider(MemoryProvider):
     def _note_labels(self, target: str, content: str) -> tuple[str, str]:
         """kind and scope for a mirrored note: a user preference is a global rule; a memory note is scoped to the host
         when it names the provider's host, and its wording makes it a pitfall, a rule or else an environment fact. An
-        empty scope leaves the binary's own default. The labels do not change the session card: store.CardFacts skips
-        facts whose source is memory, so a mirror never reaches it. They serve search (-kind rule, -scope and -in
-        filtering) and the dream, which would otherwise see an unlabelled fact (#488)."""
+        empty scope leaves the binary's own default. The labels serve search (-kind rule, -scope and -in filtering)
+        and the dream, which would otherwise see an unlabelled fact (#488)."""
         if target == "user":
             return "rule", "global"
         scope = ""
@@ -1022,7 +1019,6 @@ class MemcueMemoryProvider(MemoryProvider):
             source = arg("source") or ("user" if arg("kind") in ("rule", "decision") else "agent")
             if source not in _ADD_SOURCES:
                 return tool_error("source must be one of: " + ", ".join(_ADD_SOURCES))
-            # A global decision reaches the session card only with the user's source (#600).
             cmd = ["add", "-source", source, "-cwd", self._workspace]
             if arg("keywords"):
                 cmd += ["-keywords", arg("keywords")]

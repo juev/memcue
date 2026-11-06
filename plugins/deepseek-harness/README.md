@@ -4,17 +4,19 @@ Long-term memory for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-
 fact base:
 
 - **No facts come with a prompt** (#361). The system-prompt section tells the model to search the base with
-  `memcue_search` before it answers a question that may depend on earlier sessions, several times with synonyms, the
-  system's name and both languages if the first try finds nothing.
-- **At the first prompt and after every compaction** `memcue session-card` supplies the card of global rules and
-  decisions and the repository's decisions as a user-role notice. The card is a view of the base, not a copy. A failed card is not
+  `memcue_search` when the answer or the next step may depend on what an earlier session knew, several times with
+  synonyms, the system's name and both languages if the first try finds nothing, and to skip it when the message and
+  the files hold everything.
+- **No card of rules** (#656). The user's rules and decisions stay in the base: the section tells the model to search
+  them (`kind rule,decision`, the words of the task) at the start of a task and when it turns to another system, as
+  measured on Claude Code in #647. At the first prompt and after every compaction `memcue session-card` supplies only
+  its hints (an upgrade this machine owes, a due dream), often none, as a user-role notice. A failed call is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
 - **The model keeps its memory itself** (#494). The system-prompt section and `memcue_add` tell it to store a rule or
   a correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it
   learns it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the
-  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, and a global
-  decision reaches the session card only from the user; `tool` is what a tool's output showed, `agent` anything else, and memcue
-  refuses installation state from either (#475).
+  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default; `tool` is
+  what a tool's output showed, `agent` anything else, and memcue refuses installation state from either (#475).
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
 - **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact;
   with `shelf`, a finding read from outside sources that only a search naming the shelf returns, #545),
@@ -38,7 +40,7 @@ fact an older memcue left in the base is live too, unless it is retired or expir
 The plugin asks `memcue version -json` when it loads. Without a configured `binary` or `MEMCUE_BIN`, a missing binary
 or one older than the plugin's release is replaced by that release, installed into
 `$XDG_DATA_HOME/memcue/<version>/` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base
-the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the session card
+the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the hints
 off with one warning (search keeps working). A build from source reports a suffixed version and counts
 as the current tree.
 
@@ -155,7 +157,7 @@ granular token without the 2FA bypass cannot run `npm publish`: use `npm stage p
 
 - Hermes' `MEMORY.md` mirror has no counterpart here: dsh has no built-in memory files, so there is nothing to
   mirror. The write path is `memcue_add`, `memcue_correct` and `memcue_retire`.
-- The session card arrives as a durable message in the session log, so it replays with the session and survives a
-  harness restart.
+- The hints arrive as a durable message in the session log, so they replay with the session and survive a harness
+  restart.
 - The Claude Code hooks bridge in dsh runs `SessionStart` but ignores `PreCompact` and `SessionEnd`; this plugin uses
-  dsh's own events, so the card comes again after a compaction.
+  dsh's own events, so the hints come again after a compaction.

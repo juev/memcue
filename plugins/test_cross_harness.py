@@ -6,6 +6,7 @@ fails the run.
 """
 
 import ast
+import re
 import unittest
 from pathlib import Path
 
@@ -96,6 +97,27 @@ class PitfallLineTest(unittest.TestCase):
         self.assertEqual(ast.literal_eval(assign.value), line)
         self.assertIn("- " + line + "\n", (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8"))
 
+
+
+class NoCardTest(unittest.TestCase):
+    def test_every_host_searches_the_rules_instead_of_a_card(self):
+        """#656: no host gives a card; each note has the model search the user's rules and decisions at the start of a
+        task and says when to search at all, the lines measured in #647 (Claude Code word for word, the others with
+        their tool's name)."""
+        go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
+        hermes = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
+        hermes = re.sub(r'"\s*\n\s*"', "", hermes)  # the note is adjacent string literals; read it joined
+        dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
+        self.assertIn("-kind rule,decision \\\"<words of the task>\\\"", go)
+        for name, text in (("hermes", hermes), ("dsh", dsh)):
+            with self.subTest(host=name):
+                self.assertIn("with kind rule,decision and the words of the task", text)
+        for name, text in (("claude-code", go), ("hermes", hermes), ("dsh", dsh)):
+            with self.subTest(host=name):
+                self.assertIn("No card of rules", text)
+                self.assertIn("Before you start a task, and again when it turns to another system", text)
+                self.assertIn("Skip it when the user's message and the repository's files hold everything", text)
+                self.assertNotIn("session card", text)
 
 if __name__ == "__main__":
     unittest.main()

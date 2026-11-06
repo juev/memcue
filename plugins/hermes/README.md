@@ -10,27 +10,24 @@ memcue fact base:
   decides that may help: on starting with a specific host, service or repository, and before it diagnoses an
   unexpected error, with a short query naming the system and the problem, checking the result against the current
   state (#521). It is a hint, not a rule: no search runs on its own.
-- **The session card** (global rules, the rules and global decisions the user stated and the decisions of the current repository) is part
-  of the system prompt, through the same `memcue session-card` call Claude Code and DSH use (#363). Hermes caches the
-  system prompt and rebuilds it after a compression or a reset, and each rebuild asks for a fresh card; a cron run
-  gets none, and `session_card: false` turns it off. `session_card_chars` (passed as `MEMCUE_CARD_BUDGET`; default 0
-  keeps the binary's 3500) bounds the card, stated rules included: the binary drops the oldest user-stated rule first
-  and ends the card with a line that counts what it left out (#487). A failed card leaves the memory note without it
-  until the next rebuild and is reported to the log at most every ten minutes. The provider puts the card in as the
-  binary renders it and drops no line of it, even one that repeats `MEMORY.md` or `USER.md`: a word rule that drops
-  copies drops another rule in the same words too, the opposite one or one with a condition. A copy costs a few
-  lines, and nothing in the provider removes it (#456).
+- **No card of rules** (#656). The user's rules and decisions stay in the base: the system prompt block tells the
+  model to search them with `memcue_search` (`kind rule,decision`, the words of the task) at the start of a task and
+  when it turns to another system, and to skip memory when the message and the files hold everything. The same note
+  was measured on Claude Code in #647. The block also carries the hints of `memcue session-card` (an upgrade this
+  machine owes, a due dream), asked again at every rebuild after a compression or a reset; a cron run gets none. A
+  failed call leaves the block without the hints until the next rebuild and is reported to the log at most every ten
+  minutes. The old settings `session_card` and `session_card_chars` are ignored.
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's
   `cwd`), named by its remote as in Claude Code: it names the origin of the facts a session learns, the `repo`
-  scope, the card's decisions and the search tie-break. A session Hermes gives no `cwd` (a one-shot `hermes -z` or a
+  scope and the search tie-break. A session Hermes gives no `cwd` (a one-shot `hermes -z` or a
   cron run) takes the directory Hermes itself falls back to: `resolve_agent_cwd()`, that is `TERMINAL_CWD` or the
   process directory (#354). A session whose directory is one of Hermes's own outside git (`/opt/data`,
   `/opt/hermes`) has no project: its facts keep an empty origin and a `repo` scope is dropped (#347).
 - **The model keeps its memory itself** (#494). The system prompt block and `memcue_add` tell it to store a rule or a
   correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it learns
   it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the session
-  afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default, and a global
-  decision reaches the session card only from the user; `tool` is what a tool's output showed, `agent` anything else, and memcue refuses
+  afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default; `tool` is what a
+  tool's output showed, `agent` anything else, and memcue refuses
   installation state from either (#475).
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset forgets what the old session's searches returned.
@@ -68,9 +65,9 @@ Hermes runs one external memory provider at a time, so memcue replaces the one y
 
 ## Dream
 
-A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last one and some fact is fresh, lacks
-a translation, or is a global rule or decision without a channel. With an endpoint configured, the `session-card` call that builds the system prompt starts one
-`memcue dream -run` pass in the background and the card says nothing of the dream (#569):
+A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has passed since the last one and some fact is fresh or lacks
+a translation. With an endpoint configured, the `session-card` call that builds the system prompt starts one
+`memcue dream -run` pass in the background and the hints say nothing of the dream (#569):
 
 ```bash
 hermes config set memory.memcue.api_url https://api.deepseek.com
@@ -83,7 +80,7 @@ key read from the named environment variable of the gateway, so it stays out of 
 `memcue_add` its search queries in one short call. Without them the gateway's own `MEMCUE_API_URL` decides, and a
 `claude` on the gateway's `PATH` runs the dream on `claude -p`.
 
-Without either, the card in the system prompt ends with one line that says a dream is due and names the tools (the
+Without either, the system prompt ends with one line that says a dream is due and names the tools (the
 provider asks `memcue session-card -dream-tools`, a binary 0.19.0 or newer; #494). The model runs
 `memcue_dream_prepare`, answers the packet and hands the answer to `memcue_dream_apply` when the user's task allows;
 it never interrupts the user's work for it. Hermes builds the system prompt once and again after a compression or a
@@ -136,8 +133,8 @@ a dream through an endpoint when you start it yourself; the rules are in [Dream]
 
 5. Restart Hermes (the gateway, if you run one).
 
-The provider asks the binary for its version when the card first runs: 0.4.0 or newer is required, and an older one
-turns the card off with a warning in the log while search keeps working; the dream line needs 0.19.0. A build from source
+The provider asks the binary for its version when the hints first run: 0.4.0 or newer is required, and an older one
+turns the hints off with a warning in the log while search keeps working; the dream line needs 0.19.0. A build from source
 reports a suffixed version and counts as the current tree.
 
 Check: `hermes memory status` should list `memcue` as available. Run the plugin's tests with the binary you

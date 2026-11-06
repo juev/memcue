@@ -15,8 +15,8 @@ when you learn it, not at the end of the session.
   the user ties it to one repository (`-scope repo`).
 - **Decisions of the user** on goals, scope and approach that the code and the git history do not show:
   `-kind decision -scope repo`. `-scope global` only for a decision that holds in every repository and on every host:
-  a global decision the user stated is on every session card, so one about a single project or task costs every
-  session its room.
+  a session searches its repository and the global facts, so a global decision about a single project or task comes
+  up in every other project.
 - **Pitfalls** found by an error or a check: what happens, why, and the workaround: `-kind pitfall -source tool`.
 - **Environment outside the repository**: hosts and what runs there, services, where logs and data live, ids and
   addresses of external systems: `-kind environment -source tool` with `-scope host:<name>` or `-scope service:<name>`.
@@ -25,9 +25,9 @@ when you learn it, not at the end of the session.
 - **Events the next days need**: a release rolled out, an outage, a host taken down: `-kind event`. An event expires
   after a week (`MEMCUE_EVENT_TTL_DAYS`) unless `-expires` gives a date.
 
-Rules and decisions take `-source user`: they are the user's words, and only they reach the session card, which
-carries the global rules and decisions and the decisions of the repository even when a prompt shares no word with them. Name the
-source every time: a fact without `-source` is stored as yours (`agent`), and what a command or a file showed is
+Rules and decisions take `-source user`: they are the user's words. No card brings them to a session: the next one
+finds them by searching `-kind rule,decision` at the start of a task, so write them with the words such a task would
+use. Name the source every time: a fact without `-source` is stored as yours (`agent`), and what a command or a file showed is
 `-source tool`.
 
 Do not store: the progress of the task, what the repository, its git history or a command shows, installation state
