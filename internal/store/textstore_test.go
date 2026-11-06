@@ -503,3 +503,73 @@ func TestAFailedFileWriteIsNotHiddenByALaterOne(t *testing.T) {
 	}
 	textMatches(t, s)
 }
+
+// A fact file whose name is not a fact id, that sits in the wrong directory, that holds another fact or that is a
+// symbolic link is refused at the open, before its id can decide where a later write goes (#641); the refusal names
+// the file and not what it holds.
+func TestAnOpenRefusesAFileThatIsNotAFactFile(t *testing.T) {
+	const id = "01JSOURCE00000000000000001"
+	secret := "SECRET-OUTSIDE-THE-HISTORY"
+	fact := func(id, content string) []Fact {
+		return []Fact{{ID: id, Version: 1, Content: content, Created: t0, Status: Active, Author: "mac"}}
+	}
+	cases := []struct {
+		name  string
+		place func(t *testing.T, dir string)
+	}{
+		{"a short name", func(t *testing.T, dir string) {
+			writeFile(t, filepath.Join(dir, "1", "01.jsonl"), fact("01", "x"))
+		}},
+		{"dots in the name", func(t *testing.T, dir string) {
+			writeFile(t, filepath.Join(dir, "1", "01JSOURCE0..0000000000001.jsonl"), fact("01JSOURCE0..0000000000001", "x"))
+		}},
+		{"a lowercase name", func(t *testing.T, dir string) {
+			writeFile(t, filepath.Join(dir, "1", "01jsource00000000000000001.jsonl"), fact("01jsource00000000000000001", "x"))
+		}},
+		{"the wrong directory", func(t *testing.T, dir string) {
+			writeFile(t, filepath.Join(dir, "2", id+".jsonl"), fact(id, "x"))
+		}},
+		{"another fact inside", func(t *testing.T, dir string) {
+			writeFile(t, FactPath(dir, id), fact("../../../escape/01JSOURCE0000000000000001", "x"))
+		}},
+		{"a symbolic link out of the history", func(t *testing.T, dir string) {
+			outside := filepath.Join(t.TempDir(), "secret.jsonl")
+			writeFile(t, outside, fact(id, secret))
+			if err := os.MkdirAll(filepath.Dir(FactPath(dir, id)), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(outside, FactPath(dir, id)); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+			c.place(t, dir)
+			s, err := OpenText(dir, cache)
+			if err == nil {
+				_ = s.Close()
+				t.Fatal("opened")
+			}
+			if !strings.Contains(err.Error(), dir) || strings.Contains(err.Error(), secret) {
+				t.Errorf("error %q: want the file named and nothing it holds", err)
+			}
+		})
+	}
+	// a fact file as memcue writes it opens
+	dir, cache := t.TempDir(), filepath.Join(t.TempDir(), "facts.db")
+	writeFile(t, FactPath(dir, id), fact(id, "Порт db1 — 5432"))
+	s := openTextAt(t, dir, cache, "mac", t0)
+	defer func() { _ = s.Close() }()
+	if got, err := s.Get(id); err != nil || got.Content != "Порт db1 — 5432" {
+		t.Errorf("a valid file: %+v %v", got, err)
+	}
+}
+
+func writeFile(t *testing.T, path string, versions []Fact) {
+	t.Helper()
+	if err := WriteFactFile(path, versions); err != nil {
+		t.Fatal(err)
+	}
+}

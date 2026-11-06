@@ -418,9 +418,10 @@ text history keeps one JSON-lines file per fact, `memory/facts/<last character o
 version, so a commit stores only the facts that changed and `git log -p` shows the history of a fact. Search still
 runs on SQLite: the base becomes a cache, `facts.db` in the state directory, outside git. Every write goes to the
 cache and to the file of the fact. An open reads the directories git changed and takes their versions into the
-cache; a missing cache is built from the text, under another name and renamed into place once built, so a build
-stopped by a caller's timeout leaves no half-built cache and the next open builds it again (#635). A fact changed on two machines is merged by the same driver and the
-same rules as before.
+cache; an open refuses a file whose name is not a fact id in the directory of its last character, that holds another
+fact or that is a symbolic link (#641). A missing cache is built from the text, under another name and renamed into
+place once built, so a build stopped by a caller's timeout leaves no half-built cache and the next open builds it again
+(#635). A fact changed on two machines is merged by the same driver and the same rules as before.
 
 The session card of a synced base of the old format suggests the move. Do it in this order:
 

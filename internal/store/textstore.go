@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -419,9 +420,21 @@ func (s *Store) importTextDir(tx *sql.Tx, dir string, files map[string][]Fact) e
 			continue
 		}
 		path := filepath.Join(dir, name)
+		if e.Type()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("%s: a fact file must not be a symbolic link", path)
+		}
+		id := strings.TrimSuffix(name, ".jsonl")
+		if !validID(id) || filepath.Base(dir) != id[len(id)-1:] {
+			return fmt.Errorf("%s: not a fact file: the name must be a fact id, in the directory of its last character", path)
+		}
 		file, err := ReadFactFile(path)
 		if err != nil {
 			return err
+		}
+		for _, f := range file {
+			if f.ID != id {
+				return fmt.Errorf("%s: holds a version of fact %q, not of %s", path, f.ID, id)
+			}
 		}
 		if len(file) == 0 {
 			continue
@@ -435,6 +448,22 @@ func (s *Store) importTextDir(tx *sql.Tx, dir string, files map[string][]Fact) e
 		}
 	}
 	return nil
+}
+
+// validID says whether id can name a fact file (#641): 26 characters of digits and capital letters, the shape of a
+// ULID. An id from a file of the text decides the path of every later write of that fact, so a separator, a dot or
+// an empty id must not get that far. Every id memcue writes is a ULID; the check is looser than ULID parsing only so
+// that it names what keeps a path inside the history.
+func validID(id string) bool {
+	if len(id) != 26 {
+		return false
+	}
+	for _, r := range id {
+		if (r < '0' || r > '9') && (r < 'A' || r > 'Z') {
+			return false
+		}
+	}
+	return true
 }
 
 // exportText notes in files every fact whose file lacks versions the cache holds.
