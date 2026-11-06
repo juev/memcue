@@ -73,7 +73,7 @@ this file was not checked by hand, so it may be inflated the same way. Method an
 
 ### Pull instead of push (October 2026)
 
-Since #361 no host injects facts with a prompt: the agent searches memcue itself, and the session card stays. On 40
+Since #361 no host injects facts with a prompt: the agent searches memcue itself, and the session card stayed until #656. On 40
 real prompts, each run twice through `claude -p` with Opus on the repository as of the prompt and graded blind in two
 passes (score 0–2):
 

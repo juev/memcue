@@ -29,7 +29,7 @@ One release covers the binary and all three plugins: they carry the same version
 
 ## After the release
 
-Upgrade every host that runs memcue, then check that the base opens and that search, the session card, a write with
+Upgrade every host that runs memcue, then check that the base opens and that search, the session-start note, a write with
 `memcue add` and the plugins work. After a plugin update, check the binary separately: a plugin that downloads its own
 release does so only when no configured binary is set.
 

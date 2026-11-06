@@ -3,11 +3,12 @@
 Long-term memory for Claude Code. memcue keeps a base of short, self-contained facts in SQLite, with a text history git can sync, and works
 through hooks:
 
-- **At session start, and again after a compaction or `/clear`** it tells the agent to search memcue before it
-  answers a question that may depend on earlier sessions, and sends a card: the global rules and decisions the dream
-  labelled as behaviour (#625), the global rules and decisions you stated that no dream has read yet, and the rules
-  and decisions of the current repository, the ones you stated first, within about 1.2 thousand tokens. The card is
-  how a rule the agent would not think to search for still reaches it.
+- **At session start, and again after a compaction or `/clear`** it tells the agent when to search memcue: when the
+  answer or the next step may depend on what an earlier session knew, and not when the message and the files hold
+  everything. No card of rules comes with it (#656): the agent searches your rules and decisions itself, with
+  `memcue search -kind rule,decision` and the words of the task, at the start of a task and when the task turns to
+  another system. Measured on real prompts, the card added nothing to answers once the agent searched, and that note
+  scored the same as memcue with a card ([search-policy-647](docs/research/search-policy-647-2026-11.md)).
 - **When the agent needs something from earlier sessions** it runs `memcue search` itself, with its own words:
   synonyms, the system's name, both languages. Nothing is injected with a prompt (#361): the agent's own queries
   answered more questions right than facts matched to the prompt's words (see [Results](#results)). A search returns
@@ -99,7 +100,7 @@ same version, and a release bumps all of them together.
 
 The DSH peer range is enforced by the harness compatibility check; the Hermes row names the version the provider
 tests ran against. The binary and the adapters check each other's release: the DSH and Hermes plugins ask
-`memcue version -json` at startup and turn the session card off with one warning on a binary older
+`memcue version -json` at startup and turn their hints off with one warning on a binary older
 than 0.4.0 (search keeps working), and the Claude Code `SessionStart` hook checks `memcue version -minimum 0.4.0` and
 prints the same hint. A build from source reports a suffixed version and is treated as the current tree. Install the
 plugin and the binary from the same release.
@@ -152,7 +153,7 @@ plugin and the binary from the same release.
    `memory/facts.db merge=memcue diff=memcue` in the root `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
    Without a repository memcue works the same; the base is just not synced. A merge carries no vectors. A machine
-   whose base is in git without the driver hears it on the session card, Hermes and DSH included, until
+   whose base is in git without the driver hears it in a hint at session start, Hermes and DSH included, until
    `memcue install` runs there. When two machines change a fact apart, the merge keeps every version and the latest
    by creation time is current, with one exception: a correction of the text wins over a retirement made without
    knowing it, whichever is later (#544). A retirement made after the correction was merged, or one against a change
@@ -176,10 +177,6 @@ shared words, making up at least 0.30 of the words of both or 0.40 of the shorte
 shares with one, which makes the rule stricter or looser. It writes
 nothing and calls no model. An entry marked `ok` can leave the file; a `new` one moves with
 `memcue add -kind K -scope S -- "TEXT"` first.
-
-Do not empty the note file before the session card has a budget of its own, `MEMCUE_CARD_BUDGET` over the stated
-rules too (#487): without it the card grows by exactly the characters the file lost, because the card lines left out
-as copies of the notes come back.
 
 ### Binary from the plugin
 
@@ -904,22 +901,14 @@ with `memcue add` or stored by `memcue import` is indexed at once; nothing waits
 [Candidates](#candidates)). A search returns it when it fits: by default a search in a repository reads that
 repository's, this host's and the global facts, and one outside a repository reads every fact; a shelf is read only
 by a search that names it; an expired fact only with `-expired`; and at most `-n` facts (5 by default) above the
-`-min-score` floor come back. The session card carries a fact only if it is active and unexpired, a global `rule` or
-`decision` whose `channel` is `behaviour` or, until a dream labels it, one you stated, or a `rule` or `decision`
-scoped to the session's repository, and its source is not `memory`; it fits the card budget
-(`MEMCUE_CARD_BUDGET`). `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
+`-min-score` floor come back. No card brings facts to a session (#656): the session-start note has the agent search
+your rules and decisions (`-kind rule,decision`) at the start of a task. `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
 says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
 the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
-showed takes `-source tool`. The card carries the rules and decisions of the session's project whatever their source,
-the user's first, and from global only the rules and decisions the dream labelled `behaviour` (#625): how to work
-or answer, with no moment at which the agent would think to search for it. Neither the kind nor the source tells
-such a rule from the rest, so the dream reads each global rule and decision once and labels it with one of the
-channels of [the #606 measurement](docs/research/card-trim-606-2026-11.md) (`behaviour`, `repository`, `file`,
-`command`, `knowledge`, `outdated`); a correction of the text drops the label. Until the dream has read it, a global
-rule or decision you stated (`-source user`) is on the card, so a rule just stated is not lost, and one of the agent's
-own waits for its label; a global fact of another channel is found by search:
+showed takes `-source tool`. Facts that carry a `channel` from the dream of 0.28.0 (#625) keep it; nothing reads or
+writes it since the card went:
 
 ```bash
 memcue search -json postgres port    # the facts that fit, best first, with their IDs (-json: {"facts", "hints"}; at most -n, default 5)
@@ -952,8 +941,8 @@ memcue dream -apply answer.json      # check and carry out the model's answer to
 through git.
 
 A fact is found by a question in either language. The dream stores, next to the search queries, the whole fact in
-the other language, Russian or English, as one query that starts with `= `: search reads it, while the card and the
-search output show the fact as it was written (#392, #395); it gives a translation to 40 facts a dream (#396). Until
+the other language, Russian or English, as one query that starts with `= `: search reads it, while the
+search output shows the fact as it was written (#392, #395); it gives a translation to 40 facts a dream (#396). Until
 then the keywords the agent writes in both languages are what a question in the other language finds.
 
 Every host also tells its model to store a failure it found by running something (#566): when a command fails and the
@@ -978,8 +967,7 @@ flag out; with the change all 12 named `-source tool`, and capture and answers s
 A fact written before sources were labelled has none, and no one checked it as the user's words, so memcue relabels
 it itself (#582): when a base opens, every active fact without a source gets one version with `source: agent`, the
 rest of it unchanged, the time and the author of the version before it included, so two machines that relabel it
-apart merge as one. Nothing else changes: such a fact already stayed off the room of the user's rules on the card,
-and a fact the user states again is stored with `-source user`.
+apart merge as one. A fact the user states again is stored with `-source user`.
 
 Nothing judges a fact on its way in: the agent decided to write it. `add` refuses only installation state the agent
 saw in a tool's output or concluded (`-source tool` or `agent`): a version, the path of a binary, a config default,
@@ -997,41 +985,17 @@ corrected or retired in the session. A fact the world made wrong without anyone 
 `memcue vet`, its rules, its review model and its check of suspect facts are removed with the extraction they served;
 the `vet.log`, `vet.checked`, `extract.log` and `extract.err` of an older release can be deleted.
 
-The SessionStart card is a view of the active facts, not a copy: a rule or decision leaves it when corrected,
-retired or expired. `card.log` records the ids it carried, so a rule shows as used even though no search found it.
+The session start carries no card (#656). It used to bring the user's rules and decisions unasked, within a budget,
+over three `SessionStart` hooks; three measurements on the same real prompts found that the card added nothing to
+answers once the agent searched, and a note that has the agent search the rules and decisions at the start of a task
+scored the same as memcue with the card ([card-search-split-636](docs/research/card-search-split-636-2026-11.md),
+[search-policy-647](docs/research/search-policy-647-2026-11.md)). The plugin now declares one hook,
+`session-start -part 1`, which prints the note and the hints; parts 2 and 3 print nothing, for an older plugin, and
+`session-start` without `-part` prints the same text. `session-card` gives Hermes and DSH the hints only. `card.log` is
+no longer written, and an old one can be deleted.
 
-Claude Code keeps a hook's `additionalContext` of 10,000 characters or more out of the context: it saves the text to
-a file and shows the model a 2 KB preview. The limit holds per hook, so the plugin declares three `SessionStart`
-hooks, `session-start -part 1` to `-part 3`, and the binary lays the note, the hints and the card out over them, at most
-9,500 characters each (#480). The note and the hints open part 1. A part ends only between lines, and a part that
-starts inside a group repeats its heading. A part with nothing to carry prints nothing. Only past all three parts,
-about 28,000 characters, does the card leave lines out. The last part then says how many and how to search them,
-and `card.log` counts them as `left`. `session-start` without `-part` prints the whole text in one block, as before.
-
-Every rule and decision the user stated (`source` `user` or `user_confirmed`) is on the card, each cut to 400
-characters (#363): since the agent searches itself, the card is the only memory it gets unasked. A global decision
-gets there only when the user stated it, and its group is then headed "Global rules and decisions"; before #600 no
-global decision reached the card, and a session that did not think to search acted against it. Where it holds them
-depends on the host. At the Claude Code session start they sit outside the budget, bounded only by the three parts
-(#480, #495). On `session-card`, which Hermes and DSH put in the system prompt of every turn, they share the budget
-(`MEMCUE_CARD_BUDGET`, 3,500 by default): the oldest go first, and a cut card ends with a line that counts the rest
-(#487). On the author's
-archived base that is 9 global rules, about 1,300 characters. The other facts share a budget of about 3,500 characters,
-a dozen facts, and a labelled base has more rules than that. They are chosen in this order:
-
-1. Newest first. The date alone says little on a migrated base, where most rules share the day of the migration,
-   which is why the stated facts come before the budget.
-2. The rules and decisions of the current repository may take half of the budget before anything else is placed.
-3. The rest of the budget is filled in the order of step 1, global rules and the repository's facts together, so a
-   repository whose facts come first may take more than half.
-
-Measured on the author's base (65 global rules after the labelling of #219, 129 facts for the largest repository): the
-global card is unchanged; a repository with 49 facts, none of them stated, gets 6 lines instead of 4; a repository
-with 11 stated decisions keeps its 10 lines. Ordering by recall hits was rejected: the rules recall already served
-were the ones the card is not needed for.
-
-An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, and leaves
-the card. `memcue search` still finds it, and `search -json` shows its `expires`. The date is the local calendar day of the
+An expiry is the last day a fact is worth recalling: after it the fact stays in the base and in `facts`, and ordinary
+search leaves it out. `memcue search -expired` still finds it, and `search -json` shows its `expires`. The date is the local calendar day of the
 machine that judges it. A correction keeps the expiry unless it names a new one.
 
 ### Dream
@@ -1041,8 +1005,7 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 
 1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
    the instructions, the fresh facts to split, the facts without search queries to expand, the facts without a
-   translation to translate, the global facts to check the scope of, the global rules and decisions to label by
-   channel, and the groups to review.
+   translation to translate, the global facts to check the scope of, and the groups to review.
    It keeps the packet in the state directory.
 2. The model answers in one JSON object, with the packet's id.
 3. `memcue dream -apply FILE` checks the answer against the packet and carries out what passes. It prints and logs
@@ -1051,8 +1014,7 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 Who runs it:
 
 - **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has
-  passed since the last one and some fact is fresh, lacks a translation, or is a global rule or decision without a
-  channel (#634). The first check on a machine only marks
+  passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks
   the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
   dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
   in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
@@ -1063,8 +1025,8 @@ Who runs it:
   `MEMCUE_CLAUDE_TOKEN_FILE` names a token from `claude setup-token` for it (#591).
 - **The session's model.** Without an endpoint and without `claude` on `PATH`, or with
   `MEMCUE_DREAM_BACKGROUND=0`, the session start says in one line that a dream is due instead. On Claude Code the
-  agent then runs the `memcue-dream` skill when the user's task allows; it never interrupts a turn. On Hermes the card
-  in the system prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
+  agent then runs the `memcue-dream` skill when the user's task allows; it never interrupts a turn. On Hermes the system
+  prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
   `memcue_dream_apply` (#494). Hermes builds the system prompt once and again after a compression or a reset, so the
   line is as fresh as the last rebuild ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
 - **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
@@ -1104,8 +1066,8 @@ What the answer may do:
   first, so a base is translated over a few dozen dreams without a command of its own (#396). A fact another part of the packet may
   change — fresh, without queries, or in a group — waits for a later packet, and a fact changed since the packet is
   refused, since its translation would describe the old text.
-- **Move a global fact to its project** (#607): a fact stored `global` reaches a search from every repository and,
-  as a rule, every session card, so it must hold in every repository and on every host. The packet gives the global
+- **Move a global fact to its project** (#607): a fact stored `global` reaches a search from every repository, so
+  it must hold in every repository and on every host. The packet gives the global
   facts a few dozen at a time, in the order of their ids after the cursor in `dream.scope`, with the projects of the
   base: the `repo:` keys and `dir:` paths its active facts were learnt in, by their origin. A scope no session ran in
   is not offered: a scope set by hand to a remote whose checkout memcue names otherwise would be seen by no session.
@@ -1116,14 +1078,6 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
-- **Label a global rule or decision by channel** (#625): the card takes from global only the facts labelled
-  `behaviour`, and nothing but a reading of the text tells a rule of behaviour from a fact to look up (see
-  [Use](#use)). The packet gives the global rules and decisions without a label, the newest first, with their kind,
-  source and text; the model answers one of `behaviour`, `repository`, `file`, `command`, `knowledge` or `outdated`
-  for each, and memcue writes it as a version that keeps the creation time. A fact corrected since the packet, or
-  retired, is refused and, still without a label, offered again; a fresh fact waits for the next packet, since a
-  split of this one would retire it. A label stays through a move to a project and through search queries, and a
-  correction of the text drops it, so the dream reads the new text. `dream.log` lists the labels under `labelled`.
 - **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
   `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
   machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
@@ -1197,11 +1151,10 @@ uses.
 | `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |
 | `MEMCUE_NUMBER_TERMS` | versions, dates, ports and addresses are indexed as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)); `0` keeps the old word-only index, and a base indexed word-only is rebuilt on the first open without it | on |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
-| `MEMCUE_CARD_BUDGET` | most characters of the session card, the facts the user stated included; when they do not fit, the oldest user-stated fact goes first, and a last line counts what is left out (`memcue search -in global -kind rule` finds it). The Hermes provider sets it from `session_card_chars` | `3500` |
 | `MEMCUE_DREAM_EVERY` | how long after a dream the next one is due (a Go duration, at least `1m`) | `1h` |
 | `MEMCUE_DREAM_BACKGROUND` | `0` keeps the session start from running a due dream in the background; it then says the dream is due instead | on |
 | `MEMCUE_MEMORY_DIR` | directory of the built-in memory notes `memcue notes` reads | `$CLAUDE_CONFIG_DIR/memory` |
-| `XDG_STATE_HOME` | where `memcue/search.log`, `memcue/card.log` and `memcue/dream.log` are kept | `~/.local/state` |
+| `XDG_STATE_HOME` | where `memcue/search.log` and `memcue/dream.log` are kept | `~/.local/state` |
 
 Search is the words alone: FTS5 over the query's terms, in BM25 order, with no threshold, because the agent reads
 what it asked for. The gates that kept noise out of the facts injected with a prompt went with that injection (#361);
@@ -1234,7 +1187,7 @@ short call only when `MEMCUE_API_URL` is set. Before #494 an extraction of every
 on Opus, about $5 per million characters of transcript, and a review followed it; both are gone.
 
 A dream the session's model runs costs no call of its own: it is part of the session. A background dream (#569) is
-one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation or a channel;
+one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation;
 a pass takes the work of up to four packets (`-j 4`). On Opus through `claude -p`, a background pass over a copy of
 the author's Mac base with 141 fresh facts made six calls and cost $2.58; the passes of a whole-base run cost $0.22–1.97
 ([dream-run-2026-10](docs/research/dream-run-2026-10.md)), and a pass with little fresh work less. One packet is about 20,000–36,000
@@ -1302,7 +1255,7 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 | Capability | Claude Code | DeepSeek Harness | Hermes Agent |
 |---|---|---|---|
 | Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool |
-| Session card | `SessionStart` | `session-card` on first step and after compaction | `session-card` in the system prompt, rebuilt after compression |
+| Rules and decisions | searched by the agent at the start of a task, as the `SessionStart` note says; no card | the same, as the system-prompt section says; `session-card` hints on first step and after compaction | the same, as the system prompt says; `session-card` hints in the system prompt, rebuilt after compression |
 | Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool |
 | `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
@@ -1320,12 +1273,12 @@ same file.
 
 ## DeepSeek Harness
 
-memcue also works as a native DSH plugin: the session card, a search tool the model is told to use, and the fact
+memcue also works as a native DSH plugin: a search tool the model is told to use, its rules and decisions included, and the fact
 tools it writes its memory with. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
 
 ## Hermes Agent
 
-memcue also works as a memory provider for Hermes Agent: the session card, a search tool the model is told to use,
+memcue also works as a memory provider for Hermes Agent: a search tool the model is told to use, its rules and decisions included,
 the built-in memory tool mirrored into the base, the tools the model writes and fixes facts with, and the dream tools. See
 [plugins/hermes](plugins/hermes/README.md).
 
