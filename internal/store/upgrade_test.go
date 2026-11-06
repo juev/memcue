@@ -140,14 +140,6 @@ func TestUpgradeFromSchema5(t *testing.T) {
 	if slices.ContainsFunc(current, func(h Hit) bool { return h.ID == expiredID }) {
 		t.Error("an expired candidate is found by a search that honours expiry")
 	}
-	card, _, err := s.CardFacts(nil, today)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if slices.ContainsFunc(card, func(f Fact) bool { return f.ID == expiredID }) {
-		t.Error("an expired candidate rule is on the card")
-	}
-
 	active, err := s.Active()
 	if err != nil {
 		t.Fatal(err)

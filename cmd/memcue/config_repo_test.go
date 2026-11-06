@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"slices"
+	"strings"
 	"testing"
 
 	"github.com/juev/memcue/internal/store"
 )
 
 // The Claude config directory is a repository like any other (#617): a fact stored there without a scope holds in
-// the config repository, and the card of a session there carries that repository's rules, which a session in another
-// repository does not get. A fact stored under the old global tier (origin _global) stays global and reaches both.
+// the config repository, and a search of a session there finds that repository's rules, which a search in another
+// repository does not. A fact stored under the old global tier (origin _global) stays global and reaches both.
 func TestClaudeConfigDirectoryIsARepository(t *testing.T) {
 	dir := env(t)
 	config := filepath.Join(dir, "claude")
@@ -52,15 +52,20 @@ func TestClaudeConfigDirectoryIsARepository(t *testing.T) {
 		cwd        string
 		wantConfig bool
 	}{{config, true}, {shop, false}} {
-		_, ids, _, _, err := sessionCardWith(c.cwd, 0)
-		if err != nil {
+		t.Chdir(c.cwd)
+		var found bytes.Buffer
+		if err := runSearch([]string{"-kind", "rule", "хук ревью конфига"}, &found); err != nil {
 			t.Fatal(err)
 		}
-		if got := slices.Contains(ids, configRule); got != c.wantConfig {
-			t.Errorf("card in %s carries the config rule: %v, want %v", filepath.Base(c.cwd), got, c.wantConfig)
+		if got := strings.Contains(found.String(), configRule); got != c.wantConfig {
+			t.Errorf("search in %s finds the config rule: %v, want %v", filepath.Base(c.cwd), got, c.wantConfig)
 		}
-		if !slices.Contains(ids, old.ID) {
-			t.Errorf("card in %s lost the global rule of the old tier", filepath.Base(c.cwd))
+		found.Reset()
+		if err := runSearch([]string{"-kind", "rule", "коммиты по-английски"}, &found); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(found.String(), old.ID) {
+			t.Errorf("search in %s lost the global rule of the old tier", filepath.Base(c.cwd))
 		}
 	}
 }

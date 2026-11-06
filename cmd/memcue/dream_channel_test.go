@@ -65,7 +65,7 @@ func channelBase(t *testing.T) (rule, decision, pitfall, repo store.Fact) {
 // fact is not offered again; the card then carries the agent's rule labelled behaviour and not the user's decision
 // labelled knowledge.
 func TestDreamLabelsGlobalRulesByChannel(t *testing.T) {
-	dir := env(t)
+	env(t)
 	rule, decision, pitfall, repo := channelBase(t)
 	var sent []string
 	channelFn = func(in string) ([]extract.Channel, error) {
@@ -108,14 +108,6 @@ func TestDreamLabelsGlobalRulesByChannel(t *testing.T) {
 			t.Errorf("out lacks %q:\n%s", want, out.String())
 		}
 	}
-	card, _, _, _, err := sessionCard(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(card, rule.Content) || strings.Contains(card, decision.Content) {
-		t.Errorf("card after the dream:\n%s\nwant the rule labelled behaviour and not the decision labelled knowledge", card)
-	}
-
 	// The next dream gives only a global rule or decision stored since.
 	s, _ := store.Open(factsPath())
 	later, err := s.AddWith("Ветки создаются только в worktree.", []string{"k"}, "", "",

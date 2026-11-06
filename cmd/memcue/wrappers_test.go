@@ -18,11 +18,6 @@ func runSessionCard(in io.Reader, out io.Writer) error {
 	return runSessionCardWith(in, out, false)
 }
 
-// renderCard is the card with the stated facts inside the budget (#487).
-func renderCard(facts []store.Fact, budget int) (string, []string, int, cardFit, error) {
-	return renderCardWith(facts, budget, 0)
-}
-
 // groupFacts joins each fresh fact with its neighbours; groups that share a fact become one.
 func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, error) {
 	gr := newGrouper(active)

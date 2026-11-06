@@ -323,18 +323,6 @@ func originKey(origin string) string {
 	return strings.TrimSpace(origin[:i])
 }
 
-// projectScopes are the scopes of the project of dir, one per key, for the session card: a rule or decision written
-// on a mirror's other host or in a fork's upstream belongs to the session too.
-func projectScopes(dir string) []string {
-	var out []string
-	for _, k := range tier.Keys(dir, claudeDir()) {
-		if k != tier.Global {
-			out = append(out, tier.Scope(k))
-		}
-	}
-	return out
-}
-
 // defaultEventTTL is how long a fact that records what happened stays recalled. Knowledge outlives the run that
 // produced it; an event fact without an expiry keeps answering questions about that run for months, which is exactly
 // what the base did before (#287).

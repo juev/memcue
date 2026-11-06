@@ -52,19 +52,6 @@ func legacyRow(t *testing.T, id, content, kind, scope, source, review, expires s
 	}
 }
 
-// labelRow gives a row of legacyRow the channel a dream would, in place: the row stays at its version.
-func labelRow(t *testing.T, id, channel string) {
-	t.Helper()
-	db, err := sql.Open("sqlite", factsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-	if _, err := db.Exec(`UPDATE facts SET channel = ? WHERE id = ?`, channel, id); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // The dream reads every active fact, expired ones included, as it always read an expired approved fact: a legacy
 // candidate or provisional fact is read on the same terms whatever its review state, and a correction, which drops
 // that state, changes nothing about whether the dream reads it (#514).
@@ -166,8 +153,8 @@ func TestAddIsSearchableAtOnce(t *testing.T) {
 	}
 }
 
-// A candidate an older memcue left is found by search, listed by facts and carried by the card (#514).
-func TestLegacyCandidateIsSearchedListedAndCarried(t *testing.T) {
+// A candidate an older memcue left is found by search and listed by facts (#514).
+func TestLegacyCandidateIsSearchedAndListed(t *testing.T) {
 	env(t)
 	legacyCandidate(t, "01JLEGACYCMD00000000000001", gradleFact, "environment", "", "tool")
 	legacyCandidate(t, "01JLEGACYCMD00000000000002", "Правило-кандидат: отвечать коротко.", "rule", "global", "user")
@@ -184,22 +171,20 @@ func TestLegacyCandidateIsSearchedListedAndCarried(t *testing.T) {
 	if f := storedFact(t, "01JLEGACYCMD00000000000001"); f.Review != store.Candidate || f.Version != 1 {
 		t.Errorf("the legacy row changed: %+v", f)
 	}
-	if ctx := sessionStartContext(t, t.TempDir(), "startup", "s1"); !strings.Contains(ctx, "отвечать коротко") {
-		t.Errorf("the card lacks a legacy candidate rule: %q", ctx)
+	if ctx := searched(t, "отвечать коротко"); !strings.Contains(ctx, "01JLEGACYCMD00000000000002") {
+		t.Errorf("a legacy candidate rule is not found: %q", ctx)
 	}
 }
 
-// A provisional fact the removed vet left is found by search, listed by facts and, for a global rule a dream labelled
-// behaviour (#625), carried by the card, with its expiry, until that expiry passes (#514).
-func TestLegacyProvisionalIsSearchedListedAndCarried(t *testing.T) {
+// A provisional fact the removed vet left is found by search and listed by facts, with its expiry, until that expiry
+// passes (#514).
+func TestLegacyProvisionalIsSearchedAndListed(t *testing.T) {
 	env(t)
 	day := future()
 	legacyRow(t, "01JLEGACYCMD00000000000011", "Provisional правило: писать тесты первыми quebec.", "rule", "global",
 		"tool", store.Provisional, day)
-	labelRow(t, "01JLEGACYCMD00000000000011", store.Behaviour)
 	legacyRow(t, "01JLEGACYCMD00000000000012", "Provisional правило: просроченное romeo.", "rule", "global",
 		"tool", store.Provisional, time.Now().AddDate(0, -1, 0).Format(time.DateOnly))
-	labelRow(t, "01JLEGACYCMD00000000000012", store.Behaviour)
 	if ctx := searched(t, "тесты первыми quebec"); !strings.Contains(ctx, "01JLEGACYCMD00000000000011") {
 		t.Errorf("a legacy provisional fact is not found: %q", ctx)
 	}
@@ -212,10 +197,6 @@ func TestLegacyProvisionalIsSearchedListedAndCarried(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "01JLEGACYCMD00000000000011 v1 hermes 2026-10-20 [] expires="+day) {
 		t.Errorf("facts %q", out.String())
-	}
-	ctx := sessionStartContext(t, t.TempDir(), "startup", "s1")
-	if !strings.Contains(ctx, "писать тесты первыми") || strings.Contains(ctx, "просроченное") {
-		t.Errorf("the card: %q", ctx)
 	}
 }
 
@@ -265,7 +246,7 @@ func TestImportStoresEveryFactLive(t *testing.T) {
 	}
 }
 
-// kind and scope are what put a fact on the session card, so add rejects values the card cannot use.
+// kind and scope are what a search filters on, so add rejects values a search cannot use.
 func TestAddValidatesKindAndScope(t *testing.T) {
 	env(t)
 	for _, args := range [][]string{

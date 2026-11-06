@@ -89,8 +89,8 @@ func init() {
 const usage = `usage: memcue <command>
 
 commands:
-  session-start   SessionStart hook: tells the agent where its memory is: memcue session-start [-part N] (1 to 3, one share of the text for each hook)
-  session-card    session-start without the note: the card for a host that has its own instructions: memcue session-card [-dream-tools]
+  session-start   SessionStart hook: tells the agent where its memory is and how to search it: memcue session-start [-part N] (part 1 carries the text; 2 and 3 print nothing, for an older plugin)
+  session-card    session-start without the note: the upgrade and dream hints for a host that has its own instructions: memcue session-card [-dream-tools]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   sessions  passages of earlier Claude Code sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-keywords K1,K2] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
@@ -120,8 +120,6 @@ environment:
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
-  MEMCUE_CARD_BUDGET  most characters of the session card (default 3500); the oldest user-stated rule is
-                  dropped first
   MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 1h; dream.log in the state directory)
   MEMCUE_DREAM_BACKGROUND  0 keeps the session start from running a due dream in the background, on the endpoint
                   or on claude -p; it then says the dream is due instead

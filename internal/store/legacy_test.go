@@ -14,7 +14,6 @@ import (
 // and the dream read it, and it keeps its expiry until a person changes it. A correction keeps that expiry and drops
 // the state; clearing the expiry makes it a fact like any other, still listed. Expired or retired, it stays out.
 func TestLegacyProvisionalIsLive(t *testing.T) {
-	today := TodayAt(time.Now())
 	future := TodayAt(time.Now().AddDate(0, 1, 0))
 	past := TodayAt(time.Now().AddDate(0, -1, 0))
 	s, _ := open(t)
@@ -48,17 +47,6 @@ func TestLegacyProvisionalIsLive(t *testing.T) {
 	if got := activeIDs(); !slices.Equal(got, []string{liveID, expiredID}) {
 		t.Errorf("active %v, want the live and the expired provisional fact", got)
 	}
-	card, _, err := s.CardFacts(nil, today)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.ContainsFunc(card, func(f Fact) bool { return f.ID == liveID }) {
-		t.Error("a live provisional global rule is not on the card")
-	}
-	if slices.ContainsFunc(card, func(f Fact) bool { return f.ID == expiredID || f.ID == retiredID }) {
-		t.Errorf("an expired or retired provisional rule is on the card: %+v", card)
-	}
-
 	f, err := s.Correct(liveID, "Provisional kilo rule, corrected.", nil)
 	if err != nil {
 		t.Fatal(err)

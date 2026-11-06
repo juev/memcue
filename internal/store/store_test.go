@@ -299,74 +299,6 @@ func TestExpiryIsStoredAndKeptByCorrection(t *testing.T) {
 	}
 }
 
-// A mirror of the built-in memory never reaches the card: the memory tool already puts that note in the prompt (#424).
-// A fact of the same kind and scope from any other source does, and the mirror is counted.
-func TestCardFactsSkipMemoryMirrors(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, source string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "rule", Scope: "repo:shop", Source: source})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	mirror := add("Mirrored memory note.", "memory")
-	own := add("Shop rule written by a tool.", "tool")
-	got, mirrors, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 || got[0].ID != own.ID {
-		t.Errorf("card facts %+v, want only %s (not the mirror %s)", got, own.ID, mirror.ID)
-	}
-	if mirrors != 1 {
-		t.Errorf("mirrors = %d, want 1", mirrors)
-	}
-}
-
-// A card carries the rules and decisions that still hold on the given day and skips the expired ones; a fact whose
-// expiry is that day is still carried, as recall does.
-func TestCardFactsSkipExpired(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, kind, scope, expires string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, nil, "test 2026-10-20", expires,
-			Meta{Kind: kind, Scope: scope, Source: "user"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	expiredRule := add("Expired rule.", "rule", "global", "2026-10-19")
-	liveRule := add("Live rule.", "rule", "global", "2026-10-20")
-	expiredDecision := add("Expired decision.", "decision", "repo:shop", "2026-10-19")
-	liveDecision := add("Live decision.", "decision", "repo:shop", "")
-
-	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ids := map[string]bool{}
-	for _, f := range got {
-		ids[f.ID] = true
-	}
-	if len(got) != 2 || !ids[liveRule.ID] || !ids[liveDecision.ID] || ids[expiredRule.ID] || ids[expiredDecision.ID] {
-		t.Errorf("card facts %+v, want only %s and %s", got, liveRule.ID, liveDecision.ID)
-	}
-
-	old := add("Ancient rule.", "rule", "global", "2000-01-01")
-	got, _, err = s.CardFacts([]string{"repo:shop"}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range got {
-		if f.ID == old.ID {
-			t.Errorf("an empty today kept the expired fact %s", old.ID)
-		}
-	}
-}
-
 func TestBadExpiryIsRejected(t *testing.T) {
 	s, _ := open(t)
 	if _, err := s.AddExpiring("Срок задан неверно.", nil, "", "21.10.2026"); err == nil {
@@ -1096,60 +1028,6 @@ func TestAddBatchConcurrentIDsAreUnique(t *testing.T) {
 	}
 }
 
-// A card carries the rules of the session's repository next to its decisions, and no rule or decision of another
-// repository.
-func TestCardFactsCarryRepositoryRules(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, kind, scope string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: kind, Scope: scope})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	own := add("Shop rule.", "rule", "repo:shop")
-	other := add("Lists rule.", "rule", "repo:lists")
-	pitfall := add("Shop pitfall.", "pitfall", "repo:shop")
-	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 || got[0].ID != own.ID {
-		t.Errorf("card facts %+v, want only %s (not %s or %s)", got, own.ID, other.ID, pitfall.ID)
-	}
-}
-
-// A global decision the user stated is on the card in every repository, like a global rule; a global decision of the
-// agent's own is not (#600).
-func TestCardFactsCarryStatedGlobalDecisions(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, source string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "decision", Scope: "global", Source: source})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	stated := add("Service X is updated by hand once a month, outside the nightly job.", "user")
-	confirmed := add("Releases of project Y wait for the parallel task.", "user_confirmed")
-	agents := add("The nightly job probably skips pinned versions.", "agent")
-	for _, scopes := range [][]string{nil, {"repo:shop"}} {
-		got, _, err := s.CardFacts(scopes, "2026-10-20")
-		if err != nil {
-			t.Fatal(err)
-		}
-		ids := make([]string, 0, len(got))
-		for _, f := range got {
-			ids = append(ids, f.ID)
-		}
-		if !slices.Contains(ids, stated.ID) || !slices.Contains(ids, confirmed.ID) || slices.Contains(ids, agents.ID) {
-			t.Errorf("scopes %v: card ids %v, want %s and %s, not %s", scopes, ids, stated.ID, confirmed.ID, agents.ID)
-		}
-	}
-}
-
 // Relabel writes the labels as a new version that keeps the content and the creation time, and refuses a fact that
 // changed since the caller read it.
 func TestRelabelKeepsContentAndDate(t *testing.T) {
@@ -1417,63 +1295,6 @@ func TestOpeningAVersion4BaseIndexesTheQueries(t *testing.T) {
 	}
 }
 
-// A rule the user stated comes before newer ones the model wrote: on a migrated base most rules share one date.
-func TestCardFactsPutStatedRulesFirst(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, source string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, nil, "test 2026-10-20", "", Meta{Kind: "rule", Scope: "global", Source: source})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	stated := add("Stated rule.", "user")
-	confirmed := add("Confirmed rule.", "user_confirmed")
-	written := add("Written rule.", "tool")
-	if _, err := s.SetChannel(written.ID, written.Version, Behaviour); err != nil {
-		t.Fatal(err)
-	}
-	got, _, err := s.CardFacts(nil, "2026-10-20")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var order []string
-	for _, f := range got {
-		order = append(order, f.ID)
-	}
-	if want := []string{confirmed.ID, stated.ID, written.ID}; !slices.Equal(order, want) {
-		t.Errorf("card order %v, want the stated rules newest first, then %s", order, written.ID)
-	}
-}
-
-// The card takes the rules and decisions of every scope of the session's project: one written on a mirror's other host
-// or in a fork's upstream belongs to the session too.
-func TestCardFactsTakeEveryScopeOfTheProject(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, scope string) Fact {
-		f, err := s.AddWith(content, nil, "", "", Meta{Kind: "decision", Scope: scope})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f
-	}
-	here := add("Решение на этом хосте зеркала.", "repo:example.com/me/x")
-	mirror := add("Решение на другом хосте зеркала.", "repo:example.org/me/x")
-	other := add("Решение другого проекта.", "repo:example.com/me/y")
-	got, _, err := s.CardFacts([]string{"repo:example.com/me/x", "repo:example.org/me/x"}, "2026-10-24")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ids := map[string]bool{}
-	for _, f := range got {
-		ids[f.ID] = true
-	}
-	if !ids[here.ID] || !ids[mirror.ID] || ids[other.ID] {
-		t.Errorf("card %v: want both hosts of the mirror and not the other project", ids)
-	}
-}
-
 // RepoScopes names the repository scopes of the live facts, sorted and once each: a retired fact and a scope of another
 // kind are not among them, and a provisional fact and a candidate an older memcue left are (#514).
 func TestRepoScopes(t *testing.T) {
@@ -1589,59 +1410,6 @@ func TestSearchFilteredShelf(t *testing.T) {
 				t.Errorf("got %q, want %q", g, c.want)
 			}
 		})
-	}
-}
-
-// The global part of the card is the facts a dream labelled behaviour (#625): a global rule or decision of another
-// channel stays off the card and is found by search; one the user stated reaches the card until a dream labels it,
-// one of the agent's own waits for its label; the repository part takes its rules and decisions whatever the label.
-func TestCardFactsTakeGlobalFactsByChannel(t *testing.T) {
-	s, _ := open(t)
-	add := func(content, kind, scope, source, channel string) Fact {
-		t.Helper()
-		f, err := s.AddWith(content, []string{"proxy"}, "test 2026-10-20", "", Meta{Kind: kind, Scope: scope, Source: source})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if channel != "" {
-			if f, err = s.SetChannel(f.ID, f.Version, channel); err != nil {
-				t.Fatal(err)
-			}
-		}
-		return f
-	}
-	behaviour := add("Commit messages are written in English.", "rule", "global", "agent", Behaviour)
-	decided := add("Merge a closed task yourself after green CI.", "decision", "global", "user", Behaviour)
-	knowledge := add("The proxy listens on port 8080.", "rule", "global", "user", "knowledge")
-	outdated := add("The first proxy update has not happened yet.", "decision", "global", "user", "outdated")
-	statedBare := add("Measure before filing a task.", "rule", "global", "user", "")
-	confirmedBare := add("Ask once before a force push.", "decision", "global", "user_confirmed", "")
-	agentBare := add("Pull before a rebase.", "rule", "global", "agent", "")
-	repoRule := add("In shop, release only after the parallel task is merged.", "rule", "repo:shop", "agent", "repository")
-	got, _, err := s.CardFacts([]string{"repo:shop"}, "2026-10-20")
-	if err != nil {
-		t.Fatal(err)
-	}
-	card := make([]string, 0, len(got))
-	for _, f := range got {
-		card = append(card, f.ID)
-	}
-	for _, f := range []Fact{behaviour, decided, statedBare, confirmedBare, repoRule} {
-		if !slices.Contains(card, f.ID) {
-			t.Errorf("card lacks %q (%s %s %s %q)", f.Content, f.Kind, f.Scope, f.Source, f.Channel)
-		}
-	}
-	for _, f := range []Fact{knowledge, outdated, agentBare} {
-		if slices.Contains(card, f.ID) {
-			t.Errorf("card carries %q (%s %s %s %q)", f.Content, f.Kind, f.Scope, f.Source, f.Channel)
-		}
-	}
-	found := ids(t, s, "proxy")
-	if _, ok := found[knowledge.ID]; !ok {
-		t.Errorf("search found %v, want the fact off the card %s too", found, knowledge.ID)
-	}
-	if _, ok := found[outdated.ID]; !ok {
-		t.Errorf("search found %v, want the fact off the card %s too", found, outdated.ID)
 	}
 }
 

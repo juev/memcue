@@ -17,7 +17,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -810,61 +809,6 @@ func (s *Store) agentSources() ([]Fact, error) {
 }
 
 const sourcesStamp = "sources-rows" // versions of the base when agentSources last left no fact without a source
-
-// CardFacts returns the facts a session-start card carries: the global rules and decisions a dream labelled behaviour
-// (#625), the global rules and decisions the user stated that no dream has labelled yet, and the
-// rules and decisions whose scope is one of scopes (the session's project, tier.Scope of each of its keys), the ones the user stated first, then newest first, skipping facts whose expiry has passed. A stated rule
-// goes first because the date says little on a migrated base, where most rules share the day of the migration (#229).
-// It is a view of the active facts, not a second store: a fact appears only while it is active and unexpired. A fact
-// whose source is memory is left out and counted in mirrors: it mirrors a note of the host's built-in memory, which
-// the memory tool already puts in the prompt and prunes itself, so on the card it would be a second copy of a block
-// the card cannot take out of the prompt (#424). today is a local "YYYY-MM-DD" date; empty means today.
-func (s *Store) CardFacts(scopes []string, today string) (facts []Fact, mirrors int, err error) {
-	if today == "" {
-		today = Today()
-	}
-	active, err := s.Active()
-	if err != nil {
-		return nil, 0, err
-	}
-	var out []Fact
-	for _, f := range active {
-		if Expired(f.Expires, today) {
-			continue
-		}
-		stated := f.Source == "user" || f.Source == "user_confirmed"
-		switch {
-		case (f.Kind == "rule" || f.Kind == "decision") && strings.EqualFold(f.Scope, "global") &&
-			(f.Channel == Behaviour || f.Channel == "" && stated):
-			// The card exists for a rule the agent would not think to search for, and neither the kind nor the
-			// source of a global fact tells such a rule from the rest (#625): the dream reads each global rule and
-			// decision and labels the ones of behaviour. Until it has, a rule or decision the user just stated is on
-			// the card, so it is not lost before the next dream (#600); a global fact of the agent's own waits for
-			// its label, and one labelled another channel is found by search.
-		case (f.Kind == "decision" || f.Kind == "rule") && slices.ContainsFunc(scopes, func(sc string) bool {
-			return sc != "" && strings.EqualFold(f.Scope, sc)
-		}):
-		default:
-			continue
-		}
-		if f.Source == "memory" {
-			mirrors++
-			continue
-		}
-		out = append(out, f)
-	}
-	stated := func(f Fact) bool { return f.Source == "user" || f.Source == "user_confirmed" }
-	sort.SliceStable(out, func(i, j int) bool {
-		if si, sj := stated(out[i]), stated(out[j]); si != sj {
-			return si
-		}
-		if !out[i].Created.Equal(out[j].Created) {
-			return out[i].Created.After(out[j].Created)
-		}
-		return out[i].ID > out[j].ID
-	})
-	return out, mirrors, nil
-}
 
 // Relabel adds a version of an active fact with the given kind, scope and expiry; the content and everything else
 // stay, the creation time too: a label does not make an old fact new, which would move it ahead of recent facts in the
