@@ -54,7 +54,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.28.0`; the fact-base schema is 7 (see [Upgrade](#upgrade)). An older memcue sets a version-7 cache
+This release is `0.29.0`; the fact-base schema is 7 (see [Upgrade](#upgrade)). An older memcue sets a version-7 cache
 of a text history aside and builds its own from the text; a version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
@@ -62,6 +62,7 @@ same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.29.0 | 7 | 0.29.0 | 0.29.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.29.0 (`hermes-agent` 0.15.2) |
 | 0.28.0 | 7 | 0.28.0 | 0.28.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.28.0 (`hermes-agent` 0.15.2) |
 | 0.27.0 | 6 | 0.27.0 | 0.27.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.27.0 (`hermes-agent` 0.15.2) |
 | 0.26.1 | 6 | 0.26.1 | 0.26.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.26.1 (`hermes-agent` 0.15.2) |
@@ -266,6 +267,29 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.29.0: no card, memory is search only; the store keeps what a failed write owes (#656, #635, #640, #641, #642, #639)
+
+- **No card on any host** (#656). The session start (Claude Code) carries the note and the hints, and `session-card`
+  (Hermes, DSH) the hints only. The note is the one measured in #647: search when the answer or the next step may
+  depend on what an earlier session knew, skip it when the message and the files hold everything, and since no card
+  arrives, search the user's rules and decisions (`-kind rule,decision`, the words of the task) at the start of a task.
+  On the 50 real prompts of #636 the card added nothing to answers once the agent searched, and the note scored the
+  same as memcue with the card ([search-policy-647](docs/research/search-policy-647-2026-11.md)). The Claude Code
+  plugin declares one `SessionStart` hook; `MEMCUE_CARD_BUDGET`, `card.log` and the Hermes settings `session_card` and
+  `session_card_chars` are gone (an old `card.log` can be deleted, the settings are ignored).
+- **The dream no longer labels channels** (#656): its packet has five tasks again, and nothing makes a dream due for an
+  unlabelled global fact (#634 is superseded). Facts keep the `channel` they have; nothing reads it.
+- **A cache build stopped midway leaves no cache** (#635): a missing cache is built as `facts.db.build` and renamed into
+  place, so a caller's timeout no longer leaves a hot journal that every read-only open failed on.
+- **A failed write to a fact file stays owed** (#640): a later write that succeeds no longer hides it, and before a cache
+  of an older schema is set aside, the versions it holds that the files lack go into the files.
+- **An open refuses a file that is not a fact file** (#641): a name that is not a fact id in the directory of its last
+  character, a file holding another fact, or a symbolic link. Every file memcue writes passes.
+- Only memcue and git change the text history (#642): a fact file edited in place is not read until its directory
+  changes; change a fact with `memcue correct`.
+- The Hermes and DSH search tools mark `repo` and `other` as kinds of older facts that `memcue_add` never takes (#639).
+- No schema change and no new flag. Replace the binary and the plugins on every machine.
 
 ### 0.28.0: the card takes global facts by the channel the dream labels, and a search over the session history (#625, #621)
 
