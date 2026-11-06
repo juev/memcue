@@ -422,6 +422,19 @@ test('memcue_search hands over the hints of the binary (#453)', async () => {
 	assert.match(part.text, /-in shelf:research/)
 })
 
+test('memcue_search marks the kinds memcue_add never takes (#639)', () => {
+	const { tools } = mount()
+	const search = tools.get('memcue_search').parameters.properties.kind.description
+	const add = tools.get('memcue_add').parameters.properties.kind.description
+	for (const k of ['rule', 'decision', 'pitfall', 'environment', 'procedure', 'event']) {
+		assert.match(search, new RegExp(`\\b${k}\\b`))
+		assert.match(add, new RegExp(`\\b${k}\\b`))
+	}
+	assert.doesNotMatch(add, /\b(repo|other)\b/)
+	assert.doesNotMatch(search.split('.')[0], /\b(repo|other)\b/)
+	assert.match(search, /repo and other.*memcue_add never takes them/)
+})
+
 test('memcue_search hints on a Chinese query (#410)', async () => {
 	const { tools } = mount()
 	const search = tools.get('memcue_search')

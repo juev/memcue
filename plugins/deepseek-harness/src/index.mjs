@@ -418,7 +418,7 @@ export function apply(ctx, config) {
 			query: { type: 'string', required: true, description: 'Words to look for, in Russian or English, the languages of the facts: translate a question asked in another language.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
 			in: { type: 'string', description: 'Where to look, comma-separated: all (every repository: a host, a tool, another project, or when this repository has nothing), project (this repository only), global, host (this machine), shelf (facts read from web pages and documents, which no other place returns, all included), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:research; all,shelf:research reads both.' },
-			kind: { type: 'string', description: 'Kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. E.g. rule,decision for what was decided.' },
+			kind: { type: 'string', description: 'Kinds, comma-separated: rule, decision, pitfall, environment, event, procedure. E.g. rule,decision for what was decided. Older facts also carry repo and other, labels of the extraction era (#505): search finds them, memcue_add never takes them.' },
 			since: { type: 'string', description: 'YYYY-MM-DD: only facts learnt on or after that day.' },
 			expired: { type: 'boolean', description: 'Include facts whose expiry has passed.' },
 			words: { type: 'string', description: 'all: a fact must hold every word, for a precise match; any (default): one or more.' },

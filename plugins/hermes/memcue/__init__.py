@@ -333,8 +333,9 @@ SEARCH_SCHEMA = _schema(
            "only), global, host (this machine), shelf (facts read from web pages and documents, which no other place "
            "returns, all included), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:research; "
            "all,shelf:research reads both.",
-     "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure, repo, other. "
-             "E.g. rule,decision for what was decided.",
+     "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure. E.g. "
+             "rule,decision for what was decided. Older facts also carry repo and other, labels of the extraction era "
+             "(#505): search finds them, memcue_add never takes them.",
      "since": "Optional YYYY-MM-DD: only facts learnt on or after that day.",
      "expired": "Optional true to include facts whose expiry has passed.",
      "words": "Optional all: a fact must hold every word, for a precise match; any (default) holds one or more.",

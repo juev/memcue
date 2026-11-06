@@ -1193,6 +1193,28 @@ class NoteLabelsTest(unittest.TestCase):
                 self.assertEqual(p._note_labels(target, content), (kind, scope))
 
 
+class SchemaKindsTest(unittest.TestCase):
+    KINDS = ("rule", "decision", "pitfall", "environment", "procedure", "event")  # what memcue add takes
+
+    def test_add_names_only_the_kinds_add_takes(self):
+        """The add schema offers the six kinds of memcue add and never repo or other (#639)."""
+        kind = memcue_provider.ADD_SCHEMA["parameters"]["properties"]["kind"]["description"]
+        for k in self.KINDS:
+            self.assertRegex(kind, rf"\b{k}\b")
+        for old in ("repo", "other"):
+            self.assertNotRegex(kind, rf"\b{old}\b")
+
+    def test_search_marks_the_old_kinds(self):
+        """The search schema still lets a search ask for repo and other, which older facts carry, and says add never
+        takes them: a model that passed kind other to memcue_add was refused (#639)."""
+        kind = memcue_provider.SEARCH_SCHEMA["parameters"]["properties"]["kind"]["description"]
+        for k in self.KINDS + ("repo", "other"):
+            self.assertRegex(kind, rf"\b{k}\b")
+        self.assertIn("memcue_add never takes them", kind)
+        listed = kind.split(".")[0]  # the kinds offered first are the ones add takes
+        self.assertNotRegex(listed, r"\b(repo|other)\b")
+
+
 class BuiltinMemoryFlagsTest(unittest.TestCase):
     """The flags of the built-in memory come from Hermes, and no test reads them from the host (#504)."""
 
