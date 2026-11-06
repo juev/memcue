@@ -180,10 +180,11 @@ func dreamPass(dir string, packets int, out io.Writer) (dreamRecord, int, error)
 		return rec, work, err
 	}
 	start = time.Now()
-	r, err := askAll(calls)
+	r, byCall, err := askAll(calls)
 	timing.Model, timing.API, timing.TTFT, timing.Calls = ms(time.Since(start)), ms(r.API), ms(r.TTFT), len(calls)
 	if err != nil {
 		rec.Tokens, rec.CostUSD, rec.Timing, rec.Error = &r.Tokens, r.CostUSD, &timing, "model: "+err.Error()
+		rec.Calls = byCall
 		return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
 	}
 	// The answer stays next to its packet: what the model said is the record a refused action is checked by.
@@ -194,7 +195,7 @@ func dreamPass(dir string, packets int, out io.Writer) (dreamRecord, int, error)
 	start = time.Now()
 	rec, err = applyAnswer(dir, path, out)
 	timing.Apply = ms(time.Since(start))
-	rec.Tokens, rec.CostUSD, rec.Timing = &r.Tokens, r.CostUSD, &timing
+	rec.Tokens, rec.CostUSD, rec.Timing, rec.Calls = &r.Tokens, r.CostUSD, &timing, byCall
 	if err != nil {
 		rec.Error = err.Error()
 	}
@@ -229,69 +230,122 @@ type dreamWork struct {
 // model's judgement and their neighbours, then the facts to expand, the facts to translate and the global facts to
 // check the scope of (#607). Every call is a whole packet with
 // its instructions and the other data sections empty, so the model reads it as it reads one packet.
-func (w dreamWork) calls() ([]string, error) {
-	var out []string
-	add := func(split, expand, translate, scope []store.Fact, groups [][]store.Fact) error {
+func (w dreamWork) calls() ([]dreamCall, error) {
+	var out []dreamCall
+	add := func(task string, split, expand, translate, scope []store.Fact, groups [][]store.Fact) error {
 		projects := w.projects
 		if len(scope) == 0 {
 			projects = nil
 		}
 		text, err := renderPacket(w.id, split, expand, translate, scope, projects, groups, w.fresh)
-		out = append(out, text)
+		c := dreamCall{text: text, rec: dreamCallRecord{Task: task, Split: len(split), Groups: len(groups),
+			Facts: len(expand) + len(translate) + len(scope)}}
+		for _, g := range groups {
+			if !slices.ContainsFunc(g, func(f store.Fact) bool { return w.fresh[f.ID] }) {
+				c.rec.Swept++
+			}
+		}
+		out = append(out, c)
 		return err
 	}
 	for i := 0; i < len(w.split) || i/packetFresh*packetGroups < len(w.groups); i += packetFresh {
 		k := i / packetFresh * packetGroups
-		if err := add(w.split[min(i, len(w.split)):min(i+packetFresh, len(w.split))], nil, nil, nil,
+		if err := add(taskReview, w.split[min(i, len(w.split)):min(i+packetFresh, len(w.split))], nil, nil, nil,
 			w.groups[min(k, len(w.groups)):min(k+packetGroups, len(w.groups))]); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.expand, packetExpand) {
-		if err := add(nil, c, nil, nil, nil); err != nil {
+		if err := add(taskExpand, nil, c, nil, nil, nil); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.translate, packetTranslate) {
-		if err := add(nil, nil, c, nil, nil); err != nil {
+		if err := add(taskTranslate, nil, nil, c, nil, nil); err != nil {
 			return nil, err
 		}
 	}
 	for c := range slices.Chunk(w.scope, packetScope) {
-		if err := add(nil, nil, nil, c, nil); err != nil {
+		if err := add(taskScope, nil, nil, nil, c, nil); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
+// The tasks of a dream call in dream.log (#643). A review call holds the fresh facts to split together with the
+// groups to merge, the fresh ones and the merge sweep's, so its cost is not told apart further.
+const (
+	taskReview    = "review"
+	taskExpand    = "expand"
+	taskTranslate = "translate"
+	taskScope     = "scope"
+)
+
+// dreamCall is one model call of a pass: the packet text it sends and its line in the pass's record.
+type dreamCall struct {
+	text string
+	rec  dreamCallRecord
+}
+
+// dreamCallRecord is one model call of a dream -run pass in dream.log (#643): its task, the work it was given, how
+// many changes the model proposed, and what the call took. The record of the pass sums the tokens and the cost of its
+// calls; these lines say which task they went to. CostUSD is what `claude -p` reports; an endpoint reports tokens only,
+// so a call there has no cost, which does not mean it was free.
+type dreamCallRecord struct {
+	Task     string         `json:"task"`
+	Split    int            `json:"split,omitempty"`  // fresh facts given to split
+	Groups   int            `json:"groups,omitempty"` // groups given to merge
+	Swept    int            `json:"swept,omitempty"`  // of them, the merge sweep's: groups with no fresh fact
+	Facts    int            `json:"facts,omitempty"`  // facts given to expand, translate or check the scope of
+	Proposed int            `json:"proposed"`         // splits, queries, actions, translations or scopes the model returned
+	Tokens   extract.Tokens `json:"tokens"`
+	CostUSD  float64        `json:"cost_usd,omitempty"`
+	Model    int64          `json:"model_ms"` // the call as memcue waited for it
+	API      int64          `json:"api_ms,omitempty"`
+	Error    string         `json:"error,omitempty"`
+}
+
 // askAll sends the calls at once and joins their answers into the one answer -apply reads. A failed call fails the
 // pass, as a failed packet did: the next pass prepares the same work again. The tokens and the cost are summed; the
-// API time and the first token are the longest call's.
-func askAll(calls []string) (extract.DreamReply, error) {
+// API time and the first token are the longest call's. The records of the calls come back whether they failed or not.
+func askAll(calls []dreamCall) (extract.DreamReply, []dreamCallRecord, error) {
 	replies := make([]extract.DreamReply, len(calls))
 	errs := make([]error, len(calls))
+	took := make([]time.Duration, len(calls))
 	var wg sync.WaitGroup
 	for i, c := range calls {
-		wg.Go(func() { replies[i], errs[i] = dreamRunFn(c) })
+		wg.Go(func() {
+			start := time.Now()
+			replies[i], errs[i] = dreamRunFn(c.text)
+			took[i] = time.Since(start)
+		})
 	}
 	wg.Wait()
 	var r extract.DreamReply
 	var joined dreamAnswer
+	recs := make([]dreamCallRecord, len(calls))
 	for i, rp := range replies {
+		recs[i] = calls[i].rec
+		recs[i].Tokens, recs[i].CostUSD, recs[i].Model, recs[i].API = rp.Tokens, rp.CostUSD, ms(took[i]), ms(rp.API)
 		r.Tokens.Add(rp.Tokens)
 		r.CostUSD += rp.CostUSD
 		r.API, r.TTFT = max(r.API, rp.API), max(r.TTFT, rp.TTFT)
 		if errs[i] != nil {
+			recs[i].Error = errs[i].Error()
 			continue
 		}
 		var a dreamAnswer
 		if err := json.Unmarshal(rp.Answer, &a); err != nil {
 			errs[i] = fmt.Errorf("answer: %w", err)
+			recs[i].Error = errs[i].Error()
 			continue
 		}
-		if i > 0 && a.Packet != joined.Packet {
+		recs[i].Proposed = len(a.Splits) + len(a.Expansions) + len(a.Actions) + len(a.Translations) + len(a.Scopes)
+		// The first answer that came back sets the packet; a failed call before it is no packet to compare with.
+		if joined.Packet != "" && a.Packet != joined.Packet {
 			errs[i] = fmt.Errorf("answer is for packet %q, the others for %q", a.Packet, joined.Packet)
+			recs[i].Error = errs[i].Error()
 			continue
 		}
 		joined.Packet = a.Packet
@@ -302,9 +356,9 @@ func askAll(calls []string) (extract.DreamReply, error) {
 		joined.Scopes = append(joined.Scopes, a.Scopes...)
 	}
 	if err := errors.Join(errs...); err != nil {
-		return r, err
+		return r, recs, err
 	}
 	var err error
 	r.Answer, err = json.Marshal(joined)
-	return r, err
+	return r, recs, err
 }

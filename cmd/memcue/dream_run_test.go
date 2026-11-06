@@ -132,6 +132,76 @@ func TestDreamRunAppliesTheAnswer(t *testing.T) {
 	}
 }
 
+// The record of a pass keeps a line per model call (#643): its task, the work it was given, what the model proposed,
+// and its tokens, cost and time, which add up to the pass's own.
+func TestDreamRunLogsEachCall(t *testing.T) {
+	dir := env(t)
+	withAPI(t, "https://api.example.test")
+	dreamBase(t)
+	dreamedHoursAgo(t, dir)
+	translateAll(t)
+	fakeDreamRun(t, nil)
+	if err := runDream([]string{"-run"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	recs := readDreamLog(t, dir)
+	last := recs[len(recs)-1]
+	byTask := map[string]dreamCallRecord{}
+	var tokens extract.Tokens
+	var cost float64
+	for _, c := range last.Calls {
+		byTask[c.Task] = c
+		tokens.Add(c.Tokens)
+		cost += c.CostUSD
+		if c.API != 3000 || c.Error != "" {
+			t.Errorf("call %+v", c)
+		}
+	}
+	if len(last.Calls) != 2 || tokens != *last.Tokens || cost != last.CostUSD {
+		t.Fatalf("calls %+v do not add up to the pass: tokens %+v, cost %v", last.Calls, last.Tokens, last.CostUSD)
+	}
+	if r := byTask[taskReview]; r.Groups != 1 || r.Facts != 0 {
+		t.Errorf("review call %+v, want the group of the two copies", r)
+	}
+	if tr := byTask[taskTranslate]; tr.Facts != 2 || tr.Proposed != 2 || tr.Groups != 0 {
+		t.Errorf("translate call %+v, want two facts given and two translations", tr)
+	}
+}
+
+// A failed call is logged with its error on its own line; the call that answered keeps its record.
+func TestDreamRunLogsTheFailedCall(t *testing.T) {
+	dir := env(t)
+	withAPI(t, "https://api.example.test")
+	dreamBase(t)
+	dreamedHoursAgo(t, dir)
+	translateAll(t)
+	fakeDreamRun(t, nil)
+	good := dreamRunFn
+	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+		if strings.Contains(packet, "## Группа 1") {
+			return extract.DreamReply{Tokens: extract.Tokens{Input: 7}}, errModel
+		}
+		return good(packet)
+	}
+	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
+		t.Fatalf("err %v, want the call's error", err)
+	}
+	recs := readDreamLog(t, dir)
+	last := recs[len(recs)-1]
+	failed, answered := 0, 0
+	for _, c := range last.Calls {
+		switch {
+		case c.Task == taskReview && c.Error != "" && c.Tokens.Input == 7:
+			failed++
+		case c.Task == taskTranslate && c.Error == "" && c.Proposed == 2:
+			answered++
+		}
+	}
+	if len(last.Calls) != 2 || failed != 1 || answered != 1 {
+		t.Errorf("calls %+v", last.Calls)
+	}
+}
+
 // Facts owed a translation do not make a dream due before MEMCUE_DREAM_EVERY has passed: no call.
 func TestDreamRunWaitsForTheInterval(t *testing.T) {
 	dir := env(t)

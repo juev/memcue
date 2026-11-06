@@ -1062,15 +1062,18 @@ Who runs it:
   (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
   surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
-  once: the fresh facts with the groups, the facts to expand, the facts to translate, the global facts to check the
-  scope of and the global rules and decisions to label each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call fails the pass. Most of a call is the
-  model writing its answer, so a pass of a base far behind does the work of four packets in about a third of the time
-  of one; a pass with little work makes one or two calls. `dream.log` records the calls, the time of the packet, the
-  calls and the apply, and the tokens of each pass (#471,
-  [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)).
+  once: the fresh facts with the groups, the facts to expand, the facts to translate and the global facts to check the
+  scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call
+  fails the pass. Most of a call is the model writing its answer, so a pass of a base far behind does the work of four
+  packets in about a third of the time of one; a pass with little work makes one or two calls. `dream.log` records the
+  calls, the time of the packet, the calls and the apply, and the tokens of each pass (#471,
+  [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)). Under `calls` it keeps a line per
+  call (#643): its task (`review` for the fresh facts and the groups, the merge sweep's counted under `swept`,
+  `expand`, `translate`, `scope`), the work it was given, how many changes the model proposed, its tokens, its time
+  and, on `claude -p`, its cost. An endpoint reports tokens only, so a call there has no `cost_usd`.
 
-A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand, 40 to translate, 30 global facts to check the
-scope of and 30 global rules and decisions to label. The fresh facts it leaves out are not counted
+A packet holds up to 40 fresh facts, 30 groups, 50 facts to expand, 40 to translate, and 30 global facts to check the
+scope of. The fresh facts it leaves out are not counted
 as seen, so the next packet takes them, and the session start still says facts wait.
 
 What the answer may do:

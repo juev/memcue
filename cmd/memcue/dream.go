@@ -109,7 +109,9 @@ type dreamRecord struct {
 	CostUSD float64 `json:"cost_usd,omitempty"`
 	// Timing is where the time of a dream -run pass went (#471).
 	Timing *dreamTiming `json:"timing,omitempty"`
-	Error  string       `json:"error,omitempty"`
+	// Calls are the model calls of a dream -run pass by task, with what each was given and took (#643).
+	Calls []dreamCallRecord `json:"calls,omitempty"`
+	Error string            `json:"error,omitempty"`
 }
 
 // dreamGroupRecord is one group of a dream in dream.log. Outcome is "acted" when an action on it was applied,
