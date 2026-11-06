@@ -303,41 +303,52 @@ func freshFacts(s *store.Store, active []store.Fact, from time.Time, seen map[st
 	return fresh, nil
 }
 
-// dreamDue says, when a dream is due, how many facts are fresh and how many are owed a translation (#396): the
-// interval since the last one has passed and some fact is either. The first call on a machine only marks the base, so
-// the facts it already had are not swept by surprise (memcue dream -prepare -all does that).
-func dreamDue(dir string, every time.Duration) (fresh, owed int, last time.Time, err error) {
+// dreamOwed is what the active facts still owe a dream besides being read: a translation (#396), a channel (#625).
+type dreamOwed struct {
+	translation, channel int
+}
+
+func (o dreamOwed) none() bool { return o.translation == 0 && o.channel == 0 }
+
+// dreamDue says, when a dream is due, how many facts are fresh and what the active facts are owed: the interval since
+// the last one has passed and some fact is fresh or owed something. A global rule or decision without a channel stays
+// off the card until a dream labels it (#625), so it makes a dream due on its own (#634). The first call on a machine
+// only marks the base, so the facts it already had are not swept by surprise (memcue dream -prepare -all does that).
+func dreamDue(dir string, every time.Duration) (fresh int, owed dreamOwed, last time.Time, err error) {
 	last, ok := lastDream(dir)
 	if !ok {
 		unlock, err := lockDream(dir)
 		if err != nil {
-			return 0, 0, time.Time{}, nil // a dream is running: it marks the base itself
+			return 0, owed, time.Time{}, nil // a dream is running: it marks the base itself
 		}
 		defer unlock()
 		if _, ok := lastDream(dir); ok {
-			return 0, 0, time.Time{}, nil
+			return 0, owed, time.Time{}, nil
 		}
-		return 0, 0, time.Time{}, markBase(dir)
+		return 0, owed, time.Time{}, markBase(dir)
 	}
 	if time.Since(last) < every {
-		return 0, 0, last, nil
+		return 0, owed, last, nil
 	}
 	seen, err := readDreamSeen(dir)
 	if err != nil {
-		return 0, 0, last, err
+		return 0, owed, last, err
 	}
 	s, err := openBase()
 	if err != nil {
-		return 0, 0, last, err
+		return 0, owed, last, err
 	}
 	defer func() { _ = s.Close() }()
 	active, err := s.Active()
 	if err != nil {
-		return 0, 0, last, err
+		return 0, owed, last, err
 	}
 	for _, f := range active {
 		if owesTranslation(f) {
-			owed++
+			owed.translation++
+		}
+		if owesChannel(f) {
+			owed.channel++
 		}
 	}
 	fr, err := freshFacts(s, active, last, seen)

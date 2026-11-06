@@ -61,7 +61,7 @@ func runDreamOnce(out io.Writer, all, background bool, packets int) error {
 		if err != nil {
 			return err
 		}
-		if fresh == 0 && owed == 0 {
+		if fresh == 0 && owed.none() {
 			_, err := fmt.Fprintln(out, "dream: nothing due")
 			return err
 		}

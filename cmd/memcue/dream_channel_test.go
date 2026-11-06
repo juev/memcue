@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -239,5 +241,76 @@ func TestDreamRunAllLabelsEveryGlobalFact(t *testing.T) {
 	}
 	if len(given) < 3 {
 		t.Errorf("%d channel calls for 5 facts at 2 a call:\n%s", len(given), out.String())
+	}
+}
+
+// A base whose only debt is global rules and decisions without a channel is due once the interval has passed, and
+// the hint names them (#634): the card leaves such facts out until a dream labels them, so a quiet machine must not
+// wait for a fresh fact. Once they are labelled, nothing is due.
+func TestDreamDueForGlobalFactsWithoutAChannel(t *testing.T) {
+	dir := env(t)
+	rule, decision, pitfall, repo := channelBase(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]int{}
+	for _, f := range []store.Fact{rule, decision, pitfall, repo} {
+		// a translation each, so that the channel is the only debt
+		f, err := s.SetQueries(f.ID, f.Version, []string{extract.TranslationPrefix + "x"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen[f.ID] = f.Version
+	}
+	_ = s.Close()
+	state := filepath.Join(dir, "state", "memcue")
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeDreamSeen(state, seen); err != nil {
+		t.Fatal(err)
+	}
+	if err := markDream(state, time.Now().Add(-59*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, owed, _, err := dreamDue(state, time.Hour); err != nil || !owed.none() {
+		t.Fatalf("due within the hour: %+v %v", owed, err)
+	}
+	if err := markDream(state, time.Now().Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	fresh, owed, _, err := dreamDue(state, time.Hour)
+	if err != nil || fresh != 0 || owed != (dreamOwed{channel: 2}) {
+		t.Fatalf("due: fresh %d owed %+v %v, want only the rule and the decision owed a channel", fresh, owed, err)
+	}
+	if hint := dreamHint(); !strings.Contains(hint, "2 global rules and decisions lack a channel") ||
+		strings.Contains(hint, "wait for the dream") || strings.Contains(hint, "translation") {
+		t.Errorf("hint %q", hint)
+	}
+	s, err = store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{rule.ID, decision.ID} {
+		f, err := s.Get(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err = s.SetChannel(f.ID, f.Version, store.Behaviour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen[f.ID] = f.Version
+	}
+	_ = s.Close()
+	if err := writeDreamSeen(state, seen); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, owed, _, err := dreamDue(state, time.Hour); err != nil || fresh != 0 || !owed.none() {
+		t.Errorf("labelled base still due: fresh %d owed %+v %v", fresh, owed, err)
+	}
+	if hint := dreamHint(); hint != "" {
+		t.Errorf("hint after labelling: %q", hint)
 	}
 }

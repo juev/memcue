@@ -1046,7 +1046,8 @@ one that replaced it. A dream tidies the facts the last dream did not see. memcu
 Who runs it:
 
 - **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `1h`) has
-  passed since the last one and some fact is fresh or lacks a translation. The first check on a machine only marks
+  passed since the last one and some fact is fresh, lacks a translation, or is a global rule or decision without a
+  channel (#634). The first check on a machine only marks
   the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
   dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
   in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
@@ -1228,7 +1229,7 @@ short call only when `MEMCUE_API_URL` is set. Before #494 an extraction of every
 on Opus, about $5 per million characters of transcript, and a review followed it; both are gone.
 
 A dream the session's model runs costs no call of its own: it is part of the session. A background dream (#569) is
-one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation;
+one `dream -run` pass at most once per `MEMCUE_DREAM_EVERY`, and only while some fact is fresh or owed a translation or a channel;
 a pass takes the work of up to four packets (`-j 4`). On Opus through `claude -p`, a background pass over a copy of
 the author's Mac base with 141 fresh facts made six calls and cost $2.58; the passes of a whole-base run cost $0.22–1.97
 ([dream-run-2026-10](docs/research/dream-run-2026-10.md)), and a pass with little fresh work less. One packet is about 20,000–36,000
