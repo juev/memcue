@@ -419,9 +419,12 @@ version, so a commit stores only the facts that changed and `git log -p` shows t
 runs on SQLite: the base becomes a cache, `facts.db` in the state directory, outside git. Every write goes to the
 cache and to the file of the fact. An open reads the directories git changed and takes their versions into the
 cache; an open refuses a file whose name is not a fact id in the directory of its last character, that holds another
-fact or that is a symbolic link (#641). A missing cache is built from the text, under another name and renamed into
-place once built, so a build stopped by a caller's timeout leaves no half-built cache and the next open builds it again
-(#635). A fact changed on two machines is merged by the same driver and the same rules as before.
+fact or that is a symbolic link (#641). Only memcue and git change the text: git writes a file anew, which moves the
+time of its directory, while a file edited in place (by an editor or `rsync --inplace`) keeps it, and an open does not
+read that file until its directory changes. Change a fact with `memcue correct` (#642). A missing cache is built from
+the text, under another name and renamed into place once built, so a build stopped by a caller's timeout leaves no
+half-built cache and the next open builds it again (#635). A fact changed on two machines is merged by the same driver
+and the same rules as before.
 
 The session card of a synced base of the old format suggests the move. Do it in this order:
 
