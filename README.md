@@ -54,7 +54,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release is `0.29.0`; the fact-base schema is 7 (see [Upgrade](#upgrade)). An older memcue sets a version-7 cache
+This release is `0.30.0`; the fact-base schema is 7 (see [Upgrade](#upgrade)). An older memcue sets a version-7 cache
 of a text history aside and builds its own from the text; a version-6 base does not open in 0.20.0
 or older, so stop every older memcue and back the base up before the first open. A text history (0.22.0) is not read
 by 0.21.2 or older, so upgrade every machine that syncs the base before the move. The three plugin manifests carry the
@@ -62,6 +62,7 @@ same version, and a release bumps all of them together.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.30.0 | 7 | 0.30.0 | 0.30.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.30.0 (`hermes-agent` 0.15.2) |
 | 0.29.0 | 7 | 0.29.0 | 0.29.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.29.0 (`hermes-agent` 0.15.2) |
 | 0.28.0 | 7 | 0.28.0 | 0.28.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.28.0 (`hermes-agent` 0.15.2) |
 | 0.27.0 | 6 | 0.27.0 | 0.27.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.27.0 (`hermes-agent` 0.15.2) |
@@ -267,6 +268,22 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.30.0: a dream a day, and its calls cost less (#665, #660, #643)
+
+- **A dream is due a day after the last one by default** (#665): `MEMCUE_DREAM_EVERY` defaults to `24h` instead of
+  `1h`, so a day's facts go to the model in one or two passes instead of five or more. Over one day the full dream and
+  no dream returned the same search results on 287 real queries
+  ([dream-ablations-661](docs/research/dream-ablations-661-2026-11.md)). Set `MEMCUE_DREAM_EVERY=1h` to keep the old
+  interval.
+- **`claude -p` calls load no MCP servers** (#660): every call of memcue (dream, extraction, split, translate, expand)
+  passes an empty MCP config. `--tools ""` had turned the servers' tools off but left their context in the prompt:
+  about 32,500 of the 43,400 input tokens of an empty call. A dream pass of the #643 replay read 296,000 input tokens
+  instead of 517,000 and cost $4.18 instead of $5.19.
+- **`dream.log` records each model call of a pass** (#643): under `calls`, its task, the work it was given, the changes
+  the model proposed, its tokens, time and, on `claude -p`, its cost
+  ([dream-cost-643](docs/research/dream-cost-643-2026-11.md)).
+- No schema change and no new flag. Replace the binary and the plugins on every machine.
 
 ### 0.29.0: no card, memory is search only; the store keeps what a failed write owes (#656, #635, #640, #641, #642, #639)
 
