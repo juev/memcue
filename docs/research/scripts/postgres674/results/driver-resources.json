@@ -1,0 +1,7 @@
+{
+  "driver_peak_rss_kib": 1204428,
+  "driver_cpu_user_s": 3.316022,
+  "driver_cpu_system_s": 0.882682,
+  "python": "3.13.5 (main, Aug 10 2026, 12:06:59) [GCC 14.2.0]",
+  "platform": "x86_64"
+}

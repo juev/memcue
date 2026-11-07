@@ -1,0 +1,96 @@
+{
+  "budgets": {
+    "clients": 2,
+    "correctness_sql": 288,
+    "coverage_explain": 16,
+    "diagnostic_explain": 4,
+    "driver_wall_s": 300,
+    "hard_sql_total": 600,
+    "maintenance_work_mem_mib": 64,
+    "metadata_final": 1,
+    "metadata_initial": 2,
+    "parallel_workers": 0,
+    "query_timeout_s": 5,
+    "sql_total": 527,
+    "stage_wall_s": {
+      "metadata": 10,
+      "run": 250,
+      "test-green": 20,
+      "test-red": 20
+    },
+    "synthetic_sql_green": 12,
+    "synthetic_sql_red": 12,
+    "timing_sql": 192,
+    "work_mem_mib": 64
+  },
+  "candidate": "One distance-only inner vector scan with correlated eligibility EXISTS OFFSET 0; FETCH WITH TIES; outer original parsed-timestamp/scope/ID tie order and limit10.",
+  "causes_ranked": [
+    "Multi-key ORDER BY prevents a distance-only index path from satisfying the complete order; compare raw KNN with added ID key.",
+    "Eligibility joins/global latest aggregation favor join-first sorting; compare a correlated eligible EXISTS before distance-only limit.",
+    "Expression/operator/opclass or index invalidity mismatch; inspect actual catalog and raw distance KNN.",
+    "Cost/selectivity choice rather than capability; compare unforced raw and eligible KNN, no forced speedup arm.",
+    "Prepared generic plans or partial-index implication; inspect actual full-index predicate and disable auto-prepare for every experimental query."
+  ],
+  "correctness": {
+    "current": 128,
+    "oracle": "Live exact reference plus candidate on separate indexscan/bitmapscan-disabled correctness connections, also check saved exact ranks and eligible membership.",
+    "replica10000": 8,
+    "replica30000": 8,
+    "sql_per_context": 2,
+    "tolerance": 3e-06
+  },
+  "coverage": "After equality: all eight selected contexts at both ef_search settings, unprepared default planner; every timing query is unprepared with identical options/templates/parameters. Sixteen plans do not certify every timing execution.",
+  "diagnostic_plans": [
+    "first-saved-context reference",
+    "first-saved-vector raw distance KNN",
+    "same raw KNN with ID tie",
+    "first-saved-context candidate"
+  ],
+  "limitations": [
+    "Reused development queries, not held-out relevance.",
+    "ANN cannot guarantee all equal-distance identities even with FETCH WITH TIES.",
+    "24 dependent timed samples/group; nearest-rank p95 rank23 and p99/max rank24.",
+    "No model/provider/agent calls; production unchanged."
+  ],
+  "model_tag": "e5-small-614241f-f32-mean-l2-384",
+  "new_embeddings": 0,
+  "output": "Public fixed categories and numeric aggregates only; all SQL, values, identities, paths, raw plans private.",
+  "preparation": "psycopg prepare_threshold=None and prepare=False. No SQL PREPARE or forced generic/custom execution; generic behavior remains unmeasured. Full index predicate inspected.",
+  "production_baseline": "a5de0b989ceb1046f4933b19cae7ef60bed0ede2",
+  "provider_calls": 0,
+  "resources": "Client wall/user/system/high-water RSS only; PG server resources unknown; collector not repaired.",
+  "selection": "Reuse exactly the saved fixed eight contexts in saved order; ordinal4 has empty lexical query but vector executes.",
+  "source_hashes": {
+    "ann_shape.py": "bb32b5f146479c47402af343fdc74c4a097280029db4fe2cb23a481e923ad1af",
+    "ann_shape_study.py": "d4aac507f82bd5a624b2ee1cd2a8f664662ac82cee9ae5b744975d1fed1634d2",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "test_ann_shape.py": "d72b401913edfd91baaeb117889f2dfe17a881f767f565aab6969234ebcf9c8f"
+  },
+  "starting_head": "d14af092d6271c807a7f8ff83a75d8a4bcda0850",
+  "study": "vector-query-shape",
+  "tdd": "Red source deliberately cuts inner ties with ONLY; only prospective semantic repair replaces ONLY with WITH TIES. Same six live tests and fixtures then green. No new case selection.",
+  "timing": {
+    "arms": [
+      "reference",
+      "ann-40",
+      "ann-100"
+    ],
+    "cohorts": 1,
+    "concurrency": [
+      1,
+      2
+    ],
+    "contexts": 8,
+    "reference": "Query bytes and default planner settings unchanged; only read-only/session resource options shared with candidate.",
+    "repetitions": 3,
+    "scale": 30000,
+    "stop": "Any correctness mismatch: no further plans/timings. Any coverage plan without HNSW: INDEX_NOT_USED; no timing cohort.",
+    "timed_samples": 144,
+    "warmup_per_context_per_group": 1,
+    "warmups": 48
+  }
+}

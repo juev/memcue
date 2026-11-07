@@ -1,0 +1,18 @@
+{
+  "status": "predeclared before retrieval or transport experiments",
+  "source": "a5de0b989ceb1046f4933b19cae7ef60bed0ede2",
+  "fixture": "fixture.json (SHA256 pinned in freeze.json before run)",
+  "dataset": "invented public bilingual facts; no private corpus; no real-work effectiveness inference",
+  "split": {"tuning": 2, "held-out": 26, "mechanics": 3, "tuning_policy": "no parameter tuning; report held-out only"},
+  "language_labels": "query intent language; some Russian-intent scope/lifecycle probes use literal English anchors; report this limitation",
+  "arms": ["sqlite-full", "sqlite-content", "pg-lexical", "pg-vector-exact", "pg-hybrid-rrf60"],
+  "lexical": {"normalization": "repository text.Stems/Terms/Prefix and recall.Query.Filter", "operator": "OR unless AllWords true", "sqlite_floor": 0, "pg_rank": "ts_rank, not BM25; no inherited relative floor", "limit": 10},
+  "vectors": {"model": "intfloat/multilingual-e5-small", "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3", "file": "onnx/model.onnx", "dimensions": 384, "dtype": "float32", "pooling": "attention-masked mean then L2 normalize", "prefixes": ["query: ", "passage: "], "max_tokens": 512, "metric": "cosine", "ann": null, "fallback": "if genuine model unavailable, no vector quality claims; mechanics only"},
+  "fusion": {"method": "RRF", "k": 60, "candidate_depth_per_channel": 100, "weights": [1, 1]},
+  "metrics": ["target-hit@1/5/10", "target-recall@1/5/10", "strict-useful-precision@1/5/10 (returned denominator)", "known-harmful@1/5/10", "missing-target@10", "per-language and per-stratum"],
+  "controls": ["full baseline twice must have identical ranked IDs/versions", "same remaining source rows/history before and after each arm", "auxiliary and metadata tokens absent from content-only lexical index", "identical eligibility filters before limit across all PG channels"],
+  "sample_counts": {"retrieval_repetitions": 2, "transport_warm_per_route": 30, "transport_cold_per_route": 10, "concurrency": 2, "failure_fixture_repetitions": 1},
+  "thresholds": {"integrity_and_filter_leaks": 0, "failure_fixture_assertions": "all pass", "synthetic_candidate_hit_at_5_regression_vs_content_sqlite": "at most 0.05 absolute; descriptive only", "exact_identifier_number_hit_at_1": 0.95, "local_warm_p95_ms": 100, "local_cold_p95_ms": 250, "query_embedding_warm_p95_ms": 500, "production_go": "requires private held-out corpus, actual agent loop and authorized remote path; synthetic results cannot pass"},
+  "budgets": {"workers": 2, "cpu": 2, "ram_gib": 8, "download_max_mib": 900, "embedding_batch": 2, "embedding_execution_max_seconds": 600, "each_network_download_timeout_seconds": 120, "provider_spend_usd_ceiling": 0, "unknown_usage_or_cost": null},
+  "scope": "local research only; no ANN/scale extrapolation, no model-driven retries or final-answer claims"
+}

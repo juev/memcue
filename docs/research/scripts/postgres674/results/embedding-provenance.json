@@ -1,0 +1,33 @@
+{
+  "model": "intfloat/multilingual-e5-small",
+  "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "files": [
+    {
+      "file": "onnx/model.onnx",
+      "sha256": "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665",
+      "bytes": 470268510
+    },
+    {
+      "file": "tokenizer.json",
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+      "bytes": 17082730
+    },
+    {
+      "file": "config.json",
+      "sha256": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+      "bytes": 655
+    },
+    {
+      "file": "tokenizer_config.json",
+      "sha256": "a1d6bc8734a6f635dc158508bef000f8e2e5a759c7d92f984b2c86e5ff53425b",
+      "bytes": 443
+    }
+  ],
+  "tag": "e5-small-614241f-f32-mean-l2-384",
+  "dimensions": 384,
+  "load_ms": 2461.5093152970076,
+  "provider_usage": null,
+  "provider_cost": null,
+  "measured_provider_calls": 0,
+  "model_download_bytes": 487352338
+}

@@ -1,0 +1,14 @@
+{
+  "measured_tree": "db61c521a13545ad33ced151e5577cdd7bde0330",
+  "new_inference": 0,
+  "new_postgresql_sql": 0,
+  "new_timed_cohorts": 0,
+  "original_attempt_immutable": true,
+  "regression_source_sha256": "3d79f765cf523dfa120345e72eada1a60df638ae7d4ecf98ae75df16916df4df",
+  "repairs": [
+    "Finally-save successful timing/warmup hits and quality; retain raw returned rows in operation journal.",
+    "Make latest/status/expiry synthetic sentinels competitive above top-k; mutation controls must reject each removed guard."
+  ],
+  "scope": "Source-only repair after independent failed review L1/L2",
+  "tests_first": "Two offline regression tests run RED against unchanged measured implementation; then identical tests GREEN. SQLite homogeneous fixture adapter is test-only, not PG/full-corpus evidence."
+}

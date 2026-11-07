@@ -1,0 +1,66 @@
+{
+  "source": "a5de0b989ceb1046f4933b19cae7ef60bed0ede2",
+  "fixture_sha256": "2b82538726da62292706bfb055d3f449b98e9ccb8b1559a74b467261a73120a0",
+  "declaration_sha256": "c3fe80e665f2e3cb031aac473560a9e9e5665ce87f5ad3db4c59dcce045174cf",
+  "evaluated_driver_hashes": {
+    "README.md": "fff3ad7e07e76cb6572342a7c4a204dbc196e0f61491e72b3702c06ee0fe7521",
+    "api.py": "c89e2c1cb1ba9e8509ebb01df9fdee89c5e623a7fd583d1a359a0d572603e24c",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "bootstrap.py": "35f26b3d4daf51fb09dd1f91cfd360f4c96ca876c066be42e4ae40a2db19c61d",
+    "client.py": "b4acfe2b2b78469852e32f46bbc3f32c6ce07c8583dd61a91a84d347d5a43586",
+    "declaration.json": "c3fe80e665f2e3cb031aac473560a9e9e5665ce87f5ad3db4c59dcce045174cf",
+    "download_model.py": "31c1f2924b17c130e134b7fe96b73f3964c4c7fc183e3efecf8862124039cb38",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "experiments.py": "94948cd98896d6ac51f5c234547a108808c3c0b2cf93755a52e212b5152e7f02",
+    "fixture.json": "2b82538726da62292706bfb055d3f449b98e9ccb8b1559a74b467261a73120a0",
+    "make_fixture.py": "65d84e12f52ceb7eac350a56a0938a0eff95bf4b961068c87b2de5141de7ab16",
+    "normalize.py": "0966eddbe6b307f425c12a0429472e51aa667c565603998fb6b1b3ea3ca9874b",
+    "packages.json": "ff381d17218e414fa538edcb70f03244955d14469be363929b4e15c5b0fd3b4d",
+    "recompute.py": "7265936736fe4f804a3df087f3ea282f99c6d2a79585f7029701277bcc989ee4",
+    "requirements.lock": "1a680c72b4356797ed77a6e4ad5cdca6abd42a36c55034bed2b98206d641c2dc",
+    "schema.sql": "0fa66921e9f17d97ee65ddbfa8f5da0f451901b482e12fb3b6df669656c6467a",
+    "sqlite_bridge.go": "4a32df72ba179329bec11d96f46a2c3b1e13af9b0d752febbce27626ea2e1edf",
+    "stand.py": "5376359e2b2d733b9a12e6bd28978a309767326b7778dcbc7dc6b435c5a7410c",
+    "test_recompute.py": "6b10958a857955ce7bfd04dd24482637aa5cf45920042337cf86276dfb95707d"
+  },
+  "bridge_sha256": "9c49be26dd6fe8ddff25d22a36d2e9e645450ded4683205cbb1a1401e8c3d2b4",
+  "binary_identity": {
+    "go_version": "go1.27.0 linux/amd64",
+    "go_binary_sha256": "1db869c560a193573a71be466a34e0d4abb7792d78165c6102cdda069276a3a8",
+    "bridge_sha256": "9c49be26dd6fe8ddff25d22a36d2e9e645450ded4683205cbb1a1401e8c3d2b4",
+    "pip_bootstrap_sha256": "356e0d0de21cdc348c3394084d90939b85e4246c4d14c76aee6ca4f46646ea98",
+    "postgres_binary_sha256": "6468a969338215cb3912cf9c0b894bdbbd37b9a709926db078e9a5bf8bdc3e16",
+    "pgvector_binary_sha256": "3a24c11ac0722e562994313651788d4083aa4d9569fbdbf0ef78a6065d796800"
+  },
+  "raw_evidence": "ignored .research-private/evidence/run-03 (not publishable)",
+  "prior_runs": {
+    "run-01": "failed driver transport initialization; preserved",
+    "run-02": "completed before gofmt and source-revision guard; preserved"
+  },
+  "public_outputs": {
+    "lifecycle.json": "14a2279c5d921c34a188819db15b934d78035e7693db837758243671074b2232",
+    "aggregates.json": "c404b67c36b71744879e624e0a3b2fec81d49a9644fba51052a0af0812eb9d60",
+    "embedding-provenance.json": "2cad744029105cc2923243286471b09e8c7a83572ef671d953bfac36b561685c",
+    "driver-resources.json": "25e3dc60d1ee1d613edb9a61d88bb41b42e966d6e76e67a3308deb0ce80b6694",
+    "database-identity.json": "c4c33f2734daacb836fe65c7014e96fc847396c6883184cb6bd4ec9dcbf5e95a",
+    "audit-summary.json": "871270ad07a911fc0cb47b3b79be0e62a329de4c74e8aaa6eb069e7aeb548cf8"
+  },
+  "post_run_audit": {
+    "synthetic": true,
+    "post_run_integrity_audit": true,
+    "assertions": 155,
+    "passed": true,
+    "quality_parameters_changed": false,
+    "declaration": {
+      "purpose": "post-run integrity only; independently read the saved dump, verify content-only index payloads and restore writability",
+      "driver_sha256": "a56f05d8e1d74654e292221b792c61659723113f5ea046f6703177bcd949033c",
+      "dump_sha256": "2319234269954683eb916422930327f3bf0f4c83d4899545b1c34fdd00fb9d64",
+      "threshold": "all assertions pass",
+      "quality_parameters_changed": false,
+      "concurrency": 1
+    }
+  },
+  "post_measurement_documentation_edits": [
+    "README.md: added executed independent audit command; frozen evaluated bytes retained privately"
+  ]
+}

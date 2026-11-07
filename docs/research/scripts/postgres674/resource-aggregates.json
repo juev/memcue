@@ -1,0 +1,196 @@
+{
+  "container_identity_equal": true,
+  "cpu_limit_cores": 2.0,
+  "cpu_unlimited": false,
+  "docker_working_set_bytes": null,
+  "embedding_worker_resources": null,
+  "engine_heap_bytes": null,
+  "final_offline_tests": 4,
+  "final_source_hashes": {
+    "ann_shape.py": "4f50a39ac63c6f17e5e5f287d47181ba7d838f68ad3b038eeff7ce63aaa00269",
+    "ann_shape_exact.py": "e54d94ac3dc58792dd697aabc78b8df9943a092b745a5a110c884fe316d2b237",
+    "ann_shape_exact_study.py": "08e93dc6aa4c13686ee327654aa4fe3254bd8541f910b6405657063aaf582693",
+    "ann_shape_study.py": "e179318b26244d7addf5b6be8512a0752d301cb558503958da6284e83d7f185d",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "resource_probe.py": "4c1e88b110b7c6d489b2a8e2cf0eee8e2a0a1a6a2541734207a9d0d7a8d84099",
+    "resource_study.py": "ef12d045e978ea7bbc395914ca7251e6c6c5a879eb28e515bc140992ee688e31",
+    "test_resource_probe.py": "aee70e9ceaf468427e4cbcfcb9df67467ea1967faccd0627154b22a73147e957"
+  },
+  "fingerprints_equal": true,
+  "groups": [
+    {
+      "anon_bytes": {
+        "max": 12075008,
+        "min": 6025216
+      },
+      "arm": "baseline",
+      "cpu_seconds": 0.20049199999994016,
+      "file_bytes": {
+        "max": 786468864,
+        "min": 786468864
+      },
+      "memory_current_bytes": {
+        "max": 822984704,
+        "min": 816254976
+      },
+      "memory_events_delta": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "requests": 0,
+      "samples": 41,
+      "swap_current_bytes": {
+        "max": 0,
+        "min": 0
+      },
+      "window_wall_s": 20.001109844073653
+    },
+    {
+      "anon_bytes": {
+        "max": 9396224,
+        "min": 7352320
+      },
+      "arm": "reference",
+      "cpu_seconds": 3.3892829999999776,
+      "file_bytes": {
+        "max": 786468864,
+        "min": 786468864
+      },
+      "memory_current_bytes": {
+        "max": 820322304,
+        "min": 817979392
+      },
+      "memory_events_delta": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "requests": 16,
+      "samples": 8,
+      "swap_current_bytes": {
+        "max": 0,
+        "min": 0
+      },
+      "window_wall_s": 3.4012769358232617
+    },
+    {
+      "anon_bytes": {
+        "max": 8585216,
+        "min": 7356416
+      },
+      "arm": "ann-40",
+      "cpu_seconds": 0.04125299999998333,
+      "file_bytes": {
+        "max": 786468864,
+        "min": 786468864
+      },
+      "memory_current_bytes": {
+        "max": 819617792,
+        "min": 817893376
+      },
+      "memory_events_delta": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "requests": 16,
+      "samples": 2,
+      "swap_current_bytes": {
+        "max": 0,
+        "min": 0
+      },
+      "window_wall_s": 0.054639761336147785
+    },
+    {
+      "anon_bytes": {
+        "max": 8585216,
+        "min": 7356416
+      },
+      "arm": "ann-100",
+      "cpu_seconds": 0.039631999999983236,
+      "file_bytes": {
+        "max": 786468864,
+        "min": 786468864
+      },
+      "memory_current_bytes": {
+        "max": 819372032,
+        "min": 817995776
+      },
+      "memory_events_delta": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "requests": 16,
+      "samples": 2,
+      "swap_current_bytes": {
+        "max": 0,
+        "min": 0
+      },
+      "window_wall_s": 0.05247660633176565
+    }
+  ],
+  "historical_memory_peak_used": false,
+  "host_sampler_cpu": null,
+  "independent_review_at_author_freeze": "PENDING",
+  "measured_source_hashes": {
+    "ann_shape.py": "4f50a39ac63c6f17e5e5f287d47181ba7d838f68ad3b038eeff7ce63aaa00269",
+    "ann_shape_exact.py": "e54d94ac3dc58792dd697aabc78b8df9943a092b745a5a110c884fe316d2b237",
+    "ann_shape_exact_study.py": "08e93dc6aa4c13686ee327654aa4fe3254bd8541f910b6405657063aaf582693",
+    "ann_shape_study.py": "e179318b26244d7addf5b6be8512a0752d301cb558503958da6284e83d7f185d",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "resource_probe.py": "504b7cbd5220a772cf450748e37b1e2decd7424abbeeb74061c64feeae4b50db",
+    "resource_study.py": "1b1ef5b488e8af4387204cde3903119f2b4304c4b77f67bc4f484009a9c7f605",
+    "test_resource_probe.py": "8dbddb46b01e82b25cc95c22e421a723a19a864c7d071efc6c250c48ff9e0b9f"
+  },
+  "memory_limit_bytes": 1073741824,
+  "monthly_cost": null,
+  "new_ann_cohort": false,
+  "new_embeddings": 0,
+  "new_latency_quantiles": false,
+  "new_native_episodes": 0,
+  "new_quality_evaluation": false,
+  "numeric_sample_rows": 63,
+  "parent_acceptance": "PENDING",
+  "provider_calls": 0,
+  "sampled_memory_current_bytes": {
+    "max": 931663872,
+    "min": 816250880
+  },
+  "sampler_exit": 0,
+  "sampler_reaped": true,
+  "source_only_guard_after_probe": true,
+  "sql": {
+    "attempted": 51,
+    "completed": 51,
+    "control": 1,
+    "failed": 0,
+    "fingerprints": 2,
+    "new_explain": 0,
+    "resource_requests": 48,
+    "startup": 0
+  },
+  "status": "MEASURED",
+  "whole_probe_wall_s": 29.98706957604736
+}

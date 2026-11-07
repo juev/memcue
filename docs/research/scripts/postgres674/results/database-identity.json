@@ -1,0 +1,37 @@
+{
+  "server": {
+    "version": "PostgreSQL 17.11 (Debian 17.11-0+deb13u1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+  },
+  "extension": {
+    "extversion": "0.8.0"
+  },
+  "size": {
+    "bytes": 8345267
+  },
+  "index_sizes": [
+    {
+      "relname": "fact_fts",
+      "bytes": 57344
+    },
+    {
+      "relname": "fact_index",
+      "bytes": 65536
+    },
+    {
+      "relname": "fact_vectors",
+      "bytes": 122880
+    },
+    {
+      "relname": "facts",
+      "bytes": 49152
+    },
+    {
+      "relname": "operations",
+      "bytes": 16384
+    },
+    {
+      "relname": "stamps",
+      "bytes": 32768
+    }
+  ]
+}

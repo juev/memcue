@@ -1,0 +1,27 @@
+{
+  "cohort_requests": 192,
+  "corrected_expiry_control_selects": 12,
+  "correction": "Explicit text cast only in intentionally faulty expiry mutation; six original datatype errors remain failed evidence. Reuse successful controls, preserve both attempt packets. All use same original300second absolute clock.",
+  "correctness_selects": 288,
+  "coverage_explain": 16,
+  "final_metadata": 1,
+  "maximum_total_sql": 578,
+  "new_cohorts_permitted": 1,
+  "previous_attempted": 63,
+  "remaining_maximum": 515,
+  "representative_explain": 6,
+  "source_hashes": {
+    "ann_shape.py": "4f50a39ac63c6f17e5e5f287d47181ba7d838f68ad3b038eeff7ce63aaa00269",
+    "ann_shape_exact.py": "e54d94ac3dc58792dd697aabc78b8df9943a092b745a5a110c884fe316d2b237",
+    "ann_shape_exact_study.py": "08e93dc6aa4c13686ee327654aa4fe3254bd8541f910b6405657063aaf582693",
+    "ann_shape_study.py": "e179318b26244d7addf5b6be8512a0752d301cb558503958da6284e83d7f185d",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "test_ann_shape.py": "7e9eb9e8cb1b7818be67a73ad9935b576ae6ed88c09a18a297114f8d3ae03ac6",
+    "test_ann_shape_exact.py": "dd5fd6c9a348b9d4d69a3f8d65a5a48416c5dd71ea71d2ddca75c66fd2d99211"
+  },
+  "whole_deadline_reset": false
+}

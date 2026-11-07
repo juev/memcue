@@ -1,0 +1,10 @@
+[
+  "initdb completed; no system service registration",
+  "started rootless, loopback SCRAM, bounded settings",
+  "stopped owned process, exit 0",
+  "started rootless, loopback SCRAM, bounded settings",
+  "pg_dump custom archive and pg_restore --exit-on-error completed",
+  "stopped owned process, exit 0",
+  "started rootless, loopback SCRAM, bounded settings",
+  "stopped owned process, exit 0"
+]

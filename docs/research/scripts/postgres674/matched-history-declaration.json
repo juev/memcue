@@ -1,0 +1,90 @@
+{
+  "all_context_equality": 128,
+  "ann": {
+    "ef_construction": 64,
+    "ef_search": [
+      40,
+      100
+    ],
+    "m": 16,
+    "max_indexes": 1,
+    "measurements": "Same selected contexts, warmup1/repetitions3/c1,c2; unchanged candidate query semantics; require actual index use; no planner forcing.",
+    "quality": "Filtered exact reference oracle; strict ID recall@10, underfill, eligibility, boundary-valid fraction tolerance3e-6 separately; no natural-task extrapolation",
+    "threshold_ms": 100,
+    "trigger": "Any matched 30000 vector group p95 > 100ms, reference or CTE, c1 or c2",
+    "type": "HNSW cosine"
+  },
+  "budgets": {
+    "added_history_rows": 400000,
+    "client_workers": 2,
+    "import_writers": 1,
+    "maintenance_work_mem_mib": 64,
+    "parallel_workers": 0,
+    "search_timeout_ms": 5000,
+    "setup_timeout_ms": 180000,
+    "total_added_relation_bytes": 1073741824
+  },
+  "channels": [
+    "lexical",
+    "vector"
+  ],
+  "concurrency": [
+    1,
+    2
+  ],
+  "contexts": 8,
+  "distance": "cosine",
+  "filters": {
+    "scope-filtered": 3,
+    "unrestricted": 5
+  },
+  "input_hashes": {
+    "cases.json": "d5faecf51c1f08c8ba054ba1eae378c811aa6ba8087db80171ae0fe3aaea3ca5",
+    "complete.json": "5a338ca47314ea1e4a35679ec21700297ad43b64ef6fdb6c7043daebc75b7d0d",
+    "deployment-after.json": "df0313140d51ef1b7887efb07b2ca9826cdf01600b08d307fa22c43bcb0cd8a6",
+    "embedding-provenance.json": "4073df852e574fefc70894b80de7c5f892c69f69f6f33a38d927863985d725e2",
+    "freeze.json": "c93b3e34f278c68dcc63596ba8b22747af6498d7f6dcf3dceba8eee7ab17ec4e",
+    "query-vectors.json": "e45eb8ed5e561a2f9f7f132afd52979fcc58f6519c38e69cfcbedea0886fefb9",
+    "sqlite/normalized.json": "5ab9548f3394f403f69f3330095d81735a18a0419e02f1b560fb96d453279b5f"
+  },
+  "languages": {
+    "cyrillic": 3,
+    "latin": 4,
+    "other": 1
+  },
+  "limit": 10,
+  "model_tag": "e5-small-614241f-f32-mean-l2-384",
+  "new_embeddings": 0,
+  "plans": "First two selected contexts, both variants/channels, each scale, ANALYZE BUFFERS JSON; raw private, numeric summaries public.",
+  "preflight": "Actual source version/derived counts and bytes, conservative scaled 2x source bytes + 128MiB index reserve; check actual totals after each write before proceeding.",
+  "production_changes": false,
+  "production_digest": "f57aa8ca0bdc20bda9821f67e5df2ed50b377bd45adaba144188e001ddd14c41",
+  "provider_calls": 0,
+  "quantiles": "nearest rank; n=24 p95 rank23, p99/max rank24; small dependent tails",
+  "repetitions": 3,
+  "replication": "Stable md5(source ID), ID tie order; cycle all source primary IDs, copy every history version and matching derived rows. New IDs are performance replicas only.",
+  "schemas": "Original completed history tables; new full-history SQL replicas over all primary IDs at 10000 and 30000, including retired and expired latest versions. Same five-table schema and indexes.",
+  "selection": "Round robin sorted language/filter-shape strata, each ordered SHA256(saved context ID); no result tuning.",
+  "server_metrics": "Read-only SSH exact memcue-research project docker stats sampling scoped by phase; unavailable stays unmeasured",
+  "source_baseline": "a5de0b989ceb1046f4933b19cae7ef60bed0ede2",
+  "source_hashes": {
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "matched_study.py": "a8c5ca8ed169e1f64ea90153be669aa89639d3cf4bf5511fa4f864d7d22cde09",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "private_replay.py": "a8d9926e36c90b582996fa818d3a67f1b04994c45b382434a243b702133e1451",
+    "schema.sql": "0fa66921e9f17d97ee65ddbfa8f5da0f451901b482e12fb3b6df669656c6467a",
+    "source_identity.py": "5a78e34fa580925cf4212fe913150a4d52fff35d1cb55a4d4d38d2484fa92afa",
+    "test_matched_query.py": "33c033f3b816ac7a9e5cab668112a1380a3ad77ad2386d6dfab39d03aa6c8500"
+  },
+  "starting_head": "f7deb7ba8dbdbb641ce032ed783012021b6e684b",
+  "tie_semantics": "Unchanged scope/project priority, parsed created timestamp DESC, ID. Latest version selected before all filters.",
+  "timed_samples_per_group": 24,
+  "variants": [
+    "reference",
+    "latest-cte"
+  ],
+  "warmup": "One untimed request per selected context per arm/channel/scale/concurrency; retained sessions per worker chunk."
+}

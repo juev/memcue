@@ -1,0 +1,85 @@
+{
+  "accounting": {
+    "correctness_selects": 288,
+    "coverage_explain": 16,
+    "final_metadata": 1,
+    "fixture_selects": 60,
+    "hard_user_cap": 600,
+    "initial_metadata": 2,
+    "maximum_sql": 565,
+    "note": "libpq startup options/protocol messages are not SQL operations. All issued SELECT/EXPLAIN attempts are started/finished in one ledger; failed/absent timing is null, no placeholders.",
+    "representative_explain": 6,
+    "session_startup_sql": 0,
+    "timed_selects": 144,
+    "warmup_selects": 48
+  },
+  "alternatives": "Global scan disabling rejected by preserved timeout. Materialized vector input not selected; no adaptive method choice after results.",
+  "cohort": {
+    "arms": [
+      "reference",
+      "ann-40",
+      "ann-100"
+    ],
+    "concurrency": [
+      1,
+      2
+    ],
+    "contexts": 8,
+    "groups": 6,
+    "repetitions": 3,
+    "requests": 192,
+    "schedule": "Concurrency1then2; reference thenann40thenann100; workers take saved ordinal modulo concurrency; each worker warmups its chunk then3ordered repetitions. One cohort maximum; no rerun.",
+    "stop": "Incomplete equality/plan/index gate means no cohort. Reference identity mismatch stops cohort; poor ANN recall/underfill remains evidence, no tuning.",
+    "timed": 144,
+    "warmups": 48
+  },
+  "correctness": {
+    "current": 128,
+    "eligible": "Saved eligible sets and exact oracle; full initial/final five-table fingerprints/counts match the previously sealed snapshot, and live exact reference matches saved oracle.",
+    "ranked_selects": 288,
+    "replica10000": 8,
+    "replica30000": 8,
+    "strict_id_version_order": true,
+    "tolerance": 3e-06
+  },
+  "coverage": "After equality,16default candidate EXPLAIN ANALYZE: all8selected contexts at ef40/100. No forced plan or changed planner costs. Preparation disabled everywhere. Coverage is per probe, not every later execution.",
+  "fixtures": "Revised six real PG VALUES methods: default candidate baseline, exact candidate baseline, three independent latest/status/expiry guard mutations on exact candidate. Twelve SELECTs per suite,60total. Every lost guard must cause semantic assertions, zero setup/errors.",
+  "historical": "Original31SQL, old snapshots, failed reviews and102/7/119seals remain immutable; old virtual entries refer to their frozen trees. New source/declaration/packet identities are separate.",
+  "limitations": "Development case reuse; ANN ties may miss identities even with WITH TIES. Strict identity recall and3e-6boundary validity differ.24dependent timings/group p95rank23,p99/maxrank24, not stable tails or natural quality.",
+  "limits": {
+    "clients": 2,
+    "includes": "launcher before interpreter/import/input loading/admission; one monotonic deadline never reset at stages",
+    "maintenance_work_mem_mib": 64,
+    "parallel_workers": 0,
+    "query_admission_minimum_s": 5.5,
+    "query_timeout_s": 5,
+    "whole_driver_wall_s": 300,
+    "work_mem_mib": 64,
+    "work_reserve_s": 15
+  },
+  "method": "Correctness-only inner cosine ordering adds floating zero; score expression, bindings, eligibility and both timed compilers are unchanged. Ordinary B-tree/bitmap paths remain enabled.",
+  "model_tag": "e5-small-614241f-f32-mean-l2-384",
+  "new_embeddings": 0,
+  "new_native_episodes": 0,
+  "preparation": "prepare_threshold=None and prepare=False; no PREPARE/generic/custom test. Every template/parameter frozen privately before SQL.",
+  "production_baseline": "a5de0b989ceb1046f4933b19cae7ef60bed0ede2",
+  "provider_calls": 0,
+  "representative_plans": "Before corpus gate: first saved context current and first two selected30k, each natural default reference and correctness-only candidate,6EXPLAIN ANALYZE. Both noHNSW, candidate ordinary history index access required.",
+  "selection": "Same saved128current and fixed8per replica; saved order, vectors, filters, dates, modeltag, normalizer, limit10 and oracle. Empty lexical context remains a vector request.",
+  "server_resources": "UNKNOWN",
+  "sources": {
+    "ann_shape.py": "4f50a39ac63c6f17e5e5f287d47181ba7d838f68ad3b038eeff7ce63aaa00269",
+    "ann_shape_exact.py": "e54d94ac3dc58792dd697aabc78b8df9943a092b745a5a110c884fe316d2b237",
+    "ann_shape_exact_study.py": "559112778c3edd15d8e65719bc9d83275c574c7b275e6ae821dbbe2a97c488df",
+    "ann_shape_study.py": "e179318b26244d7addf5b6be8512a0752d301cb558503958da6284e83d7f185d",
+    "backend.py": "cbf255ae0daef0f35c00040c8dbe0a714857080b6d51c79a119a2e95e3039cdd",
+    "deployed.py": "74829e85fd9df99b142c72cc6aaec01184926aabb8503ef266123aef8859174e",
+    "embed.py": "b03b87771195118a61bb5f26e1a18533b41d32137fd29d13850b444eb2c4d2e1",
+    "matched_query.py": "c1e13831b98a2ede2fe1b4530c307ba28a6561cbf8a726d2e4ce43f4eab8bac0",
+    "outputs.py": "88c45abc384c566d992145a22e18dbb5d39a818fdefb12d6c7c7ee292e46825e",
+    "test_ann_shape.py": "7e9eb9e8cb1b7818be67a73ad9935b576ae6ed88c09a18a297114f8d3ae03ac6",
+    "test_ann_shape_exact.py": "dd5fd6c9a348b9d4d69a3f8d65a5a48416c5dd71ea71d2ddca75c66fd2d99211"
+  },
+  "starting_head": "3c827fd2c4eb065485fb6e30d21d659d7802da90",
+  "startup": "Autocommit; default_transaction_read_only=on; statement_timeout5000; lock_timeout5000; parallel0; jitoff; work/maintenance64MB; ef40or100; no index/bitmap disabling, forcing or iterative-mode change."
+}

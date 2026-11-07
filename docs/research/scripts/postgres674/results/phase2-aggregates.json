@@ -1,0 +1,1658 @@
+{
+  "status": "unlabeled private replay; issue remains open",
+  "counts": {
+    "input_files": 7714,
+    "fact_files": 7713,
+    "log_records": 1096,
+    "raw_version_lines": 33372,
+    "unique_version_rows": 33371,
+    "duplicate_lines": 1,
+    "unique_ids": 7713,
+    "latest_active": 3462,
+    "latest_active_expired": 19
+  },
+  "context_strata": {
+    "latin": 64,
+    "cyrillic": 63,
+    "other": 1
+  },
+  "integrity": {
+    "returned_hits_checked": 20985,
+    "exact_vector_repetitions_checked": 512,
+    "source_projection_equal": true,
+    "index_counts": {
+      "sqlite-full": 3462,
+      "sqlite-content": 3462
+    },
+    "history_unchanged": true,
+    "preexisting_relations_unchanged": true
+  },
+  "retrieval": {
+    "sqlite-full": {
+      "all": {
+        "contexts": 128,
+        "empty": 5,
+        "returned_count": 1222,
+        "primary_characters": 309528,
+        "sqlite-full-at-1": {
+          "intersection_count": 123,
+          "baseline_returned_count": 123,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 612,
+          "baseline_returned_count": 612,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 1222,
+          "baseline_returned_count": 1222,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 68,
+          "baseline_returned_count": 122,
+          "overlap_fraction": 0.5573770491803278,
+          "ranked_equal_contexts": 73
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 370,
+          "baseline_returned_count": 610,
+          "overlap_fraction": 0.6065573770491803,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 768,
+          "baseline_returned_count": 1214,
+          "overlap_fraction": 0.6326194398682042,
+          "ranked_equal_contexts": 5
+        }
+      },
+      "latin": {
+        "contexts": 64,
+        "empty": 4,
+        "returned_count": 592,
+        "primary_characters": 162590,
+        "sqlite-full-at-1": {
+          "intersection_count": 60,
+          "baseline_returned_count": 60,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 297,
+          "baseline_returned_count": 297,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 592,
+          "baseline_returned_count": 592,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 42,
+          "baseline_returned_count": 59,
+          "overlap_fraction": 0.711864406779661,
+          "ranked_equal_contexts": 46
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 189,
+          "baseline_returned_count": 295,
+          "overlap_fraction": 0.6406779661016949,
+          "ranked_equal_contexts": 4
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 389,
+          "baseline_returned_count": 584,
+          "overlap_fraction": 0.666095890410959,
+          "ranked_equal_contexts": 4
+        }
+      },
+      "cyrillic": {
+        "contexts": 63,
+        "empty": 0,
+        "returned_count": 630,
+        "primary_characters": 146938,
+        "sqlite-full-at-1": {
+          "intersection_count": 63,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 315,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 630,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 26,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.4126984126984127,
+          "ranked_equal_contexts": 26
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 181,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.5746031746031746,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 379,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.6015873015873016,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "other": {
+        "contexts": 1,
+        "empty": 1,
+        "returned_count": 0,
+        "primary_characters": 0,
+        "sqlite-full-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        }
+      }
+    },
+    "sqlite-content": {
+      "all": {
+        "contexts": 128,
+        "empty": 6,
+        "returned_count": 1214,
+        "primary_characters": 281218,
+        "sqlite-full-at-1": {
+          "intersection_count": 68,
+          "baseline_returned_count": 123,
+          "overlap_fraction": 0.5528455284552846,
+          "ranked_equal_contexts": 73
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 370,
+          "baseline_returned_count": 612,
+          "overlap_fraction": 0.6045751633986928,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 768,
+          "baseline_returned_count": 1222,
+          "overlap_fraction": 0.6284779050736498,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 122,
+          "baseline_returned_count": 122,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 610,
+          "baseline_returned_count": 610,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 1214,
+          "baseline_returned_count": 1214,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 128
+        }
+      },
+      "latin": {
+        "contexts": 64,
+        "empty": 5,
+        "returned_count": 584,
+        "primary_characters": 141173,
+        "sqlite-full-at-1": {
+          "intersection_count": 42,
+          "baseline_returned_count": 60,
+          "overlap_fraction": 0.7,
+          "ranked_equal_contexts": 46
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 189,
+          "baseline_returned_count": 297,
+          "overlap_fraction": 0.6363636363636364,
+          "ranked_equal_contexts": 4
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 389,
+          "baseline_returned_count": 592,
+          "overlap_fraction": 0.6570945945945946,
+          "ranked_equal_contexts": 4
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 59,
+          "baseline_returned_count": 59,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 295,
+          "baseline_returned_count": 295,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 584,
+          "baseline_returned_count": 584,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 64
+        }
+      },
+      "cyrillic": {
+        "contexts": 63,
+        "empty": 0,
+        "returned_count": 630,
+        "primary_characters": 140045,
+        "sqlite-full-at-1": {
+          "intersection_count": 26,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.4126984126984127,
+          "ranked_equal_contexts": 26
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 181,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.5746031746031746,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 379,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.6015873015873016,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 63,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 315,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 630,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 1.0,
+          "ranked_equal_contexts": 63
+        }
+      },
+      "other": {
+        "contexts": 1,
+        "empty": 1,
+        "returned_count": 0,
+        "primary_characters": 0,
+        "sqlite-full-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        }
+      }
+    },
+    "pg-lexical": {
+      "all": {
+        "contexts": 128,
+        "empty": 6,
+        "returned_count": 1214,
+        "primary_characters": 417210,
+        "sqlite-full-at-1": {
+          "intersection_count": 57,
+          "baseline_returned_count": 123,
+          "overlap_fraction": 0.4634146341463415,
+          "ranked_equal_contexts": 62
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 311,
+          "baseline_returned_count": 612,
+          "overlap_fraction": 0.5081699346405228,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 656,
+          "baseline_returned_count": 1222,
+          "overlap_fraction": 0.5368248772504092,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 74,
+          "baseline_returned_count": 122,
+          "overlap_fraction": 0.6065573770491803,
+          "ranked_equal_contexts": 80
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 339,
+          "baseline_returned_count": 610,
+          "overlap_fraction": 0.5557377049180328,
+          "ranked_equal_contexts": 6
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 726,
+          "baseline_returned_count": 1214,
+          "overlap_fraction": 0.5980230642504119,
+          "ranked_equal_contexts": 6
+        }
+      },
+      "latin": {
+        "contexts": 64,
+        "empty": 5,
+        "returned_count": 584,
+        "primary_characters": 200315,
+        "sqlite-full-at-1": {
+          "intersection_count": 36,
+          "baseline_returned_count": 60,
+          "overlap_fraction": 0.6,
+          "ranked_equal_contexts": 40
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 163,
+          "baseline_returned_count": 297,
+          "overlap_fraction": 0.5488215488215489,
+          "ranked_equal_contexts": 4
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 324,
+          "baseline_returned_count": 592,
+          "overlap_fraction": 0.5472972972972973,
+          "ranked_equal_contexts": 4
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 40,
+          "baseline_returned_count": 59,
+          "overlap_fraction": 0.6779661016949152,
+          "ranked_equal_contexts": 45
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 168,
+          "baseline_returned_count": 295,
+          "overlap_fraction": 0.5694915254237288,
+          "ranked_equal_contexts": 5
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 352,
+          "baseline_returned_count": 584,
+          "overlap_fraction": 0.6027397260273972,
+          "ranked_equal_contexts": 5
+        }
+      },
+      "cyrillic": {
+        "contexts": 63,
+        "empty": 0,
+        "returned_count": 630,
+        "primary_characters": 216895,
+        "sqlite-full-at-1": {
+          "intersection_count": 21,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.3333333333333333,
+          "ranked_equal_contexts": 21
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 148,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.46984126984126984,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 332,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.526984126984127,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 34,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.5396825396825397,
+          "ranked_equal_contexts": 34
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 171,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.5428571428571428,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 374,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.5936507936507937,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "other": {
+        "contexts": 1,
+        "empty": 1,
+        "returned_count": 0,
+        "primary_characters": 0,
+        "sqlite-full-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 1
+        }
+      }
+    },
+    "pg-vector-exact": {
+      "all": {
+        "contexts": 128,
+        "empty": 0,
+        "returned_count": 1280,
+        "primary_characters": 341698,
+        "sqlite-full-at-1": {
+          "intersection_count": 45,
+          "baseline_returned_count": 123,
+          "overlap_fraction": 0.36585365853658536,
+          "ranked_equal_contexts": 45
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 184,
+          "baseline_returned_count": 612,
+          "overlap_fraction": 0.3006535947712418,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 373,
+          "baseline_returned_count": 1222,
+          "overlap_fraction": 0.30523731587561376,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 44,
+          "baseline_returned_count": 122,
+          "overlap_fraction": 0.36065573770491804,
+          "ranked_equal_contexts": 44
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 169,
+          "baseline_returned_count": 610,
+          "overlap_fraction": 0.27704918032786885,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 339,
+          "baseline_returned_count": 1214,
+          "overlap_fraction": 0.27924217462932455,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "latin": {
+        "contexts": 64,
+        "empty": 0,
+        "returned_count": 640,
+        "primary_characters": 177580,
+        "sqlite-full-at-1": {
+          "intersection_count": 24,
+          "baseline_returned_count": 60,
+          "overlap_fraction": 0.4,
+          "ranked_equal_contexts": 24
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 94,
+          "baseline_returned_count": 297,
+          "overlap_fraction": 0.3164983164983165,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 174,
+          "baseline_returned_count": 592,
+          "overlap_fraction": 0.2939189189189189,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 24,
+          "baseline_returned_count": 59,
+          "overlap_fraction": 0.4067796610169492,
+          "ranked_equal_contexts": 24
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 86,
+          "baseline_returned_count": 295,
+          "overlap_fraction": 0.29152542372881357,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 161,
+          "baseline_returned_count": 584,
+          "overlap_fraction": 0.2756849315068493,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "cyrillic": {
+        "contexts": 63,
+        "empty": 0,
+        "returned_count": 630,
+        "primary_characters": 163327,
+        "sqlite-full-at-1": {
+          "intersection_count": 21,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.3333333333333333,
+          "ranked_equal_contexts": 21
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 90,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.2857142857142857,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 199,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.31587301587301586,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 20,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.31746031746031744,
+          "ranked_equal_contexts": 20
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 83,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.2634920634920635,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 178,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.28253968253968254,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "other": {
+        "contexts": 1,
+        "empty": 0,
+        "returned_count": 10,
+        "primary_characters": 791,
+        "sqlite-full-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        }
+      }
+    },
+    "pg-hybrid-rrf60": {
+      "all": {
+        "contexts": 128,
+        "empty": 0,
+        "returned_count": 1280,
+        "primary_characters": 390385,
+        "sqlite-full-at-1": {
+          "intersection_count": 54,
+          "baseline_returned_count": 123,
+          "overlap_fraction": 0.43902439024390244,
+          "ranked_equal_contexts": 54
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 290,
+          "baseline_returned_count": 612,
+          "overlap_fraction": 0.4738562091503268,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 585,
+          "baseline_returned_count": 1222,
+          "overlap_fraction": 0.4787234042553192,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 56,
+          "baseline_returned_count": 122,
+          "overlap_fraction": 0.45901639344262296,
+          "ranked_equal_contexts": 56
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 280,
+          "baseline_returned_count": 610,
+          "overlap_fraction": 0.45901639344262296,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 595,
+          "baseline_returned_count": 1214,
+          "overlap_fraction": 0.4901153212520593,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "latin": {
+        "contexts": 64,
+        "empty": 0,
+        "returned_count": 640,
+        "primary_characters": 199093,
+        "sqlite-full-at-1": {
+          "intersection_count": 30,
+          "baseline_returned_count": 60,
+          "overlap_fraction": 0.5,
+          "ranked_equal_contexts": 30
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 154,
+          "baseline_returned_count": 297,
+          "overlap_fraction": 0.5185185185185185,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 287,
+          "baseline_returned_count": 592,
+          "overlap_fraction": 0.4847972972972973,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 30,
+          "baseline_returned_count": 59,
+          "overlap_fraction": 0.5084745762711864,
+          "ranked_equal_contexts": 30
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 147,
+          "baseline_returned_count": 295,
+          "overlap_fraction": 0.49830508474576274,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 295,
+          "baseline_returned_count": 584,
+          "overlap_fraction": 0.5051369863013698,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "cyrillic": {
+        "contexts": 63,
+        "empty": 0,
+        "returned_count": 630,
+        "primary_characters": 190501,
+        "sqlite-full-at-1": {
+          "intersection_count": 24,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.38095238095238093,
+          "ranked_equal_contexts": 24
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 136,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.43174603174603177,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 298,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.473015873015873,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 26,
+          "baseline_returned_count": 63,
+          "overlap_fraction": 0.4126984126984127,
+          "ranked_equal_contexts": 26
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 133,
+          "baseline_returned_count": 315,
+          "overlap_fraction": 0.4222222222222222,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 300,
+          "baseline_returned_count": 630,
+          "overlap_fraction": 0.47619047619047616,
+          "ranked_equal_contexts": 0
+        }
+      },
+      "other": {
+        "contexts": 1,
+        "empty": 0,
+        "returned_count": 10,
+        "primary_characters": 791,
+        "sqlite-full-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-full-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-1": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-5": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        },
+        "sqlite-content-at-10": {
+          "intersection_count": 0,
+          "baseline_returned_count": 0,
+          "overlap_fraction": null,
+          "ranked_equal_contexts": 0
+        }
+      }
+    }
+  },
+  "latency_ms": {
+    "sqlite-full": {
+      "native-library-c1": {
+        "n": 256,
+        "p50": 10.195269,
+        "p95": 20.209615,
+        "p99": 24.270505
+      },
+      "research-cli-cache-c1": {
+        "n": 8,
+        "p50": 204.367158934474,
+        "p95": 209.2763800173998,
+        "p99": 209.2763800173998,
+        "response_bytes": 32116
+      },
+      "research-cli-cache-c2": {
+        "n": 8,
+        "p50": 214.0306355431676,
+        "p95": 225.77414568513632,
+        "p99": 225.77414568513632,
+        "response_bytes": 32113
+      }
+    },
+    "sqlite-content": {
+      "native-library-c1": {
+        "n": 256,
+        "p50": 7.234476999999999,
+        "p95": 15.319445,
+        "p99": 18.486752
+      },
+      "research-cli-cache-c1": {
+        "n": 8,
+        "p50": 208.77672545611858,
+        "p95": 213.42047210782766,
+        "p99": 213.42047210782766,
+        "response_bytes": 29896
+      },
+      "research-cli-cache-c2": {
+        "n": 8,
+        "p50": 222.52617590129375,
+        "p95": 226.01877618581057,
+        "p99": 226.01877618581057,
+        "response_bytes": 29896
+      }
+    },
+    "pg-lexical": {
+      "warm-sql-c1": {
+        "n": 256,
+        "p50": 9.957991540431976,
+        "p95": 24.153878912329674,
+        "p99": 30.42258881032467
+      },
+      "warm-sql-c2": {
+        "n": 256,
+        "p50": 10.406289249658585,
+        "p95": 25.724478997290134,
+        "p99": 34.49175786226988
+      },
+      "research-cli-cache-c1": {
+        "n": 8,
+        "p50": 210.67162603139877,
+        "p95": 223.01948815584183,
+        "p99": 223.01948815584183,
+        "response_bytes": 41080
+      },
+      "research-cli-cache-c2": {
+        "n": 8,
+        "p50": 234.5075998455286,
+        "p95": 269.821778871119,
+        "p99": 269.821778871119,
+        "response_bytes": 41081
+      }
+    },
+    "pg-vector-exact": {
+      "warm-sql-c1": {
+        "n": 256,
+        "p50": 43.80897432565689,
+        "p95": 62.90942523628473,
+        "p99": 83.93181394785643
+      },
+      "warm-sql-c2": {
+        "n": 256,
+        "p50": 45.58375105261803,
+        "p95": 56.266261264681816,
+        "p99": 68.99305153638124
+      },
+      "research-cli-cache-c1": {
+        "n": 8,
+        "p50": 272.48373068869114,
+        "p95": 314.4173938781023,
+        "p99": 314.4173938781023,
+        "response_bytes": 36706
+      },
+      "research-cli-cache-c2": {
+        "n": 8,
+        "p50": 277.527729049325,
+        "p95": 286.890453658998,
+        "p99": 286.890453658998,
+        "response_bytes": 36706
+      },
+      "research-cli-cold-model": {
+        "n": 3,
+        "p50": 2933.722066693008,
+        "p95": 3178.028916940093,
+        "p99": 3178.028916940093
+      },
+      "model-load": {
+        "n": 3,
+        "p50": 2474.7925866395235,
+        "p95": 2724.970948882401,
+        "p99": 2724.970948882401
+      },
+      "query-embed": {
+        "n": 3,
+        "p50": 7.293832488358021,
+        "p95": 7.922361604869366,
+        "p99": 7.922361604869366
+      }
+    },
+    "pg-hybrid-rrf60": {
+      "warm-sql-c1": {
+        "n": 256,
+        "p50": 55.65015319734812,
+        "p95": 73.68989568203688,
+        "p99": 91.35594684630632
+      },
+      "warm-sql-c2": {
+        "n": 256,
+        "p50": 57.199154049158096,
+        "p95": 81.50012977421284,
+        "p99": 93.59077550470829
+      },
+      "research-cli-cache-c1": {
+        "n": 8,
+        "p50": 281.27935249358416,
+        "p95": 289.8889407515526,
+        "p99": 289.8889407515526,
+        "response_bytes": 40526
+      },
+      "research-cli-cache-c2": {
+        "n": 8,
+        "p50": 281.9253047928214,
+        "p95": 298.2470225542784,
+        "p99": 298.2470225542784,
+        "response_bytes": 40529
+      },
+      "research-cli-cold-model": {
+        "n": 3,
+        "p50": 2930.788779631257,
+        "p95": 2941.4543053135276,
+        "p99": 2941.4543053135276
+      },
+      "model-load": {
+        "n": 3,
+        "p50": 2454.3224535882473,
+        "p95": 2479.824999347329,
+        "p99": 2479.824999347329
+      },
+      "query-embed": {
+        "n": 3,
+        "p50": 7.084689103066921,
+        "p95": 7.801299914717674,
+        "p99": 7.801299914717674
+      }
+    }
+  },
+  "embedding": {
+    "passage": {
+      "quantiles": {
+        "n": 3462,
+        "p50": 19.78973299264908,
+        "p95": 44.19353883713484,
+        "p99": 58.17975848913193
+      },
+      "total_ms": 77353.72604243457,
+      "cache_hits": 1,
+      "at_token_limit": 1
+    },
+    "query": {
+      "quantiles": {
+        "n": 128,
+        "p50": 6.885082460939884,
+        "p95": 9.690080769360065,
+        "p99": 10.888750664889812
+      },
+      "total_ms": 923.1490259990096,
+      "cache_hits": 0
+    },
+    "query-cache": {
+      "quantiles": {
+        "n": 256,
+        "p50": 0.0018598511815071106,
+        "p95": 0.0026514753699302673,
+        "p99": 0.004579313099384308
+      },
+      "total_ms": 0.5105659365653992,
+      "cache_hits": 256
+    }
+  },
+  "embedding_load_ms": 2477.652388624847,
+  "floor_diagnostic": [
+    {
+      "arm": "sqlite-full",
+      "contexts": 16,
+      "zero_floor_returned": 150,
+      "native_default_floor_returned": 111
+    },
+    {
+      "arm": "sqlite-content",
+      "contexts": 16,
+      "zero_floor_returned": 150,
+      "native_default_floor_returned": 106
+    }
+  ],
+  "scale": [
+    {
+      "size": 10000,
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "sql_ms": {
+        "n": 24,
+        "p50": 7.821419276297092,
+        "p95": 10.980173945426941,
+        "p99": 11.050243861973286
+      },
+      "empty": 3
+    },
+    {
+      "size": 10000,
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "sql_ms": {
+        "n": 24,
+        "p50": 9.695285931229591,
+        "p95": 12.171253561973572,
+        "p99": 12.55856640636921
+      },
+      "empty": 3
+    },
+    {
+      "size": 10000,
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "sql_ms": {
+        "n": 24,
+        "p50": 24.201192893087864,
+        "p95": 30.15372436493635,
+        "p99": 31.543826684355736
+      },
+      "empty": 0
+    },
+    {
+      "size": 10000,
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "sql_ms": {
+        "n": 24,
+        "p50": 26.420320384204388,
+        "p95": 34.719210118055344,
+        "p99": 40.00247176736593
+      },
+      "empty": 0
+    },
+    {
+      "size": 30000,
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "sql_ms": {
+        "n": 24,
+        "p50": 26.845747604966164,
+        "p95": 46.576482243835926,
+        "p99": 48.28500933945179
+      },
+      "empty": 3
+    },
+    {
+      "size": 30000,
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "sql_ms": {
+        "n": 24,
+        "p50": 25.86538251489401,
+        "p95": 38.89499604701996,
+        "p99": 39.78787176311016
+      },
+      "empty": 3
+    },
+    {
+      "size": 30000,
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "sql_ms": {
+        "n": 24,
+        "p50": 75.54452121257782,
+        "p95": 101.16596147418022,
+        "p99": 108.7887967005372
+      },
+      "empty": 0
+    },
+    {
+      "size": 30000,
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "sql_ms": {
+        "n": 24,
+        "p50": 77.0605318248272,
+        "p95": 97.15377073734999,
+        "p99": 117.91151389479637
+      },
+      "empty": 0
+    }
+  ],
+  "throughput": [
+    {
+      "phase": "warm-session",
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "size": null,
+      "requests": 256,
+      "wall_s": 2.980970843695104,
+      "requests_per_s": 85.87806235725259
+    },
+    {
+      "phase": "warm-session",
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "size": null,
+      "requests": 256,
+      "wall_s": 1.6282317489385605,
+      "requests_per_s": 157.22577585585447
+    },
+    {
+      "phase": "warm-session",
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "size": null,
+      "requests": 256,
+      "wall_s": 11.69651468936354,
+      "requests_per_s": 21.886861753168127
+    },
+    {
+      "phase": "warm-session",
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "size": null,
+      "requests": 256,
+      "wall_s": 5.976939845830202,
+      "requests_per_s": 42.83128266358541
+    },
+    {
+      "phase": "warm-session",
+      "arm": "pg-hybrid-rrf60",
+      "concurrency": 1,
+      "size": null,
+      "requests": 256,
+      "wall_s": 14.39384340774268,
+      "requests_per_s": 17.78538175997479
+    },
+    {
+      "phase": "warm-session",
+      "arm": "pg-hybrid-rrf60",
+      "concurrency": 2,
+      "size": null,
+      "requests": 256,
+      "wall_s": 7.574763854034245,
+      "requests_per_s": 33.79643312096877
+    },
+    {
+      "phase": "research-cli",
+      "arm": "sqlite-full",
+      "concurrency": 1,
+      "size": null,
+      "requests": 8,
+      "wall_s": 1.625187074765563,
+      "requests_per_s": 4.9225102292633105
+    },
+    {
+      "phase": "research-cli",
+      "arm": "sqlite-full",
+      "concurrency": 2,
+      "size": null,
+      "requests": 8,
+      "wall_s": 0.8823082149028778,
+      "requests_per_s": 9.06712627727332
+    },
+    {
+      "phase": "research-cli",
+      "arm": "sqlite-content",
+      "concurrency": 1,
+      "size": null,
+      "requests": 8,
+      "wall_s": 1.6532118851318955,
+      "requests_per_s": 4.839065138563137
+    },
+    {
+      "phase": "research-cli",
+      "arm": "sqlite-content",
+      "concurrency": 2,
+      "size": null,
+      "requests": 8,
+      "wall_s": 0.8825457198545337,
+      "requests_per_s": 9.064686191349505
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "size": null,
+      "requests": 8,
+      "wall_s": 1.688718568533659,
+      "requests_per_s": 4.737319852500068
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "size": null,
+      "requests": 8,
+      "wall_s": 0.9849713928997517,
+      "requests_per_s": 8.122063298151263
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "size": null,
+      "requests": 8,
+      "wall_s": 2.2148513942956924,
+      "requests_per_s": 3.6119804789629892
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "size": null,
+      "requests": 8,
+      "wall_s": 1.1204480146989226,
+      "requests_per_s": 7.140001048732005
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-hybrid-rrf60",
+      "concurrency": 1,
+      "size": null,
+      "requests": 8,
+      "wall_s": 2.214002045802772,
+      "requests_per_s": 3.6133661281687255
+    },
+    {
+      "phase": "research-cli",
+      "arm": "pg-hybrid-rrf60",
+      "concurrency": 2,
+      "size": null,
+      "requests": 8,
+      "wall_s": 1.13368487264961,
+      "requests_per_s": 7.056634690116901
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "size": 10000,
+      "requests": 24,
+      "wall_s": 0.2185659883543849,
+      "requests_per_s": 109.80665464329326
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-lexical",
+      "concurrency": 1,
+      "size": 30000,
+      "requests": 24,
+      "wall_s": 0.6979600423946977,
+      "requests_per_s": 34.385922606194065
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "size": 10000,
+      "requests": 24,
+      "wall_s": 0.1412646910175681,
+      "requests_per_s": 169.89383424209865
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-lexical",
+      "concurrency": 2,
+      "size": 30000,
+      "requests": 24,
+      "wall_s": 0.34842072520405054,
+      "requests_per_s": 68.8822399584426
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "size": 10000,
+      "requests": 24,
+      "wall_s": 0.6227541994303465,
+      "requests_per_s": 38.538479583041884
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-vector-exact",
+      "concurrency": 1,
+      "size": 30000,
+      "requests": 24,
+      "wall_s": 1.9073743959888816,
+      "requests_per_s": 12.582742040823694
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "size": 10000,
+      "requests": 24,
+      "wall_s": 0.3611215893179178,
+      "requests_per_s": 66.45961003143267
+    },
+    {
+      "phase": "controlled-scale",
+      "arm": "pg-vector-exact",
+      "concurrency": 2,
+      "size": 30000,
+      "requests": 24,
+      "wall_s": 1.0267120422795415,
+      "requests_per_s": 23.375590245064597
+    }
+  ],
+  "resources": [
+    {
+      "stage": "native-negative-controls",
+      "wall_s": 0.0451602078974247,
+      "cpu_user_s": 0.0,
+      "cpu_system_s": 0.0009689999999999976,
+      "process_highwater_rss_kib": 504388,
+      "children_cpu_user_s": 0.016481000000000023,
+      "children_cpu_system_s": 0.008240999999999998,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "native-parser",
+      "wall_s": 1.1983355404809117,
+      "cpu_user_s": 0.0,
+      "cpu_system_s": 0.0007130000000000192,
+      "process_highwater_rss_kib": 504388,
+      "children_cpu_user_s": 1.4178829999999998,
+      "children_cpu_system_s": 0.208744,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "sqlite-full-and-content-import-replay",
+      "wall_s": 22.02025458216667,
+      "cpu_user_s": 0.0006180000000002295,
+      "cpu_system_s": 0.00016300000000002424,
+      "process_highwater_rss_kib": 504388,
+      "children_cpu_user_s": 20.959989,
+      "children_cpu_system_s": 1.9735049999999998,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "native-floor-diagnostic",
+      "wall_s": 0.44193861819803715,
+      "cpu_user_s": 0.0157029999999998,
+      "cpu_system_s": 0.0012659999999999894,
+      "process_highwater_rss_kib": 504388,
+      "children_cpu_user_s": 0.2067300000000003,
+      "children_cpu_system_s": 0.23490400000000022,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "model-load-authenticate",
+      "wall_s": 2.477673533372581,
+      "cpu_user_s": 1.8480000000000003,
+      "cpu_system_s": 0.7496579999999998,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "passage-backfill",
+      "wall_s": 78.60848517809063,
+      "cpu_user_s": 156.58214099999998,
+      "cpu_system_s": 0.14451199999999997,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "query-embedding",
+      "wall_s": 0.939178379252553,
+      "cpu_user_s": 1.8710700000000031,
+      "cpu_system_s": 0.004065000000000207,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "deployed-schema-history-index-import",
+      "wall_s": 1.002296932041645,
+      "cpu_user_s": 0.14416700000001015,
+      "cpu_system_s": 0.0,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "deployed-vector-import",
+      "wall_s": 0.5724307065829635,
+      "cpu_user_s": 0.4687100000000157,
+      "cpu_system_s": 0.015856000000000092,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "deployed-warm-replay",
+      "wall_s": 44.251588239334524,
+      "cpu_user_s": 1.093841999999995,
+      "cpu_system_s": 0.12863799999999959,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 504388
+    },
+    {
+      "stage": "research-cli-contrasts",
+      "wall_s": 32.20613625366241,
+      "cpu_user_s": 0.052846999999985655,
+      "cpu_system_s": 0.007792999999999939,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 28.064523,
+      "children_cpu_system_s": 7.805692,
+      "children_highwater_rss_kib": 1284196
+    },
+    {
+      "stage": "scale-import-10000",
+      "wall_s": 0.647835430689156,
+      "cpu_user_s": 0.000778999999994312,
+      "cpu_system_s": 0.0,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 1284196
+    },
+    {
+      "stage": "scale-import-30000",
+      "wall_s": 1.4654313158243895,
+      "cpu_user_s": 0.0006979999999998654,
+      "cpu_system_s": 8.999999999925734e-06,
+      "process_highwater_rss_kib": 1284196,
+      "children_cpu_user_s": 0.0,
+      "children_cpu_system_s": 0.0,
+      "children_highwater_rss_kib": 1284196
+    }
+  ],
+  "storage": {
+    "current": {
+      "facts": {
+        "relation_bytes": 18939904,
+        "total_bytes": 20660224,
+        "indexes_bytes": 1687552
+      },
+      "fact_index": {
+        "relation_bytes": 1179648,
+        "total_bytes": 1499136,
+        "indexes_bytes": 286720
+      },
+      "fact_fts": {
+        "relation_bytes": 1425408,
+        "total_bytes": 3473408,
+        "indexes_bytes": 2015232
+      },
+      "fact_vectors": {
+        "relation_bytes": 7340032,
+        "total_bytes": 7684096,
+        "indexes_bytes": 311296
+      },
+      "stamps": {
+        "relation_bytes": 0,
+        "total_bytes": 16384,
+        "indexes_bytes": 8192
+      }
+    },
+    "scale_10000": {
+      "facts": {
+        "relation_bytes": 18939904,
+        "total_bytes": 20668416,
+        "indexes_bytes": 1687552
+      },
+      "fact_index": {
+        "relation_bytes": 1073152,
+        "total_bytes": 1400832,
+        "indexes_bytes": 286720
+      },
+      "fact_fts": {
+        "relation_bytes": 1425408,
+        "total_bytes": 4505600,
+        "indexes_bytes": 3039232
+      },
+      "fact_vectors": {
+        "relation_bytes": 7340032,
+        "total_bytes": 7692288,
+        "indexes_bytes": 311296
+      },
+      "stamps": {
+        "relation_bytes": 0,
+        "total_bytes": 16384,
+        "indexes_bytes": 8192
+      },
+      "scale": {
+        "relation_bytes": 11542528,
+        "total_bytes": 31170560,
+        "indexes_bytes": 5758976
+      }
+    },
+    "scale_30000": {
+      "facts": {
+        "relation_bytes": 18939904,
+        "total_bytes": 20668416,
+        "indexes_bytes": 1687552
+      },
+      "fact_index": {
+        "relation_bytes": 1073152,
+        "total_bytes": 1400832,
+        "indexes_bytes": 286720
+      },
+      "fact_fts": {
+        "relation_bytes": 1425408,
+        "total_bytes": 4505600,
+        "indexes_bytes": 3039232
+      },
+      "fact_vectors": {
+        "relation_bytes": 7340032,
+        "total_bytes": 7692288,
+        "indexes_bytes": 311296
+      },
+      "stamps": {
+        "relation_bytes": 0,
+        "total_bytes": 16384,
+        "indexes_bytes": 8192
+      },
+      "scale": {
+        "relation_bytes": 34652160,
+        "total_bytes": 83320832,
+        "indexes_bytes": 7004160
+      }
+    }
+  },
+  "sqlite_bytes": {
+    "sqlite-full": 57901056,
+    "sqlite-content": 57901056
+  },
+  "backend_memory": {
+    "status": "unavailable-app-role",
+    "total_bytes": null,
+    "used_bytes": null,
+    "sqlstate": "42501"
+  },
+  "unknown": {
+    "natural_quality": null,
+    "actual_agent_outcome": null,
+    "hermes_plugin_latency": null,
+    "remote_client_latency": null,
+    "provider_billing": null,
+    "local_operating_cost": null,
+    "server_cpu_rss": null,
+    "network_bytes": null,
+    "ann": null
+  }
+}

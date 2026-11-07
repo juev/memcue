@@ -1,0 +1,7 @@
+{
+  "collector_exit": 255,
+  "qualification": "Exact named research container discovered after project-label miss; SSH streaming exited without samples. Server CPU and memory unmeasured. Driver observations are separate.",
+  "reaped": true,
+  "samples": 0,
+  "status": "unmeasured-no-samples"
+}

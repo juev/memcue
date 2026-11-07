@@ -1,0 +1,1392 @@
+{
+  "synthetic": true,
+  "facts": [
+    {
+      "id": "ticket-a",
+      "version": 1,
+      "content": "TASK-4821 requires the cobalt adapter.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "ticket-b",
+      "version": 1,
+      "content": "TASK-4822 requires the amber adapter.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "version-a",
+      "version": 1,
+      "content": "The build uses Go 1.27 and listens on port 8081.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "version-b",
+      "version": 1,
+      "content": "The build uses Go 1.26 and listens on port 8082.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "ru-version",
+      "version": 1,
+      "content": "Для сборки используется Python 3.12, а не Python 3.11.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "ru-ticket",
+      "version": 1,
+      "content": "Задача OPS-731 требует проверки резервной копии.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "project",
+      "version": 1,
+      "content": "The cache lifetime is forty minutes.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": "environment"
+    },
+    {
+      "id": "other-project",
+      "version": 1,
+      "content": "The cache lifetime is ninety minutes.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:other",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "host",
+      "version": 1,
+      "content": "On this host the cache directory is /var/cache/demo.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "host:client-a",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "other-host",
+      "version": 1,
+      "content": "On this host the cache directory is /srv/cache/demo.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "host:client-b",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "global",
+      "version": 1,
+      "content": "Use UTC for audit timestamps.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "global",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "shelf",
+      "version": 1,
+      "content": "The zephyr engine uses immutable segments.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "shelf:research",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "other-shelf",
+      "version": 1,
+      "content": "The zephyr engine uses mutable segments.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "shelf:other",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "ordinary",
+      "version": 1,
+      "content": "The zephyr adapter requires TLS.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "expiry-live",
+      "version": 1,
+      "content": "The violet maintenance window begins at midnight.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "2026-11-06",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "expiry-old",
+      "version": 1,
+      "content": "The violet maintenance window begins at noon.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "2026-11-05",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "retired",
+      "version": 1,
+      "content": "The scarlet database accepts anonymous logins.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "retired",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "active",
+      "version": 1,
+      "content": "The scarlet database requires authentication.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "history",
+      "version": 1,
+      "content": "The indigo backup is retained for seven days.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": "storage"
+    },
+    {
+      "id": "history",
+      "version": 2,
+      "content": "The indigo backup is retained for thirty days.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": "storage"
+    },
+    {
+      "id": "paraphrase-en",
+      "version": 1,
+      "content": "A failed payment must be attempted again with the same operation key.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "paraphrase-ru",
+      "version": 1,
+      "content": "После сбоя оплаты повторный запрос обязан содержать прежний ключ операции.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "negation-en",
+      "version": 1,
+      "content": "Do not enable public access to the archive.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "opposite-en",
+      "version": 1,
+      "content": "Enable public access to the sample gallery.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "negation-ru",
+      "version": 1,
+      "content": "Не включать открытый доступ к архиву.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "opposite-ru",
+      "version": 1,
+      "content": "Включить открытый доступ к демонстрационной галерее.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "legacy",
+      "version": 1,
+      "content": "Резервные копии хранятся в отдельном хранилище.",
+      "keywords": "backupvault",
+      "queries": "= backups reside in a separate vault",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "aux-only",
+      "version": 1,
+      "content": "The orchard grows pears.",
+      "keywords": "quartzmarker",
+      "queries": "hiddenquerymarker",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "or-one",
+      "version": 1,
+      "content": "The narwhal service uses cedar storage.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "and-both",
+      "version": 1,
+      "content": "The narwhal service uses cedar storage and copper transport.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "kind-rule",
+      "version": 1,
+      "content": "The juniper scheduler runs every morning.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "kind-event",
+      "version": 1,
+      "content": "The juniper scheduler ran at noon.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "event",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "date-new",
+      "version": 1,
+      "content": "The saffron proxy uses strict validation.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-02T00:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "date-old",
+      "version": 1,
+      "content": "The saffron proxy uses loose validation.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-10-01T00:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "ru-exact",
+      "version": 1,
+      "content": "Сервис Барсук использует очередь сообщений, а не прямой вызов.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "semantic-en",
+      "version": 1,
+      "content": "Keep a second copy of the data on another physical device.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "semantic-ru",
+      "version": 1,
+      "content": "Сохраняйте вторую копию данных на другом физическом устройстве.",
+      "keywords": "",
+      "queries": "",
+      "origin": "demo 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "user",
+      "evidence": "Synthetic fixture",
+      "review": "",
+      "prompt_version": 0,
+      "channel": ""
+    },
+    {
+      "id": "metadata-only",
+      "version": 1,
+      "content": "The meadow grows flowers.",
+      "keywords": "",
+      "queries": "",
+      "origin": "metadatamarker 2026-11-01",
+      "created": "2026-11-01T12:00:00Z",
+      "status": "active",
+      "author": "fixture-client",
+      "expires": "",
+      "kind": "rule",
+      "scope": "repo:demo",
+      "source": "tool",
+      "evidence": "evidencemarker",
+      "review": "",
+      "prompt_version": 0,
+      "channel": "channelmarker"
+    }
+  ],
+  "cases": [
+    {
+      "id": "tune-en",
+      "language": "en",
+      "stratum": "literal",
+      "split": "tuning",
+      "query": {
+        "Text": "cobalt adapter",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ticket-a"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "tune-ru",
+      "language": "ru",
+      "stratum": "literal",
+      "split": "tuning",
+      "query": {
+        "Text": "очередь сообщений",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ru-exact"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "id-en",
+      "language": "en",
+      "stratum": "identifier",
+      "split": "held-out",
+      "query": {
+        "Text": "TASK-4821",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ticket-a"
+      ],
+      "harmful": [
+        "ticket-b"
+      ]
+    },
+    {
+      "id": "id-ru",
+      "language": "ru",
+      "stratum": "identifier",
+      "split": "held-out",
+      "query": {
+        "Text": "OPS-731",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ru-ticket"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "number-en",
+      "language": "en",
+      "stratum": "number",
+      "split": "held-out",
+      "query": {
+        "Text": "Go 1.27",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "version-a"
+      ],
+      "harmful": [
+        "version-b"
+      ]
+    },
+    {
+      "id": "number-ru",
+      "language": "ru",
+      "stratum": "number",
+      "split": "held-out",
+      "query": {
+        "Text": "Python 3.12",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ru-version"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "scope-en",
+      "language": "en",
+      "stratum": "scope",
+      "split": "held-out",
+      "query": {
+        "Text": "cache lifetime",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "project"
+      ],
+      "harmful": [
+        "other-project"
+      ]
+    },
+    {
+      "id": "scope-ru",
+      "language": "ru",
+      "stratum": "scope",
+      "split": "held-out",
+      "query": {
+        "Text": "cache directory",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "host"
+      ],
+      "harmful": [
+        "other-host"
+      ]
+    },
+    {
+      "id": "shelf-en",
+      "language": "en",
+      "stratum": "shelf-excluded",
+      "split": "held-out",
+      "query": {
+        "Text": "zephyr",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "ordinary"
+      ],
+      "harmful": [
+        "shelf",
+        "other-shelf"
+      ]
+    },
+    {
+      "id": "shelf-ru",
+      "language": "ru",
+      "stratum": "shelf-included",
+      "split": "held-out",
+      "query": {
+        "Text": "zephyr",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06",
+        "In": [
+          "shelf:research"
+        ]
+      },
+      "targets": [
+        "shelf"
+      ],
+      "harmful": [
+        "other-shelf",
+        "ordinary"
+      ]
+    },
+    {
+      "id": "expiry-en",
+      "language": "en",
+      "stratum": "expiry",
+      "split": "held-out",
+      "query": {
+        "Text": "violet maintenance",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "expiry-live"
+      ],
+      "harmful": [
+        "expiry-old"
+      ]
+    },
+    {
+      "id": "expiry-ru",
+      "language": "ru",
+      "stratum": "expiry",
+      "split": "held-out",
+      "query": {
+        "Text": "violet",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "expiry-live"
+      ],
+      "harmful": [
+        "expiry-old"
+      ]
+    },
+    {
+      "id": "retired-en",
+      "language": "en",
+      "stratum": "retired",
+      "split": "held-out",
+      "query": {
+        "Text": "scarlet database",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "active"
+      ],
+      "harmful": [
+        "retired"
+      ]
+    },
+    {
+      "id": "retired-ru",
+      "language": "ru",
+      "stratum": "retired",
+      "split": "held-out",
+      "query": {
+        "Text": "scarlet",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "active"
+      ],
+      "harmful": [
+        "retired"
+      ]
+    },
+    {
+      "id": "history-en",
+      "language": "en",
+      "stratum": "history",
+      "split": "held-out",
+      "query": {
+        "Text": "indigo backup thirty",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "history"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "history-ru",
+      "language": "ru",
+      "stratum": "history",
+      "split": "held-out",
+      "query": {
+        "Text": "indigo",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "history"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "para-en",
+      "language": "en",
+      "stratum": "paraphrase",
+      "split": "held-out",
+      "query": {
+        "Text": "How should I retry a declined transaction?",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "paraphrase-en",
+        "paraphrase-ru"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "para-ru",
+      "language": "ru",
+      "stratum": "paraphrase",
+      "split": "held-out",
+      "query": {
+        "Text": "Как повторить неудачный денежный перевод?",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "paraphrase-en",
+        "paraphrase-ru"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "neg-en",
+      "language": "en",
+      "stratum": "negation",
+      "split": "held-out",
+      "query": {
+        "Text": "public access archive forbidden",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "negation-en",
+        "negation-ru"
+      ],
+      "harmful": [
+        "opposite-en",
+        "opposite-ru"
+      ]
+    },
+    {
+      "id": "neg-ru",
+      "language": "ru",
+      "stratum": "negation",
+      "split": "held-out",
+      "query": {
+        "Text": "Запрещен открытый доступ к архиву",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "negation-en",
+        "negation-ru"
+      ],
+      "harmful": [
+        "opposite-en",
+        "opposite-ru"
+      ]
+    },
+    {
+      "id": "legacy-en",
+      "language": "en",
+      "stratum": "legacy-language",
+      "split": "held-out",
+      "query": {
+        "Text": "backups reside separate vault",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "legacy"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "legacy-ru",
+      "language": "ru",
+      "stratum": "legacy-language",
+      "split": "held-out",
+      "query": {
+        "Text": "Резервные копии хранилище",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "legacy"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "or-en",
+      "language": "en",
+      "stratum": "or",
+      "split": "held-out",
+      "query": {
+        "Text": "narwhal nonexistentterm",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "or-one",
+        "and-both"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "and-ru",
+      "language": "ru",
+      "stratum": "and",
+      "split": "held-out",
+      "query": {
+        "Text": "narwhal copper",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06",
+        "AllWords": true
+      },
+      "targets": [
+        "and-both"
+      ],
+      "harmful": [
+        "or-one"
+      ]
+    },
+    {
+      "id": "kind-en",
+      "language": "en",
+      "stratum": "kind",
+      "split": "held-out",
+      "query": {
+        "Text": "juniper scheduler",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06",
+        "Kinds": [
+          "rule"
+        ]
+      },
+      "targets": [
+        "kind-rule"
+      ],
+      "harmful": [
+        "kind-event"
+      ]
+    },
+    {
+      "id": "date-ru",
+      "language": "ru",
+      "stratum": "date",
+      "split": "held-out",
+      "query": {
+        "Text": "saffron proxy",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06",
+        "Since": "2026-11-01"
+      },
+      "targets": [
+        "date-new"
+      ],
+      "harmful": [
+        "date-old"
+      ]
+    },
+    {
+      "id": "semantic-en",
+      "language": "en",
+      "stratum": "paraphrase",
+      "split": "held-out",
+      "query": {
+        "Text": "How do we protect against a disk failure?",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "semantic-en",
+        "semantic-ru"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "semantic-ru",
+      "language": "ru",
+      "stratum": "paraphrase",
+      "split": "held-out",
+      "query": {
+        "Text": "Как защититься от поломки диска?",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [
+        "semantic-en",
+        "semantic-ru"
+      ],
+      "harmful": []
+    },
+    {
+      "id": "aux-en",
+      "language": "en",
+      "stratum": "field-isolation",
+      "split": "mechanics",
+      "query": {
+        "Text": "quartzmarker",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [],
+      "harmful": []
+    },
+    {
+      "id": "query-en",
+      "language": "en",
+      "stratum": "field-isolation",
+      "split": "mechanics",
+      "query": {
+        "Text": "hiddenquerymarker",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [],
+      "harmful": []
+    },
+    {
+      "id": "metadata-en",
+      "language": "en",
+      "stratum": "field-isolation",
+      "split": "mechanics",
+      "query": {
+        "Text": "metadatamarker evidencemarker channelmarker",
+        "N": 10,
+        "MinScore": 0,
+        "Project": [
+          "demo"
+        ],
+        "Host": "client-a",
+        "Today": "2026-11-06"
+      },
+      "targets": [],
+      "harmful": []
+    }
+  ]
+}

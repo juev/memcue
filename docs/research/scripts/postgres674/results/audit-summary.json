@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "post_run_integrity_audit": true,
+  "assertions": 155,
+  "passed": true,
+  "quality_parameters_changed": false,
+  "declaration": {
+    "purpose": "post-run integrity only; independently read the saved dump, verify content-only index payloads and restore writability",
+    "driver_sha256": "a56f05d8e1d74654e292221b792c61659723113f5ea046f6703177bcd949033c",
+    "dump_sha256": "2319234269954683eb916422930327f3bf0f4c83d4899545b1c34fdd00fb9d64",
+    "threshold": "all assertions pass",
+    "quality_parameters_changed": false,
+    "concurrency": 1
+  }
+}
