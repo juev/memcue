@@ -33,11 +33,21 @@ func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 	list := fs.Bool("list", false, "only list the notes that would be migrated")
 	text := fs.Bool("text", false, "move the base from one SQLite file to a text history git can merge fact by fact (#530)")
 	repos := fs.Bool("repos", false, "move facts written under directory names onto project keys (#343); args are old=new pairs")
-	apply := fs.Bool("apply", false, "with -repos: back the base up and write the changes instead of reporting them")
+	postgres := fs.Bool("postgres", false, "copy the whole history of the local base into the empty PostgreSQL base of MEMCUE_POSTGRES_DSN")
+	apply := fs.Bool("apply", false, "with -repos or -postgres: write the changes instead of reporting them")
 	var roots multiFlag
 	fs.Var(&roots, "root", "with -repos: a directory to look for clones under (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *postgres {
+		if *text || *repos || len(roots) > 0 || *all || *dry || *list || fs.NArg() > 0 {
+			return errors.New("migrate: -postgres takes only -apply")
+		}
+		return inv.runMigratePostgres(*apply, out)
+	}
+	if os.Getenv("MEMCUE_POSTGRES_DSN") != "" {
+		return errors.New("command unavailable for PostgreSQL; explicitly unset MEMCUE_POSTGRES_DSN for local maintenance")
 	}
 	if *text {
 		if *repos || *apply || len(roots) > 0 || *all || *dry || *list || fs.NArg() > 0 {

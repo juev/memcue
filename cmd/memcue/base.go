@@ -199,6 +199,11 @@ func (inv *invocation) openBase() (*store.Store, error) {
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
 		return store.OpenPostgresContext(inv.ctx, dsn)
 	}
+	return inv.openLocalBase()
+}
+
+// openLocalBase opens the local base whatever MEMCUE_POSTGRES_DSN says: a text history is brought into its cache first.
+func (inv *invocation) openLocalBase() (*store.Store, error) {
 	b := factsBase()
 	if !b.text {
 		return inv.local(store.Open(b.path))

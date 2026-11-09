@@ -110,10 +110,36 @@ pgx gets both `LookupFunc` and `DialFunc`; the original DSN hostname and TLS Ser
 | `session-start`, `session-card`, `pre-command`, `observe-problem` | Remote fact reads; local receipt/session state. Remote repository failure is unavailable, not an empty snapshot. Background dream maintenance is disabled. |
 | `sessions` | Local session history, independent of the fact backend. |
 | `dump FILE`, `merge BASE OURS THEIRS` | Explicit historical/local files; no implicit remote redirection. |
-| `migrate`, `import`, `install`, `notes`, `dream`, `reindex` | Explicitly rejected before implicit-base maintenance. Unset the DSN for a deliberate local invocation. |
+| `migrate -postgres [-apply]` | Copies the whole local history into an empty PostgreSQL base; see [Moving a local base](#moving-a-local-base). |
+| `migrate` (other forms), `import`, `install`, `notes`, `dream`, `reindex` | Explicitly rejected before implicit-base maintenance. Unset the DSN for a deliberate local invocation. |
 | `connect`, `version`, help | Lifecycle/metadata; no implicit local fact migration. |
 
 The store API supports atomic `AddBatch` and expected-version relabeling. `memcue add -batch FILE` accepts one JSON array of content-only FactInput objects (exported field names, embedded metadata flattened), validates the whole input, then writes all facts atomically and prints one ID per fact. Only optional `-force` can accompany `-batch`; other flags/positional text are rejected. The input must be a regular, non-symlink file no larger than 64 MiB. Scope/origin/expiry are explicit per input; auxiliary keywords/queries and unknown fields are rejected. Remote split/retag, historical file import/backup and remote reindex workflows remain explicit unsupported/local maintenance operations. These refusals are the supported maintenance matrix; they do not require a remote implementation. Search JSON retains its existing integration contract. Default session state is namespaced by remote endpoint/database/user/transport, excluding passwords; an explicit `MEMCUE_STATE_DIR` remains the caller's override.
+
+## Moving a local base
+
+`memcue migrate -postgres` copies every version of every fact of the local base (`MEMCUE_FACTS`, a text history or a
+SQLite file) into the PostgreSQL base of `MEMCUE_POSTGRES_DSN`, keeping ids, versions, timestamps, authors, retired
+and expired facts. Without `-apply` it reports the source and the target and writes nothing, not even the schema.
+
+```sh
+export MEMCUE_POSTGRES_DSN="$(cat "$HOME/.config/memcue/postgres-owner.dsn")"
+memcue migrate -postgres          # report: facts and versions in the source, state of the target
+memcue migrate -postgres -apply   # copy, read back, compare, commit
+```
+
+The target must hold no facts: a base already in use is refused (`ErrTargetNotEmpty`), so the copy never becomes a
+second writer. An empty database gets its schema as on a first open, so the role needs schema creation rights there;
+use the provisioning role, not the runtime one. The copy runs in one transaction under the PostgreSQL write lock: one
+COPY, then every version is read back and compared byte for byte with the source before the commit, so a mismatch
+leaves the base empty. A lost commit reply is reported as an unknown outcome: inspect the base before running it
+again. The history limits (100,000 versions, 64 MiB) are checked before connecting. A missing or empty local base is
+refused rather than copied as nothing. The command is bounded by signals, not by the four-second budget of a fact
+operation.
+
+Stop every writer of the local base before the copy, and switch every client to the DSN after it: writes made to the
+local base after the copy stay local. The local base is read, never changed, except that opening a text history
+brings its cache up to date as any local open does.
 
 ## Ownership, backups and verified limits
 

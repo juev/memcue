@@ -17,3 +17,20 @@ func remoteCommandAllowed(command string) error {
 	}
 	return nil
 }
+
+// migratesToPostgres reports whether the command line is migrate -postgres: the one maintenance command that takes the
+// DSN, as the target of a copy of the local base. Its flags are checked again when the command parses them.
+func migratesToPostgres(args []string) bool {
+	if len(args) < 1 || args[0] != "migrate" {
+		return false
+	}
+	for _, a := range args[1:] {
+		switch a {
+		case "-postgres", "--postgres", "-postgres=true", "--postgres=true":
+			return true
+		case "--":
+			return false
+		}
+	}
+	return false
+}

@@ -24,7 +24,9 @@ type invocation struct {
 
 func newInvocation() *invocation {
 	signalCtx, stopSignal := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	if os.Getenv("MEMCUE_POSTGRES_DSN") == "" {
+	// A copy of the whole base into PostgreSQL is bounded by signals, as local maintenance is, not by the budget of
+	// a fact operation.
+	if os.Getenv("MEMCUE_POSTGRES_DSN") == "" || migratesToPostgres(os.Args[1:]) {
 		return &invocation{ctx: signalCtx, stop: stopSignal}
 	}
 	budget := 4 * time.Second

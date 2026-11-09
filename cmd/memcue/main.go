@@ -108,7 +108,7 @@ commands:
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
   dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all|-background] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
-  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text
+  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text; copy the whole history into an empty PostgreSQL base: memcue migrate -postgres [-apply]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
@@ -151,7 +151,7 @@ func runMain() (code int) {
 		_, _ = fmt.Fprint(diagnostics, usage)
 		return 2
 	}
-	if err = remoteCommandAllowed(os.Args[1]); err != nil {
+	if err = remoteCommandAllowed(os.Args[1]); err != nil && !migratesToPostgres(os.Args[1:]) {
 		_, _ = fmt.Fprintln(diagnostics, "memcue:", err)
 		return 1
 	}
