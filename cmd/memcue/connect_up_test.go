@@ -300,7 +300,7 @@ func TestConnectUpLogsInOnlyAfterTheHelperSettles(t *testing.T) {
 	}
 }
 
-// A helper still starting at the deadline is pending, never logged in.
+// A helper still starting at the deadline is reported as starting, with the control server to check, never logged in.
 func TestConnectUpReportsAHelperStillStartingAsPending(t *testing.T) {
 	_, ops := connectUpStates(t, []string{"Starting"})
 	t.Setenv("MEMCUE_TAILSCALE_CONNECT_TIMEOUT", "1s")
@@ -308,8 +308,31 @@ func TestConnectUpReportsAHelperStillStartingAsPending(t *testing.T) {
 	if err := runConnect([]string{"up"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(out.Bytes(), []byte("pending (Starting)")) || bytes.Contains(out.Bytes(), []byte("Tailnet ready")) {
+	if !bytes.Contains(out.Bytes(), []byte("still starting (Starting)")) || bytes.Contains(out.Bytes(), []byte("Tailnet ready")) || bytes.Contains(out.Bytes(), []byte("device approval")) {
 		t.Fatalf("a starting helper must be pending: %q", out.String())
+	}
+	for _, op := range ops() {
+		if op != "status" {
+			t.Fatalf("up must not log in while the helper is starting: %v", ops())
+		}
+	}
+}
+
+// Cancelling up while it waits for a starting helper reports the cancellation, not a pending state.
+func TestConnectUpCancelledWhileStartingFails(t *testing.T) {
+	_, ops := connectUpStates(t, []string{"Starting"})
+	t.Setenv("MEMCUE_TAILSCALE_CONNECT_TIMEOUT", "10s")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	time.AfterFunc(300*time.Millisecond, cancel) // as SIGINT does
+	var out bytes.Buffer
+	start := time.Now()
+	err := runConnectContext(ctx, []string{"up"}, &out)
+	if err == nil || !bytes.Contains([]byte(err.Error()), []byte("cancelled")) {
+		t.Fatalf("err %v, output %q: want the cancellation", err, out.String())
+	}
+	if took := time.Since(start); took > 3*time.Second {
+		t.Fatalf("up took %v after cancellation", took)
 	}
 	for _, op := range ops() {
 		if op != "status" {

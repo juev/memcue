@@ -33,6 +33,9 @@ func connectUp(ctx context.Context, cfg tailnet.Config, bootstrap bool, out io.W
 		}
 	}
 	if state, err = settled(ctx, cfg, state); err != nil {
+		if ctx.Err() != nil {
+			return errors.New("tailnet helper startup timed out or was cancelled; retry memcue connect up")
+		}
 		return errors.New("helper started but status is unavailable; retry memcue connect up or stop with memcue connect off")
 	}
 	if !starting(state) && state.State != "Running" && state.State != "NeedsMachineAuth" {
@@ -44,6 +47,10 @@ func connectUp(ctx context.Context, cfg tailnet.Config, bootstrap bool, out io.W
 			_, err = fmt.Fprintln(out, "Open this URL to authorize the Memcue node:\n"+state.AuthURL+"\nThe helper stays in the background. After approval, run memcue connect up again to check readiness.")
 			return err
 		}
+	}
+	if starting(state) {
+		_, err = fmt.Fprintln(out, "Tailnet is still starting ("+state.State+"). Check that the control server is reachable, then run memcue connect up again. The helper stays in the background.")
+		return err
 	}
 	if state.State != "Running" {
 		_, err = fmt.Fprintln(out, "Tailnet authorization pending ("+state.State+"). Complete device approval, then run memcue connect up again. The helper stays in the background.")
@@ -73,13 +80,13 @@ func settled(ctx context.Context, cfg tailnet.Config, state tailnet.State) (tail
 	for starting(state) {
 		select {
 		case <-wait.Done():
-			return state, nil
+			return state, ctx.Err()
 		case <-ticker.C:
 		}
 		next, err := tailnet.Admin(wait, cfg, "status")
 		if err != nil {
 			if wait.Err() != nil {
-				return state, nil
+				return state, ctx.Err()
 			}
 			return state, err
 		}
