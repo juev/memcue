@@ -18,6 +18,13 @@ import (
 // This fixture implements only private administration IPC, not a tailnet or DB.
 func connectUpFixture(t *testing.T, state string, delay ...time.Duration) (string, func() []string) {
 	t.Helper()
+	return connectUpStates(t, []string{state}, delay...)
+}
+
+// connectUpStates answers the n-th status with states[n], and the last state after them, as a backend that moves
+// from startup to its decided state does.
+func connectUpStates(t *testing.T, states []string, delay ...time.Duration) (string, func() []string) {
+	t.Helper()
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -40,6 +47,7 @@ func connectUpFixture(t *testing.T, state string, delay ...time.Duration) (strin
 	}
 	var mu sync.Mutex
 	var ops []string
+	statuses := 0
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -54,6 +62,10 @@ func connectUpFixture(t *testing.T, state string, delay ...time.Duration) (strin
 			_ = json.NewDecoder(c).Decode(&m)
 			mu.Lock()
 			ops = append(ops, m.Op)
+			state := states[min(statuses, len(states)-1)]
+			if m.Op == "status" {
+				statuses++
+			}
 			mu.Unlock()
 			response := map[string]any{"running": true, "state": state, "node_id": "fixture-node"}
 			if m.Op == "login" {
@@ -251,5 +263,57 @@ func TestConnectUpReusesReadyHelperWithoutLogin(t *testing.T) {
 	got := ops()
 	if len(got) != 1 || got[0] != "status" {
 		t.Fatalf("up must not reauthorize or restart a running node: %v", got)
+	}
+}
+
+// A helper restoring an approved identity passes NoState and Starting before Running: up waits for it instead of
+// starting a login, which would regenerate the node key and void the approval (#697).
+func TestConnectUpWaitsForAStartingHelperWithoutLogin(t *testing.T) {
+	_, ops := connectUpStates(t, []string{"NoState", "Starting", "Starting", "Running"})
+	var out bytes.Buffer
+	if err := runConnect([]string{"up"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("Tailnet ready")) {
+		t.Fatalf("a helper that becomes ready must be reported ready: %q", out.String())
+	}
+	for _, op := range ops() {
+		if op != "status" {
+			t.Fatalf("up must not log in while the helper is starting: %v", ops())
+		}
+	}
+}
+
+// A fresh identity settles on NeedsLogin: only then does up start a login and show its URL.
+func TestConnectUpLogsInOnlyAfterTheHelperSettles(t *testing.T) {
+	_, ops := connectUpStates(t, []string{"NoState", "NeedsLogin"})
+	var out bytes.Buffer
+	if err := runConnect([]string{"up"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("https://login.example.test/authorize")) {
+		t.Fatalf("login URL missing: %q", out.String())
+	}
+	got := ops()
+	if len(got) != 3 || got[0] != "status" || got[1] != "status" || got[2] != "login" {
+		t.Fatalf("unexpected operations: %v", got)
+	}
+}
+
+// A helper still starting at the deadline is pending, never logged in.
+func TestConnectUpReportsAHelperStillStartingAsPending(t *testing.T) {
+	_, ops := connectUpStates(t, []string{"Starting"})
+	t.Setenv("MEMCUE_TAILSCALE_CONNECT_TIMEOUT", "1s")
+	var out bytes.Buffer
+	if err := runConnect([]string{"up"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("pending (Starting)")) || bytes.Contains(out.Bytes(), []byte("Tailnet ready")) {
+		t.Fatalf("a starting helper must be pending: %q", out.String())
+	}
+	for _, op := range ops() {
+		if op != "status" {
+			t.Fatalf("up must not log in while the helper is starting: %v", ops())
+		}
 	}
 }

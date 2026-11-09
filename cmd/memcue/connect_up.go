@@ -32,7 +32,10 @@ func connectUp(ctx context.Context, cfg tailnet.Config, bootstrap bool, out io.W
 			return errors.New("helper started but status is unavailable; retry memcue connect up or stop with memcue connect off")
 		}
 	}
-	if state.State != "Running" && state.State != "NeedsMachineAuth" {
+	if state, err = settled(ctx, cfg, state); err != nil {
+		return errors.New("helper started but status is unavailable; retry memcue connect up or stop with memcue connect off")
+	}
+	if !starting(state) && state.State != "Running" && state.State != "NeedsMachineAuth" {
 		state, err = tailnet.Admin(ctx, cfg, "login")
 		if err != nil {
 			return errors.New("helper is running but login is unavailable; check the control server and retry memcue connect up, or stop with memcue connect off")
@@ -48,6 +51,41 @@ func connectUp(ctx context.Context, cfg tailnet.Config, bootstrap bool, out io.W
 	}
 	_, err = fmt.Fprintln(out, "Tailnet ready. The helper is running in the background; stop it with memcue connect off.")
 	return err
+}
+
+// starting is a backend that has not decided yet whether its identity is approved.
+func starting(s tailnet.State) bool {
+	return s.State == "" || s.State == "NoState" || s.State == "Starting"
+}
+
+// settled waits while the backend is starting. A helper restoring an approved identity passes NoState and Starting
+// before Running; a login there regenerates its node key and voids the approval (#697). The wait leaves a quarter of
+// the deadline for the answer; a backend still starting then is reported as pending, without a login.
+func settled(ctx context.Context, cfg tailnet.Config, state tailnet.State) (tailnet.State, error) {
+	wait := ctx
+	if deadline, ok := ctx.Deadline(); ok {
+		var cancel context.CancelFunc
+		wait, cancel = context.WithDeadline(ctx, deadline.Add(-time.Until(deadline)/4))
+		defer cancel()
+	}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for starting(state) {
+		select {
+		case <-wait.Done():
+			return state, nil
+		case <-ticker.C:
+		}
+		next, err := tailnet.Admin(wait, cfg, "status")
+		if err != nil {
+			if wait.Err() != nil {
+				return state, nil
+			}
+			return state, err
+		}
+		state = next
+	}
+	return state, nil
 }
 
 // startConnectHelper never inherits terminal/consumer pipes. Only the private
