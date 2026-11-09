@@ -40,8 +40,8 @@ func TestRepair3StaleCallerVersion(t *testing.T) {
 		t.Errorf("stale retirement must conflict: %v", err)
 	}
 	h, err := a.History(f.ID)
-	if err != nil || len(h) != 2 {
-		t.Fatalf("stale operations appended history: %d %v", len(h), err)
+	if err != nil || len(h) != 1 || h[0].Version != 2 || h[0].Content != "Synthetic updated orchard" {
+		t.Fatalf("stale operations changed the fact: %+v %v", h, err)
 	}
 	var wg sync.WaitGroup
 	results := make(chan error, 2)

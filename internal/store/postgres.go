@@ -8,23 +8,68 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/juev/memcue/internal/tailnet"
 )
 
 var errRemote = errors.New("PostgreSQL operation failed; check server availability, permissions and schema")
 
 // ErrAmbiguous means a commit reply was lost. Never automatically replay this mutation.
-var ErrAmbiguous = errors.New("PostgreSQL commit outcome is unknown; inspect history before retrying")
+var ErrAmbiguous = errors.New("PostgreSQL commit outcome is unknown; inspect the fact before retrying")
 
+// ErrPostgresSchema1 is a base written by a memcue before #700: it kept every version and had no search index.
+var ErrPostgresSchema1 = errors.New("PostgreSQL base uses schema 1, which this memcue does not read; recreate it with memcue migrate -postgres")
+
+// postgresSchemaVersion is the schema of memcue.facts. Version 2 (#700) keeps one row per fact, its current version,
+// with the search terms of its content, and searches on the server; version 1 kept every version and searched on the
+// client.
+const postgresSchemaVersion = 2
+
+// postgresSchema holds one row per fact. The client writes the payload and the terms; PostgreSQL derives the
+// columns the filters and the full-text index read, so they cannot disagree with the payload. Text that a filter
+// compares or sorts is in the C collation: byte order, as SQLite compares it.
+const postgresSchema = `CREATE SCHEMA IF NOT EXISTS memcue;
+CREATE TABLE IF NOT EXISTS memcue.version (singleton boolean PRIMARY KEY CHECK(singleton), version integer NOT NULL);
+INSERT INTO memcue.version VALUES(true,2) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS memcue.facts (
+ id text COLLATE "C" PRIMARY KEY,
+ version integer NOT NULL CHECK(version>0),
+ payload jsonb NOT NULL,
+ terms text[] NOT NULL,
+ active boolean NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Status' = 'active', false)) STORED,
+ kind text COLLATE "C" NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Kind', '')) STORED,
+ scope text COLLATE "C" NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Scope', '')) STORED,
+ scope_fold text COLLATE "C" NOT NULL GENERATED ALWAYS AS (translate(coalesce(payload->>'Scope', ''), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')) STORED,
+ origin text COLLATE "C" NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Origin', '')) STORED,
+ created text COLLATE "C" NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Created', '')) STORED,
+ expires text COLLATE "C" NOT NULL GENERATED ALWAYS AS (coalesce(payload->>'Expires', '')) STORED,
+ length integer NOT NULL GENERATED ALWAYS AS (cardinality(terms)) STORED,
+ lexemes tsvector NOT NULL GENERATED ALWAYS AS (array_to_tsvector(terms)) STORED);
+CREATE INDEX IF NOT EXISTS facts_lexemes ON memcue.facts USING gin (lexemes) WHERE active;
+CREATE INDEX IF NOT EXISTS facts_scope ON memcue.facts (scope) WHERE active;`
+
+// postgresStore is one PostgreSQL handle: its configuration and the one connection its operations share. The
+// connection opens with the handle and stays open for the next operation, so a command pays for TCP, TLS and
+// authentication once; an operation whose budget runs out closes it, and the next operation opens a new one.
 type postgresStore struct {
-	config     *pgx.ConnConfig
-	request    context.Context
-	cancel     context.CancelFunc
-	mu         sync.Mutex
-	projection *Store
+	config  *pgx.ConnConfig
+	request context.Context
+	cancel  context.CancelFunc
+	mu      sync.Mutex
+	// life bounds every connection of the handle; end cancels it on Close.
+	life context.Context
+	end  context.CancelFunc
+	conn *pgx.Conn
+	// release closes every stream the dialer of conn opened, pgx's cancellation streams included.
+	release func()
+	closed  bool
+	// active is the context of the running operation. The dialer of conn opens streams only while it is live, so
+	// pgx's asynchronous cleanup cannot reach the network after the operation's budget.
+	active atomic.Pointer[context.Context]
 }
 
 func PostgresConfig(dsn string) (*pgx.ConnConfig, error) {
@@ -66,6 +111,9 @@ func PostgresConfig(dsn string) (*pgx.ConnConfig, error) {
 	cfg.RuntimeParams["application_name"] = "memcue"
 	cfg.RuntimeParams["statement_timeout"] = "10000"
 	cfg.RuntimeParams["lock_timeout"] = "10000"
+	// One round trip per statement: the default mode first prepares and describes every new statement, and a
+	// command's connection runs each of its statements once.
+	cfg.DefaultQueryExecMode = pgx.QueryExecModeExec
 	return cfg, nil
 }
 
@@ -73,30 +121,47 @@ func PostgresConfig(dsn string) (*pgx.ConnConfig, error) {
 // otherwise use a fresh background cleanup context after the caller has returned.
 type operationConn struct {
 	net.Conn
-	once sync.Once
-	err  error
+	once   sync.Once
+	err    error
+	closed func(*operationConn)
 }
 
-func (c *operationConn) Close() error { c.once.Do(func() { c.err = c.Conn.Close() }); return c.err }
+func (c *operationConn) Close() error {
+	c.once.Do(func() {
+		c.err = c.Conn.Close()
+		if c.closed != nil {
+			c.closed(c)
+		}
+	})
+	return c.err
+}
 
 func budgetConfig(operation context.Context, config *pgx.ConnConfig) *pgx.ConnConfig {
 	cfg, _ := ownedBudgetConfig(operation, config)
 	return cfg
 }
 
-// Each operation owns every connection allocated by its dialer, including pgx's
+// The owner context owns every connection allocated by its dialer, including pgx's
 // independently-contexted asynchronous CancelRequest streams. Shared transports
-// are not closed: only the net.Conn returned for this operation is owned here.
+// are not closed: only the net.Conn returned for this owner is owned here.
 func ownedBudgetConfig(operation context.Context, config *pgx.ConnConfig) (*pgx.ConnConfig, func()) {
 	cfg := config.Copy()
 	dial := cfg.DialFunc
 	var mu sync.Mutex
 	closed := false
-	var connections []*operationConn
+	connections := map[*operationConn]bool{}
+	forget := func(c *operationConn) {
+		mu.Lock()
+		delete(connections, c)
+		mu.Unlock()
+	}
 	release := func() {
 		mu.Lock()
 		closed = true
-		owned := append([]*operationConn(nil), connections...)
+		owned := make([]*operationConn, 0, len(connections))
+		for c := range connections {
+			owned = append(owned, c)
+		}
 		mu.Unlock()
 		for _, c := range owned {
 			_ = c.Close()
@@ -120,22 +185,22 @@ func ownedBudgetConfig(operation context.Context, config *pgx.ConnConfig) (*pgx.
 		if err != nil {
 			return nil, err
 		}
-		owned := &operationConn{Conn: conn}
+		owned := &operationConn{Conn: conn, closed: forget}
 		mu.Lock()
 		if closed || operation.Err() != nil {
 			mu.Unlock()
 			_ = owned.Close()
 			return nil, context.Canceled
 		}
-		connections = append(connections, owned)
+		connections[owned] = true
 		mu.Unlock()
 		return owned, nil
 	}
 	return cfg, func() { stop(); release() }
 }
 
-// OpenPostgres uses PostgreSQL as the sole authority. SQLite projections are private,
-// temporary in-memory query engines, never a fallback or a writable local cache.
+// OpenPostgres uses PostgreSQL as the sole authority. Every read and search runs on the server: nothing is copied
+// into a local base, and there is no local fallback.
 func OpenPostgres(dsn string) (*Store, error) { return openPostgres(context.Background(), dsn) }
 func openPostgres(parent context.Context, dsn string) (*Store, error) {
 	cfg, err := PostgresConfig(dsn)
@@ -147,161 +212,186 @@ func openPostgres(parent context.Context, dsn string) (*Store, error) {
 	if err := tailnet.Configure(ctx, cfg); err != nil {
 		return nil, err
 	}
-	owned, release := ownedBudgetConfig(ctx, cfg)
-	defer release()
-	c, err := pgx.ConnectConfig(ctx, owned)
-	if err != nil {
-		return nil, errRemote
+	// The handle, not one operation, owns its connection: it closes with Close or with the caller's context.
+	life, end := context.WithCancel(parent)
+	r := &postgresStore{config: cfg, life: life, end: end}
+	host, _ := os.Hostname()
+	s := &Store{remote: r, author: host, now: time.Now}
+	if _, err := postgresOp(s, ctx, false, func(ctx context.Context, c *pgx.Conn) (struct{}, error) {
+		return struct{}{}, ensureSchema(ctx, c)
+	}); err != nil {
+		r.close()
+		return nil, err
 	}
-	forceClose := context.AfterFunc(ctx, func() { _ = c.PgConn().Conn().Close() })
-	defer forceClose()
-	defer func() { _ = c.Close(ctx) }()
+	return s, nil
+}
+
+// ensureSchema checks the schema with one statement. Only a database without it takes the lock and creates it, so
+// an ordinary open needs no DDL rights and no write.
+func ensureSchema(ctx context.Context, c *pgx.Conn) error {
+	var version int
+	err := c.QueryRow(ctx, `SELECT version FROM memcue.version WHERE singleton`).Scan(&version)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && (pgErr.Code == "42P01" || pgErr.Code == "3F000") {
+		version, err = createSchema(ctx, c)
+	}
+	if err != nil {
+		if errors.Is(err, ErrAmbiguous) || errors.Is(err, errIncompatible) {
+			return err
+		}
+		return errRemote
+	}
+	switch version {
+	case postgresSchemaVersion:
+		return nil
+	case 1:
+		return ErrPostgresSchema1
+	}
+	return errors.New("incompatible PostgreSQL schema; update Memcue")
+}
+
+var errIncompatible = errors.New("incompatible PostgreSQL schema; operator repair required")
+
+func createSchema(ctx context.Context, c *pgx.Conn) (int, error) {
 	tx, err := c.Begin(ctx)
 	if err != nil {
-		return nil, errRemote
+		return 0, errRemote
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(680681)`); err != nil {
-		return nil, errRemote
+		return 0, errRemote
 	}
 	var versionTable, factsTable bool
 	if err = tx.QueryRow(ctx, `SELECT to_regclass('memcue.version') IS NOT NULL,to_regclass('memcue.facts') IS NOT NULL`).Scan(&versionTable, &factsTable); err != nil {
-		return nil, errRemote
+		return 0, errRemote
 	}
 	if versionTable != factsTable {
-		return nil, errors.New("incompatible PostgreSQL schema; operator repair required")
+		return 0, errIncompatible
 	}
 	if !versionTable {
-		_, err = tx.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS memcue;
- CREATE TABLE IF NOT EXISTS memcue.version (singleton boolean PRIMARY KEY CHECK(singleton), version integer NOT NULL);
- INSERT INTO memcue.version VALUES(true,1) ON CONFLICT DO NOTHING;
- CREATE TABLE IF NOT EXISTS memcue.facts (id text NOT NULL, version integer NOT NULL CHECK(version>0), payload jsonb NOT NULL, PRIMARY KEY(id,version));`)
-		if err != nil {
-			return nil, errRemote
+		if _, err = tx.Exec(ctx, postgresSchema); err != nil {
+			return 0, errRemote
 		}
 	}
 	var version int
 	if err := tx.QueryRow(ctx, `SELECT version FROM memcue.version WHERE singleton`).Scan(&version); err != nil {
-		return nil, errRemote
-	}
-	if version != 1 {
-		return nil, errors.New("incompatible PostgreSQL schema; update Memcue")
+		return 0, errRemote
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return nil, ErrAmbiguous
+		return 0, ErrAmbiguous
 	}
-	host, _ := os.Hostname()
-	return &Store{remote: &postgresStore{config: cfg}, author: host, now: time.Now}, nil
+	return version, nil
 }
 
-// remoteDo builds a current-version query projection lazily. Explicit request
-// stores retain one immutable query snapshot; ordinary library stores refresh it
-// for each call. History is always read directly from PostgreSQL.
-func remoteDo[T any](s *Store, write bool, fn func(*Store) (T, error)) (zero T, err error) {
-	if write {
-		return zero, ErrRemoteUnsupported
-	}
+// postgresOp runs fn on the handle's connection under ctx, one operation at a time. It opens the connection when
+// there is none. A budget that runs out closes the connection, so a statement cannot outlive it; the next operation
+// opens a new one. A read that outlives its budget fails with the context's error, a write with ErrAmbiguous.
+func postgresOp[T any](s *Store, ctx context.Context, write bool, fn func(context.Context, *pgx.Conn) (T, error)) (result T, err error) {
 	r := s.remote
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var zero T
+	if r.closed {
+		return zero, errors.New("PostgreSQL handle is closed")
+	}
 	if r.request != nil && r.request.Err() != nil {
 		return zero, r.request.Err()
 	}
-	if r.projection != nil {
-		result, err := fn(r.projection)
-		if r.request.Err() != nil {
-			return zero, r.request.Err()
+	defer func() {
+		if err == nil && ctx.Err() != nil {
+			result = zero
+			if write {
+				err = ErrAmbiguous
+			} else {
+				err = ctx.Err()
+			}
 		}
-		return result, err
+		// A read that outlived its budget failed because of it, whatever the statement reported.
+		if err != nil && !write && ctx.Err() != nil {
+			result, err = zero, ctx.Err()
+		}
+	}()
+	r.active.Store(&ctx)
+	defer r.active.Store(nil)
+	if r.conn != nil && r.conn.IsClosed() {
+		r.drop(ctx)
 	}
-	var local *Store
-	result, err := nativeTransaction(s, false, func(p *postgresTransaction) (T, error) {
-		var e error
-		local, e = buildQueryProjection(p)
+	if r.conn == nil {
+		owner, cancel := context.WithCancel(r.life)
+		dial, release := ownedBudgetConfig(owner, r.gated())
+		c, e := pgx.ConnectConfig(ctx, dial)
 		if e != nil {
-			return zero, e
+			release()
+			cancel()
+			return zero, errRemote
 		}
-		local.author, local.now = s.author, s.now
-		return fn(local)
-	})
-	if local != nil {
-		if err == nil && r.request != nil {
-			local.ctx = r.request
-			r.projection = local
-		} else {
-			_ = local.Close()
-		}
+		r.conn, r.release = c, func() { release(); cancel() }
+	}
+	c := r.conn
+	stop := context.AfterFunc(ctx, func() { _ = c.PgConn().Conn().Close() })
+	result, err = fn(ctx, c)
+	if !stop() || ctx.Err() != nil || c.IsClosed() {
+		r.drop(ctx)
 	}
 	return result, err
 }
-func buildQueryProjection(p *postgresTransaction) (*Store, error) {
-	rows, err := p.tx.Query(p.ctx, `SELECT DISTINCT ON (id) id, version, payload FROM memcue.facts ORDER BY id,version DESC LIMIT 100001`)
-	if err != nil {
-		return nil, errRemote
-	}
-	defer rows.Close()
-	local, err := openFile(":memory:")
-	if err != nil {
-		return nil, errRemote
-	}
-	ok := false
-	defer func() {
-		if !ok {
-			_ = local.Close()
+
+// gated is the configuration whose dialer refuses outside a live operation and bounds each dial by it.
+func (r *postgresStore) gated() *pgx.ConnConfig {
+	cfg := r.config.Copy()
+	dial := cfg.DialFunc
+	cfg.DialFunc = func(ctx context.Context, network, address string) (net.Conn, error) {
+		op := r.active.Load()
+		if op == nil || (*op).Err() != nil {
+			return nil, context.Canceled
 		}
-	}()
-	local.ctx = p.ctx
-	tx, err := local.db.BeginTx(p.ctx, nil)
-	if err != nil {
-		return nil, errRemote
+		bounded, cancel := context.WithCancel(ctx)
+		defer cancel()
+		stop := context.AfterFunc(*op, cancel)
+		defer stop()
+		return dial(bounded, network, address)
 	}
-	defer func() { _ = tx.Rollback() }()
-	n, size := 0, 0
-	for rows.Next() {
-		if p.ctx.Err() != nil {
-			return nil, p.ctx.Err()
-		}
-		var id string
-		var version int
-		var b []byte
-		if rows.Scan(&id, &version, &b) != nil {
-			return nil, errRemote
-		}
-		n++
-		size += len(b)
-		if n > 100000 || size > 64<<20 {
-			return nil, errors.New("PostgreSQL history exceeds this client's projection limit")
-		}
-		var f Fact
-		if unmarshalFact(p.ctx, b, &f) != nil || f.ID != id || f.Version != version {
-			return nil, errRemote
-		}
-		if err = insertContext(p.ctx, tx, f); err != nil {
-			return nil, errRemote
-		}
+	return cfg
+}
+
+// drop closes the connection and every stream its dialer opened. The caller holds mu.
+func (r *postgresStore) drop(ctx context.Context) {
+	if r.conn == nil {
+		return
 	}
-	if rows.Err() != nil {
-		return nil, errRemote
+	c := r.conn
+	stop := context.AfterFunc(ctx, func() { _ = c.PgConn().Conn().Close() })
+	_ = c.Close(ctx)
+	stop()
+	r.release()
+	r.conn, r.release = nil, nil
+}
+
+func (r *postgresStore) close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return
 	}
-	if p.ctx.Err() != nil {
-		return nil, p.ctx.Err()
+	r.closed = true
+	parent := context.Background()
+	if r.request != nil {
+		parent = r.request
 	}
-	if err = rebuildContext(p.ctx, tx); err != nil {
-		return nil, errRemote
+	ctx, cancel := context.WithTimeout(parent, time.Second)
+	r.drop(ctx)
+	cancel()
+	r.end()
+	if r.cancel != nil {
+		r.cancel()
 	}
-	if err = tx.Commit(); err != nil {
-		return nil, errRemote
-	}
-	ok = true
-	return local, nil
 }
 
 // ErrRemoteUnsupported identifies operations that require a local file or a local maintenance workflow.
 var ErrRemoteUnsupported = errors.New("operation unavailable for PostgreSQL; use PostgreSQL backup tools or explicitly unset MEMCUE_POSTGRES_DSN for local maintenance")
 
-// OpenPostgresContext shares one query snapshot until a mutation or Close.
-// The caller owns the request context. OpenPostgres retains per-call library semantics.
+// OpenPostgresContext binds schema startup and every operation to the caller-owned request context; the handle's
+// connection closes with Close or with that context. OpenPostgres gives each operation its own budget.
 func OpenPostgresContext(ctx context.Context, dsn string) (*Store, error) {
 	s, err := openPostgres(ctx, dsn)
 	if err == nil {
@@ -310,10 +400,10 @@ func OpenPostgresContext(ctx context.Context, dsn string) (*Store, error) {
 	return s, err
 }
 
-func (s *Store) operationContext() (context.Context, context.CancelFunc) {
+func (r *postgresStore) operation() (context.Context, context.CancelFunc) {
 	parent := context.Background()
-	if s.remote.request != nil {
-		parent = s.remote.request
+	if r.request != nil {
+		parent = r.request
 	}
 	return context.WithTimeout(parent, 10*time.Second)
 }
@@ -332,4 +422,13 @@ func OpenPostgresRequest(dsn string, budget time.Duration) (*Store, error) {
 	}
 	s.remote.cancel = cancel
 	return s, nil
+}
+
+// Borrow returns a handle that shares this PostgreSQL handle's connection and whose Close leaves it open: the owner
+// closes it. A command that opens the base several times thereby connects once. A local store is returned as is.
+func (s *Store) Borrow() *Store {
+	if s.remote == nil {
+		return s
+	}
+	return &Store{remote: s.remote, author: s.author, now: s.now, borrowed: true}
 }

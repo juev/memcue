@@ -197,7 +197,7 @@ func runMigrateText(out io.Writer) error {
 
 func (inv *invocation) openBase() (*store.Store, error) {
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
-		return store.OpenPostgresContext(inv.ctx, dsn)
+		return inv.openRemote(dsn)
 	}
 	return inv.openLocalBase()
 }
@@ -214,9 +214,23 @@ func (inv *invocation) openLocalBase() (*store.Store, error) {
 	}
 	return inv.local(store.OpenText(b.path, cache))
 }
+
+// openRemote opens the PostgreSQL base once per invocation and lends it out: the opens of one command share a
+// connection, which close closes.
+func (inv *invocation) openRemote(dsn string) (*store.Store, error) {
+	if inv.remote == nil {
+		s, err := store.OpenPostgresContext(inv.ctx, dsn)
+		if err != nil {
+			return nil, err
+		}
+		inv.remote = s
+	}
+	return inv.remote.Borrow(), nil
+}
+
 func (inv *invocation) openBaseReadOnly() (*store.Store, error) {
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
-		return store.OpenPostgresContext(inv.ctx, dsn)
+		return inv.openRemote(dsn)
 	}
 	b := factsBase()
 	if !b.text {

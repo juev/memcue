@@ -39,7 +39,8 @@ func TestPostgresFactSurvivesNewClient(t *testing.T) {
 	}
 }
 
-func TestPostgresCorrectionAppendsHistory(t *testing.T) {
+// PostgreSQL keeps the current version only (#700): a correction replaces it and keeps the metadata.
+func TestPostgresCorrectionReplacesTheVersion(t *testing.T) {
 	dsn := os.Getenv("MEMCUE_TEST_POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("requires an isolated PostgreSQL fixture")
@@ -55,13 +56,13 @@ func TestPostgresCorrectionAppendsHistory(t *testing.T) {
 	}
 	revised, err := s.Correct(f.ID, "Synthetic revised cedar", f.Version)
 	if err != nil {
-		t.Fatalf("remote correction must append history: %v", err)
+		t.Fatalf("remote correction: %v", err)
 	}
 	h, err := s.History(f.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(h) != 2 || h[0] != f || h[1] != revised || revised.Version != 2 || revised.Evidence != f.Evidence || revised.Scope != f.Scope {
+	if len(h) != 1 || h[0] != revised || revised.Version != 2 || revised.Evidence != f.Evidence || revised.Scope != f.Scope {
 		t.Fatalf("history or metadata changed: %#v", h)
 	}
 }
@@ -190,9 +191,8 @@ func TestPostgresReadersAgreeOnStoredHistory(t *testing.T) {
 	if err != nil || count < 1 {
 		t.Fatalf("count reader: %d %v", count, err)
 	}
-	stats, err := s.IndexStats()
-	if err != nil || stats.Rows < 1 || stats.Live != stats.Rows {
-		t.Fatalf("index reader: %#v %v", stats, err)
+	if _, err = s.IndexStats(); !errors.Is(err, ErrRemoteUnsupported) {
+		t.Fatalf("index statistics belong to local reindex: %v", err)
 	}
 }
 

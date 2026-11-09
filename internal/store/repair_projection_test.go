@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestRepairProjectionCannotPublishAfterDeadline(t *testing.T) {
+func TestRepairOperationCannotPublishAfterDeadline(t *testing.T) {
 	dsn := os.Getenv("MEMCUE_REPAIR_DSN")
 	if dsn == "" {
 		t.Skip("isolated PostgreSQL required")
@@ -27,12 +27,24 @@ func TestRepairProjectionCannotPublishAfterDeadline(t *testing.T) {
 	if _, err = c.Exec(context.Background(), "TRUNCATE memcue.facts"); err != nil {
 		t.Fatal(err)
 	}
-	f, err := s.AddWith("synthetic projection budget", "fixture", "", Meta{})
+	f, err := s.AddWith("synthetic operation budget", "fixture", "", Meta{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = remoteDo(s, false, func(local *Store) (Fact, error) { time.Sleep(10100 * time.Millisecond); return local.Get(f.ID) })
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err = postgresOp(s, ctx, false, func(ctx context.Context, c *pgx.Conn) (Fact, error) {
+		var id string
+		if e := c.QueryRow(ctx, `SELECT id FROM memcue.facts WHERE id=$1`, f.ID).Scan(&id); e != nil {
+			return Fact{}, e
+		}
+		time.Sleep(200 * time.Millisecond)
+		return f, nil
+	})
 	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expired projection published success instead of operation deadline: %v", err)
+		t.Fatalf("expired operation published success instead of operation deadline: %v", err)
+	}
+	if _, err = s.Get(f.ID); err != nil {
+		t.Fatalf("next operation did not reconnect after the expired one: %v", err)
 	}
 }

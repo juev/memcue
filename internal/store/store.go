@@ -177,6 +177,8 @@ type Store struct {
 	// text is the directory of the text history and textLock the file that serializes writes to it; both are empty
 	// for a base that is one SQLite file (see OpenText).
 	text, textLock string
+	// borrowed is a handle of Borrow: its Close leaves the shared PostgreSQL connection to the owner.
+	borrowed bool
 }
 
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
@@ -591,7 +593,7 @@ type IndexStats struct {
 // not for Open.
 func (s *Store) IndexStats() (IndexStats, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) (IndexStats, error) { return local.IndexStats() })
+		return IndexStats{}, ErrRemoteUnsupported
 	}
 	var st IndexStats
 	if err := s.db.QueryRowContext(s.context(), `SELECT count(*) FROM facts f
@@ -623,15 +625,8 @@ func (s *Store) IndexStats() (IndexStats, error) {
 // Close closes the base.
 func (s *Store) Close() error {
 	if s.remote != nil {
-		if s.remote.cancel != nil {
-			s.remote.cancel()
-		}
-		s.remote.mu.Lock()
-		defer s.remote.mu.Unlock()
-		if s.remote.projection != nil {
-			err := s.remote.projection.Close()
-			s.remote.projection = nil
-			return err
+		if !s.borrowed {
+			s.remote.close()
 		}
 		return nil
 	}
@@ -938,7 +933,7 @@ func (s *Store) Retag(id string, version int, origin, scope string) (Fact, error
 // Current returns the latest version of every fact that is not retired, whatever its review state.
 func (s *Store) Current() ([]Fact, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) ([]Fact, error) { return local.Current() })
+		return remoteFacts(s, `SELECT version, payload FROM memcue.facts WHERE active ORDER BY id`)
 	}
 	return s.query(`SELECT `+s.cols("f")+` FROM facts f
 		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? ORDER BY f.id`, Active)
@@ -949,7 +944,7 @@ func (s *Store) Current() ([]Fact, error) {
 // the rows that carry the name look up their latest version.
 func (s *Store) CountNamed(name string) (int, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) (int, error) { return local.CountNamed(name) })
+		return remoteCountNamed(s, name)
 	}
 	var n int
 	err := s.db.QueryRowContext(s.context(), `SELECT count(*) FROM facts f
@@ -1231,7 +1226,7 @@ func scan(row interface{ Scan(...any) error }, extra ...any) (Fact, error) {
 // Get returns the latest version of a fact, active or retired.
 func (s *Store) Get(id string) (Fact, error) {
 	if s.remote != nil {
-		return remoteRead(s, id, true)
+		return remoteGet(s, id)
 	}
 	if s.native != nil {
 		return s.native.get(id)
@@ -1243,7 +1238,7 @@ func (s *Store) Get(id string) (Fact, error) {
 	return f, err
 }
 
-// History returns every version of a fact, oldest first.
+// History returns every version of a fact, oldest first. A PostgreSQL base keeps only the current one (#700).
 func (s *Store) History(id string) ([]Fact, error) {
 	if s.remote != nil {
 		return remoteHistory(s, id)
@@ -1251,12 +1246,31 @@ func (s *Store) History(id string) ([]Fact, error) {
 	return s.query(`SELECT `+s.cols("")+` FROM facts WHERE id = ? ORDER BY version`, id)
 }
 
-// Rows returns every version of every fact, ordered by id and version.
+// Rows returns every version of every fact, ordered by id and version. A PostgreSQL base
+// keeps only the current version of each fact (#700).
 func (s *Store) Rows() ([]Fact, error) {
 	if s.remote != nil {
-		return remoteRows(s)
+		return remoteFacts(s, `SELECT version, payload FROM memcue.facts ORDER BY id`)
 	}
 	return s.query(`SELECT ` + s.cols("") + ` FROM facts ORDER BY id, version`)
+}
+
+// ActiveIn returns the latest version of every active fact of kind whose scope is one of scopes, exactly, ordered by
+// id. It is how session start reads the repository pitfalls without reading the whole base.
+func (s *Store) ActiveIn(kind string, scopes []string) ([]Fact, error) {
+	if s.remote != nil {
+		return remoteFacts(s, `SELECT version, payload FROM memcue.facts WHERE active AND kind = $1 AND scope = ANY($2::text[]) ORDER BY id`, kind, scopes)
+	}
+	if len(scopes) == 0 {
+		return nil, nil
+	}
+	args := []any{Active, kind}
+	for _, sc := range scopes {
+		args = append(args, sc)
+	}
+	return s.query(`SELECT `+s.cols("f")+` FROM facts f
+		WHERE f.version = (SELECT max(version) FROM facts WHERE id = f.id) AND f.status = ? AND `+s.col("f", "kind")+` = ?
+		AND `+s.col("f", "scope")+` IN (`+marks(len(scopes))+`) ORDER BY f.id`, args...)
 }
 
 // Active returns the latest version of every fact that is not retired, expired facts and the candidate and provisional
@@ -1271,7 +1285,7 @@ func (s *Store) Active() ([]Fact, error) {
 // does not know exactly.
 func (s *Store) RepoScopes() ([]string, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) ([]string, error) { return local.RepoScopes() })
+		return remoteRepoScopes(s)
 	}
 	scope := s.col("f", "scope")
 	return s.liveStrings(scope, "lower("+scope+") LIKE 'repo:%'")
@@ -1281,7 +1295,7 @@ func (s *Store) RepoScopes() ([]string, error) {
 // without duplicates. A search by "-in repo:KEY" matches these as well as the repository scopes (#459).
 func (s *Store) OriginTiers() ([]string, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) ([]string, error) { return local.OriginTiers() })
+		return remoteOriginTiers(s)
 	}
 	return s.liveStrings("substr(f.origin, 1, instr(f.origin, ' ') - 1)", "instr(f.origin, ' ') > 1")
 }
@@ -1461,7 +1475,7 @@ func (s *Store) Search(terms []string, limit int) ([]Hit, error) {
 // still gets limit facts when the base holds them.
 func (s *Store) SearchFiltered(terms []string, limit int, f Filter) ([]Hit, error) {
 	if s.remote != nil {
-		return remoteDo(s, false, func(local *Store) ([]Hit, error) { return local.SearchFiltered(terms, limit, f) })
+		return remoteSearch(s, terms, limit, f)
 	}
 	if len(terms) == 0 {
 		return nil, nil
@@ -1516,12 +1530,7 @@ const docFreqChunk = 200
 // and one statement of the same counts took 30-45% less on loffe (#337, docs/research/search-chain-2026-10.md).
 func (s *Store) DocFreq(terms []string) (map[string]int, int, error) {
 	if s.remote != nil {
-		type frequency struct {
-			df map[string]int
-			n  int
-		}
-		v, err := remoteDo(s, false, func(local *Store) (frequency, error) { df, n, e := local.DocFreq(terms); return frequency{df, n}, e })
-		return v.df, v.n, err
+		return remoteDocFreq(s, terms)
 	}
 	df := make(map[string]int, len(terms))
 	total := 0

@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"os"
+
+	"github.com/jackc/pgx/v5"
 	"testing"
 	"time"
 )
@@ -19,15 +21,15 @@ func TestRepair2OneRequestBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	sleep := func(p *postgresTransaction) (int, error) {
-		_, err := p.tx.Exec(p.ctx, `SELECT pg_sleep(0.2)`)
+	sleep := func(ctx context.Context, c *pgx.Conn) (int, error) {
+		_, err := c.Exec(ctx, `SELECT pg_sleep(0.2)`)
 		return 0, err
 	}
-	if _, err = nativeTransaction(s, false, sleep); err != nil {
+	if _, err = remoteRead(s, sleep); err != nil {
 		t.Fatalf("first query setup: %v", err)
 	}
 	start := time.Now()
-	_, err = nativeTransaction(s, false, sleep)
+	_, err = remoteRead(s, sleep)
 	if err == nil {
 		t.Error("second operation received a fresh deadline beyond the request budget")
 	}
@@ -44,7 +46,7 @@ func TestRepair2OneRequestBudget(t *testing.T) {
 	}
 	defer func() { _ = library.Close() }()
 	for i := 0; i < 2; i++ {
-		if _, err = nativeTransaction(library, false, sleep); err != nil {
+		if _, err = remoteRead(library, sleep); err != nil {
 			t.Fatalf("library operation %d inherited expired request: %v", i, err)
 		}
 	}

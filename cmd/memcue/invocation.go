@@ -20,6 +20,8 @@ type invocation struct {
 	ctx    context.Context
 	stop   context.CancelFunc
 	effect bool
+	// remote is the PostgreSQL handle of the invocation: every openBase borrows its one connection, and close closes it.
+	remote *store.Store
 }
 
 func newInvocation() *invocation {
@@ -41,7 +43,13 @@ func newInvocation() *invocation {
 	ctx, cancel := context.WithTimeout(signalCtx, budget)
 	return &invocation{ctx: ctx, stop: func() { cancel(); stopSignal() }}
 }
-func (i *invocation) close() { i.stop() }
+func (i *invocation) close() {
+	if i.remote != nil {
+		_ = i.remote.Close()
+		i.remote = nil
+	}
+	i.stop()
+}
 
 func (inv *invocation) inputBytesLimit(in io.Reader, limit int) ([]byte, error) {
 	var stop func() bool

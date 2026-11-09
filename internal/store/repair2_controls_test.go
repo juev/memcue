@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestRepair2NativeHistoryBoundary(t *testing.T) {
+func TestRepair2RetiredFactsStayOutOfQueries(t *testing.T) {
 	dsn := os.Getenv("MEMCUE_REPAIR_DSN")
 	if dsn == "" {
 		t.Skip("isolated PostgreSQL required")
@@ -24,19 +24,20 @@ func TestRepair2NativeHistoryBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close(context.Background()) }()
-	if _, err = c.Exec(context.Background(), `TRUNCATE memcue.facts; INSERT INTO memcue.facts SELECT 'history-boundary',i,jsonb_build_object('ID','history-boundary','Version',i,'Content','synthetic','Created','2026-01-01T00:00:00Z','Status','retired') FROM generate_series(1,100000) i`); err != nil {
+	if _, err = c.Exec(context.Background(), `TRUNCATE memcue.facts; INSERT INTO memcue.facts(id,version,payload,terms) SELECT 'retired-'||i,3,jsonb_build_object('ID','retired-'||i,'Version',3,'Content','synthetic cedar','Created','2026-01-01T00:00:00Z','Status','retired','Scope','repo:retired'),'{cedar}' FROM generate_series(1,1000) i`); err != nil {
 		t.Fatal(err)
 	}
-	h, err := s.History("history-boundary")
-	if err != nil || len(h) != 100000 {
-		t.Fatalf("full immutable history boundary: %d %v", len(h), err)
-	}
-	if h[0].Version != 1 || h[len(h)-1].Version != 100000 {
-		t.Fatal("history order/version changed")
+	rows, err := s.Rows()
+	if err != nil || len(rows) != 1000 || rows[0].Version != 3 {
+		t.Fatalf("retired facts are not read whole: %d %v", len(rows), err)
 	}
 	scopes, err := s.RepoScopes()
 	if err != nil || len(scopes) != 0 {
-		t.Fatalf("retired projection leaked scope: %v", err)
+		t.Fatalf("retired fact leaked scope: %v %v", scopes, err)
+	}
+	hits, err := s.Search([]string{"cedar"}, 5)
+	if err != nil || len(hits) != 0 {
+		t.Fatalf("retired fact found by search: %d %v", len(hits), err)
 	}
 }
 func TestRepair2ConcurrentExpectedVersion(t *testing.T) {
@@ -83,7 +84,7 @@ func TestRepair2ConcurrentExpectedVersion(t *testing.T) {
 		t.Fatalf("concurrent CAS: accepted=%d conflicts=%d", accepted, conflicts)
 	}
 	h, err := s.History(f.ID)
-	if err != nil || len(h) != 2 || h[1].Evidence != "retain" {
+	if err != nil || len(h) != 1 || h[0].Version != 2 || h[0].Evidence != "retain" {
 		t.Fatalf("history/metadata lost: %v", err)
 	}
 }

@@ -90,7 +90,7 @@ func TestRepairLostCommitReplyIsAmbiguous(t *testing.T) {
 		}()
 		return a, nil
 	}
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	go func() { _, err := s.AddWith("synthetic uncertain commit", "fixture", "", Meta{}); done <- err }()
 	select {

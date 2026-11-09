@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+// A read whose statement the server never answers ends at the operation deadline; a read is one statement without a
+// transaction (#700), so the proxy stalls the statement itself.
 func TestRepairReadRollbackRespectsDeadline(t *testing.T) {
 	dsn := os.Getenv("MEMCUE_REPAIR_DSN")
 	if dsn == "" {
@@ -83,7 +85,7 @@ func TestRepairReadRollbackRespectsDeadline(t *testing.T) {
 			if _, err = io.ReadFull(client, body); err != nil {
 				return
 			}
-			if header[0] == 'Q' && bytes.Equal(body, []byte("rollback\x00")) {
+			if header[0] == 'P' || header[0] == 'Q' {
 				once.Do(func() { close(reached) })
 				<-release
 			}
@@ -98,7 +100,7 @@ func TestRepairReadRollbackRespectsDeadline(t *testing.T) {
 	addr := ln.Addr().(*net.TCPAddr)
 	cfg.Host = "127.0.0.1"
 	cfg.Port = uint16(addr.Port)
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	start := time.Now()
 	go func() { _, err := s.Get("synthetic-missing"); done <- err }()
@@ -217,7 +219,7 @@ func TestRepairWriteRollbackRespectsDeadline(t *testing.T) {
 	addr := ln.Addr().(*net.TCPAddr)
 	cfg.Host = "127.0.0.1"
 	cfg.Port = uint16(addr.Port)
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	start := time.Now()
 	go func() { _, err := s.AddWith("", "fixture", "", Meta{}); done <- err }()
@@ -321,7 +323,7 @@ func TestRepairCleanupDoesNotDialAfterBudget(t *testing.T) {
 			if _, err = io.ReadFull(client, body); err != nil {
 				return
 			}
-			if header[0] == 'Q' && bytes.Equal(body, []byte("rollback\x00")) {
+			if header[0] == 'P' || header[0] == 'Q' { // a read is one statement (#700)
 				once.Do(func() { close(reached) })
 				<-release
 			}
@@ -345,7 +347,7 @@ func TestRepairCleanupDoesNotDialAfterBudget(t *testing.T) {
 		}
 		return originalDial(ctx, network, address)
 	}
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	start := time.Now()
 	began = start
@@ -455,7 +457,7 @@ func TestRepairRollbackTimeoutCannotPublishReadSuccess(t *testing.T) {
 			if _, err = io.ReadFull(client, body); err != nil {
 				return
 			}
-			if header[0] == 'Q' && bytes.Equal(body, []byte("rollback\x00")) {
+			if header[0] == 'P' || header[0] == 'Q' { // a read is one statement (#700)
 				once.Do(func() { close(reached) })
 				<-release
 			}
@@ -470,7 +472,7 @@ func TestRepairRollbackTimeoutCannotPublishReadSuccess(t *testing.T) {
 	addr := ln.Addr().(*net.TCPAddr)
 	cfg.Host = "127.0.0.1"
 	cfg.Port = uint16(addr.Port)
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	start := time.Now()
 	go func() { _, err := s.Rows(); done <- err }()

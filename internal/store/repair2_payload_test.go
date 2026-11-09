@@ -22,7 +22,7 @@ func TestRepair2NativeGetValidatesStoredVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = c.Close(context.Background()) }()
-	if _, err = c.Exec(context.Background(), `TRUNCATE memcue.facts; INSERT INTO memcue.facts VALUES ('malformed',1,'{"ID":"malformed","Version":2,"Content":"synthetic"}')`); err != nil {
+	if _, err = c.Exec(context.Background(), `TRUNCATE memcue.facts; INSERT INTO memcue.facts(id,version,payload,terms) VALUES ('malformed',1,'{"ID":"malformed","Version":2,"Content":"synthetic"}','{}')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.Get("malformed"); err == nil {

@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"github.com/jackc/pgx/v5"
@@ -39,6 +38,7 @@ func TestRepairCloseRespectsTotalDeadline(t *testing.T) {
 	reached := make(chan struct{})
 	release := make(chan struct{})
 	var wg sync.WaitGroup
+	var once sync.Once
 	cfg.DialFunc = func(ctx context.Context, network, address string) (net.Conn, error) {
 		a, b := net.Pipe()
 		up, err := (&net.Dialer{}).DialContext(ctx, "tcp", target)
@@ -79,15 +79,16 @@ func TestRepairCloseRespectsTotalDeadline(t *testing.T) {
 				if _, err := up.Write(body); err != nil {
 					return
 				}
-				if header[0] == 'Q' && bytes.Equal(body, []byte("rollback\x00")) {
-					close(reached)
+				// A read is one statement (#700): the proxy stops reading after forwarding it.
+				if header[0] == 'P' || header[0] == 'Q' {
+					once.Do(func() { close(reached) })
 					<-release
 				}
 			}
 		}()
 		return a, nil
 	}
-	s.remote.config = cfg
+	useConfig(s, cfg)
 	done := make(chan error, 1)
 	start := time.Now()
 	go func() { _, err := s.Get("missing"); done <- err }()

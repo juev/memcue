@@ -10,8 +10,8 @@ import (
 	"github.com/juev/memcue/internal/store"
 )
 
-// runMigratePostgres copies the whole history of the local base into an empty PostgreSQL base: memcue migrate
-// -postgres [-apply]. Without -apply it reports what it would copy and where, and writes nothing. The source is the
+// runMigratePostgres copies the latest version of every fact of the local base into an empty PostgreSQL base, which
+// keeps no history (#700): memcue migrate -postgres [-apply]. Without -apply it reports what it would copy and where, and writes nothing. The source is the
 // local base (MEMCUE_FACTS), the target MEMCUE_POSTGRES_DSN; after the copy the DSN selects PostgreSQL as the authority.
 func (inv *invocation) runMigratePostgres(apply bool, out io.Writer) error {
 	dsn := os.Getenv("MEMCUE_POSTGRES_DSN")
@@ -55,11 +55,16 @@ func (inv *invocation) runMigratePostgres(apply bool, out io.Writer) error {
 	switch {
 	case !state.Schema:
 		_, err = fmt.Fprintf(out, "target %s: no memcue schema yet\n", target)
+	case state.Version == 1:
+		_, err = fmt.Fprintf(out, "target %s: PostgreSQL schema 1, %d versions\n", target, state.Rows)
 	default:
-		_, err = fmt.Fprintf(out, "target %s: %d versions\n", target, state.Rows)
+		_, err = fmt.Fprintf(out, "target %s: %d facts\n", target, state.Rows)
 	}
 	if err != nil {
 		return err
+	}
+	if state.Version == 1 {
+		return errors.New("migrate -postgres: the target holds PostgreSQL schema 1, which this memcue does not read; drop the memcue schema with the owner role (DROP SCHEMA memcue CASCADE) and run again")
 	}
 	if state.Rows != 0 {
 		return store.ErrTargetNotEmpty
@@ -71,7 +76,7 @@ func (inv *invocation) runMigratePostgres(apply bool, out io.Writer) error {
 	if err := store.CopyToPostgres(inv.ctx, dsn, rows); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "copied %d versions of %d facts and read them back unchanged\n", len(rows), len(facts))
+	_, err = fmt.Fprintf(out, "copied the latest versions of %d facts and read them back unchanged\n", len(facts))
 	return err
 }
 

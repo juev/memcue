@@ -308,14 +308,24 @@ func (inv *invocation) repositoryPitfallParts(cwd string) (string, []string) {
 		return repositoryPitfallsUnavailable, nil
 	}
 	defer func() { _ = s.Close() }()
-	facts, err := repositoryVersions(s)
+	scopes := make([]string, len(keys))
+	for i, key := range keys {
+		scopes[i] = tier.Scope(key)
+	}
+	var facts []store.Fact
+	if s.Text() == "" {
+		// A SQLite file or PostgreSQL answers with the pitfalls alone; PostgreSQL would otherwise send the whole base.
+		facts, err = s.ActiveIn("pitfall", scopes)
+	} else {
+		facts, err = repositoryVersions(s)
+	}
 	if err != nil {
 		return repositoryPitfallsUnavailable, nil
 	}
 	var lines []string
 	today := time.Now().UTC().Format("2006-01-02")
 	for _, f := range facts {
-		if f.Kind == "pitfall" && slices.ContainsFunc(keys, func(key string) bool { return f.Scope == tier.Scope(key) }) && (f.Expires == "" || f.Expires >= today) {
+		if f.Kind == "pitfall" && slices.Contains(scopes, f.Scope) && (f.Expires == "" || f.Expires >= today) {
 			lines = append(lines, f.Content)
 		}
 	}

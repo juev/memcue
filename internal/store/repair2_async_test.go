@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type repair2FaultConn struct {
@@ -60,12 +62,12 @@ func TestRepair2ActualAsyncCancellationOwnedUntilReturn(t *testing.T) {
 				peers <- y
 				return x, nil
 			}
-			s.remote.config = cfg
+			useConfig(s, cfg)
 			var peer net.Conn
 			var cleanup <-chan struct{}
-			_, err = nativeTransaction(s, false, func(p *postgresTransaction) (int, error) {
-				cleanup = p.tx.Conn().PgConn().CleanupDone()
-				_, e := p.tx.Exec(p.ctx, `SELECT 'repair2_async'`)
+			_, err = remoteRead(s, func(ctx context.Context, c *pgx.Conn) (int, error) {
+				cleanup = c.PgConn().CleanupDone()
+				_, e := c.Exec(ctx, `SELECT 'repair2_async'`)
 				if e == nil {
 					t.Fatal("real pgx I/O fault missing")
 				}

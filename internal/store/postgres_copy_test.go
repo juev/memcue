@@ -90,8 +90,8 @@ func localHistory(t *testing.T) []Fact {
 	return rows
 }
 
-// The copy keeps every version of every fact: PostgreSQL then reads the same history, current facts and search.
-func TestCopyToPostgresKeepsTheWholeHistory(t *testing.T) {
+// The copy keeps the latest version of every fact (#700): PostgreSQL then reads the same current facts and search.
+func TestCopyToPostgresKeepsTheLatestVersions(t *testing.T) {
 	dsn := emptyPostgres(t)
 	rows := localHistory(t)
 	ctx := context.Background()
@@ -102,6 +102,7 @@ func TestCopyToPostgresKeepsTheWholeHistory(t *testing.T) {
 	if err := CopyToPostgres(ctx, dsn, rows); err != nil {
 		t.Fatal(err)
 	}
+	rows = Latest(rows)
 	s, err := OpenPostgres(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +113,7 @@ func TestCopyToPostgresKeepsTheWholeHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got) != len(rows) {
-		t.Fatalf("PostgreSQL holds %d versions, want %d", len(got), len(rows))
+		t.Fatalf("PostgreSQL holds %d facts, want %d", len(got), len(rows))
 	}
 	for i := range rows {
 		if !got[i].Created.Equal(rows[i].Created) {

@@ -77,8 +77,9 @@ func TestMutationReceiptLoss(t *testing.T) {
 					if e2 != nil {
 						t.Fatal(e2)
 					}
-					if op.name != "add" && len(h) != op.version {
-						t.Fatalf("commit precondition: versions=%d want=%d", len(h), op.version)
+					// PostgreSQL keeps the current version only (#700): it carries the version number.
+					if op.name != "add" && (len(h) != 1 || h[0].Version != op.version) {
+						t.Fatalf("commit precondition: versions=%+v want=%d", h, op.version)
 					}
 					if e == nil || !strings.Contains(strings.ToUpper(e.Error()), "UNKNOWN OUTCOME") {
 						t.Fatalf("%s committed but response loss lacks explicit UNKNOWN OUTCOME: %v", op.name, e)

@@ -128,7 +128,8 @@ func TestMigratePostgresRefusesAMissingOrEmptySource(t *testing.T) {
 	}
 }
 
-// The report writes nothing, -apply copies the whole history, and a second -apply refuses the base now in use.
+// The report writes nothing, -apply copies the latest version of every fact (#700), and a second -apply refuses the
+// base now in use.
 func TestMigratePostgresReportsThenCopies(t *testing.T) {
 	env(t)
 	s, err := store.Open(factsPath())
@@ -175,7 +176,7 @@ func TestMigratePostgresReportsThenCopies(t *testing.T) {
 	if err := inv.runMigrate([]string{"-postgres", "-apply"}, &copied); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(copied.String(), "copied 3 versions of 2 facts") {
+	if !strings.Contains(copied.String(), "copied the latest versions of 2 facts") {
 		t.Errorf("apply output:\n%s", copied.String())
 	}
 	remote, err := inv.openBase()
@@ -184,8 +185,9 @@ func TestMigratePostgresReportsThenCopies(t *testing.T) {
 	}
 	got, err := remote.Rows()
 	_ = remote.Close()
+	local = store.Latest(local)
 	if err != nil || len(got) != len(local) {
-		t.Fatalf("PostgreSQL holds %d versions (%v), want %d", len(got), err, len(local))
+		t.Fatalf("PostgreSQL holds %d facts (%v), want %d", len(got), err, len(local))
 	}
 	for i := range local {
 		if got[i].ID != local[i].ID || got[i].Version != local[i].Version || got[i].Content != local[i].Content || got[i].WriteID != local[i].WriteID {
