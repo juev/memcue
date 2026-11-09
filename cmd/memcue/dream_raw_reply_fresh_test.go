@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -35,7 +36,7 @@ func TestAutomaticDreamRejectsRawObsoleteReplyAtomically(t *testing.T) {
 			previous := dreamRunFn
 			t.Cleanup(func() { dreamRunFn = previous })
 			var calls atomic.Int32
-			dreamRunFn = func(packet string) (extract.DreamReply, error) {
+			dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 				calls.Add(1)
 				state, err := stateDir()
 				if err != nil {

@@ -102,7 +102,7 @@ func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 				b, err := os.ReadFile(n.path)
 				var r extract.Result
 				if err == nil {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+					ctx, cancel := context.WithTimeout(inv.ctx, 5*time.Minute)
 					r, err = noteFn(ctx, n.ref(), string(b))
 					cancel()
 				}

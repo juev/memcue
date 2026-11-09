@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"regexp"
@@ -20,7 +21,7 @@ func fakeDreamRun(t *testing.T, fail error) *int {
 	calls := 0
 	var mu sync.Mutex
 	old := dreamRunFn
-	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 		// The fakes of the session's model behind answerPacket keep what they were sent: one answer at a time.
 		mu.Lock()
 		defer mu.Unlock()
@@ -112,11 +113,11 @@ func TestDreamRunLogsTheFailedCall(t *testing.T) {
 	dreamedHoursAgo(t, dir)
 	fakeDreamRun(t, nil)
 	good := dreamRunFn
-	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 		if strings.Contains(packet, "## Группа 1") {
 			return extract.DreamReply{Tokens: extract.Tokens{Input: 7}}, errModel
 		}
-		return good(packet)
+		return good(ctx, packet)
 	}
 	if err := runDream([]string{"-run"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
 		t.Fatalf("err %v, want the call's error", err)
@@ -182,7 +183,7 @@ func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
 	good := dreamRunFn
 	var mu sync.Mutex
 	first := ""
-	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 		// The packet of the second pass fails.
 		id := regexp.MustCompile("`packet` — ровно `([^`]+)`").FindStringSubmatch(packet)[1]
 		mu.Lock()
@@ -194,7 +195,7 @@ func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
 		if second {
 			return extract.DreamReply{}, errModel
 		}
-		return good(packet)
+		return good(ctx, packet)
 	}
 	err := runDream([]string{"-run", "-all", "-j", "1"}, &bytes.Buffer{})
 	if !errors.Is(err, errModel) || !strings.Contains(err.Error(), "pass 2") {

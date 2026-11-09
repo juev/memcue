@@ -25,8 +25,8 @@ const dreamRunTimeout = 10 * time.Minute
 var dreamAllPasses = 200
 
 // dreamRunFn is the model call of dream -run, replaced in tests.
-var dreamRunFn = func(packet string) (extract.DreamReply, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dreamRunTimeout)
+var dreamRunFn = func(parent context.Context, packet string) (extract.DreamReply, error) {
+	ctx, cancel := context.WithTimeout(parent, dreamRunTimeout)
 	defer cancel()
 	return extract.DreamAnswer(ctx, packet)
 }
@@ -154,7 +154,7 @@ func (inv *invocation) dreamPass(dir string, packets int, out io.Writer) (dreamR
 		return rec, work, err
 	}
 	start = time.Now()
-	r, byCall, err := askAll(calls)
+	r, byCall, err := askAll(inv.ctx, calls)
 	timing.Model, timing.API, timing.TTFT, timing.Calls = ms(time.Since(start)), ms(r.API), ms(r.TTFT), len(calls)
 	if err != nil {
 		rec.Tokens, rec.CostUSD, rec.Timing, rec.Error = &r.Tokens, r.CostUSD, &timing, "model: "+err.Error()
@@ -271,7 +271,7 @@ type dreamCallRecord struct {
 // askAll sends the calls at once and joins their answers into the one answer -apply reads. A failed call fails the
 // pass, as a failed packet did: the next pass prepares the same work again. The tokens and the cost are summed; the
 // API time and the first token are the longest call's. The records of the calls come back whether they failed or not.
-func askAll(calls []dreamCall) (extract.DreamReply, []dreamCallRecord, error) {
+func askAll(ctx context.Context, calls []dreamCall) (extract.DreamReply, []dreamCallRecord, error) {
 	replies := make([]extract.DreamReply, len(calls))
 	errs := make([]error, len(calls))
 	took := make([]time.Duration, len(calls))
@@ -279,7 +279,7 @@ func askAll(calls []dreamCall) (extract.DreamReply, []dreamCallRecord, error) {
 	for i, c := range calls {
 		wg.Go(func() {
 			start := time.Now()
-			replies[i], errs[i] = dreamRunFn(c.text)
+			replies[i], errs[i] = dreamRunFn(ctx, c.text)
 			took[i] = time.Since(start)
 		})
 	}

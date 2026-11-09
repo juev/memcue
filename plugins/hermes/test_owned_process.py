@@ -74,4 +74,21 @@ class OwnedProcess(unittest.TestCase):
        except Exception as e:ok,answer=False,str(e)
      self.assertTrue(mark.exists(),'actual executable must have started')
      self.assertFalse(ok);self.assertIn('UNKNOWN OUTCOME',answer)
+ def test_group_of_only_the_unreaped_leader_is_not_a_transport_failure(self):
+  # macOS answers killpg with EPERM, not ESRCH, when only the unreaped leader
+  # of the owned group remains; a finished read must still succeed.
+  from unittest.mock import patch
+  h=load('eperm_hermes',ROOT/'plugins/hermes/memcue/__init__.py');c=load('eperm_codex',ROOT/'plugins/codex/scripts/memcue.py')
+  with tempfile.TemporaryDirectory(prefix='memcue-eperm-') as d:
+   d=Path(d);exe=d/'finite-read'
+   exe.write_text('#!'+sys.executable+'\nimport sys\nsys.stdout.write("{}")\n');exe.chmod(0o700)
+   def eperm(pgid,sig):raise PermissionError(1,'Operation not permitted')
+   for name in ('hermes','codex'):
+    with self.subTest(caller=name),patch('os.killpg',eperm):
+     if name=='hermes':
+      ok,out=h.MemcueMemoryProvider({'binary':str(exe),'dream':False})._run(['facts'],timeout=2)
+     else:
+      try:out=c.call({'binary':str(exe),'facts':str(d/'facts'),'state_dir':str(d/'state'),'host':'synthetic'},['facts'],str(d),timeout=2);ok=True
+      except c.AdapterError as e:ok,out=False,str(e)
+     self.assertTrue(ok,out);self.assertEqual(out.strip(),'{}')
 if __name__=='__main__':unittest.main()

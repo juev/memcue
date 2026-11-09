@@ -117,7 +117,9 @@ class _OwnedSubprocess:
                     os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
                     try:
                         os.killpg(proc.pid, signal.SIGKILL)
-                    except ProcessLookupError:
+                    except (ProcessLookupError, PermissionError):
+                        # macOS reports EPERM instead of ESRCH when only the
+                        # unreaped leader of our own group remains.
                         pass
                     proc.wait(timeout=None if deadline is None else max(.001, deadline - time.monotonic()))
                 if timed_out:

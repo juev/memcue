@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -308,11 +309,11 @@ func TestEnglishDefaultCJKHintStartsWithEnglish(t *testing.T) {
 func TestEnglishDefaultJoinedAnswerRejectsLegacyTranslationField(t *testing.T) {
 	env(t)
 	old := dreamRunFn
-	dreamRunFn = func(string) (extract.DreamReply, error) {
+	dreamRunFn = func(context.Context, string) (extract.DreamReply, error) {
 		return extract.DreamReply{Answer: []byte(`{"packet":"legacy-reply","translations":[{"id":"synthetic","translation":"unsolicited"}]}`)}, nil
 	}
 	t.Cleanup(func() { dreamRunFn = old })
-	r, recs, err := askAll([]dreamCall{{text: "synthetic packet", rec: dreamCallRecord{Task: taskReview}}})
+	r, recs, err := askAll(context.Background(), []dreamCall{{text: "synthetic packet", rec: dreamCallRecord{Task: taskReview}}})
 	if err == nil {
 		t.Fatal("legacy translation reply was silently normalized instead of refused")
 	}

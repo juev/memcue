@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"github.com/juev/memcue/internal/extract"
 	"net/http"
@@ -85,11 +86,11 @@ func TestContentOnlyDreamFailedCallAppliesNothing(t *testing.T) {
 	fakeDream(t, mergeAnswer(duplicate, kept))
 	fakeDreamRun(t, nil)
 	good := dreamRunFn
-	dreamRunFn = func(packet string) (extract.DreamReply, error) {
+	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 		if hasFacts(packetBlock(packet, "## Данные: область")) {
 			return extract.DreamReply{}, errModel
 		}
-		return good(packet)
+		return good(ctx, packet)
 	}
 	if err := runDream([]string{"-run", "-all", "-j", "2"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
 		t.Fatalf("failed scope call: %v", err)
