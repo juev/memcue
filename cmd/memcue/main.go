@@ -155,6 +155,10 @@ func runMain() (code int) {
 		_, _ = fmt.Fprintln(diagnostics, "memcue:", err)
 		return 1
 	}
+	if err = serverCommandAllowed(os.Args[1:]); err != nil {
+		_, _ = fmt.Fprintln(diagnostics, "memcue:", err)
+		return 1
+	}
 	if m := os.Getenv("MEMCUE_MODEL"); m != "" {
 		extract.Model = m
 	}

@@ -47,8 +47,8 @@ func isDir(p string) bool {
 
 // exists says whether the base has been written: a check that must not create it looks here.
 func (b factBase) exists() bool {
-	if os.Getenv("MEMCUE_POSTGRES_DSN") != "" {
-		return true
+	if os.Getenv("MEMCUE_POSTGRES_DSN") != "" || serverName() != "" {
+		return true // the replica of server mode is created by its first open
 	}
 	_, err := os.Stat(b.path)
 	return err == nil
@@ -65,6 +65,9 @@ func cachePath(b factBase) (string, error) {
 
 // openBase opens the base of this process for reading and writing.
 func openBase() (*store.Store, error) {
+	if serverName() != "" {
+		return openReplica()
+	}
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
 		return store.OpenPostgresRequest(dsn, 4*time.Second)
 	}
@@ -196,6 +199,9 @@ func runMigrateText(out io.Writer) error {
 }
 
 func (inv *invocation) openBase() (*store.Store, error) {
+	if serverName() != "" {
+		return inv.local(openReplica())
+	}
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
 		return inv.openRemote(dsn)
 	}
@@ -229,6 +235,9 @@ func (inv *invocation) openRemote(dsn string) (*store.Store, error) {
 }
 
 func (inv *invocation) openBaseReadOnly() (*store.Store, error) {
+	if serverName() != "" {
+		return inv.local(openReplica()) // the helper writes the replica anyway: a report reads it as it is
+	}
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" {
 		return inv.openRemote(dsn)
 	}

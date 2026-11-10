@@ -1,8 +1,9 @@
 # Sync server over the tailnet
 
 State: target contract for [#714](https://github.com/juev/memcue/issues/714), partly implemented: the merge, the
-server and replica bases (`internal/store/synced.go`) and the server (`internal/server`, `memcue server`); the helper,
-the client commands, dream on the server and the migration are not. Sections are marked implemented as the steps land.
+server and replica bases (`internal/store/synced.go`), the server (`internal/server`, `memcue server`), the helper's
+sync (`internal/replica`) and the client commands (`cmd/memcue/server_mode.go`); dream on the server and the migration
+are not. Sections are marked implemented as the steps land.
 Sources: the #714 discussion and RFC of 2026-11-10 (owner's decisions), the measurements of
 [daemon-703](../research/daemon-703-2026-11.md), the merge method of juev/lists (`docs/specs/sync.md`, S1-S3 there).
 
@@ -108,7 +109,10 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   reports the binary version, the last sync time, the outbox length and rejected changes. Its `dial` operation also
   reaches the server, which `migrate -server` uses; that admin command has no four-second budget.
 - **Client commands.** Rejected in server mode: `install`, `dream`, `migrate` except `-server`, `merge`, `dump`. Working
-  on the replica: `import`, `notes`, `reindex`.
+  on the replica: `import`, `notes`, `reindex`. `MEMCUE_SERVER` needs no `MEMCUE_TAILSCALE_MODE`: the helper is the only
+  transport there; with `MEMCUE_POSTGRES_DSN` too, every command refuses. A session start asks the helper for its
+  status for at most half a second; a helper of another version is told to exit, and its replacement
+  (`connect serve -takeover`) waits up to ten seconds for the identity. Implemented.
 - **Migration.** From one base: loffe and Hermes are merged into the Mac base once by the existing git sync, then
   `migrate -server` loads that base.
 
@@ -116,7 +120,8 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
 
 Tests are named as the steps land.
 
-- R1: server mode, server down → search, session-start and add succeed without network delay.
+- R1: server mode, server down → search, session-start and add succeed without network delay
+  (`TestServerModeKeepsOneReplicaPerMachine`, `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`).
 - R2, R3, R7, R16: end-to-end on a real tailnet (opt-in test next to `internal/tailnet/final_refresh_test.go`): a
   server and two clients built from the tree.
 - R4, R6, R8, R12: server handler tests through `httptest` (`internal/server/server_test.go`:
@@ -129,7 +134,10 @@ Tests are named as the steps land.
 - R3 (local part), R7, R9: replica store tests (`TestReplicaWriteIsFoundAtOnceAndQueued`,
   `TestServerRowKeepsTheReplicasPendingChange`, `TestRetireAgainstACorrectionStaysRetiredAndReopensCorrected`,
   `TestResetReplicaKeepsTheOutbox`); the helper's loop with a fake server follows.
-- R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`.
-- R11: command tests and a freshness unit test.
+- R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`
+  (`TestSessionStartStartsAndReplacesTheRealHelper`, `TestSessionStartReplacesAHelperOfAnotherVersion`).
+- R11: command tests and a freshness unit test (client side: `TestServerModeRefusesLocalCommands`,
+  `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`).
 - R14: `make test-plugins`.
-- R15: command tests with a fake helper (`connectUpStates`).
+- R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`).
+- R16: `TestServerModeKeepsOneReplicaPerMachine`, `TestPathDependsOnTheServerOnly`.

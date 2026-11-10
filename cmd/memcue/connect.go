@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/juev/memcue/internal/replica"
 	"github.com/juev/memcue/internal/store"
@@ -104,16 +105,28 @@ func runConnectContext(parent context.Context, args []string, out io.Writer) err
 	case "serve":
 		fs := flag.NewFlagSet("connect serve", flag.ContinueOnError)
 		bootstrap := fs.Bool("bootstrap", false, "explicitly bootstrap from MEMCUE_TAILSCALE_AUTH_KEY_FILE")
+		takeover := fs.Bool("takeover", false, "wait for a helper that was asked to exit to release the identity")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
 		if fs.NArg() != 0 {
-			return errors.New("connect serve accepts only -bootstrap")
+			return errors.New("connect serve accepts only -bootstrap and -takeover")
 		}
 		if replicaPath != "" {
 			cfg.Worker = replica.NewWorker(replicaPath)
 		}
-		return runConnectOwner(ctx, cfg, *bootstrap)
+		if !*takeover {
+			return runConnectOwner(ctx, cfg, *bootstrap)
+		}
+		// A session start replaces a helper of another version (R10): the old one exits on its own time.
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			err := runConnectOwner(ctx, cfg, *bootstrap)
+			if !errors.Is(err, tailnet.ErrOwned) || time.Now().After(deadline) || ctx.Err() != nil {
+				return err
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
 	case "login":
 		if len(args) != 1 {
 			return errors.New("usage: memcue connect login")

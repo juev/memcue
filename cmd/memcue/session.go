@@ -80,7 +80,8 @@ func (inv *invocation) runSessionStartWith(in io.Reader, out io.Writer, part int
 	if pitfalls {
 		automatic = inv.repositoryPitfalls(h.CWD)
 	}
-	for _, hint := range []string{automatic, inv.autoMemoryHint(), inv.dreamHint(), inv.upkeepHint(h.CWD)} {
+	for _, hint := range []string{automatic, inv.autoMemoryHint(), inv.dreamHint(), inv.upkeepHint(h.CWD),
+		inv.serverHints()} {
 		if hint != "" {
 			context += "\n\n" + hint
 		}
@@ -137,6 +138,9 @@ func (inv *invocation) dreamToolsHint() string {
 // dreamHintTo is the dream hint that names how the model runs the dream. A dream the session start hands to the
 // background (#569) needs no hint.
 func (inv *invocation) dreamHintTo(how string) string {
+	if serverName() != "" {
+		return "" // the server dreams (R11)
+	}
 	if dreamBackground() || !factsBase().exists() {
 		return "" // no base yet: the hint must not create one
 	}
@@ -176,7 +180,7 @@ func (inv *invocation) runSessionCardMode(in io.Reader, out io.Writer, dreamTool
 	if pitfalls {
 		automatic = inv.repositoryPitfalls(h.CWD)
 	}
-	hints := []string{automatic, inv.upkeepHint(h.CWD)}
+	hints := []string{automatic, inv.upkeepHint(h.CWD), inv.serverHints()}
 	if dreamTools {
 		hints = append(hints, inv.dreamToolsHint())
 	}

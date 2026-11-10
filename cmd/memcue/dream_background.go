@@ -48,8 +48,8 @@ var spawnDream = func(dir string) error {
 // unless MEMCUE_DREAM_BACKGROUND is false, and only with a model to run it on, the endpoint of MEMCUE_API_URL or
 // `claude -p`. The session start then says nothing of the dream; without either the host's model keeps the hint.
 func dreamBackground() bool {
-	if os.Getenv("MEMCUE_POSTGRES_DSN") != "" {
-		return false
+	if os.Getenv("MEMCUE_POSTGRES_DSN") != "" || serverName() != "" {
+		return false // the server dreams in server mode (R11)
 	}
 	if on, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("MEMCUE_DREAM_BACKGROUND"))); err == nil && !on {
 		return false

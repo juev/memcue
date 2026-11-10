@@ -66,6 +66,9 @@ type reply struct {
 	IPs   []string `json:"ips,omitempty"`
 }
 
+// ErrOwned: another helper owns the tailnet identity.
+var ErrOwned = errors.New("tailnet identity already has an owner; use the existing helper")
+
 var errHelper = errors.New("embedded transport unavailable; start memcue connect serve, then memcue connect login")
 
 func socketPath(c Config) (string, func(), error) {
@@ -212,7 +215,7 @@ func acquire(c Config) (func(), error) {
 	}
 	if err := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
-		return nil, errors.New("tailnet identity already has an owner; use the existing helper")
+		return nil, ErrOwned
 	}
 	release := func() { _ = syscall.Flock(fd, syscall.LOCK_UN); _ = f.Close() }
 	data := profileBytes(c)
