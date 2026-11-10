@@ -117,6 +117,37 @@ func TestOpenTakesInWhatGitWrote(t *testing.T) {
 	textMatches(t, s)
 }
 
+// Two adapters may keep two caches of one text history. A correction written through one is appended to an existing
+// file, which does not change the directory time an open checks, so the other cache never read it (#709). The
+// append now moves that time, and the other cache's next open finds the correction for Get and for search.
+func TestAnotherCacheReadsAnAppendedCorrection(t *testing.T) {
+	dir := t.TempDir()
+	cacheA, cacheB := filepath.Join(t.TempDir(), "a.db"), filepath.Join(t.TempDir(), "b.db")
+	a := openTextAt(t, dir, cacheA, "codex", t0)
+	f, err := a.AddWith("Orchard deploy needs the copper gate", "x", "", Meta{Kind: "pitfall"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := openTextAt(t, dir, cacheB, "claude", t0)
+	if got, err := b.Get(f.ID); err != nil || got.Version != 1 {
+		t.Fatalf("the second cache did not take in the new fact: %+v %v", got, err)
+	}
+	_ = b.Close()
+	if _, err := a.Correct(f.ID, "Orchard deploy needs the amber gate"); err != nil {
+		t.Fatal(err)
+	}
+	_ = a.Close()
+
+	b = openTextAt(t, dir, cacheB, "claude", t0)
+	defer func() { _ = b.Close() }()
+	if got, err := b.Get(f.ID); err != nil || got.Version != 2 || got.Content != "Orchard deploy needs the amber gate" {
+		t.Errorf("the second cache missed the appended correction: %+v %v", got, err)
+	}
+	if len(ids(t, b, "amber gate")) != 1 {
+		t.Error("the appended correction is not searchable through the second cache")
+	}
+}
+
 // A version the cache committed while its file missed it (the process stopped between the two writes) reaches the
 // file at the next open.
 func TestOpenWritesWhatTheFileMissed(t *testing.T) {

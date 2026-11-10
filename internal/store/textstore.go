@@ -24,9 +24,10 @@ import (
 //
 // Finding what git changed must cost almost nothing, since every search opens the base. Git writes a file anew when it
 // checks one out or merges it, which changes the modification time of its directory; memcue itself only appends to a
-// file, which does not. So the stamp textDirsStamp keeps the modification time of every directory as the last open saw
-// it, and an open reads only the directories whose time moved. A new fact file of this memcue moves its directory too,
-// and the next open reads that directory once and finds nothing new.
+// file, which would not, so an append sets the directory's time itself: another cache of the same history must read
+// the new version too (#709). So the stamp textDirsStamp keeps the modification time of every directory as the last
+// open saw it, and an open reads only the directories whose time moved. A write of this memcue moves its directory
+// too, and the next open reads that directory once and finds nothing new.
 
 const (
 	textDirsStamp = "text-dirs" // JSON object: directory name → modification time in nanoseconds

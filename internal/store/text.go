@@ -253,7 +253,10 @@ func WriteFactFile(path string, versions []Fact) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// appendFacts adds versions at the end of the file at path in one write, creating it when the fact is new.
+// appendFacts adds versions at the end of the file at path in one write, creating it when the fact is new. Appending
+// to a file does not change its directory's modification time, which is what an open checks for changes (see
+// textstore.go), so another cache of the same history would never read the new version (#709). appendFacts therefore
+// sets that time itself, after the write: an open that sees the new time reads the directory and finds the version.
 func appendFacts(path string, versions []Fact) error {
 	data, err := EncodeFacts(versions)
 	if err != nil {
@@ -270,5 +273,8 @@ func appendFacts(path string, versions []Fact) error {
 		_ = f.Close()
 		return err
 	}
-	return f.Close()
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Chtimes(filepath.Dir(path), time.Time{}, time.Now())
 }

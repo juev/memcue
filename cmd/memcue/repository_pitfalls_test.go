@@ -116,6 +116,36 @@ func TestRepositoryPitfallsCardLifecycle(t *testing.T) {
 	}
 }
 
+// The pitfalls of a text history come from its cache (#709). Another adapter with its own state directory keeps another
+// cache of the same history; a correction it appends must still reach this session's pitfalls, as #686 required.
+func TestRepositoryPitfallsSeeAnotherCachesCorrection(t *testing.T) {
+	dir, repo := pitfallFixture(t)
+	meta := store.Meta{Kind: "pitfall", Scope: "repo:example.invalid/team/repo"}
+	f := putPitfall(t, "COPPER-CONTENT: the fixture deploy needs the copper gate.", "", meta)
+	if got := lifecycleContext(t, repo, "startup", false); !strings.Contains(got, "COPPER-CONTENT") {
+		t.Fatal("the first cache did not deliver the pitfall")
+	}
+	own := os.Getenv("MEMCUE_STATE_DIR")
+	t.Setenv("MEMCUE_STATE_DIR", filepath.Join(dir, "other-adapter-state"))
+	s, err := openBase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Correct(f.ID, "AMBER-CONTENT: the fixture deploy needs the amber gate."); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_STATE_DIR", own)
+	for _, card := range []bool{false, true} {
+		got := lifecycleContext(t, repo, "startup", card)
+		if !strings.Contains(got, "AMBER-CONTENT") || strings.Contains(got, "COPPER-CONTENT") {
+			t.Fatalf("card=%v: the other cache's correction did not reach the pitfalls:\n%s", card, got)
+		}
+	}
+}
+
 func TestRepositoryPitfallsSwitchSnapshot(t *testing.T) {
 	dir, repo := pitfallFixture(t)
 	f := putPitfall(t, "Old repository failed because its index was stale; rebuild it.", "", store.Meta{Kind: "pitfall", Scope: "repo:example.invalid/team/repo"})

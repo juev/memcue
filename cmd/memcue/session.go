@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -312,13 +311,9 @@ func (inv *invocation) repositoryPitfallParts(cwd string) (string, []string) {
 	for i, key := range keys {
 		scopes[i] = tier.Scope(key)
 	}
-	var facts []store.Fact
-	if s.Text() == "" {
-		// A SQLite file or PostgreSQL answers with the pitfalls alone; PostgreSQL would otherwise send the whole base.
-		facts, err = s.ActiveIn("pitfall", scopes)
-	} else {
-		facts, err = repositoryVersions(s)
-	}
+	// Every base answers with the pitfalls alone. A text history's cache already holds what another cache appended:
+	// the append moves the directory time, and the open read that directory (#709).
+	facts, err := s.ActiveIn("pitfall", scopes)
 	if err != nil {
 		return repositoryPitfallsUnavailable, nil
 	}
@@ -371,46 +366,6 @@ func (inv *invocation) runSessionPitfalls(in io.Reader, out io.Writer) error {
 	text := header + strings.Join(lines, "\n\n")
 
 	return inv.encoder(out).Encode(map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": event, "additionalContext": text, "repositoryPitfallCount": count}})
-}
-
-// repositoryVersions reads whole persisted histories as well as pending cache writes.
-// Another adapter may use a different cache: append-only corrections do not change
-// the directory mtime that ordinary search uses to avoid rereading text histories.
-func repositoryVersions(s *store.Store) ([]store.Fact, error) {
-	rows, err := s.Rows()
-	if err != nil {
-		return nil, err
-	}
-	if s.Text() != "" {
-		paths, err := filepath.Glob(filepath.Join(s.Text(), "*", "*.jsonl"))
-		if err != nil {
-			return nil, err
-		}
-		for _, path := range paths {
-			if strings.HasPrefix(filepath.Base(filepath.Dir(path)), ".") {
-				continue
-			}
-			versions, err := store.ReadFactFile(path)
-			if err != nil {
-				return nil, err
-			}
-			rows = append(rows, versions...)
-		}
-	}
-	latest := map[string]store.Fact{}
-	for _, f := range rows {
-		if old, ok := latest[f.ID]; !ok || f.Version > old.Version {
-			latest[f.ID] = f
-		}
-	}
-	var facts []store.Fact
-	for _, f := range latest {
-		if f.Status == store.Active {
-			facts = append(facts, f)
-		}
-	}
-	sort.Slice(facts, func(i, j int) bool { return facts[i].ID < facts[j].ID })
-	return facts, nil
 }
 
 func (inv *invocation) runSessionPitfallsJSON(in io.Reader, out io.Writer) error {
