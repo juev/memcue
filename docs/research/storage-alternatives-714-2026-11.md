@@ -4,8 +4,9 @@ Status: **read and probed 2026-11-10; SQLite stays, product code unchanged.** Th
 [#714](https://github.com/juev/memcue/issues/714) was being built: could another local database replace SQLite, and
 could a database that syncs through git be used instead of a sync server of our own. Neither candidate fits. Turso
 Sync syncs only with Turso Cloud and does not resolve conflicts. Dolt needs cgo and ICU, its probe binary is 147 MB,
-and a second process that opens the same database cannot write. The other git-backed libraries found are hobby
-projects or have no merge.
+and a second process that opens the same database cannot write. DoltLite, a SQLite fork with Dolt storage, keeps
+FTS5 and lets several processes write, but it needs cgo, leaves same-column conflicts to the application and syncs
+through its own remotes, not git. The other git-backed libraries found are hobby projects or have no merge.
 
 ## What the storage has to do
 
@@ -67,6 +68,41 @@ machine, and one writer per base. Several processes would need `dolt sql-server`
 Its merge does not remove the merge of #714 either: a same-cell conflict is the application's to resolve, and that is
 the HLC register merge again, written against `dolt_conflicts`.
 
+## DoltLite
+
+DoltLite is a fork of SQLite in C that replaces the B-tree with Dolt's prolly-tree storage and adds commits, branches,
+merge and push/pull as SQL functions. The vendor calls it beta: the [beta post](https://www.dolthub.com/blog/2026-08-31-doltlite-beta/)
+of 2026-08-31 names version 0.50.0, says the file format is "frozen for the beta", and that "small `autocommit` writes
+… are 3.1X slower than SQLite". The [README](https://github.com/dolthub/doltlite) states "One durable writer at a time.
+A concurrent writer gets `SQLITE_BUSY`", while readers stay live. Its remotes are `file://`, an HTTP server
+`doltlite-remotesrv` that "binds to localhost until TLS and authentication are configured", and DoltHub; git remotes
+are not mentioned. The Go [bindings](https://github.com/dolthub/doltlite/blob/master/doc/doltlite/bindings.md) list
+Linux and macOS, not Windows. The [datalib post](https://www.dolthub.com/blog/2026-10-29-doltlite-datalib/) of
+2026-10-29 describes an application by Imbue that stores mirrored personal data in DoltLite, one commit per sync.
+
+A probe on darwin/arm64 with Go 1.27.3 and `github.com/dolthub/doltlite-driver` v0.51.10:
+
+| Check | Result |
+|---|---|
+| `CGO_ENABLED=0 go build` | builds, but the driver is not registered: `sql: unknown driver "doltlite"` |
+| `go build` with cgo | builds in 31 s from the vendored amalgamation; 13 176 834 bytes, no library outside the system |
+| FTS5 with `unicode61` and `bm25()` | works |
+| six processes writing one file at once, 50 rows each | no failed insert; all 400 rows of the run are in the table and the FTS index |
+| `dolt_merge` of branches that changed different columns of one row | merges both changes, no conflict |
+| `dolt_merge` of branches that changed the same column of one row | the whole merge is rolled back, including the other row's clean change; the Go call returns no row and no error |
+
+DoltLite removes the two blockers of Dolt for several processes and for search, but not the others:
+
+- memcue releases are built with `CGO_ENABLED=0` for linux and darwin on amd64 and arm64 (`.goreleaser.yaml`). With
+  DoltLite every target needs a C toolchain.
+- A same-column conflict is still the application's to resolve. That is the HLC register merge of #714 again, inside
+  an explicit transaction, since under autocommit the conflict silently discards the merge.
+- Delivery would still need a server of our own and a change notification: the remotes are pull-based and the HTTP
+  remote server is local-only without TLS and authentication.
+
+One property is new: DoltLite keeps every version of a row, which the #714 server and replicas deliberately do not
+(one row per fact, no history). If the server ever needs a history again, DoltLite is the candidate to measure first.
+
 ## Other git-backed libraries
 
 These were seen in search results only; their code and documentation were not read:
@@ -92,6 +128,8 @@ conflict rules.
 
 - Turso's sync documentation (`docs.turso.tech/sync/usage`) and any Turso status newer than 2025-03-31.
 - Dolt with several processes through `dolt sql-server`, the size of a push to a git remote, and Dolt on Linux.
+- DoltLite on Linux, its sync between two machines, the pure-Go sync library `dolthub/doltlite-go`, and its
+  concurrency contract (`doc/doltlite/concurrency.md`).
 - The code of CommitDB, gitdb and stash.
 
 ## Sources
@@ -105,5 +143,10 @@ conflict rules.
   [concurrency, 2026-02-17](https://www.dolthub.com/blog/2026-02-17-dolt-concurrency/),
   [full-text indexes, 2023-07-26](https://dolthub.com/blog/2023-07-26-announcing-fulltext-indexes),
   [driver](https://github.com/dolthub/driver); read 2026-11-10. The probe was run the same day.
+- DoltLite: [datalib, 2026-10-29](https://www.dolthub.com/blog/2026-10-29-doltlite-datalib/),
+  [beta, 2026-08-31](https://www.dolthub.com/blog/2026-08-31-doltlite-beta/),
+  [README](https://github.com/dolthub/doltlite),
+  [bindings](https://github.com/dolthub/doltlite/blob/master/doc/doltlite/bindings.md); read 2026-11-10. The probe was
+  run the same day.
 - Search results: [CommitDB](https://pkg.go.dev/github.com/nickyhof/CommitDB/v2),
   [gitdb](https://github.com/gogitdb/gitdb), [stash/app/git](https://pkg.go.dev/github.com/umputun/stash@v0.19.0/app/git).
