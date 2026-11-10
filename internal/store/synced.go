@@ -363,7 +363,7 @@ type Applied struct {
 
 // ApplyChanges merges changes sent by replicas into the server base in one transaction. A change whose op_id the
 // server has answered gets that answer again and is not applied twice (R4). A change that cannot be applied is
-// refused on its own and does not stop the others.
+// refused on its own and does not stop the others; only RefusedNotFound is not remembered.
 func (s *Store) ApplyChanges(changes []Change) ([]Applied, error) {
 	if s.sync == nil || s.sync.role != RoleServer {
 		return nil, fmt.Errorf("%w: only a server applies changes of replicas", ErrSyncedBase)
@@ -399,6 +399,12 @@ func (s *Store) ApplyChanges(changes []Change) ([]Applied, error) {
 		a, err := s.applyOne(tx, clock, ch)
 		if err != nil {
 			return nil, err
+		}
+		if a.Refused == RefusedNotFound {
+			// The create of the fact may still come (a replica retries it after a refusal of its own), so this
+			// answer is not final.
+			out = append(out, a)
+			continue
 		}
 		b, err := json.Marshal(a)
 		if err != nil {
@@ -869,4 +875,77 @@ func (s *Store) DataVersion() (int64, error) {
 	var v int64
 	err := s.db.QueryRow(`PRAGMA data_version`).Scan(&v)
 	return v, err
+}
+
+// ReissueID moves a fact created here, whose create the server refused because another fact holds its id
+// (RefusedIDTaken), to a new id: its outbox entries get the new id and new op ids, so the server sees a new
+// operation, and the replica's row is built again from them. A row of id that came from the server is the other
+// fact and stays. It returns the new id.
+func (s *Store) ReissueID(id string) (string, error) {
+	if s.sync == nil || s.sync.role != RoleReplica {
+		return "", fmt.Errorf("%w: only a replica reissues ids", ErrSyncedBase)
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.Query(`SELECT n, change FROM outbox WHERE id = ? ORDER BY n`, id)
+	if err != nil {
+		return "", err
+	}
+	type entry struct {
+		n  int64
+		ch Change
+	}
+	var entries []entry
+	for rows.Next() {
+		var e entry
+		var v string
+		if err := rows.Scan(&e.n, &v); err != nil {
+			_ = rows.Close()
+			return "", err
+		}
+		if err := json.Unmarshal([]byte(v), &e.ch); err != nil {
+			_ = rows.Close()
+			return "", err
+		}
+		entries = append(entries, e)
+	}
+	if err := rows.Close(); err != nil {
+		return "", err
+	}
+	if len(entries) == 0 || !entries[0].ch.Create {
+		return "", fmt.Errorf("%w: no create of %s waits in the outbox", ErrNotFound, id)
+	}
+	cur, exists, err := loadRow(tx, id)
+	if err != nil {
+		return "", err
+	}
+	if exists && cur.Seq == 0 {
+		for _, q := range []string{`DELETE FROM facts WHERE id = ?`, `DELETE FROM sync_rows WHERE id = ?`} {
+			if _, err := tx.Exec(q, id); err != nil {
+				return "", err
+			}
+		}
+		if err := reindex(tx, id); err != nil {
+			return "", err
+		}
+	}
+	newID := newOpID(s.now())
+	for _, e := range entries {
+		e.ch.ID, e.ch.OpID = newID, newOpID(s.now())
+		b, err := json.Marshal(e.ch)
+		if err != nil {
+			return "", err
+		}
+		if _, err := tx.Exec(`UPDATE outbox SET op_id = ?, id = ?, change = ? WHERE n = ?`, e.ch.OpID, newID, string(b),
+			e.n); err != nil {
+			return "", err
+		}
+	}
+	if err := s.replay(tx, Row{Fact: Fact{ID: newID}, Stamps: Stamps{}}, false); err != nil {
+		return "", err
+	}
+	return newID, tx.Commit()
 }

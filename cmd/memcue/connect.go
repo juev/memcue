@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/juev/memcue/internal/replica"
 	"github.com/juev/memcue/internal/store"
 	"github.com/juev/memcue/internal/tailnet"
 )
@@ -59,21 +60,36 @@ func runConnectContext(parent context.Context, args []string, out io.Writer) err
 		}
 		return json.NewEncoder(out).Encode(state)
 	}
-	if mode != "embedded" {
-		return errors.New("enable embedded transport explicitly: export MEMCUE_TAILSCALE_MODE=embedded")
+	// A memcue server is reached only through the helper, so MEMCUE_SERVER needs no MEMCUE_TAILSCALE_MODE (#714).
+	serverName, dsn := os.Getenv("MEMCUE_SERVER"), os.Getenv("MEMCUE_POSTGRES_DSN")
+	var replicaPath string
+	switch {
+	case serverName != "" && dsn != "":
+		return errors.New("set MEMCUE_SERVER or MEMCUE_POSTGRES_DSN, not both")
+	case serverName != "":
+		if replicaPath, err = replica.Path(serverName); err != nil {
+			return err
+		}
+		if cfg, err = tailnet.Settings(serverName, replica.Port); err != nil {
+			return err
+		}
+		cfg.Server = true
+	default:
+		if mode != "embedded" {
+			return errors.New("enable embedded transport explicitly: export MEMCUE_TAILSCALE_MODE=embedded")
+		}
+		if dsn == "" {
+			return errors.New("connect requires an explicit MEMCUE_POSTGRES_DSN backend or MEMCUE_SERVER")
+		}
+		pg, err := store.PostgresConfig(dsn)
+		if err != nil {
+			return err
+		}
+		if cfg, err = tailnet.Settings(pg.Host, strconv.Itoa(int(pg.Port))); err != nil {
+			return err
+		}
 	}
-	dsn := os.Getenv("MEMCUE_POSTGRES_DSN")
-	if dsn == "" {
-		return errors.New("connect requires an explicit MEMCUE_POSTGRES_DSN backend")
-	}
-	pg, err := store.PostgresConfig(dsn)
-	if err != nil {
-		return err
-	}
-	cfg, err = tailnet.Settings(pg.Host, strconv.Itoa(int(pg.Port)))
-	if err != nil {
-		return err
-	}
+	cfg.Version = version
 	switch args[0] {
 	case "up":
 		fs := flag.NewFlagSet("connect up", flag.ContinueOnError)
@@ -93,6 +109,9 @@ func runConnectContext(parent context.Context, args []string, out io.Writer) err
 		}
 		if fs.NArg() != 0 {
 			return errors.New("connect serve accepts only -bootstrap")
+		}
+		if replicaPath != "" {
+			cfg.Worker = replica.NewWorker(replicaPath)
 		}
 		return runConnectOwner(ctx, cfg, *bootstrap)
 	case "login":

@@ -22,12 +22,30 @@ import (
 type Config struct {
 	Dir, Hostname, ControlURL, Host, Port, KeyFile string
 	Timeout                                        time.Duration
+	// Server: Host and Port name a memcue server, not a PostgreSQL backend (#714). The profile records it, so one
+	// identity never serves both.
+	Server bool
+	// Version is the binary's version, which status reports (R10).
+	Version string
+	// Worker, when set, runs for the helper's life with a dialer to Host:Port; status reports its state.
+	Worker Worker
 }
 type State struct {
 	NodeID  string `json:"node_id,omitempty"`
 	Running bool   `json:"running"`
 	State   string `json:"state"`
 	AuthURL string `json:"auth_url,omitempty"`
+	// Version is the helper's binary version; Sync the state of its Worker.
+	Version string          `json:"version,omitempty"`
+	Sync    json.RawMessage `json:"sync,omitempty"`
+}
+
+// Worker is work a helper runs beside its node: the replica sync of memcue server mode.
+type Worker interface {
+	// Run works until ctx ends; dial opens a connection to the configured destination over the tailnet.
+	Run(ctx context.Context, dial func(context.Context) (net.Conn, error))
+	// Status is the state of the work, reported by the helper's status as JSON.
+	Status() any
 }
 type node interface {
 	Status(context.Context) (State, error)
@@ -82,10 +100,12 @@ func privateDir(dir string) error {
 	return nil
 }
 func profileBytes(c Config) []byte {
+	// Server is left out for a PostgreSQL profile, so the profile of an identity made before #714 stays the same.
 	profile := struct {
 		Version                          int
 		Hostname, ControlURL, Host, Port string
-	}{1, c.Hostname, c.ControlURL, c.Host, c.Port}
+		Server                           bool `json:",omitempty"`
+	}{1, c.Hostname, c.ControlURL, c.Host, c.Port, c.Server}
 	data, _ := json.Marshal(profile)
 	return data
 }
@@ -266,6 +286,13 @@ func serveOwned(ctx context.Context, c Config, n node, ready chan<- struct{}) er
 	close(ready)
 	var wg sync.WaitGroup
 	defer wg.Wait()
+	if c.Worker != nil {
+		workCtx, stopWork := context.WithCancel(ctx)
+		worked := make(chan struct{})
+		dial := func(ctx context.Context) (net.Conn, error) { return dialPeer(ctx, c, n) }
+		go func() { defer close(worked); c.Worker.Run(workCtx, dial) }()
+		defer func() { stopWork(); <-worked }()
+	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -361,9 +388,29 @@ func serveOwned(ctx context.Context, c Config, n node, ready chan<- struct{}) er
 					}
 				}
 			}
+			if r.Error == "" && m.Op == "status" && c.Worker != nil {
+				r.Sync, _ = json.Marshal(c.Worker.Status())
+			}
+			r.Version = c.Version
 			_ = json.NewEncoder(conn).Encode(r)
 		}()
 	}
+}
+
+// dialPeer connects to Host:Port of c through the node, once the node runs and Host is one approved peer.
+func dialPeer(ctx context.Context, c Config, n node) (net.Conn, error) {
+	state, err := n.Status(ctx)
+	if err != nil {
+		return nil, errHelper
+	}
+	if state.State != "Running" {
+		return nil, errors.New("tailnet login or device approval required; run memcue connect up")
+	}
+	ips, err := n.Lookup(ctx, c.Host)
+	if err != nil || len(ips) == 0 {
+		return nil, errors.New("server is not an approved tailnet peer")
+	}
+	return n.Dial(ctx, net.JoinHostPort(ips[0], c.Port))
 }
 func exchange(ctx context.Context, c Config, m message) (net.Conn, reply, error) {
 	if err := privateDir(c.Dir); err != nil {

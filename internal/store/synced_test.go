@@ -444,3 +444,74 @@ func TestSyncedBasesRefuseOtherRoles(t *testing.T) {
 		t.Fatalf("OpenServer of a base with facts: %v", err)
 	}
 }
+
+func TestReissuedIDKeepsTheFactAndItsCorrection(t *testing.T) {
+	srv, _ := openRole(t, OpenServer, syncT0)
+	a, _ := openRole(t, OpenReplica, syncT0)
+	f, err := a.AddWith("ours", "global 2026-11-10", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Correct(f.ID, "ours, corrected", 1); err != nil {
+		t.Fatal(err)
+	}
+	other := createChange(f.ID, "the other fact", stamp(syncT0.UnixMilli()-1, devB))
+	other.Created = syncT0.Add(-time.Hour)
+	if res, err := srv.ApplyChanges([]Change{other}); err != nil || res[0].Refused != "" {
+		t.Fatalf("other create: %+v %v", res, err)
+	}
+	before, err := a.Outbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := srv.ApplyChanges(before[:1]); err != nil || res[0].Refused != RefusedIDTaken {
+		t.Fatalf("create of a held id: %+v %v", res, err)
+	}
+	newID, err := a.ReissueID(f.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, a, newID); got.Content != "ours, corrected" || got.Version != 2 {
+		t.Fatalf("reissued fact %+v", got)
+	}
+	if _, err := a.Get(f.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("the old id still holds our fact: %v", err)
+	}
+	after, err := a.Outbox()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 2 || after[0].ID != newID || after[1].ID != newID || after[0].OpID == before[0].OpID ||
+		after[1].OpID == before[1].OpID {
+		t.Fatalf("outbox after reissue %+v", after)
+	}
+	for _, r := range push(t, a, srv) {
+		if r.Refused != "" {
+			t.Fatalf("reissued changes refused: %+v", r)
+		}
+	}
+	if got := mustGet(t, srv, newID); got.Content != "ours, corrected" {
+		t.Fatalf("server has %+v", got)
+	}
+	pull(t, srv, a)
+	if got := mustGet(t, a, f.ID); got.Content != "the other fact" {
+		t.Fatalf("the held id on the replica: %+v", got)
+	}
+}
+
+func TestNotFoundIsAnsweredAgainOnceTheCreateArrives(t *testing.T) {
+	srv, _ := openRole(t, OpenServer, syncT0)
+	ch := createChange("01JDSATE00000000000000000A", "late", stamp(100, devA))
+	edit := Change{OpID: "edit", ID: ch.ID, Stamp: stamp(200, devA), Base: ch.Stamp,
+		Values: map[string]string{RegKind: "rule"}}
+	if res, err := srv.ApplyChanges([]Change{edit}); err != nil || res[0].Refused != RefusedNotFound {
+		t.Fatalf("edit before create: %+v %v", res, err)
+	}
+	res, err := srv.ApplyChanges([]Change{ch, edit})
+	if err != nil || res[0].Refused != "" || res[1].Refused != "" {
+		t.Fatalf("after the create: %+v %v", res, err)
+	}
+	if got := mustGet(t, srv, ch.ID); got.Kind != "rule" {
+		t.Fatalf("edit not applied: %+v", got)
+	}
+}
