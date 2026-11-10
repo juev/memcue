@@ -18,6 +18,9 @@ The selected and natively validated release is **2.1.301**. Public Mods support 
 command hook remains separate. `hooks/register.js` registers `classic.SessionStart` and `classic.UserPromptSubmit`, plus `classic.PostToolUse` after actual cwd changes:
 one function call reads one snapshot and appends a dynamically sized `additionalContext` array, preserving all
 `await next(e)` result fields. There is no fixed number of chunks, no fact truncation and no cross-hook repacking.
+A prompt or a cwd change re-sends the snapshot only when its content differs from the one already delivered in
+that session; session start, `/clear` and compaction always deliver it, and a failed read forgets the delivered
+one, so the next boundary delivers again (#712).
 
 Facts longer than the classic string ceiling travel whole through `prompt.context` blocks on initial/rebuilt context,
 or additive `prompt.submit` / `tool.call` context for subsequent tasks and actual cwd changes. First-message blocks

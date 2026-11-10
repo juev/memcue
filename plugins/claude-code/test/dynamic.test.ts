@@ -177,3 +177,44 @@ test('blocked classic continuation preserves policy without reading facts', asyn
  expect(result.additionalContext).toEqual(['policy'])
  expect(reads).toBe(0)
 })
+test('a prompt re-sends the snapshot only when it changed (#712)', async ($, on) => {
+ on('env.get',()=>({value:undefined}));on('session.id',()=>({value:'repeat'}));on('session.cwd',()=>({value:'/repeat'}))
+ let facts=['Repeat cause; whole workaround.']
+ on('process.run',()=>({value:{exitCode:0,stdout:JSON.stringify({context:'Repository repeat',facts}),stderr:''}}))
+ on('classic.SessionStart',()=>({}));on('classic.UserPromptSubmit',()=>({additionalContext:['prior'],sessionTitle:'keep'}))
+ const prompt=()=>$.classic.UserPromptSubmit({hook_event_name:'UserPromptSubmit',session_id:'repeat',cwd:'/repeat',prompt:'ok',transcript_path:''})
+ const start=await $.classic.SessionStart({hook_event_name:'SessionStart',session_id:'repeat',cwd:'/repeat',source:'startup',transcript_path:''})
+ expect(start.additionalContext).toContain('Repeat cause; whole workaround.')
+ const same=await prompt()
+ expect(same.additionalContext).toEqual(['prior'])
+ expect(same.sessionTitle).toBe('keep')
+ facts=['Repeat cause; newer workaround.']
+ const changed=await prompt()
+ expect(changed.additionalContext).toContain('Repeat cause; newer workaround.')
+ expect((await prompt()).additionalContext).toEqual(['prior'])
+ const compacted=await $.classic.SessionStart({hook_event_name:'SessionStart',session_id:'repeat',cwd:'/repeat',source:'compact',transcript_path:''})
+ expect(compacted.additionalContext).toContain('Repeat cause; newer workaround.')
+})
+test('a cwd change within the same repository adds nothing (#712)', async ($, on) => {
+ let cwd='/same/a'
+ on('env.get',()=>({value:undefined}));on('session.id',()=>({value:'subdir'}));on('session.cwd',()=>({value:cwd}))
+ on('process.run',()=>({value:{exitCode:0,stdout:JSON.stringify({context:'Repository same',facts:['Same cause; workaround.']}),stderr:''}}))
+ on('classic.SessionStart',()=>({}))
+ on('tool.call',()=>{cwd='/same/b';return {result:{stdout:'unchanged output',stderr:'',interrupted:false}}})
+ await $.classic.SessionStart({hook_event_name:'SessionStart',session_id:'subdir',cwd:'/same/a',source:'startup',transcript_path:''})
+ const result=await $.tool.call({tool:'Bash',command:'cd /same/b'})
+ expect(result.result.stdout).toBe('unchanged output')
+ expect(result.context).toBe(undefined)
+})
+test('a failed read forgets the delivered snapshot, so the same facts come again (#712)', async ($, on) => {
+ on('env.get',()=>({value:undefined}));on('session.id',()=>({value:'forget'}));on('session.cwd',()=>({value:'/forget'}))
+ let fail=false
+ on('process.run',()=>({value:{exitCode:fail?1:0,stdout:JSON.stringify({context:'Repository forget',facts:['Forget cause; workaround.']}),stderr:''}}))
+ on('classic.UserPromptSubmit',()=>({}))
+ const prompt=()=>$.classic.UserPromptSubmit({hook_event_name:'UserPromptSubmit',session_id:'forget',cwd:'/forget',prompt:'ok',transcript_path:''})
+ expect((await prompt()).additionalContext).toContain('Forget cause; workaround.')
+ fail=true
+ expect((await prompt()).additionalContext.some(t=>t.includes('unavailable'))).toBe(true)
+ fail=false
+ expect((await prompt()).additionalContext).toContain('Forget cause; workaround.')
+})

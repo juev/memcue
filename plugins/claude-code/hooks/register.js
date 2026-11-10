@@ -4,6 +4,16 @@ const pendingTask = new Map()
 const pendingTool = new Map()
 const activeSessions = new Set()
 const deliveredCwds = new Map()
+// The snapshot last delivered to a session, by content: a prompt or a cwd change re-sends the same facts only when they
+// changed, so a 30 KB snapshot is not repeated with every message (#712). A failed read forgets it, so the next
+// boundary delivers again; a session start, /clear or compaction always delivers.
+const deliveredSnapshots = new Map()
+const fingerprint = data => JSON.stringify(texts(data))
+const unchanged = (id, data) => !data.failed && deliveredSnapshots.get(id) === fingerprint(data)
+function remember(id, data) {
+  if (data.failed) deliveredSnapshots.delete(id)
+  else deliveredSnapshots.set(id, fingerprint(data))
+}
 const unavailable = 'Repository pitfalls unavailable: native transport failed or truncated. Earlier snapshots do not establish current applicability.'
 async function snapshot($, cwd) {
   try {
@@ -34,11 +44,13 @@ export async function deliver($, e, next) {
   if (data.failed) deliveredCwds.delete(e.session_id)
   else deliveredCwds.set(e.session_id, e.cwd)
   if (e.hook_event_name === 'SessionStart') { pendingTask.delete(e.session_id); pendingStart.set(e.session_id, data) }
+  else if (unchanged(e.session_id, data)) { pendingTask.delete(e.session_id); return result }
   else {
     data.unsupported = large(data) && exceeds(largeTexts(data))
     pendingTask.set(e.session_id, data)
     if (data.unsupported) return {...result, additionalContext:[...(result.additionalContext || []), hardLimit]}
   }
+  remember(e.session_id, data)
   // One captured snapshot hands off only its large fields; small facts have no aggregate budget.
   return {...result, additionalContext:[...(result.additionalContext || []), ...smallTexts(data)]}
 }
@@ -53,6 +65,8 @@ export function register(on) {
     const data = await snapshot($, cwd)
     if (data.failed) deliveredCwds.delete(e.session_id)
     else deliveredCwds.set(e.session_id, cwd)
+    if (unchanged(e.session_id, data)) return result
+    remember(e.session_id, data)
     data.unsupported = large(data) && exceeds(largeTexts(data))
     pendingTool.set(`${e.session_id}:${e.tool_use_id}`, data)
     return {...result, additionalContext:[...(result.additionalContext || []), ...(data.unsupported ? [hardLimit] : smallTexts(data))]}
@@ -74,6 +88,8 @@ export function register(on) {
     const data = await snapshot($, cwd)
     if (data.failed) deliveredCwds.delete(id)
     else deliveredCwds.set(id, cwd)
+    if (unchanged(id, data)) return result
+    remember(id, data)
     return {...result, context:additiveContext(result.context || [], data)}
   })
   on('prompt.submit', async ($, e, next) => {
