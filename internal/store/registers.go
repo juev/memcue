@@ -27,13 +27,16 @@ type Stamps map[string]string
 
 // Row is a fact of a synced base: its one current version, the stamps of its registers, the change number the
 // server gave its last change (0 before the server has seen it) and the time of that change. LoserOf names the fact
-// whose concurrent correction pushed out this fact's content (R6), "" for any other fact.
+// whose concurrent correction pushed out this fact's content (R6), "" for any other fact. ContentVersion is the
+// version at which the content register last changed: a dream on the server tells a new text from new labels by it
+// (R11).
 type Row struct {
 	Fact
-	Stamps  Stamps
-	Seq     int64
-	Updated time.Time
-	LoserOf string
+	Stamps         Stamps
+	Seq            int64
+	Updated        time.Time
+	LoserOf        string
+	ContentVersion int
 }
 
 // Change is one write of a synced base: new values of some registers of one fact, all stamped with Stamp.
@@ -96,6 +99,7 @@ func ApplyChange(row *Row, exists bool, ch Change) (Merged, error) {
 			m.Loser = v
 		}
 	}
+	content := false
 	for _, reg := range Registers {
 		v, ok := ch.Values[reg]
 		if !ok || ch.Stamp <= row.Stamps[reg] {
@@ -104,9 +108,13 @@ func ApplyChange(row *Row, exists bool, ch Change) (Merged, error) {
 		setRegister(&row.Fact, reg, v)
 		row.Stamps[reg] = ch.Stamp
 		m.Changed = true
+		content = content || reg == RegContent
 	}
 	if m.Changed {
 		row.Version++
+	}
+	if content {
+		row.ContentVersion = row.Version
 	}
 	return m, nil
 }

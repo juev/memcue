@@ -2,8 +2,8 @@
 
 State: target contract for [#714](https://github.com/juev/memcue/issues/714), partly implemented: the merge, the
 server and replica bases (`internal/store/synced.go`), the server (`internal/server`, `memcue server`), the helper's
-sync (`internal/replica`) and the client commands (`cmd/memcue/server_mode.go`); dream on the server and the migration
-are not. Sections are marked implemented as the steps land.
+sync (`internal/replica`) and the client commands (`cmd/memcue/server_mode.go`), dream on the server and `migrate -server`;
+the plugins and the documentation are not. Sections are marked implemented as the steps land.
 Sources: the #714 discussion and RFC of 2026-11-10 (owner's decisions), the measurements of
 [daemon-703](../research/daemon-703-2026-11.md), the merge method of juev/lists (`docs/specs/sync.md`, S1-S3 there).
 
@@ -114,7 +114,13 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   status for at most half a second; a helper of another version is told to exit, and its replacement
   (`connect serve -takeover`) waits up to ten seconds for the identity. Implemented.
 - **Migration.** From one base: loffe and Hermes are merged into the Mac base once by the existing git sync, then
-  `migrate -server` loads that base.
+  `migrate -server` loads that base. Each fact goes with the text and labels of its latest version and the creation
+  time of its first. Implemented in `cmd/memcue/migrate_server.go`.
+- **Dream on the server.** `memcue server` looks every ten minutes whether a dream is due (`MEMCUE_DREAM_EVERY`,
+  the model of `MEMCUE_API_URL` or `claude -p`, off with `MEMCUE_DREAM_BACKGROUND=0`) and runs `memcue dream -run
+  -background` as a process of its own on the server base. A server row keeps `content_version`, the version at which
+  its text last changed, so new labels alone leave a fact as the last dream saw it. `memcue server` refuses to run
+  with `MEMCUE_SERVER` or `MEMCUE_POSTGRES_DSN`, which would send its dream to a client backend. Implemented.
 
 ## Verification scenarios
 
@@ -137,7 +143,9 @@ Tests are named as the steps land.
 - R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`
   (`TestSessionStartStartsAndReplacesTheRealHelper`, `TestSessionStartReplacesAHelperOfAnotherVersion`).
 - R11: command tests and a freshness unit test (client side: `TestServerModeRefusesLocalCommands`,
-  `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`).
+  `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`; server side:
+  `TestDreamOnTheServerSeesANewTextAndNotNewLabels`, `TestServerDreamsWhenADreamIsDue`).
+- R12: `TestImportLoadsAnEmptyBaseOnly`, `TestMigrateServerReportsAndLoadsAnEmptyServerOnly`.
 - R14: `make test-plugins`.
 - R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`).
 - R16: `TestServerModeKeepsOneReplicaPerMachine`, `TestPathDependsOnTheServerOnly`.

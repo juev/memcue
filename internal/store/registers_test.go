@@ -71,7 +71,7 @@ func TestAnyOrderOfChangesGivesTheSameRegisters(t *testing.T) {
 			}
 		}
 		sort.Strings(losers)
-		row.Version = 0
+		row.Version, row.ContentVersion = 0, 0 // both count the changes applied, so they follow the order
 		if want == nil {
 			want, wantLosers = &row, losers
 			return

@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS sync_rows (
 	origin_stamp    TEXT NOT NULL DEFAULT '',
 	seq             INTEGER NOT NULL DEFAULT 0,
 	updated         TEXT NOT NULL DEFAULT '',
-	loser_of        TEXT NOT NULL DEFAULT ''
+	loser_of        TEXT NOT NULL DEFAULT '',
+	content_version INTEGER NOT NULL DEFAULT 0
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS sync_rows_seq ON sync_rows(seq);
 `
@@ -210,7 +211,7 @@ var syncColumns = func() string {
 	for _, reg := range Registers {
 		cols = append(cols, stampColumn(reg))
 	}
-	return strings.Join(append(cols, "seq", "updated", "loser_of"), ", ")
+	return strings.Join(append(cols, "seq", "updated", "loser_of", "content_version"), ", ")
 }()
 
 // loadRow reads the row of id; exists is false when the base has no such fact.
@@ -234,15 +235,16 @@ func scanSync(r interface{ Scan(...any) error }, f Fact) (Row, error) {
 	var (
 		seq              int64
 		updated, loserOf string
+		contentVersion   int
 	)
-	args := make([]any, 0, len(Registers)+3)
+	args := make([]any, 0, len(Registers)+4)
 	for i := range stamps {
 		args = append(args, &stamps[i])
 	}
-	if err := r.Scan(append(args, &seq, &updated, &loserOf)...); err != nil {
+	if err := r.Scan(append(args, &seq, &updated, &loserOf, &contentVersion)...); err != nil {
 		return Row{}, err
 	}
-	row := Row{Fact: f, Stamps: Stamps{}, Seq: seq, LoserOf: loserOf}
+	row := Row{Fact: f, Stamps: Stamps{}, Seq: seq, LoserOf: loserOf, ContentVersion: contentVersion}
 	for i, reg := range Registers {
 		if stamps[i] != "" {
 			row.Stamps[reg] = stamps[i]
@@ -268,7 +270,7 @@ func saveRow(tx *sql.Tx, row Row) error {
 	if !row.Updated.IsZero() {
 		updated = row.Updated.UTC().Format(time.RFC3339Nano)
 	}
-	args = append(args, row.Seq, updated, row.LoserOf)
+	args = append(args, row.Seq, updated, row.LoserOf, row.ContentVersion)
 	if _, err := tx.Exec(`INSERT OR REPLACE INTO sync_rows(id, `+syncColumns+`) VALUES (?, `+marks(len(args)-1)+`)`,
 		args...); err != nil {
 		return err
@@ -835,6 +837,7 @@ func (s *Store) Import(facts []Fact) error {
 		row := Row{Fact: Fact{ID: f.ID, Version: max(f.Version, 1), Content: strings.TrimSpace(f.Content), Origin: f.Origin,
 			Created: f.Created.UTC(), Status: f.Status, Expires: f.Expires,
 			Meta: approved(Meta{Kind: f.Kind, Scope: f.Scope, Source: f.Source})}, Stamps: Stamps{}, Updated: s.now().UTC()}
+		row.ContentVersion = row.Version
 		for _, reg := range Registers {
 			row.Stamps[reg] = st.String()
 		}
@@ -948,4 +951,18 @@ func (s *Store) ReissueID(id string) (string, error) {
 		return "", err
 	}
 	return newID, tx.Commit()
+}
+
+// ContentVersion is the version at which the text of a fact of a synced base last changed, and false for a base that
+// keeps a history instead.
+func (s *Store) ContentVersion(id string) (int, bool, error) {
+	if s.sync == nil {
+		return 0, false, nil
+	}
+	var v int
+	err := s.db.QueryRow(`SELECT content_version FROM sync_rows WHERE id = ?`, id).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, true, fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
+	return v, true, err
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -73,13 +74,25 @@ func openBase() (*store.Store, error) {
 	}
 	b := factsBase()
 	if !b.text {
-		return store.Open(b.path)
+		return openFileBase(b.path)
 	}
 	cache, err := cachePath(b)
 	if err != nil {
 		return nil, err
 	}
 	return store.OpenText(b.path, cache)
+}
+
+// openFileBase opens a base of one SQLite file, which on a sync server is the server's base (#714): dream and the
+// reports of the server machine open it as the CLI opens any base.
+func openFileBase(path string) (*store.Store, error) {
+	s, err := store.Open(path)
+	if errors.Is(err, store.ErrSyncedBase) {
+		if srv, serr := store.OpenServer(path); serr == nil {
+			return srv, nil
+		}
+	}
+	return s, err
 }
 
 // openBaseReadOnly opens the base without changing it, for a report that must see the base as it is. A text history
@@ -212,7 +225,7 @@ func (inv *invocation) openBase() (*store.Store, error) {
 func (inv *invocation) openLocalBase() (*store.Store, error) {
 	b := factsBase()
 	if !b.text {
-		return inv.local(store.Open(b.path))
+		return inv.local(openFileBase(b.path))
 	}
 	cache, err := cachePath(b)
 	if err != nil {

@@ -856,6 +856,14 @@ func onlyLabelsSince(s *store.Store, id string, seen int) (bool, error) {
 	if seen <= 0 {
 		return false, nil
 	}
+	// The base of a sync server keeps one row per fact and no history: the version at which its text last changed
+	// tells a new text from new labels (#714, R11).
+	if v, synced, err := s.ContentVersion(id); synced {
+		if errors.Is(err, store.ErrNotFound) {
+			return false, nil
+		}
+		return err == nil && v <= seen, err
+	}
 	hist, err := s.History(id)
 	if err != nil {
 		return false, err

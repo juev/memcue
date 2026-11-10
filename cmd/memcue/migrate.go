@@ -34,11 +34,18 @@ func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 	text := fs.Bool("text", false, "move the base from one SQLite file to a text history git can merge fact by fact (#530)")
 	repos := fs.Bool("repos", false, "move facts written under directory names onto project keys (#343); args are old=new pairs")
 	postgres := fs.Bool("postgres", false, "copy the whole history of the local base into the empty PostgreSQL base of MEMCUE_POSTGRES_DSN")
-	apply := fs.Bool("apply", false, "with -repos or -postgres: write the changes instead of reporting them")
+	toServer := fs.Bool("server", false, "load the latest version of every fact of the local base into the empty server of MEMCUE_SERVER")
+	apply := fs.Bool("apply", false, "with -repos, -postgres or -server: write the changes instead of reporting them")
 	var roots multiFlag
 	fs.Var(&roots, "root", "with -repos: a directory to look for clones under (repeatable)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *toServer {
+		if *postgres || *text || *repos || len(roots) > 0 || *all || *dry || *list || fs.NArg() > 0 {
+			return errors.New("migrate: -server takes only -apply")
+		}
+		return inv.runMigrateServer(*apply, out)
 	}
 	if *postgres {
 		if *text || *repos || len(roots) > 0 || *all || *dry || *list || fs.NArg() > 0 {

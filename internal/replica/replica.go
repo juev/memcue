@@ -133,3 +133,21 @@ func (h *HTTP) do(req *http.Request, out any) error {
 
 // ErrNotRunning: the helper has not started the sync, or could not open the replica.
 var ErrNotRunning = errors.New("replica sync is not running")
+
+// Import loads facts into the empty server (R12). It has no deadline of its own: a whole base may take a while.
+func (h *HTTP) Import(ctx context.Context, facts []server.Row) (int, error) {
+	b, err := json.Marshal(server.Import{Facts: facts})
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, httpBase+"/v1/import", bytes.NewReader(b))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var got server.Imported
+	if err := h.do(req, &got); err != nil {
+		return 0, err
+	}
+	return got.Facts, nil
+}
