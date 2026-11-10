@@ -15,6 +15,7 @@ class RemoteSelection(unittest.TestCase):
     def test_explicit_remote_transport_and_invalid_selection_are_preserved(self):
         config = {'facts': '/synthetic/facts', 'state_dir': '/synthetic/state', 'host': 'synthetic'}
         settings = {'MEMCUE_POSTGRES_DSN': 'explicit-invalid-fixture',
+                    'MEMCUE_SERVER': 'memcue-server',
                     'MEMCUE_TAILSCALE_MODE': 'embedded',
                     'MEMCUE_TAILSCALE_STATE_DIR': '/synthetic/identity',
                     'MEMCUE_TAILSCALE_HOSTNAME': 'synthetic-client',
@@ -30,6 +31,7 @@ class RemoteSelection(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             local = adapter.child_env(config)
         self.assertNotIn('MEMCUE_POSTGRES_DSN', local)
+        self.assertNotIn('MEMCUE_SERVER', local)
         self.assertNotIn('MEMCUE_TAILSCALE_MODE', local)
 
 

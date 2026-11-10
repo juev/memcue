@@ -1,8 +1,100 @@
 # Optional remote facts and embedded Tailscale
 
-SQLite and text history plus SQLite remain the default. PostgreSQL is selected only by a nonempty `MEMCUE_POSTGRES_DSN`. Whitespace is invalid. A remote error never opens, migrates, imports or writes the local fact base. Transport selection is independent: PostgreSQL works over ordinary networking with no embedded node.
+SQLite and text history plus SQLite remain the default. A memcue server is selected by a nonempty `MEMCUE_SERVER` (see [Server mode](#server-mode-a-memcue-server-on-the-tailnet)). PostgreSQL is selected only by a nonempty `MEMCUE_POSTGRES_DSN`. Whitespace is invalid. A remote error never opens, migrates, imports or writes the local fact base. Transport selection is independent: PostgreSQL works over ordinary networking with no embedded node.
 
 These remote-backend commands are included in v0.32.0 and later and require matching binary and adapter versions. For a source checkout, build with `make build` and use `bin/memcue` (or explicitly install that build on your PATH). Publishing or installing a release does not perform live data migration or production enrollment.
+
+## Server mode: a memcue server on the tailnet
+
+`MEMCUE_SERVER` selects server mode (#714, contract in [docs/specs/sync-server.md](specs/sync-server.md)). One
+machine runs `memcue server` and keeps the shared base in SQLite. Every other machine keeps a local SQLite replica of
+it and works only on the replica. The CLI never uses the network in this mode: search, session start, add, correct,
+retire and reopen answer from the replica, with or without a connection. A single background process per machine,
+the tailnet helper, keeps the replica in step with the server.
+
+### The server
+
+`memcue server` runs in the foreground under systemd or Docker and logs to stderr. It serves the base of
+`MEMCUE_FACTS`, a SQLite file, over plain HTTP on port 80 of its own tailnet node (the tailnet encrypts the traffic).
+It opens no port of the host. Give it a tailnet identity of its own and a stable name:
+
+```sh
+export MEMCUE_FACTS=/srv/memcue/server.db
+export MEMCUE_TAILSCALE_STATE_DIR=/srv/memcue/tailnet   # private, 0700, not shared with a helper
+export MEMCUE_TAILSCALE_HOSTNAME=memcue-server
+export MEMCUE_TAILSCALE_CONTROL_URL=https://headscale.example.org
+export MEMCUE_TAILSCALE_AUTH_KEY_FILE=/srv/memcue/auth.key   # owner-only; only with -bootstrap
+memcue server -bootstrap   # the first start logs in with the key; later starts need no flag
+```
+
+Without `-bootstrap` the server logs the login URL until someone approves the node. The server refuses to start
+with `MEMCUE_SERVER` or `MEMCUE_POSTGRES_DSN` in its environment, and it refuses a base that already keeps a history
+of versions: such a base is loaded with `migrate -server`.
+
+Access is the tailnet ACL alone: allow the client machines to reach the server node on TCP port 80, and nothing
+else. The server names each client in its log by its tailnet node name.
+
+The server is the only machine that dreams. Every ten minutes it checks whether a dream is due (`MEMCUE_DREAM_EVERY`,
+24h by default) and runs `memcue dream -run -background` on its base, with `claude -p` or `MEMCUE_API_URL` as on any
+machine; `MEMCUE_DREAM_BACKGROUND=0` turns that off. A change of labels alone does not make a fact fresh for the
+next dream.
+
+### A client
+
+```sh
+export MEMCUE_SERVER=memcue-server             # the server's tailnet node name, short or full
+export MEMCUE_TAILSCALE_CONTROL_URL=https://headscale.example.org
+memcue connect up                               # once: log the helper in, approve the device
+memcue search "$QUERY"
+```
+
+`MEMCUE_SERVER` needs no `MEMCUE_TAILSCALE_MODE`; with `MEMCUE_POSTGRES_DSN` set too, every command refuses. The
+replica is `$XDG_STATE_HOME/memcue/server-<name>/replica.db`: one per server, shared by every agent of the machine
+whatever `MEMCUE_FACTS` and `MEMCUE_STATE_DIR` they set. An agent's state directory keeps the agent's own files.
+
+The helper long-polls the server: a change written on one machine reaches the replicas of the others in about a
+second. A write made offline is found at once on its own replica and waits in the replica's outbox until the server
+accepts it. Each field of a fact merges on its own, so concurrent edits of different fields both survive. When two
+machines correct the text at once, the later text wins and the other one is kept as a new fact. A fact retired on one
+machine and corrected on another stays retired with the correction, and `reopen` brings back the corrected text.
+
+A session start or session card that finds no helper starts one in the background and answers without waiting. One
+that finds a helper of another memcue version asks it to exit and starts its own. They add a line when the helper
+waits for a login, when the replica has never synced, and when the server refused changes of the outbox (a clock far
+ahead, for example). `memcue connect status` prints the helper's version, the last sync, the outbox length and the
+refused changes.
+
+### Commands in server mode
+
+| Commands | Server mode |
+| --- | --- |
+| `add`, `correct`, `retire`, `reopen`, `facts`, `history`, `search`, `import`, `notes`, `reindex` | The replica. `history` shows the current version only: the server and the replicas keep one row per fact. |
+| `session-start`, `session-card` | The replica, the helper's status and the hints above; no dream hint and no background dream. |
+| `migrate -server [-apply]` | Loads the local base of `MEMCUE_FACTS` into the empty server; see below. |
+| `dream`, `install`, `merge`, `dump`, `migrate` (other forms) | Refused: they work on a local base or on git. |
+| `connect`, `version`, `sessions`, help | As without server mode. |
+
+### Moving to a server
+
+Server mode starts from one base. While the machines still sync through git, merge them into one base as usual
+(for example, let loffe and Hermes push and pull into the Mac's base) and stop every writer. Then, on the machine that
+holds the merged base:
+
+```sh
+export MEMCUE_FACTS=~/.claude/memory/facts     # the merged local base
+export MEMCUE_SERVER=memcue-server
+memcue connect up
+memcue migrate -server          # report: facts, active and retired, and versions
+memcue migrate -server -apply   # load them into the empty server
+```
+
+Each fact goes with the text and labels of its latest version and the creation time of its first; older versions
+stay in the local base. A server that holds any fact refuses, and nothing is stored. After the load, set
+`MEMCUE_SERVER` for every agent of every machine; writes made to a local base afterwards stay local.
+
+In a container such as Hermes, the helper runs inside the container: give it `MEMCUE_SERVER`, a private
+`MEMCUE_TAILSCALE_STATE_DIR` on a volume and `MEMCUE_TAILSCALE_CONTROL_URL`, run `memcue connect up` once in the
+container, and let the session starts keep the helper running.
 
 ## Ordinary PostgreSQL
 

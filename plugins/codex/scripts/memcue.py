@@ -156,7 +156,7 @@ def child_env(config):
     env = {k: v for k, v in os.environ.items() if not k.startswith('MEMCUE_')}
     # Explicit backend/transport selection survives this boundary. Removing the
     # DSN would silently redirect a remote invocation into the configured local base.
-    for key in ('MEMCUE_POSTGRES_DSN', 'MEMCUE_TAILSCALE_MODE',
+    for key in ('MEMCUE_POSTGRES_DSN', 'MEMCUE_SERVER', 'MEMCUE_TAILSCALE_MODE',
                 'MEMCUE_TAILSCALE_STATE_DIR', 'MEMCUE_TAILSCALE_HOSTNAME',
                 'MEMCUE_TAILSCALE_CONTROL_URL', 'MEMCUE_TAILSCALE_ALLOW_LOOPBACK_CONTROL',
                 'MEMCUE_TAILSCALE_CONNECT_TIMEOUT'):

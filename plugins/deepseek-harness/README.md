@@ -107,6 +107,9 @@ the base gets no dream from dsh. `MEMCUE_DREAM_BACKGROUND=0` in the environment 
 
 ## Configuration
 
+Server mode needs no field: with `MEMCUE_SERVER` in dsh's environment memcue works on this machine's replica of the
+server, and `facts` is ignored. See [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
+
 All fields are optional; `MEMCUE_BIN` and `MEMCUE_FACTS` from the environment are still the ambient fallbacks.
 A configured field wins over the environment.
 

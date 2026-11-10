@@ -50,6 +50,10 @@ launcher with `--config /absolute/path/to/memcue.json`; it reloads configuration
 environment does **not** reach later model shell commands. Do not substitute bare `memcue` or depend on the hook to
 change PATH. Explicit `--config` wins over `MEMCUE_CODEX_CONFIG`, which wins over the default location.
 
+Server mode: the launcher passes `MEMCUE_SERVER` and the `MEMCUE_TAILSCALE_*` settings to memcue. With them,
+memcue works on this machine's replica of the server and ignores the configured `facts`; the dream runs on the
+server. See [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
+
 ## Install the local plugin
 
 From a checkout containing this integration, with your usual Codex environment:

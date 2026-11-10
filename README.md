@@ -39,7 +39,9 @@ ticket key such as `PROJ-1234`, `#123` or `!45` is kept as one exact term, so a 
 and not another number; bare numbers, ports and versions are still left out of the index. A versioned name such as
 `PostgreSQL-16` is not a ticket: it keeps `PostgreSQL` and drops `16`.
 
-The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. The same
+The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. Or one
+machine runs `memcue server` and the others keep a replica of its base, synced over a tailnet: set `MEMCUE_SERVER`
+(see [server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet)). The same
 base works for [Hermes Agent](plugins/hermes/README.md) and for
 [DeepSeek Harness](plugins/deepseek-harness/README.md).
 
@@ -161,7 +163,8 @@ plugin and the binary from the same release.
    `facts/*/*.jsonl merge=memcue` in `memory/.gitattributes`, next to the text, and a base of the old format gets
    `memory/facts.db merge=memcue diff=memcue` in the root `.gitattributes`. The driver is a small script in `.git` that finds the binary through `MEMCUE_BIN`, then `PATH`,
    then the path it had when `memcue install` ran, so an upgrade that moves the binary does not break the next merge.
-   Without a repository memcue works the same; the base is just not synced. A merge carries no vectors. A machine
+   Without a repository memcue works the same; the base is just not synced. In server mode (`MEMCUE_SERVER`) there is
+   no git sync and no `memcue install`: the tailnet helper syncs the replica. A merge carries no vectors. A machine
    whose base is in git without the driver hears it in a hint at session start, Hermes and DSH included, until
    `memcue install` runs there. When two machines change a fact apart, the merge keeps every version and the latest
    by creation time is current, with one exception: a correction of the text wins over a retirement made without
@@ -1169,6 +1172,7 @@ machine that judges it. A correction keeps the expiry unless it names a new one.
 
 A session writes a fact without reading every neighbour, so two sessions can store the same fact, or a fact and the
 one that replaced it. A dream tidies the facts the last dream did not see. memcue starts no model for it: the model of a session does it.
+In server mode only the server dreams, on a schedule; a client refuses `dream` and shows no dream hint.
 
 1. `memcue dream -prepare` groups each fresh fact with the stored facts close to it in words and prints one packet:
    the instructions, the fresh facts to split and the global facts to check
@@ -1296,6 +1300,7 @@ uses.
 | Variable | Meaning | Default |
 |---|---|---|
 | `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history)), else `$CLAUDE_CONFIG_DIR/memory/facts.db`; `~/.claude` without `CLAUDE_CONFIG_DIR` |
+| `MEMCUE_SERVER` | tailnet node name of a `memcue server`: every command then works on this machine's replica of it, `$XDG_STATE_HOME/memcue/server-<name>/replica.db`, whatever `MEMCUE_FACTS` says, and the tailnet helper syncs it ([server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet)) | unset |
 | `MEMCUE_STATE_DIR` | state directory for logs, locks and the dream schedule; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
 | `MEMCUE_MODEL` | model of `migrate` and `dream -run` | `claude-opus-5-5` |
 | `MEMCUE_API_URL` | OpenAI-compatible endpoint for the main model instead of `claude -p`, e.g. `https://api.deepseek.com`; set `MEMCUE_MODEL` with it | unset |

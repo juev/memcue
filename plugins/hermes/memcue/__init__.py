@@ -805,7 +805,8 @@ class MemcueMemoryProvider(MemoryProvider):
         session of a user."""
         if self._context == "cron" or not self._binary_ok():
             return ""
-        if not self._facts or not Path(self._facts).exists():
+        # In server mode (MEMCUE_SERVER, #714) the CLI works on this machine's replica, whatever the facts file says.
+        if not os.environ.get("MEMCUE_SERVER", "").strip() and (not self._facts or not Path(self._facts).exists()):
             return ""
         session = (self._session_id or "").strip()
         payload: dict[str, Any] = {"cwd": self._workspace,

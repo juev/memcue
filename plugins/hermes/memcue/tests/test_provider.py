@@ -697,6 +697,26 @@ class ProviderTest(unittest.TestCase):
                 p.system_prompt_block()
                 self.assertEqual("-dream-tools" in calls.read_text(encoding="utf-8").splitlines(), want)
 
+    def test_server_mode_asks_for_hints_without_a_local_base(self):
+        """In server mode the replica stands in for the facts file (#714, R14): session-card is asked although the file
+        does not exist."""
+        calls = Path(self.home) / "card-args-server"
+        stub = Path(self.home) / "card-memcue-server"
+        stub.write_text("#!/bin/sh\n"
+                        "case \"$1\" in\n  version) printf '{\"version\":\"0.36.0\"}\\n' ;;\n"
+                        f"  session-card) echo card >> {shlex.quote(str(calls))} ;;\nesac\nexit 0\n",
+                        encoding="utf-8")
+        stub.chmod(0o755)
+        missing = Path(self.home) / "no-such-base.db"
+        for server, want in (("", False), ("memcue-server", True)):
+            with self.subTest(server=server), unittest.mock.patch.dict(os.environ, {"MEMCUE_SERVER": server}):
+                if calls.exists():
+                    calls.unlink()
+                p = memcue_provider.MemcueMemoryProvider({"binary": str(stub), "facts": str(missing)})
+                p.initialize("s1", hermes_home=self.home)
+                p._hints_text()
+                self.assertEqual(calls.exists(), want)
+
     def test_the_built_in_memory_is_warned_about_once(self):
         """The built-in memory is a second memory (#494): while its notes are there the provider says so once per
         start, and says nothing without them."""

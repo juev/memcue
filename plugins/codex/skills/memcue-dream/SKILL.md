@@ -9,6 +9,7 @@ Use the configured launcher from SessionStart or AGENTS.md for every command. Ap
 The working model does the reasoning; prepare/apply requires no Claude executable, API credentials or second model.
 Keep the configured background policy: the launcher disables background dream and endpoint calls on every call.
 Never interrupt the user's task for maintenance.
+In server mode (`MEMCUE_SERVER` set) `dream` is refused: the server dreams on its own. Tell the user so and stop.
 
 1. Run `dream -prepare`. If it reports "no dream yet on this machine", use the same configured launcher with
    `dream -prepare -all` to review all active facts, or `dream -prepare -since DATE` for a chosen starting date.

@@ -153,6 +153,10 @@ MEMCUE_BIN="$HERMES_HOME/bin/memcue" python3 "$HERMES_HOME/plugins/memcue/tests/
 
 ## The fact base
 
+In server mode (`MEMCUE_SERVER` in Hermes' environment) memcue works on the container's replica of the server, not on
+the file below: the hints come without a local base file, and only the server dreams. Run the tailnet helper inside
+the container; see [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
+
 By default the base is `$HERMES_HOME/memcue/facts.db`, inside Hermes' home, so `hermes backup` covers it. Set
 `memory.memcue.facts` (or `MEMCUE_FACTS` in Hermes' environment) to use another file, for example one shared with
 Claude Code. A leading `~/` or `$HOME/` is expanded; the path must be absolute, so the value names one file rather

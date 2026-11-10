@@ -106,7 +106,7 @@ commands:
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
   dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all|-background] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
-  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text; copy the whole history into an empty PostgreSQL base: memcue migrate -postgres [-apply]
+  migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text; copy the whole history into an empty PostgreSQL base: memcue migrate -postgres [-apply]; load the base into an empty memcue server: memcue migrate -server [-apply]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
@@ -116,6 +116,7 @@ commands:
 
 environment:
   MEMCUE_POSTGRES_DSN  explicit PostgreSQL backend; empty keeps SQLite/text history offline
+  MEMCUE_SERVER   tailnet name of a memcue server: work on this machine's replica of it, synced by the helper
   MEMCUE_TAILSCALE_MODE  off (default) or embedded; see docs/remote-backends.md
   MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
   MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base
@@ -128,7 +129,7 @@ environment:
   MEMCUE_CALLER   name of the hook or plugin that runs a search, recorded in search.log
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
-  MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 1h; dream.log in the state directory)
+  MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 24h; dream.log in the state directory)
   MEMCUE_DREAM_BACKGROUND  0 keeps the session start from running a due dream in the background, on the endpoint
                   or on claude -p; it then says the dream is due instead
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes memcue notes reads by default
