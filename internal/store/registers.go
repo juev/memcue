@@ -36,17 +36,17 @@ type Row struct {
 
 // Change is one write of a synced base: new values of some registers of one fact, all stamped with Stamp.
 type Change struct {
-	OpID string // identifies the write for a retry
-	ID   string // the fact
+	OpID string `json:"op_id"` // identifies the write for a retry
+	ID   string `json:"id"`    // the fact
 	// Create makes the fact: Values hold every register, Created and Source describe it.
-	Create  bool
-	Created time.Time
-	Source  string
-	Values  map[string]string
-	Stamp   string
+	Create  bool              `json:"create,omitempty"`
+	Created time.Time         `json:"created,omitzero"`
+	Source  string            `json:"source,omitempty"`
+	Values  map[string]string `json:"values"`
+	Stamp   string            `json:"stamp"`
 	// Base is the content stamp the new content was made from; it tells a correction made after the stored content
 	// from one made beside it (R6).
-	Base string
+	Base string `json:"base,omitempty"`
 }
 
 // Merged is what ApplyChange did to a row.

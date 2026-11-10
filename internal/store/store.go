@@ -179,6 +179,8 @@ type Store struct {
 	text, textLock string
 	// borrowed is a handle of Borrow: its Close leaves the shared PostgreSQL connection to the owner.
 	borrowed bool
+	// sync is the role of a base of a sync server or a replica (OpenServer, OpenReplica), nil otherwise.
+	sync *syncRole
 }
 
 // Open opens or creates the base at path. The rollback journal (not WAL) keeps the file whole between writes, so
@@ -186,6 +188,10 @@ type Store struct {
 func Open(path string) (*Store, error) {
 	s, err := openFile(path)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.refuseSynced(); err != nil {
+		_ = s.Close()
 		return nil, err
 	}
 	if _, err := s.agentSources(); err != nil {
@@ -729,6 +735,9 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 	if len(facts) == 0 {
 		return facts, nil
 	}
+	if s.sync != nil {
+		return s.syncWrite(facts)
+	}
 	if s.native != nil {
 		if err := s.native.append(facts); err != nil {
 			return nil, err
@@ -1051,12 +1060,19 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 		out = append(out, Fact{ID: pid.String(), Version: 1, Content: content, Origin: cur.Origin,
 			Created: s.now().UTC(), Status: Active, Author: s.author, Expires: cur.Expires, Meta: approved(cur.Meta)})
 	}
+	written := append([]Fact{retired}, out...)
+	if s.sync != nil {
+		stored, err := s.syncWrite(written)
+		if err != nil {
+			return nil, err
+		}
+		return stored[1:], nil
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	written := append([]Fact{retired}, out...)
 	for _, f := range written {
 		if err := insert(tx, f); err != nil {
 			return nil, err
@@ -1075,6 +1091,13 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 // write stores a new version of a fact as this memcue writes it, and returns the version as stored.
 func (s *Store) write(f Fact) (Fact, error) {
 	f.Meta = approved(f.Meta)
+	if s.sync != nil {
+		stored, err := s.syncWrite([]Fact{f})
+		if err != nil {
+			return Fact{}, err
+		}
+		return stored[0], nil
+	}
 	if f.WriteID != "" {
 		f.WriteID = projectedWriteID(f, "", "")
 	}
