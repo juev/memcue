@@ -1,7 +1,9 @@
 # memcue for Codex CLI
 
 Codex searches and writes the existing memcue fact base through shell commands. A reviewed SessionStart hook supplies
-standing instructions and maintenance hints. It does not search for facts or inject a rules card. The working model
+standing instructions and maintenance hints. UserPromptSubmit and PreToolUse (Bash) hooks deliver the repository-pitfall
+snapshot of the target cwd; a session receives it again only when it changes, or after startup, resume, clear or
+compaction. The hooks do not search facts by the task or inject a rules card. The working model
 chooses searches and writes; these instructions do not establish model compliance or recall quality.
 
 This is a local CLI integration. It needs Python 3.9+, a memcue binary from 0.30.0 or newer, and Codex CLI 0.167.0.
@@ -41,7 +43,7 @@ uses the CLI default of seven days unless an add explicitly passes `-expires`.
 including a sibling directory after a migration. No base defaults to the Claude directory. To share an existing base,
 explicitly set `facts` to that base and choose its corresponding state directory; back it up first. This setup does
 not migrate or rewrite the base. Native CLI opens may update indexes/cache as usual; inspect compatibility before
-sharing with older binaries. State holds the text cache and dream schedule; hooks and later calls must use this same file.
+sharing with older binaries. State holds the text cache, the dream schedule and a digest of the last pitfall snapshot each session received; hooks and later calls must use this same file.
 
 The hook prints the exact configured launcher command into the model's instructions. Every skill call uses that
 launcher with `--config /absolute/path/to/memcue.json`; it reloads configuration each time. A hook child's exported

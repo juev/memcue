@@ -11,6 +11,12 @@ import shlex
 import subprocess as _subprocess
 import sys
 import tempfile
+import time
+
+try:
+    import fcntl
+except ImportError:  # Windows is not a supported platform; snapshots are then compared without a lock.
+    fcntl = None
 
 
 class _ResponseTransportError(OSError):
@@ -302,6 +308,49 @@ def context(command):
     return (ROOT / 'policy.md').read_text(encoding='utf-8').replace('@MEMCUE@', command)
 
 
+SNAPSHOTS = 'codex-pitfall-snapshots.json'
+SNAPSHOT_SESSIONS = 128
+
+
+def snapshot_changed(config, session, text):
+    """Say whether text differs from the last repository-pitfall snapshot this session received (#705).
+
+    PreToolUse runs before every shell command, and an unchanged snapshot only repeats what the context holds.
+    text None forgets the session: after startup, resume, clear or compaction the context may not hold it any more.
+    A state that cannot be read or written delivers the snapshot rather than risk withholding a changed one.
+    """
+    state = Path(config['state_dir'])
+    key = hashlib.sha256(session.encode('utf-8')).hexdigest()
+    digest = None if text is None else hashlib.sha256(text.encode('utf-8')).hexdigest()
+    try:
+        state.mkdir(parents=True, exist_ok=True)
+        with open(state / (SNAPSHOTS + '.lock'), 'a', encoding='utf-8') as lock:
+            if fcntl:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+            path = state / SNAPSHOTS
+            try:
+                seen = json.loads(path.read_text(encoding='utf-8'))
+            except (FileNotFoundError, ValueError):
+                seen = {}
+            if not isinstance(seen, dict):
+                seen = {}
+            entry = seen.pop(key, None)
+            if digest is not None and isinstance(entry, dict) and entry.get('sha256') == digest:
+                return False
+            if digest is not None:
+                seen[key] = {'sha256': digest, 'at': time.time()}
+            if len(seen) > SNAPSHOT_SESSIONS:
+                oldest = sorted(seen, key=lambda k: seen[k].get('at', 0) if isinstance(seen[k], dict) else 0)
+                for old in oldest[:len(seen) - SNAPSHOT_SESSIONS]:
+                    del seen[old]
+            tmp = path.with_name(path.name + '.' + secrets.token_hex(8))
+            tmp.write_text(json.dumps(seen), encoding='utf-8')
+            os.replace(tmp, path)
+    except OSError:
+        return True
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     default = os.environ.get('MEMCUE_CODEX_CONFIG') or str(Path(os.environ.get('CODEX_HOME', str(Path.home()/'.codex'))) / 'memcue.json')
@@ -333,6 +382,10 @@ def main():
                 response['hookSpecificOutput']['additionalContext'] += '\n\n' + hints
             elif event != 'SessionStart':
                 response['hookSpecificOutput']['additionalContext'] = 'Repository pitfalls: no git repository. This supersedes earlier repository-pitfall snapshots.'
+            if event == 'SessionStart':
+                snapshot_changed(config, data['session_id'], None)
+            elif not snapshot_changed(config, data['session_id'], response['hookSpecificOutput']['additionalContext']):
+                response['hookSpecificOutput']['additionalContext'] = ''
         elif args.command == 'instructions':
             sys.stdout.write((ROOT / 'AGENTS.md.snippet').read_text(encoding='utf-8').replace(
                 '@MEMCUE@', command).replace('@ROOT@', str(ROOT)))

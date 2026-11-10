@@ -88,6 +88,43 @@ class RealCLI(unittest.TestCase):
         self.assertIn('No active repository pitfalls', switched['additionalContext'])
         self.assertIn('supersedes', switched['additionalContext'])
 
+    def pitfall_hook(self, event, session, cwd=None, **fields):
+        payload = dict(hook_event_name=event, session_id=session, cwd=str(cwd or self.nested),
+                       model='synthetic-model', permission_mode='default', transcript_path=None, **fields)
+        return json.loads(self.cli('hook', data=json.dumps(payload)).stdout)['hookSpecificOutput']['additionalContext']
+
+    def test_unchanged_pitfall_snapshot_is_sent_once_per_context(self):
+        # #705: PreToolUse runs before every shell command; one session repeated one snapshot seven times.
+        text = "Codex fixture failed because its cache was stale; clear the whole cache."
+        self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
+        other = self.home/'other'
+        subprocess.run(['git', 'init', '-q', str(other)], env=self.env, check=True)
+        subprocess.run(['git', '-C', str(other), 'remote', 'add', 'origin',
+                        'https://example.invalid/team/other.git'], env=self.env, check=True)
+        bash = lambda target: dict(tool_name='Bash', tool_input={'command': 'pwd', 'workdir': str(target)})
+        self.pitfall_hook('SessionStart', 'dedupe', source='startup')
+        self.assertIn(text, self.pitfall_hook('UserPromptSubmit', 'dedupe', prompt='Task', turn_id='one'))
+        self.assertEqual(self.pitfall_hook('PreToolUse', 'dedupe', turn_id='one', **bash(self.nested)), '',
+                         'an unchanged snapshot was sent again')
+        self.assertEqual(self.pitfall_hook('UserPromptSubmit', 'dedupe', prompt='Next', turn_id='two'), '')
+        switched = self.pitfall_hook('PreToolUse', 'dedupe', turn_id='two', **bash(other))
+        self.assertIn('No active repository pitfalls', switched)
+        self.assertNotIn(text, switched)
+        self.assertIn(text, self.pitfall_hook('PreToolUse', 'dedupe', turn_id='two', **bash(self.nested)),
+                      'returning to the repository must restore its snapshot over the other one')
+        self.assertIn(text, self.pitfall_hook('PreToolUse', 'another', turn_id='one', **bash(self.nested)),
+                      'sessions must not share delivered snapshots')
+        self.pitfall_hook('SessionStart', 'dedupe', source='compact')
+        self.assertIn(text, self.pitfall_hook('UserPromptSubmit', 'dedupe', prompt='After', turn_id='three'),
+                      'compaction drops the snapshot from context; it must be sent again')
+
+    def test_unreadable_snapshot_state_still_delivers(self):
+        text = "Codex fixture failed because its index was stale; rebuild the whole index."
+        self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
+        (self.home/'state'/'codex-pitfall-snapshots.json').mkdir(parents=True)
+        for turn in ('one', 'two'):
+            self.assertIn(text, self.pitfall_hook('UserPromptSubmit', 'broken-state', prompt='Task', turn_id=turn))
+
     def test_pitfall_transport_has_no_preview_threshold(self):
         content = ("Codex full condition and workaround: " + "schema repair detail. " * 1200).strip()
         self.add(content, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
@@ -109,7 +146,8 @@ class RealCLI(unittest.TestCase):
             self.cli('add','-cwd',str(path),'-kind','pitfall','-scope','repo','--',name+' failure; repair fixture.')
         for field in ('workdir','cwd'):
             for value in ('target',str(target)):
-                payload=dict(hook_event_name='PreToolUse',session_id='relative',cwd=str(self.nested),model='synthetic',permission_mode='default',transcript_path=None,tool_name='Bash',tool_input={'command':'pwd',field:value})
+                # One session per case: an unchanged snapshot is not sent twice in a session (#705).
+                payload=dict(hook_event_name='PreToolUse',session_id='relative-'+field+'-'+str(value),cwd=str(self.nested),model='synthetic',permission_mode='default',transcript_path=None,tool_name='Bash',tool_input={'command':'pwd',field:value})
                 text=json.loads(self.cli('hook',data=json.dumps(payload)).stdout)['hookSpecificOutput']['additionalContext']
                 self.assertIn('intended failure;',text)
                 self.assertNotIn('unintended failure;',text)
