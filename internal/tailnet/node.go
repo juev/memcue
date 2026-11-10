@@ -64,6 +64,32 @@ func (n *realNode) Dial(ctx context.Context, address string) (net.Conn, error) {
 }
 func (n *realNode) Close() error { return n.server.Close() }
 
+// bootstrapKey reads the auth key of a first login from an owner-only regular file.
+func bootstrapKey(path string) (string, error) {
+	fd, e := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if e != nil {
+		return "", errors.New("cannot open bootstrap key file")
+	}
+	f := os.NewFile(uintptr(fd), "bootstrap key")
+	fi, e := f.Stat()
+	if e != nil || !fi.Mode().IsRegular() || (fi.Mode().Perm() != 0600 && fi.Mode().Perm() != 0400) {
+		_ = f.Close()
+		return "", errors.New("bootstrap key must be an owner-only regular file (0400 or 0600)")
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok || st.Uid != uint32(os.Geteuid()) {
+		_ = f.Close()
+		return "", errors.New("bootstrap key has the wrong owner")
+	}
+	data, e := io.ReadAll(io.LimitReader(f, 4097))
+	_ = f.Close()
+	authKey := strings.TrimSpace(string(data))
+	if e != nil || len(data) > 4096 || authKey == "" || strings.ContainsAny(authKey, " \t\n\r") {
+		return "", errors.New("invalid bootstrap key file")
+	}
+	return authKey, nil
+}
+
 // Run owns one durable embedded node until ctx is cancelled or connect off is called.
 func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) error {
 	if err := rejectAmbient(); err != nil {
@@ -76,26 +102,8 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 	defer release()
 	authKey := ""
 	if bootstrap {
-		fd, e := syscall.Open(c.KeyFile, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
-		if e != nil {
-			return errors.New("cannot open bootstrap key file")
-		}
-		f := os.NewFile(uintptr(fd), "bootstrap key")
-		fi, e := f.Stat()
-		if e != nil || !fi.Mode().IsRegular() || (fi.Mode().Perm() != 0600 && fi.Mode().Perm() != 0400) {
-			_ = f.Close()
-			return errors.New("bootstrap key must be an owner-only regular file (0400 or 0600)")
-		}
-		st, ok := fi.Sys().(*syscall.Stat_t)
-		if !ok || st.Uid != uint32(os.Geteuid()) {
-			_ = f.Close()
-			return errors.New("bootstrap key has the wrong owner")
-		}
-		data, e := io.ReadAll(io.LimitReader(f, 4097))
-		_ = f.Close()
-		authKey = strings.TrimSpace(string(data))
-		if e != nil || len(data) > 4096 || authKey == "" || strings.ContainsAny(authKey, " \t\n\r") {
-			return errors.New("invalid bootstrap key file")
+		if authKey, err = bootstrapKey(c.KeyFile); err != nil {
+			return err
 		}
 	}
 	// The pinned release routes log uploads through a noop transport in this supported mode.

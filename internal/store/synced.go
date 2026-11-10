@@ -214,22 +214,22 @@ var syncColumns = func() string {
 }()
 
 // loadRow reads the row of id; exists is false when the base has no such fact.
-func loadRow(tx *sql.Tx, id string) (row Row, loserOf string, exists bool, err error) {
+func loadRow(tx *sql.Tx, id string) (row Row, exists bool, err error) {
 	f, err := scan(tx.QueryRow(`SELECT `+columns+` FROM facts WHERE id = ? ORDER BY version DESC LIMIT 1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
-		return Row{}, "", false, nil
+		return Row{}, false, nil
 	}
 	if err != nil {
-		return Row{}, "", false, err
+		return Row{}, false, err
 	}
-	row, loserOf, err = scanSync(tx.QueryRow(`SELECT `+syncColumns+` FROM sync_rows WHERE id = ?`, id), f)
+	row, err = scanSync(tx.QueryRow(`SELECT `+syncColumns+` FROM sync_rows WHERE id = ?`, id), f)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Row{Fact: f, Stamps: Stamps{}}, "", true, nil
+		return Row{Fact: f, Stamps: Stamps{}}, true, nil
 	}
-	return row, loserOf, err == nil, err
+	return row, err == nil, err
 }
 
-func scanSync(r interface{ Scan(...any) error }, f Fact) (Row, string, error) {
+func scanSync(r interface{ Scan(...any) error }, f Fact) (Row, error) {
 	stamps := make([]string, len(Registers))
 	var (
 		seq              int64
@@ -240,20 +240,20 @@ func scanSync(r interface{ Scan(...any) error }, f Fact) (Row, string, error) {
 		args = append(args, &stamps[i])
 	}
 	if err := r.Scan(append(args, &seq, &updated, &loserOf)...); err != nil {
-		return Row{}, "", err
+		return Row{}, err
 	}
-	row := Row{Fact: f, Stamps: Stamps{}, Seq: seq}
+	row := Row{Fact: f, Stamps: Stamps{}, Seq: seq, LoserOf: loserOf}
 	for i, reg := range Registers {
 		if stamps[i] != "" {
 			row.Stamps[reg] = stamps[i]
 		}
 	}
 	row.Updated, _ = time.Parse(time.RFC3339Nano, updated)
-	return row, loserOf, nil
+	return row, nil
 }
 
 // saveRow makes row the one stored version of its fact and refreshes its index entry.
-func saveRow(tx *sql.Tx, row Row, loserOf string) error {
+func saveRow(tx *sql.Tx, row Row) error {
 	if _, err := tx.Exec(`DELETE FROM facts WHERE id = ?`, row.ID); err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func saveRow(tx *sql.Tx, row Row, loserOf string) error {
 	if !row.Updated.IsZero() {
 		updated = row.Updated.UTC().Format(time.RFC3339Nano)
 	}
-	args = append(args, row.Seq, updated, loserOf)
+	args = append(args, row.Seq, updated, row.LoserOf)
 	if _, err := tx.Exec(`INSERT OR REPLACE INTO sync_rows(id, `+syncColumns+`) VALUES (?, `+marks(len(args)-1)+`)`,
 		args...); err != nil {
 		return err
@@ -297,7 +297,7 @@ func (s *Store) syncWrite(facts []Fact) ([]Fact, error) {
 	}
 	out := make([]Fact, 0, len(facts))
 	for _, f := range facts {
-		row, loserOf, exists, err := loadRow(tx, f.ID)
+		row, exists, err := loadRow(tx, f.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (s *Store) syncWrite(facts []Fact) ([]Fact, error) {
 		} else if err := enqueue(tx, ch); err != nil {
 			return nil, err
 		}
-		if err := saveRow(tx, row, loserOf); err != nil {
+		if err := saveRow(tx, row); err != nil {
 			return nil, err
 		}
 		out = append(out, row.Fact)
@@ -420,7 +420,11 @@ func (s *Store) ApplyChanges(changes []Change) ([]Applied, error) {
 
 func (s *Store) applyOne(tx *sql.Tx, clock *hlc.Clock, ch Change) (Applied, error) {
 	a := Applied{OpID: ch.OpID, ID: ch.ID}
-	row, loserOf, exists, err := loadRow(tx, ch.ID)
+	if ch.Create && ValidID(ch.ID) != nil {
+		a.Refused = RefusedMalformed
+		return a, nil
+	}
+	row, exists, err := loadRow(tx, ch.ID)
 	if err != nil {
 		return a, err
 	}
@@ -446,7 +450,7 @@ func (s *Store) applyOne(tx *sql.Tx, clock *hlc.Clock, ch Change) (Applied, erro
 		if row.Seq, err = nextSeq(tx); err != nil {
 			return a, err
 		}
-		if err := saveRow(tx, row, loserOf); err != nil {
+		if err := saveRow(tx, row); err != nil {
 			return a, err
 		}
 	}
@@ -477,7 +481,8 @@ func (s *Store) keepLoser(tx *sql.Tx, clock *hlc.Clock, row Row, content string)
 	if loser.Seq, err = nextSeq(tx); err != nil {
 		return "", err
 	}
-	return loser.ID, saveRow(tx, loser, row.ID)
+	loser.LoserOf = row.ID
+	return loser.ID, saveRow(tx, loser)
 }
 
 // LoserOf is the id of the fact whose concurrent correction pushed out the content of id, or "".
@@ -526,7 +531,7 @@ func (s *Store) Changes(since int64, limit int) ([]Row, int64, error) {
 	}
 	out := make([]Row, 0, len(ids))
 	for _, id := range ids {
-		row, _, exists, err := loadRow(tx, id)
+		row, exists, err := loadRow(tx, id)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -678,7 +683,7 @@ func (s *Store) replay(tx *sql.Tx, row Row, exists bool) error {
 		return nil
 	}
 	row.Seq = seq
-	return saveRow(tx, row, "")
+	return saveRow(tx, row)
 }
 
 func txLastSeq(tx *sql.Tx) (int64, error) {
@@ -773,4 +778,95 @@ func (s *Store) State() (SyncState, error) {
 		return st, err
 	}
 	return st, tx.Commit()
+}
+
+// ValidID checks that id is a fact id: a ULID in its canonical form.
+func ValidID(id string) error {
+	u, err := ulid.ParseStrict(id)
+	if err != nil || u.String() != id {
+		return fmt.Errorf("%w: fact id %q is not a ULID", ErrChange, id)
+	}
+	return nil
+}
+
+// ErrNotEmpty: an import into a server base that already holds facts.
+var ErrNotEmpty = errors.New("server base already holds facts")
+
+// Import loads facts into an empty server base in one transaction (R12): every register of a fact is stamped with
+// its creation time and the server's device id. A base that holds any fact refuses with ErrNotEmpty and stores
+// nothing; so does a set with an invalid or repeated fact.
+func (s *Store) Import(facts []Fact) error {
+	if s.sync == nil || s.sync.role != RoleServer {
+		return fmt.Errorf("%w: only a server imports facts", ErrSyncedBase)
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var n int
+	if err := tx.QueryRow(`SELECT count(*) FROM facts`).Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("%w: %d facts", ErrNotEmpty, n)
+	}
+	clock, err := s.clock(tx)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]bool, len(facts))
+	for _, f := range facts {
+		if err := checkImported(f); err != nil {
+			return err
+		}
+		if seen[f.ID] {
+			return fmt.Errorf("%w: fact %s given twice", ErrChange, f.ID)
+		}
+		seen[f.ID] = true
+		st := hlc.Stamp{Millis: f.Created.UnixMilli(), Device: s.sync.device}
+		clock.Observe(st)
+		row := Row{Fact: Fact{ID: f.ID, Version: max(f.Version, 1), Content: strings.TrimSpace(f.Content), Origin: f.Origin,
+			Created: f.Created.UTC(), Status: f.Status, Expires: f.Expires,
+			Meta: approved(Meta{Kind: f.Kind, Scope: f.Scope, Source: f.Source})}, Stamps: Stamps{}, Updated: s.now().UTC()}
+		for _, reg := range Registers {
+			row.Stamps[reg] = st.String()
+		}
+		if row.Seq, err = nextSeq(tx); err != nil {
+			return err
+		}
+		if err := saveRow(tx, row); err != nil {
+			return err
+		}
+	}
+	if err := saveClock(tx, clock); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func checkImported(f Fact) error {
+	if err := ValidID(f.ID); err != nil {
+		return err
+	}
+	switch {
+	case strings.TrimSpace(f.Content) == "":
+		return fmt.Errorf("%w: fact %s has no content", ErrChange, f.ID)
+	case f.Status != Active && f.Status != Retired:
+		return fmt.Errorf("%w: fact %s has status %q", ErrChange, f.ID, f.Status)
+	case f.Created.IsZero() || f.Created.UnixMilli() <= 0:
+		return fmt.Errorf("%w: fact %s has no creation time", ErrChange, f.ID)
+	}
+	if err := ValidExpiry(f.Expires); err != nil {
+		return fmt.Errorf("%w: fact %s: %v", ErrChange, f.ID, err)
+	}
+	return nil
+}
+
+// DataVersion changes when another connection, such as a dream in another process, commits to the base; this
+// Store's own commits leave it as it is. A long poll compares it to notice changes it did not make.
+func (s *Store) DataVersion() (int64, error) {
+	var v int64
+	err := s.db.QueryRow(`PRAGMA data_version`).Scan(&v)
+	return v, err
 }

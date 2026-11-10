@@ -111,6 +111,7 @@ commands:
   merge     git merge driver: memcue merge BASE OURS THEIRS
   dump      git textconv: memcue dump FILE
   install   set up the git repository of the base for sync: memcue install [-repo DIR]
+  server    serve the base of MEMCUE_FACTS to replicas on the tailnet: memcue server [-bootstrap]
   version   print the version: memcue version [-json] [-minimum X.Y.Z]
 
 environment:
@@ -226,6 +227,8 @@ func runMain() (code int) {
 		err = runDump(os.Args[2:], out)
 	case "install":
 		err = runInstall(os.Args[2:], out)
+	case "server":
+		err = runServer(os.Args[2:])
 	case "version":
 		err = runVersion(os.Args[2:], out)
 	case "-h", "--help", "help":

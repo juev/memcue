@@ -26,12 +26,14 @@ var Registers = []string{RegContent, RegKind, RegScope, RegExpires, RegStatus, R
 type Stamps map[string]string
 
 // Row is a fact of a synced base: its one current version, the stamps of its registers, the change number the
-// server gave its last change (0 before the server has seen it) and the time of that change.
+// server gave its last change (0 before the server has seen it) and the time of that change. LoserOf names the fact
+// whose concurrent correction pushed out this fact's content (R6), "" for any other fact.
 type Row struct {
 	Fact
 	Stamps  Stamps
 	Seq     int64
 	Updated time.Time
+	LoserOf string
 }
 
 // Change is one write of a synced base: new values of some registers of one fact, all stamped with Stamp.

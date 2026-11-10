@@ -1,7 +1,8 @@
 # Sync server over the tailnet
 
-State: target contract for [#714](https://github.com/juev/memcue/issues/714), not implemented yet. Sections are
-marked implemented as the steps land.
+State: target contract for [#714](https://github.com/juev/memcue/issues/714), partly implemented: the merge, the
+server and replica bases (`internal/store/synced.go`) and the server (`internal/server`, `memcue server`); the helper,
+the client commands, dream on the server and the migration are not. Sections are marked implemented as the steps land.
 Sources: the #714 discussion and RFC of 2026-11-10 (owner's decisions), the measurements of
 [daemon-703](../research/daemon-703-2026-11.md), the merge method of juev/lists (`docs/specs/sync.md`, S1-S3 there).
 
@@ -77,6 +78,12 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   - `POST /v1/changes` takes a batch of stamped field changes with `op_id` and returns each result with its `seq`.
   - `POST /v1/import` loads facts into an empty base only (R12).
 
+  It listens on port 80 of the tailnet; WireGuard of the tailnet encrypts the traffic, so the HTTP is plain. Its
+  tailnet identity is its own `MEMCUE_TAILSCALE_STATE_DIR`, owned like a helper's (`owner.lock`). A change stamped
+  more than five minutes ahead of the server's clock is refused as `ahead` (R8) and not remembered, so the same
+  operation is accepted once the clock catches up; the other refusals (`malformed`, `id_taken`, `not_found`) are
+  answered again on a retry (R4). Implemented.
+
   A custom binary protocol was rejected: payloads are megabytes at most and HTTP is easier to inspect. A push started
   by the server was rejected: a client would have to listen on the tailnet, for no gain in latency over the long poll.
 - **Change number.** `seq` is a signed 64-bit integer the server raises on every write, `max(seq)+1` inside the write
@@ -86,7 +93,10 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   `MEMCUE_SERVER` alone (R16). Only the helper uses the network: it long-polls, applies rows, and sends the outbox.
   An agent's state directory keeps the agent's own files (Codex pitfall snapshots, logs, `search.log`).
 - **Outbox.** A replica table of unsent field changes with their stamps, base stamp and `op_id`. A row received from
-  the server replaces the local row, and the outbox entries of that fact are applied on top again.
+  the server replaces the local row, and the outbox entries of that fact are applied on top again. Implemented in
+  `internal/store/synced.go`: the stamps, `seq`, `updated` and `loser_of` (the fact a losing text came from, R6) live
+  in `sync_rows`, one row per fact beside its one row in `facts`. An ordinary open refuses a server or replica base,
+  and a base with unsynced facts cannot become one.
 - **Device id.** A random id created with the replica and stored in it. A tailnet identity was rejected: it does not
   exist before the first login and is shared by every base of the machine.
 - **Fields.** The server and the replica carry `id`, `version`, `content`, `origin`, `created`, `status`, `expires`,
@@ -109,9 +119,16 @@ Tests are named as the steps land.
 - R1: server mode, server down → search, session-start and add succeed without network delay.
 - R2, R3, R7, R16: end-to-end on a real tailnet (opt-in test next to `internal/tailnet/final_refresh_test.go`): a
   server and two clients built from the tree.
-- R4, R6, R8, R12: server handler tests through `httptest`.
-- R5: property test, every permutation of one set of changes gives the same row.
-- R9: replica tests with a fake server.
+- R4, R6, R8, R12: server handler tests through `httptest` (`internal/server/server_test.go`:
+  `TestRetryAfterALostReplyGetsTheEarlierAnswer`, `TestConcurrentContentReachesReplicasWithTheLoser`,
+  `TestStampFarAheadIsRefusedAndNotRemembered`, `TestImportLoadsAnEmptyBaseOnly`); the long poll
+  (`TestLongPollAnswersACommitOfAnotherProcess`, `TestLongPollAnswersAPushAtOnce`); store level in
+  `internal/store/synced_test.go` (`TestRetriedOperationIsAppliedOnce`, `TestConcurrentCorrectionsKeepTheLosingText`).
+- R5: property test, every permutation of one set of changes gives the same row
+  (`TestAnyOrderOfChangesGivesTheSameRegisters`).
+- R3 (local part), R7, R9: replica store tests (`TestReplicaWriteIsFoundAtOnceAndQueued`,
+  `TestServerRowKeepsTheReplicasPendingChange`, `TestRetireAgainstACorrectionStaysRetiredAndReopensCorrected`,
+  `TestResetReplicaKeepsTheOutbox`); the helper's loop with a fake server follows.
 - R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`.
 - R11: command tests and a freshness unit test.
 - R14: `make test-plugins`.
