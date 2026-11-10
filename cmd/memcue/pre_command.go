@@ -194,10 +194,9 @@ func (inv *invocation) runPreCommand(args []string, out io.Writer) error {
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
 		return errors.New("pre-command cwd must be a directory")
 	}
+	// Without a project identity (a temporary non-Git directory) only this host's and the global facts apply (#705):
+	// the project clause of the query then matches nothing, never every repository.
 	keys := tier.Keys(abs, claudeDir(), inv.ctx)
-	if len(keys) == 0 {
-		return errors.New("pre-command: no project identity; resolve the target repository first")
-	}
 	var packet []byte
 	err = inv.withPullState(func(st *pullState) error {
 		key := pullHash(*session)
@@ -304,6 +303,9 @@ func (inv *invocation) runPreCommand(args []string, out io.Writer) error {
 			if answer.Omitted > 0 {
 				answer.Blocked = true
 				answer.Hint = "Incomplete pull: do not execute. Read and acknowledge any received facts using receipt, then narrow words with the same session. Whole facts are never truncated. If a fact cannot fit or budget runs out, request explicit review outside this budget."
+			}
+			if len(keys) == 0 {
+				answer.Hint = "No project identity: only this host's and global facts were checked. " + answer.Hint
 			}
 			b, _ := jsonctx.Marshal(inv.ctx, answer)
 			if len(b)+1 > answer.Remaining {

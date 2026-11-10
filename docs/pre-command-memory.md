@@ -12,7 +12,8 @@ keeps an empty Hermes cwd from becoming the process repository; `72bf9cb` names 
 repositories by remotes. This implementation uses the existing tier resolver, including
 linked worktree common directories and remote aliases, rather than guessing from a
 basename. The actual absolute command cwd is resolved through symlinks and checked on
-every pull. Missing project identity is an error, never an all-repository fallback.
+every pull. Without a project identity (a temporary non-Git directory) only this host's
+and the global facts apply, and the hint says so (#705); there is never an all-repository fallback.
 Host/global constraints join project facts; shelves and other repositories stay out.
 For this protocol, an explicit scope is authoritative: only target repository aliases,
 this host and global scopes are applicable. Origin matching is a fallback only for

@@ -10,6 +10,55 @@ import (
 	"testing"
 )
 
+// A temporary non-Git directory has no project identity. pre-command used to fail there, and an agent that executes
+// only after an unblocked answer could not write memory from it (#705). It now checks this host's and the global
+// facts only: another repository's and another host's facts stay out, so there is no all-repository fallback.
+func TestPreCommandWithoutProjectChecksHostAndGlobal(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_HOST", "synthetic-host")
+	repo := filepath.Join(dir, "quarry")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".git/config"), []byte("[remote \"origin\"]\nurl = https://synthetic.invalid/quarry.git\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	global := addFactForTest(t, "-kind", "rule", "-scope", "global", "Orchard deploys always need an amber review.")
+	host := addFactForTest(t, "-kind", "pitfall", "-scope", "host:synthetic-host", "Orchard deploys on this host need amber mode.")
+	foreign := addFactForTest(t, "-cwd", repo, "-kind", "pitfall", "-scope", "repo", "Orchard deploys in quarry need amber tokens.")
+	other := addFactForTest(t, "-kind", "pitfall", "-scope", "host:another-host", "Orchard deploys on another host need amber keys.")
+	work := t.TempDir()
+	pull := func(args ...string) pullAnswer {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runPreCommand(append([]string{"-cwd", work, "-session", "synthetic-no-project", "-action", "deploy"}, args...), &out); err != nil {
+			t.Fatalf("pre-command %q in a directory without project identity: %v", args, err)
+		}
+		var answer pullAnswer
+		if err := json.Unmarshal(out.Bytes(), &answer); err != nil {
+			t.Fatalf("pre-command %q: %v\n%s", args, err, out.String())
+		}
+		return answer
+	}
+	first := pull("--", "orchard deploy amber")
+	got := map[string]bool{}
+	for _, f := range first.Facts {
+		got[f.ID] = true
+	}
+	if !got[global] || !got[host] {
+		t.Errorf("host and global facts missing without a project: got %v, want %s and %s", got, global, host)
+	}
+	if got[foreign] || got[other] {
+		t.Errorf("another repository's or host's fact applied without a project: %v", got)
+	}
+	if !first.Blocked || !strings.HasPrefix(first.Hint, "No project identity: only this host's and global facts were checked.") {
+		t.Fatalf("first answer: blocked=%v hint=%q", first.Blocked, first.Hint)
+	}
+	if acked := pull("-ack", first.Receipt, "--", "orchard deploy amber"); acked.Blocked {
+		t.Fatalf("acknowledging host and global facts did not unblock: %+v", acked)
+	}
+}
+
 // The session note shows where -ack goes (#704): placed after --, it is query text and starts a new request, so the
 // receipt is never acknowledged. The form the note prints must acknowledge; the form agents tried must not.
 func TestPreCommandNoteAckFormAcknowledges(t *testing.T) {
