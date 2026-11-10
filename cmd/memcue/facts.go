@@ -549,9 +549,9 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 	n := fs.Int("n", 5, "the most facts to return; fewer come when the rest do not fit")
 	minScore := fs.Float64("min-score", recall.MinScore,
 		"leave out a fact whose BM25 is below this share of the best one (0 keeps every fact up to -n)")
-	in := fs.String("in", "", "where to look, comma-separated, a union: project (this repository), global, host (this "+
-		"machine), all (every fact off the shelves), shelf (every shelf), or a scope such as repo:KEY, host:NAME, "+
-		"service:NAME, shelf:SLUG (default: project, host and global in a repository, all elsewhere)")
+	in := fs.String("in", "", "where to look, comma-separated, a union: global, host (this machine), all (every fact off "+
+		"the shelves), shelf (every shelf), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:SLUG (default: "+
+		"this repository, this host and global in a repository, widened to all when they hold nothing; all elsewhere)")
 	kind := fs.String("kind", "", "only facts of these kinds, comma-separated: "+strings.Join(recall.Kinds, ", "))
 	since := fs.String("since", "", "only facts learnt on or after this day (YYYY-MM-DD)")
 	expired := fs.Bool("expired", false, "include facts whose expiry has passed")
@@ -566,6 +566,10 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 	if *n < 1 {
 		// A limit below one asks for nothing, and the empty answer it gets would say the base holds nothing (#454).
 		return errors.New("search: -n must be >= 1")
+	}
+	if slices.ContainsFunc(splitList(*in), func(place string) bool { return strings.TrimSpace(place) == "project" }) {
+		// The repository alone hid this host's and the global facts and found nothing the default did not (#712).
+		return errors.New(errProjectGone)
 	}
 	q := recall.Query{Text: strings.Join(words, " "), N: *n, MinScore: *minScore,
 		Project: tier.Keys(*cwd, claudeDir(), inv.ctx), Host: currentHost(), In: splitList(*in), Kinds: splitList(*kind), Since: *since,
@@ -595,15 +599,26 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		// An ordinary search in a repository that finds nothing there searches every repository at once (#712): the
+		// agent did that itself one call later, and the answer says where the facts come from.
+		widened := false
+		if len(hits) == 0 && q.NarrowByDefault() {
+			wide := q
+			wide.In = []string{"all"}
+			if hits, err = recall.Search(s, wide); err != nil {
+				return err
+			}
+			widened = true
+		}
 		query := q.Text
 		inv.logSearch(*session, *cwd, query, hits, time.Since(start))
 		// The lines that follow the facts, in the order the plain answer prints them; -json carries the same ones, so
 		// a host that parses the answer is told what a reader is (#453).
 		var hints []string
+		if widened && len(hits) > 0 {
+			hints = append(hints, widenedHint)
+		}
 		if len(hits) == 0 {
-			if q.NarrowByDefault() {
-				hints = append(hints, "No facts of this repository, this host or global match; -in all searches every repository.")
-			}
 			if len(f.ExcludePrefixes) > 0 && len(f.KeepScopes) == 0 {
 				hint, err := shelfHint(s, q)
 				if err != nil {
@@ -619,12 +634,19 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 			hints = append(hints, cjkHint)
 		}
 		if *asJSON {
-			return inv.encoder(out).Encode(searchAnswer{Facts: searchJSON(hits), Hints: hints})
+			return inv.encoder(out).Encode(searchAnswer{Facts: searchJSON(hits), Hints: hints, Widened: widened && len(hits) > 0})
 		}
-		if len(hits) == 0 && !q.NarrowByDefault() {
+		if len(hits) == 0 {
 			if _, err := fmt.Fprintln(out, "No stored facts match."); err != nil {
 				return err
 			}
+		}
+		if widened && len(hits) > 0 {
+			// Ahead of the facts, so a fact of another repository is not read as one of this repository.
+			if _, err := fmt.Fprintln(out, widenedHint); err != nil {
+				return err
+			}
+			hints = hints[1:]
 		}
 		for _, h := range hits {
 			if _, err := fmt.Fprintln(out, strings.Join(strings.Fields(h.ID+" "+h.Origin+" | "+h.Content), " ")); err != nil {
@@ -639,6 +661,13 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 		return nil
 	})
 }
+
+// widenedHint heads the facts of an ordinary search widened to every repository (#712).
+const widenedHint = "No facts of this repository, this host or global match; these come from other repositories: check that they apply."
+
+// errProjectGone answers -in project, removed in #712: the default already ranks the repository's facts first.
+const errProjectGone = "search: -in project is gone: search without -in (this repository, this host and global, " +
+	"widened to every repository when they hold nothing), or name one repository with -in repo:KEY"
 
 // shelfHints is the most shelved facts the hint of an empty search counts, and shelfNames the most shelves it names.
 const (
@@ -723,6 +752,8 @@ type searchFact struct {
 type searchAnswer struct {
 	Facts []searchFact `json:"facts"`
 	Hints []string     `json:"hints,omitempty"`
+	// Widened says the facts come from every repository because this repository, this host and global had none (#712).
+	Widened bool `json:"widened,omitempty"`
 }
 
 func searchJSON(hits []store.Hit) []searchFact {

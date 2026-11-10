@@ -236,9 +236,10 @@ the key. A fact written with no scope gets the project its origin names, and `gl
 
 The project narrows and orders `memcue search`. In a session that works in a repository, search looks at that
 repository's facts (those learnt in it or scoped to it, `repo:<key>`), this host's and the global ones by default
-(#418). Outside a repository, and in the Hermes tool, the default is the whole base. `-in all` searches every
-repository, `-in project` searches this repository only, and `-in host`, `-in global` or a scope such as
-`-in repo:KEY` name another (#409); a key may be the end of the stored one, `-in repo:memcue`, or the tier of an origin,
+(#418); when none of them holds a fact, the same search runs over every repository and the answer says so above the
+facts, `"widened": true` in `-json` (#712). Outside a repository, and in the Hermes tool, the default is the whole
+base. `-in all` searches every repository, and `-in host`, `-in global` or a scope such as `-in repo:KEY` name another
+(#409); `-in project` is gone (#712): it hid this host's and the global facts and found nothing the default did not; a key may be the end of the stored one, `-in repo:memcue`, or the tier of an origin,
 `-in repo:_global` (#459). The default was
 measured, not assumed: the project's facts alone answered a question about the host with 1 fact where the whole base
 gave 5, three of them the host facts that answered it, and 255 of the 391 live facts of that base carry the host scope

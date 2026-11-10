@@ -485,8 +485,8 @@ exit 0
 `)
 	await chmod(binary, 0o755)
 	const { tools } = mount({ binary })
-	await tools.get('memcue_search').execute({ query: 'harness base', in: 'project,host', kind: 'rule,decision', since: '2026-10-01', expired: true, words: 'all', min_score: 0 }, {})
-	assert.equal((await readFile(log, 'utf8')).trim(), `search -json -n 5 -cwd ${process.cwd()} -in project,host -kind rule,decision -since 2026-10-01 -min-score 0 -expired -all-words -- harness base`)
+	await tools.get('memcue_search').execute({ query: 'harness base', in: 'host,global', kind: 'rule,decision', since: '2026-10-01', expired: true, words: 'all', min_score: 0 }, {})
+	assert.equal((await readFile(log, 'utf8')).trim(), `search -json -n 5 -cwd ${process.cwd()} -in host,global -kind rule,decision -since 2026-10-01 -min-score 0 -expired -all-words -- harness base`)
 	await assert.rejects(tools.get('memcue_search').execute({ query: 'x', words: 'some' }, {}), /words must be all or any/)
 })
 

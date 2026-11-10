@@ -15,7 +15,8 @@ Hook child environment does not propagate to later shell calls. Run commands fro
   `origin` (optional), `scope` (optional), `created` and `expires` (optional).
   Do not invent source or kind fields in that response. Inspect the configured base history when persisted metadata is needed.
   Default search includes the repository, host and global facts in a repository; outside a project it searches all
-  off-shelf facts. Use `-in project`, `-in host`, `-in global`, `-in repo:KEY` or `-in all` deliberately.
+  off-shelf facts; an empty answer in a repository is widened to every repository and marked `widened`.
+  Use `-in host`, `-in global`, `-in repo:KEY` or `-in all` deliberately.
   Use `-expired` only when investigating expired facts, and `-n` or `-min-score 0` to widen a search.
 - Search first before every write. Use the memcue skill to add, correct or retire facts while working; nothing extracts
   them from the transcript. Correct an existing fact rather than adding a duplicate. Preserve source, kind, scope and expiry.

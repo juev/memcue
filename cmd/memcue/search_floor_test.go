@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -153,7 +155,7 @@ func TestSearchHintsOnCJK(t *testing.T) {
 }
 
 // In a repository, search finds the repository's, this host's and the global facts without -in, and an answer with
-// none of them names -in all (#418).
+// none of them searches every repository and says so ahead of the facts (#418, #712).
 func TestSearchDefaultInARepository(t *testing.T) {
 	dir := env(t)
 	repo := filepath.Join(dir, "shop")
@@ -162,7 +164,7 @@ func TestSearchDefaultInARepository(t *testing.T) {
 	own := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:"+key, "nats магазина слушает 4222.")
 	host := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "host:"+currentHost(), "nats на этом хосте в docker.")
 	global := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "global", "nats держим на 4222 везде.")
-	addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
+	lib := addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
 	var out bytes.Buffer
 	if err := runSearch([]string{"-min-score", "0", "nats"}, &out); err != nil {
 		t.Fatal(err)
@@ -172,16 +174,72 @@ func TestSearchDefaultInARepository(t *testing.T) {
 			t.Errorf("default search lacks %s: %q", id, out.String())
 		}
 	}
-	if strings.Contains(out.String(), "библиотеки") {
-		t.Errorf("default search found another repository's fact: %q", out.String())
+	if strings.Contains(out.String(), "библиотеки") || strings.Contains(out.String(), widenedHint) {
+		t.Errorf("a default search with facts of its own widened: %q", out.String())
 	}
+
 	out.Reset()
-	if err := runSearch([]string{"4223"}, &out); err != nil {
+	if err := runSearch([]string{"библиотеки"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	want := "No facts of this repository, this host or global match; -in all searches every repository."
-	if strings.TrimSpace(out.String()) != want {
-		t.Errorf("an empty default answer printed %q, want %q", out.String(), want)
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 || lines[0] != widenedHint || !strings.HasPrefix(lines[1], lib+" ") {
+		t.Errorf("an empty default search printed %q, want the widening line, then the library's fact", out.String())
+	}
+
+	out.Reset()
+	if err := runSearch([]string{"-json", "библиотеки"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var answer searchAnswer
+	if err := json.Unmarshal(out.Bytes(), &answer); err != nil {
+		t.Fatal(err)
+	}
+	if !answer.Widened || len(answer.Facts) != 1 || answer.Facts[0].ID != lib || !slices.Contains(answer.Hints, widenedHint) {
+		t.Errorf("-json of a widened search = %+v", answer)
+	}
+
+	out.Reset()
+	if err := runSearch([]string{"-json", "nats"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), `"widened"`) {
+		t.Errorf("-json of a search with facts of its own carries widened: %s", out.String())
+	}
+
+	out.Reset()
+	if err := runSearch([]string{"5672"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "No stored facts match." {
+		t.Errorf("a search no repository answers printed %q", got)
+	}
+}
+
+// An explicit place is kept as given: an empty -in host answer is not widened (#712).
+func TestSearchExplicitPlaceIsNotWidened(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	gitRepo(t, repo)
+	t.Chdir(repo)
+	addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
+	var out bytes.Buffer
+	if err := runSearch([]string{"-in", "host", "библиотеки"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "No stored facts match." {
+		t.Errorf("-in host printed %q, want no facts", got)
+	}
+}
+
+// -in project is gone (#712): alone or in a union it fails and points to the default and to -in repo:KEY.
+func TestSearchRejectsProject(t *testing.T) {
+	env(t)
+	for _, in := range []string{"project", "host, project"} {
+		err := runSearch([]string{"-in", in, "nats"}, &bytes.Buffer{})
+		if err == nil || err.Error() != errProjectGone {
+			t.Errorf("-in %q: got %v, want %q", in, err, errProjectGone)
+		}
 	}
 }
 

@@ -454,8 +454,7 @@ SEARCH_SCHEMA = _schema(
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
               "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
               "got is thinner than the question needs.",
-     "in": "Optional where to look, comma-separated, a union: all (the default), project (the session's repository "
-           "only), global, host (this machine), shelf (facts read from web pages and documents, which no other place "
+     "in": "Optional where to look, comma-separated, a union: all (the default), global, host (this machine), shelf (facts read from web pages and documents, which no other place "
            "returns, all included), or a scope such as repo:KEY, host:NAME, service:NAME, shelf:research; "
            "all,shelf:research reads both.",
      "kind": "Optional kinds, comma-separated: rule, decision, pitfall, environment, event, procedure. E.g. "

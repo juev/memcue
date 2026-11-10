@@ -234,7 +234,6 @@ class RealCLI(unittest.TestCase):
         expired=self.add('Synthetic orchard old event.','-kind','event','-source','user','-scope','global','-expires','2000-01-01')
         ids=lambda result:{f['id'] for f in result['facts']}
         self.assertEqual(ids(self.search('synthetic orchard')),{repo,global_id,host})
-        self.assertEqual(ids(self.search('-in','project','synthetic orchard')),{repo})
         self.assertEqual(ids(self.search('-in','global','synthetic orchard')),{global_id})
         self.assertEqual(ids(self.search('-in','host','synthetic orchard')),{host})
         self.assertEqual(ids(self.search('-in','shelf:research','synthetic orchard')),{shelf})

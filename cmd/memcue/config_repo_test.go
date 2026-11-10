@@ -57,8 +57,12 @@ func TestClaudeConfigDirectoryIsARepository(t *testing.T) {
 		if err := runSearch([]string{"-kind", "rule", "хук ревью конфига"}, &found); err != nil {
 			t.Fatal(err)
 		}
-		if got := strings.Contains(found.String(), configRule); got != c.wantConfig {
-			t.Errorf("search in %s finds the config rule: %v, want %v", filepath.Base(c.cwd), got, c.wantConfig)
+		// The config rule is the config repository's: elsewhere it comes only through the widened search, marked as
+		// a fact of another repository (#712).
+		widened := strings.HasPrefix(found.String(), widenedHint+"\n")
+		if !strings.Contains(found.String(), configRule) || widened == c.wantConfig {
+			t.Errorf("search in %s printed %q: want the config rule, widened %v", filepath.Base(c.cwd), found.String(),
+				!c.wantConfig)
 		}
 		found.Reset()
 		if err := runSearch([]string{"-kind", "rule", "коммиты по-английски"}, &found); err != nil {

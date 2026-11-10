@@ -877,12 +877,14 @@ class ProviderTest(unittest.TestCase):
         self.p._workspace = str(repo)
         found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3"}))
         self.assertEqual([f["id"] for f in found["facts"]], [other])
-        narrow = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
-        self.assertEqual(narrow["facts"], [])
-        # The workspace is a project to memcue: the narrow search finds a fact of this repository.
+        # -in project is gone (#712): the tool hands memcue's refusal back.
+        gone = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
+        self.assertIn("-in project is gone", gone["error"])
+        # A fact of this repository is found by naming the repository.
         own = self.memcue("add", "-origin", "example.com/us/app 2026-10-27", "-scope", "repo:example.com/us/app",
                           "Nginx на server3 слушает порт 8443.")[0].split()[0]
-        mine = json.loads(self.p.handle_tool_call("memcue_search", {"query": "nginx server3", "in": "project"}))
+        mine = json.loads(self.p.handle_tool_call("memcue_search", {"query": "nginx server3",
+                                                                    "in": "repo:example.com/us/app"}))
         self.assertEqual([f["id"] for f in mine["facts"]], [own])
 
     def test_search_answer_reads_both_shapes(self):

@@ -366,9 +366,9 @@ var cases = []benchCase{
 	},
 	{
 		id: "no-match-gives-hint", stratum: characterization,
-		note: "Records that a query nothing fits returns no fact, and a hint that holds no fact: on stdout without " +
-			"-json, in `hints` with it (#453). Inside a repository the hint names `-in all`; only that it is there " +
-			"is asserted, not its wording.",
+		note: "Records that a query nothing fits returns no fact: on stdout a line that holds no fact, and no " +
+			"`hints` with -json (#453). Inside a repository the empty default search was already widened to every " +
+			"repository (#712), so no hint sends the agent to -in all.",
 		setup: func(t *testing.T, w *world) {
 			w.add(t, "own", queueFact, addOpts{cwd: w.repo(t, "widget").dir})
 		},
@@ -378,8 +378,8 @@ var cases = []benchCase{
 			if strings.TrimSpace(stdout) == "" || strings.Contains(stdout, w.id(t, "own")) {
 				t.Errorf("stdout %q; want a hint and no fact", stdout)
 			}
-			if len(a.hints) != 1 || !strings.Contains(a.hints[0], "-in all") {
-				t.Errorf("-json hints %q, want the one that names -in all", a.hints)
+			if len(a.hints) != 0 {
+				t.Errorf("-json hints %q, want none", a.hints)
 			}
 		}},
 	},
