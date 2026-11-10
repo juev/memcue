@@ -91,10 +91,15 @@ func (s *Syncer) failed(err error) {
 	}
 }
 
+// pullLoop long-polls the server. The first pull, and the first after a failure, asks without waiting: a long poll
+// answers only when a fact is written, and until an answer comes the replica does not know that the server is reachable.
+// Without it a new replica of an empty server would not learn its base, and the status would keep the last failure
+// for the length of a poll after the server is back (R15).
 func (s *Syncer) pullLoop(ctx context.Context) {
 	backoff := time.Second
+	wait := time.Duration(0)
 	for ctx.Err() == nil {
-		if err := s.pullOnce(ctx); err != nil {
+		if err := s.pullOnce(ctx, wait); err != nil {
 			if ctx.Err() != nil {
 				return
 			}
@@ -103,21 +108,22 @@ func (s *Syncer) pullLoop(ctx context.Context) {
 				return
 			}
 			backoff = min(2*backoff, 30*time.Second)
+			wait = 0
 			continue
 		}
 		s.failed(nil)
-		backoff = time.Second
+		backoff, wait = time.Second, s.wait
 	}
 }
 
 // pullOnce applies one answer of the server. A server of another base, or one behind the replica, makes the replica
 // start over from that base with its outbox kept (R9).
-func (s *Syncer) pullOnce(ctx context.Context) error {
+func (s *Syncer) pullOnce(ctx context.Context, wait time.Duration) error {
 	st, err := s.r.State()
 	if err != nil {
 		return err
 	}
-	c, err := s.c.Pull(ctx, st.LastSeq, s.wait, s.limit)
+	c, err := s.c.Pull(ctx, st.LastSeq, wait, s.limit)
 	if err != nil {
 		return err
 	}

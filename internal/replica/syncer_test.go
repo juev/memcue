@@ -295,6 +295,48 @@ func TestCreateOfATakenIDGetsANewID(t *testing.T) {
 	})
 }
 
+// longPollSyncer runs the sync of a new replica whose long poll waits a minute, longer than the tests below allow.
+func longPollSyncer(t *testing.T, l *link) *Syncer {
+	t.Helper()
+	r, err := store.OpenReplica(filepath.Join(t.TempDir(), "replica.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(r, NewHTTP(l.dial))
+	s.wait = time.Minute
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); s.Run(ctx) }()
+	t.Cleanup(func() { cancel(); <-done; _ = r.Close() })
+	return s
+}
+
+func TestNewReplicaOfAnEmptyServerSyncsWithoutWaiting(t *testing.T) {
+	s := longPollSyncer(t, linkTo(newServer(t)))
+	took := eventually(t, "the first sync", func() bool {
+		st, err := s.Status()
+		return err == nil && !st.LastSync.IsZero()
+	})
+	if took > 5*time.Second {
+		t.Fatalf("first sync of an empty server took %v", took)
+	}
+}
+
+func TestStatusClearsTheFailureWhenTheServerIsBack(t *testing.T) {
+	srv := newServer(t)
+	l := linkTo(srv)
+	s := longPollSyncer(t, l)
+	eventually(t, "the first sync", func() bool { st, err := s.Status(); return err == nil && !st.LastSync.IsZero() })
+	l.set(srv.ts.Listener.Addr().String(), true)
+	srv.ts.CloseClientConnections() // the long poll in progress breaks, and the next dial fails
+	eventually(t, "the failure in the status", func() bool { st, err := s.Status(); return err == nil && st.Error != "" })
+	l.set(srv.ts.Listener.Addr().String(), false)
+	took := eventually(t, "the failure to clear", func() bool { st, err := s.Status(); return err == nil && st.Error == "" })
+	if took > 5*time.Second {
+		t.Fatalf("the status kept the failure %v after the server was back", took)
+	}
+}
+
 func TestWorkerReportsWhyItDoesNotRun(t *testing.T) {
 	w := NewWorker(filepath.Join(t.TempDir(), "replica.db"))
 	if st, ok := w.Status().(Status); !ok || st.Error != ErrNotRunning.Error() {

@@ -19,7 +19,7 @@ const serverProfile = `{"Version":1,"Hostname":"memcue","ControlURL":"https://co
 
 // serverEnv is env in server mode with a private, empty tailnet identity. The helper is never really started: the
 // starts are recorded.
-func serverEnv(t *testing.T) (identity string, starts func() []bool) {
+func serverEnv(t *testing.T) (identity string, starts func() int) {
 	t.Helper()
 	env(t)
 	identity = t.TempDir()
@@ -33,16 +33,16 @@ func serverEnv(t *testing.T) (identity string, starts func() []bool) {
 	t.Setenv("MEMCUE_TAILSCALE_HOSTNAME", "memcue")
 	t.Setenv("MEMCUE_TAILSCALE_CONTROL_URL", "https://controlplane.tailscale.com")
 	var mu sync.Mutex
-	var started []bool
+	started := 0
 	old := startHelper
-	startHelper = func(takeover bool) error {
+	startHelper = func() error {
 		mu.Lock()
-		started = append(started, takeover)
+		started++
 		mu.Unlock()
 		return nil
 	}
 	t.Cleanup(func() { startHelper = old })
-	return identity, func() []bool { mu.Lock(); defer mu.Unlock(); return append([]bool(nil), started...) }
+	return identity, func() int { mu.Lock(); defer mu.Unlock(); return started }
 }
 
 // fakeHelper answers the helper protocol in identity with reply and records the operations it was asked for.
@@ -183,8 +183,8 @@ func TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce(t *testing.T) {
 			t.Errorf("card=%v: a dream hint in server mode: %q", card, text)
 		}
 	}
-	if got := starts(); len(got) != 2 || got[0] || got[1] {
-		t.Fatalf("helper starts %v, want two plain starts", got)
+	if got := starts(); got != 2 {
+		t.Fatalf("helper started %d times, want 2", got)
 	}
 	if spawned {
 		t.Fatal("a client started a background dream in server mode")
@@ -198,8 +198,8 @@ func TestSessionStartReplacesAHelperOfAnotherVersion(t *testing.T) {
 	if got := ops(); len(got) != 2 || got[0] != "status" || got[1] != "off" {
 		t.Fatalf("helper was asked %v, want status then off", got)
 	}
-	if got := starts(); len(got) != 1 || !got[0] {
-		t.Fatalf("helper starts %v, want one takeover", got)
+	if got := starts(); got != 1 {
+		t.Fatalf("helper started %d times, want 1", got)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestSessionStartReportsLoginAndRefusedChanges(t *testing.T) {
 			t.Errorf("no %q in %q", want, text)
 		}
 	}
-	if got := starts(); len(got) != 0 {
-		t.Fatalf("a running helper of this version was started again: %v", got)
+	if got := starts(); got != 0 {
+		t.Fatalf("a running helper of this version was started again %d times", got)
 	}
 }

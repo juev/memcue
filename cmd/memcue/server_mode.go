@@ -91,9 +91,11 @@ const helperWait = 500 * time.Millisecond
 // startHelper starts the helper detached; tests replace it.
 var startHelper = startHelperDetached
 
-// startHelperDetached runs memcue connect serve in its own session and returns without waiting for it (R10). With
-// takeover the new helper waits for the one it replaces to let go of the tailnet identity.
-func startHelperDetached(takeover bool) error {
+// startHelperDetached runs memcue connect serve -takeover in its own session and returns without waiting for it (R10).
+// The new helper waits for one that is exiting to let go of the tailnet identity: a helper asked to exit closes its
+// socket at once but holds the identity until its node is down, and a plain start in that window would find it owned
+// and exit, leaving the machine without a helper.
+func startHelperDetached() error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -103,11 +105,7 @@ func startHelperDetached(takeover bool) error {
 		return err
 	}
 	defer func() { _ = null.Close() }()
-	args := []string{"connect", "serve"}
-	if takeover {
-		args = append(args, "-takeover")
-	}
-	cmd := exec.Command(exe, args...)
+	cmd := exec.Command(exe, "connect", "serve", "-takeover")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = null, null, null
 	for _, entry := range os.Environ() {
@@ -139,11 +137,11 @@ func (inv *invocation) serverHints() string {
 	switch {
 	case err != nil:
 		if tailnet.ValidateExistingProfile(cfg) == nil {
-			_ = startHelper(false)
+			_ = startHelper()
 		}
 	case state.Version != version:
 		_, _ = tailnet.Admin(ctx, tailnet.Config{Dir: cfg.Dir}, "off")
-		_ = startHelper(true)
+		_ = startHelper()
 	case state.State == "NeedsLogin" || state.State == "NeedsMachineAuth" || state.State == "Stopped":
 		lines = append(lines, fmt.Sprintf("memcue: the tailnet helper of this machine waits for a login (%s), so the "+
 			"replica of %s does not sync; tell the user to run memcue connect up.", state.State, cfg.Host))
