@@ -156,6 +156,7 @@ a source link is not a downloadable copy of the private evidence.
 | [What opening the base costs, October 2026](open-cost-2026-10.md) |
 | [Releasing 0.22.0 and moving to the text history, October 2026](release-0-22-0-555-2026-10.md) |
 | [SQLite or DuckDB for the fact base, October 2026](storage-2026-10.md) |
+| [Alternatives to SQLite for the sync server: Turso and git-backed databases, November 2026 (#714)](storage-alternatives-714-2026-11.md) |
 | [Compacting the text history: what the merge needs, October 2026 (#575, step 1)](text-history-compaction-575-2026-10.md) |
 | [The cost of opening a text history, October 2026](text-open-cost-557-2026-10.md) |
 
