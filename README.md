@@ -58,7 +58,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.33.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.34.0`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -66,6 +66,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.34.0 | 9 | 0.34.0 | 0.34.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.34.0 (`hermes-agent` >=0.17.0) |
 | 0.33.0 | 9 | 0.33.0 | 0.33.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.33.0 (`hermes-agent` >=0.17.0) |
 | 0.32.0 | 9 | 0.32.0 | 0.32.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.32.0 (`hermes-agent` >=0.17.0) |
 | 0.31.1 | 9 | 0.31.1 | 0.31.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.31.1 (`hermes-agent` >=0.17.0) |
@@ -275,6 +276,22 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.34.0: PostgreSQL searches on the server, faster session start on a text base
+
+- **PostgreSQL schema 2 (incompatible).** The PostgreSQL base keeps one row per fact (its current version) and
+  searches on the server, with one connection per command (#700). It keeps no fact history. A schema 1 base, written
+  by 0.32.0–0.33.x, is refused with `PostgreSQL base uses schema 1`; there is no in-place upgrade. Recreate it from a
+  local base with `memcue migrate -postgres -apply` after dropping the `memcue` schema, as
+  [Moving a local base](docs/remote-backends.md#moving-a-local-base) describes. The local schema remains **9**.
+- On a text base, `session-start` and `session-card -pitfalls-only` read the repository's pitfalls from the cache
+  instead of rereading the whole history: 296 ms → 27 ms at 10,000 facts (#709). An append to a fact file now also
+  sets its directory's time, so another cache of the same history (another adapter's state directory) reads the
+  correction at its next open, for search as well. Corrections written by an older memcue are not marked this way.
+- `pre-command` in a directory without a project identity (a temporary non-Git directory) checks this host's and the
+  global facts instead of failing (#705).
+- The pre-command instructions say that `-ack RECEIPT` goes before `--` (#704).
+- The Codex plugin sends a repository-pitfall snapshot only when it changes, not before every shell command (#705).
 
 ### 0.33.0: moving a local base into PostgreSQL, working embedded Tailscale
 
