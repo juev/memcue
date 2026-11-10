@@ -87,6 +87,19 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
                 self.assertIn('Never correct a fact solely to change its language.',text)
                 self.assertIn('Existing fact content remains as stored.',text)
 
+    def test_delivered_policy_places_ack_before_double_dash(self):
+        # #704: agents put -ack after --, where it is query text and starts a new request.
+        hook=self.run_adapter('hook',data=self.payload())
+        self.assertEqual(hook.returncode,0,hook.stderr)
+        note=json.loads(hook.stdout)['hookSpecificOutput']['additionalContext']
+        fallback=self.run_adapter('instructions')
+        self.assertEqual(fallback.returncode,0,fallback.stderr)
+        for text in (note,fallback.stdout):
+            with self.subTest(text=text[:60]):
+                self.assertIn('-ack RECEIPT` before `--`',text)
+                self.assertIn('-action "<family>" -ack RECEIPT -- "<words>"',text)
+                self.assertNotIn('with -ack RECEIPT.',text)
+
     def test_later_shell_calls_use_same_config_without_hook_environment(self):
         r = self.run_adapter('hook',data=self.payload())
         self.assertEqual(r.returncode,0,r.stderr)

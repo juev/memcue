@@ -299,7 +299,7 @@ func (inv *invocation) runPreCommand(args []string, out io.Writer) error {
 				answer.Receipt = pullHash(request + "\x00" + strings.Join(delivered, "\x00"))
 				task.Pending = &pullReceipt{Request: request, Token: answer.Receipt, Facts: delivered}
 				answer.Blocked = true
-				answer.Hint = "Read whole facts, then repeat this request with -ack RECEIPT (tool: ack). Execute only after an unblocked response. After a transport failure retry without ack; CLI exit is not host delivery."
+				answer.Hint = "Read whole facts, then repeat this request with -ack RECEIPT before -- (tool: ack). Execute only after an unblocked response. After a transport failure retry without ack; CLI exit is not host delivery."
 			}
 			if answer.Omitted > 0 {
 				answer.Blocked = true
