@@ -122,51 +122,6 @@ class ProviderTest(unittest.TestCase):
                     self.assertIn("error", result)
         self.assertIn("Cobalt observatory.", "\n".join(self.facts()))
 
-    def test_pre_command_actual_target_and_repeat(self):
-        note=self.p.system_prompt_block()
-        instruction=note[note.index("Before the first relevant command"):note.index("Search the base with memcue_search")]
-        self.assertLessEqual(len((instruction+json.dumps(memcue_provider.PRE_COMMAND_SCHEMA)).encode()),2048)
-        repo=Path(self.home)/"orchard"
-        (repo/".git").mkdir(parents=True)
-        (repo/".git/config").write_text('[remote "origin"]\nurl = https://synthetic.invalid/orchard.git\n')
-        fact=self.memcue("add", "-cwd", str(repo), "-kind", "pitfall", "-scope", "repo", "--",
-                         "Orchard build requires amber mode.")[0].split()[0]
-        args={"cwd":str(repo), "session":"synthetic-task", "action":"build", "query":"orchard build"}
-        first=json.loads(self.p.handle_tool_call("memcue_pre_command", args))
-        self.assertIn(fact, [f["id"] for f in first["facts"]])
-        self.assertTrue(first["blocked"])
-        self.assertEqual(json.loads(self.p.handle_tool_call("memcue_pre_command", args))["facts"],first["facts"])
-        ready=json.loads(self.p.handle_tool_call("memcue_pre_command",dict(args,ack=first["receipt"])))
-        self.assertFalse(ready["blocked"])
-        self.assertEqual(json.loads(self.p.handle_tool_call("memcue_pre_command", args))["facts"], [])
-
-    def test_pre_command_retries_after_lost_transport_until_host_ack(self):
-        repo=Path(self.home)/"transport-orchard"
-        (repo/".git").mkdir(parents=True)
-        (repo/".git/config").write_text('[remote "origin"]\nurl = https://synthetic.invalid/orchard.git\n')
-        fact=self.memcue("add", "-cwd",str(repo),"-kind","pitfall","-scope","repo","--",
-                         "Orchard build requires amber mode only for synthetic fixtures.")[0].split()[0]
-        wrapper=Path(self.home)/"delayed.py"
-        marker=Path(self.home)/"delayed-once"
-        wrapper.write_text("#!"+sys.executable+"\nimport subprocess,sys,time,pathlib\n"
-                           +"p=subprocess.run(["+json.dumps(BIN)+"]+sys.argv[1:])\n"
-                           +"marker=pathlib.Path("+json.dumps(str(marker))+")\n"
-                           +"if p.returncode==0 and sys.argv[1]=='pre-command' and not marker.exists():\n"
-                           +" marker.write_text('synthetic'); time.sleep(1)\nsys.exit(p.returncode)\n")
-        wrapper.chmod(0o700)
-        self.p._config["binary"]=str(wrapper)
-        args={"cwd":str(repo),"session":"transport-task","action":"build","query":"orchard build"}
-        with unittest.mock.patch.object(memcue_provider,"_RECALL_TIMEOUT",0.3):
-            lost=self.p.handle_tool_call("memcue_pre_command",args)
-        self.assertIn("timed out",lost)
-        self.assertTrue(marker.exists(),"wrapper must time out after successful CLI commit")
-        retry=json.loads(self.p.handle_tool_call("memcue_pre_command",args))
-        self.assertIn(fact,[f["id"] for f in retry["facts"]],"CLI success must not consume undelivered facts")
-        self.assertTrue(retry["blocked"])
-        acknowledged=json.loads(self.p.handle_tool_call("memcue_pre_command",dict(args,ack=retry["receipt"])))
-        self.assertFalse(acknowledged["blocked"])
-        self.assertEqual(acknowledged["facts"],[])
-
     def test_repository_pitfalls_follow_task_cwd_and_compaction(self):
         repo = Path(self.home)/"pitfall-repo"
         other = Path(self.home)/"other-repo"
@@ -635,7 +590,7 @@ class ProviderTest(unittest.TestCase):
         p.initialize("s2", hermes_home=self.home, agent_context="subagent")
         p.on_memory_write("add", "memory", "Факт из сабагента.")
         self.assertFalse(Path(p._facts).exists())
-        self.assertEqual([s["name"] for s in p.get_tool_schemas()], ["memcue_search", "memcue_pre_command"])
+        self.assertEqual([s["name"] for s in p.get_tool_schemas()], ["memcue_search"])
         self.assertIn("error", json.loads(p.handle_tool_call("memcue_add", {"content": "x"})))
 
     def test_tools_add_search_correct_retire(self):
@@ -656,7 +611,7 @@ class ProviderTest(unittest.TestCase):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         p.initialize("c1", hermes_home=self.home, agent_context="cron")
         self.assertEqual([s["name"] for s in p.get_tool_schemas()],
-                         ["memcue_search", "memcue_pre_command", "memcue_dream_prepare", "memcue_dream_apply"])
+                         ["memcue_search", "memcue_dream_prepare", "memcue_dream_apply"])
         self.assertIn("error", json.loads(p.handle_tool_call("memcue_add", {"content": "x"})))
         self.assertIn("result", json.loads(p.handle_tool_call("memcue_dream_prepare", {"since": "all"})))
 

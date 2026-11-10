@@ -36,7 +36,7 @@ const messageTerms = 2
 // Query is what the agent asks Search for (#409): the words, how many facts and how close to the best, and where and
 // what to look in. Its zero value is no search; Defaults gives the measured defaults.
 type Query struct {
-	// OriginOnlyUnscoped prevents a matching origin from overriding an explicit scope (pre-command only).
+	// OriginOnlyUnscoped prevents a matching origin from overriding an explicit scope (the #703 research daemon only).
 	OriginOnlyUnscoped bool
 	// Recurrence is explicit observed problem counts, capped by the caller; only exact score/place ties use it.
 	Recurrence map[string]int

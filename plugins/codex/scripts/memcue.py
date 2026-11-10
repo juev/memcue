@@ -390,8 +390,8 @@ def main():
             sys.stdout.write((ROOT / 'AGENTS.md.snippet').read_text(encoding='utf-8').replace(
                 '@MEMCUE@', command).replace('@ROOT@', str(ROOT)))
         else:
-            if args.command not in ('pre-command', 'observe-problem', 'version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream'):
-                raise AdapterError('unsupported command; use pre-command/observe-problem/search/add/correct/retire/reopen/facts/dump/version/dream')
+            if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream'):
+                raise AdapterError('unsupported command; use search/add/correct/retire/reopen/facts/dump/version/dream')
             if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-list']) or
                                                 len(args.args) == 3 and args.args[:2] == ['-prepare', '-since'] and
                                                 args.args[2] and not args.args[2].startswith('-') or

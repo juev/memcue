@@ -18,8 +18,6 @@ import (
 	"github.com/juev/memcue/internal/tier"
 )
 
-const preCommandNote = "Before the first relevant command or action-family/cwd change, resolve the actual target working directory and run `memcue pre-command -cwd \"<absolute cwd>\" -session \"<stable task ID>\" -action \"<family>\" -- \"<English action/system words>\"`. Read whole facts and validate applicability, then repeat the identical request with `-ack RECEIPT` before `--` (`-action \"<family>\" -ack RECEIPT -- \"<words>\"`); after `--` it is query text and starts a new request. Never acknowledge failed transport; retry without -ack. Execute only when blocked is false. Do not repeat for every shell command. Keep session across repository switches and compaction; change -epoch after compaction to re-read applicable facts. Budget: 4096 UTF-8 bytes per response and 16384 per task, including 2048 reserved for this instruction; metadata/hints count. Never put private arguments in query or action."
-
 // sessionNote replaces the built-in memory instructions: it tells the agent where its memory is, to search it before
 // answering from earlier sessions (#361) and, when it decides it may help, during work and before diagnosing a
 // surprise (#522), and how to write to it.
@@ -77,7 +75,7 @@ func (inv *invocation) runSessionStartWith(in io.Reader, out io.Writer, part int
 		return nil
 	}
 	inv.startDream()
-	context := sessionNote + "\n- " + preCommandNote
+	context := sessionNote
 	var automatic string
 	if pitfalls {
 		automatic = inv.repositoryPitfalls(h.CWD)
@@ -277,7 +275,7 @@ func clip(s string, n int) string {
 	return s
 }
 
-// repositoryPitfalls is automatic repository context, independent of ranked search and pre-command receipts.
+// repositoryPitfalls is automatic repository context, independent of ranked search.
 func (inv *invocation) repositoryPitfalls(cwd string) string {
 	header, lines := inv.repositoryPitfallParts(cwd)
 	if header == "" || header == repositoryPitfallsUnavailable {

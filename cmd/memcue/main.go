@@ -93,8 +93,6 @@ const usage = `usage: memcue <command>
 commands:
   session-start   SessionStart hook: repository pitfalls, memory instructions and hints: memcue session-start [-part N] (part 1 carries the text; 2 and 3 print nothing, for an older plugin)
   session-card    session-start without the note: repository pitfalls and maintenance hints: memcue session-card [-dream-tools] [-pitfalls-only | -pitfalls-json | -hints-only]
-  pre-command bounded scoped pull: -cwd DIR -session TASK -action FAMILY [-epoch GENERATION] [-ack RECEIPT] WORDS
-  observe-problem record an evidenced occurrence: -fact ID -incident STABLE_ID
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   sessions  passages of earlier Claude Code sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
@@ -193,10 +191,6 @@ func runMain() (code int) {
 		// Nothing is extracted any more (#494), but a plugin older than that still calls these after a turn or at
 		// the end of a session: take its input and exit 0, so it logs no failure for every turn.
 		_, _ = io.Copy(io.Discard, os.Stdin)
-	case "pre-command":
-		err = inv.runPreCommand(os.Args[2:], out)
-	case "observe-problem":
-		err = inv.runObserveProblem(os.Args[2:], out)
 	case "search":
 		err = inv.runSearch(os.Args[2:], out)
 	case "sessions":

@@ -5,8 +5,6 @@ through hooks:
 
 Codex CLI users: see the [local pull-mode integration](plugins/codex/README.md) for setup, hook review, skills and verification limits.
 
-Before command execution, use the [bounded scoped pull](docs/pre-command-memory.md) for applicable pitfalls and operating constraints; it includes all four integrations, context budgets and observation-based recurrence.
-
 - **At session start, and again after a compaction or `/clear`** it tells the agent when to search memcue: when the
   answer or the next step may depend on what an earlier session knew, and not when the message and the files hold
   everything. No card of rules comes with it (#656): the agent searches your rules and decisions itself, with
@@ -270,7 +268,7 @@ A shelf is read only when a search names it: `-in shelf:research`, or `-in shelf
 leaves the shelves out, `-in all` included: a page read once is noise in a search about anything else, and an `all`
 that still read the shelf would hide nothing. Places are a union, so `-in all,shelf:research` reads every fact off
 the shelves and that one shelf, in either order; a shelf the search does not name stays out even when a named place
-such as `project` would reach its fact through the origin (#532). A search that finds nothing, while its words fit a
+such as `repo:KEY` would reach its fact through the origin (#532). A search that finds nothing, while its words fit a
 shelved fact, says where to look: `1 fact on the shelf matches: -in shelf:research`. `search -json` carries each
 fact's `scope`, so a fact from the shelf can be told from the rest, and prints one object,
 `{"facts": [...], "hints": [...]}`, whose `hints` are the lines the plain answer prints after the facts, this one
@@ -1013,7 +1011,7 @@ scoped to the current git repository arrive as whole content, including conditio
 never grants applicability. Linked worktrees share repository identity; a non-git directory loads no pitfalls.
 Rules, decisions, environment, service/host/global facts and the research shelf stay on their existing search paths.
 Snapshots name their repository and supersede earlier snapshots; facts remain data whose conditions need checking.
-This channel does not consume or acknowledge pre-command budgets/receipts, and adds no model calls.
+This channel adds no model calls.
 
 Claude Code uses native function hooks (verified client 2.1.301): a single snapshot produces a dynamic array of
 whole facts on start/task entry. Large facts use first-message context blocks on startup/rebuild and additive prompt

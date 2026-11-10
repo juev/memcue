@@ -68,7 +68,7 @@ jobs:
       - name: install harness packages
         run: npm install --no-save --no-package-lock @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/dsh-tools@0.2.0-rc.2
 
-      # Jobs do not share binaries: the pre-command integration test executes the real CLI.
+      # Jobs do not share binaries: the native DSH and Claude Code tests execute the real CLI.
       - name: build memcue
         run: go build -p 2 -o bin/memcue ./cmd/memcue
 

@@ -13,7 +13,6 @@ test: build test-codex test-claude-mods
 	go test -race -p 2 -parallel 2 -count=1 -json ./...
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I plugins/hermes/memcue/tests/test_provider.py
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I -m unittest discover -s plugins/hermes -p 'test_*.py'
-	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I plugins/test_pre_command.py
 	python3 -I plugins/test_cross_harness.py
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I docs/research/scripts/test_search_stand.py
 	$(MAKE) test-plugins

@@ -54,7 +54,7 @@ func TestRemoteCommandMatrixProtectsLocalMaintenance(t *testing.T) {
 			t.Fatalf("%s could touch local state under a remote selection", name)
 		}
 	}
-	for _, name := range []string{"search", "add", "correct", "retire", "reopen", "facts", "session-start", "session-card", "pre-command", "observe-problem", "sessions", "dump", "merge", "connect", "version"} {
+	for _, name := range []string{"search", "add", "correct", "retire", "reopen", "facts", "session-start", "session-card", "sessions", "dump", "merge", "connect", "version"} {
 		if err := remoteCommandAllowed(name); err != nil {
 			t.Fatalf("supported or explicit-file command %s rejected: %v", name, err)
 		}

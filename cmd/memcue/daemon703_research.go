@@ -482,7 +482,7 @@ func (d *daemon703) answer(req request703) (string, error) {
 		}
 		return encode703(map[string]any{"additionalContext": strings.Join(lines, "\n\n"), "repositoryPitfallCount": len(facts)})
 	case "precommand":
-		// The store read of pre-command, without its receipt state file.
+		// The store read of the removed pre-command (#679, removed in #712), kept as the prototype measured it.
 		q := recall.Query{OriginOnlyUnscoped: true, Text: strings.Join(req.Words, " "), N: 256, MinScore: recall.MinScore,
 			Project: tier.Keys(req.Cwd, claudeDir(), ctx), Host: currentHost(), In: []string{"project", "host", "global"},
 			Kinds: []string{"rule", "decision", "pitfall", "environment", "procedure"}, Recurrence: map[string]int{}}

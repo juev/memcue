@@ -109,7 +109,7 @@ pgx gets both `LookupFunc` and `DialFunc`; the original DSN hostname and TLS Ser
 | Commands | PostgreSQL selection |
 | --- | --- |
 | `add`, `correct`, `retire`, `reopen`, `facts`, `history`, `search` | Remote authoritative facts. `history -json` exposes the current version using exported Fact field names; PostgreSQL keeps no older ones. |
-| `session-start`, `session-card`, `pre-command`, `observe-problem` | Remote fact reads; local receipt/session state. Remote repository failure is unavailable, not an empty snapshot. Background dream maintenance is disabled. |
+| `session-start`, `session-card` | Remote fact reads; local session state. Remote repository failure is unavailable, not an empty snapshot. Background dream maintenance is disabled. |
 | `sessions` | Local session history, independent of the fact backend. |
 | `dump FILE`, `merge BASE OURS THEIRS` | Explicit historical/local files; no implicit remote redirection. |
 | `migrate -postgres [-apply]` | Copies the latest version of every local fact into an empty PostgreSQL base; see [Moving a local base](#moving-a-local-base). |

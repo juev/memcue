@@ -4,7 +4,7 @@ This is a narrow data channel: all latest active, UTC-nonexpired `kind=pitfall` 
 repository are delivered whole. Origin alone never grants applicability. Current remote aliases intentionally share
 explicit scope; linked worktrees use the same repository identity. Non-git contexts load no repository facts. Rules,
 decisions, host/global/service data and research shelves remain on their existing paths. No storage/schema migration,
-model inference, ranked query, top-k selection, pre-command budget or acknowledgment is added.
+model inference, ranked query or top-k selection is added.
 
 `session-card -pitfalls-json` returns one complete native whole-fact snapshot. A read failure exits nonzero without
 partial output. Content and framing are separate fields. Historical versions in text and pending cache writes are

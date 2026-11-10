@@ -152,52 +152,6 @@ class RealCLI(unittest.TestCase):
                 self.assertIn('intended failure;',text)
                 self.assertNotIn('unintended failure;',text)
 
-    def test_pre_command_uses_configured_base_and_actual_cwd(self):
-        fact=self.add('Synthetic orchard build requires amber mode.', '-kind','pitfall','-source','tool','-scope','repo')
-        args=('pre-command','-cwd',str(self.nested),'-session','synthetic-task','-action','build','synthetic orchard build')
-        first=json.loads(self.cli(*args).stdout)
-        self.assertIn(fact,[f['id'] for f in first['facts']])
-        replay=json.loads(self.cli(*args).stdout)
-        self.assertEqual(replay['facts'],first['facts'])
-        self.assertTrue(replay['blocked'])
-        ready=json.loads(self.cli(*args,'-ack',replay['receipt']).stdout)
-        self.assertFalse(ready['blocked'])
-        self.assertEqual(ready['facts'],[])
-        self.assertEqual(json.loads(self.cli(*args).stdout)['facts'],[])
-
-    def test_pre_command_transport_timeout_replays_before_acknowledgment(self):
-        fact=self.add('Synthetic orchard build requires amber mode only for synthetic fixtures.',
-                      '-kind','pitfall','-source','tool','-scope','repo')
-        wrapper=self.home/'delayed.py'
-        marker=self.home/'delayed-once'
-        wrapper.write_text('#!'+sys.executable+'\nimport pathlib,subprocess,sys,time\n'
-                           +'p=subprocess.run(['+json.dumps(self.settings['binary'])+']+sys.argv[1:])\n'
-                           +'marker=pathlib.Path('+json.dumps(str(marker))+')\n'
-                           +"if p.returncode==0 and sys.argv[1]=='pre-command' and not marker.exists():\n"
-                           +" marker.write_text('synthetic'); time.sleep(1)\nsys.exit(p.returncode)\n")
-        wrapper.chmod(0o700)
-        self.settings['binary']=str(wrapper)
-        self.config.write_text(json.dumps(self.settings))
-        runner=self.home/'short-adapter-timeout.py'
-        runner.write_text('import importlib.util\n'
-                          +'spec=importlib.util.spec_from_file_location("adapter",'+json.dumps(str(ADAPTER))+')\n'
-                          +'module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)\n'
-                          +'module.TIMEOUT=0.3; import sys; sys.exit(module.main())\n')
-        args=('pre-command','-cwd',str(self.nested),'-session','transport-task','-action','build',
-              'synthetic orchard build')
-        lost=subprocess.run([sys.executable,'-I',str(runner),'--config',str(self.config),*args],
-                            cwd=self.nested,env=self.env,text=True,capture_output=True,timeout=5)
-        self.assertNotEqual(lost.returncode,0)
-        self.assertIn('timed out',lost.stderr)
-        self.assertEqual(lost.stdout,'')
-        self.assertTrue(marker.exists(),'timeout must follow successful CLI commit')
-        replay=json.loads(self.cli(*args).stdout)
-        self.assertIn(fact,[f['id'] for f in replay['facts']], 'CLI commit must not imply adapter delivery')
-        self.assertTrue(replay['blocked'])
-        ready=json.loads(self.cli(*args,'-ack',replay['receipt']).stdout)
-        self.assertFalse(ready['blocked'])
-        self.assertEqual(ready['facts'],[])
-
     def test_cross_session_crud_preserves_history_provenance_and_expiry(self):
         self.assertEqual(self.search('synthetic orchard')['facts'],[])
         fact=self.add('Synthetic orchard reviews require the amber label.','-kind','rule','-scope','repo',
