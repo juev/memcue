@@ -22,6 +22,7 @@ func env(t *testing.T) string {
 	// The gateway's own environment carries these; a test that asks whether a log is off by default must not
 	// inherit the flag of the shell that runs it (the same reason the suite is run with env -u MEMCUE_*).
 	t.Setenv("MEMCUE_SEARCH_LOG", "")
+	t.Setenv("MEMCUE_CALLER", "")
 	t.Setenv("MEMCUE_USAGE_LOG", "")
 	t.Setenv("MEMCUE_NUMBER_TERMS", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
@@ -173,6 +174,46 @@ func TestSearchLogsTheQueryAndTheFacts(t *testing.T) {
 	}
 	if rec.Session != "s1" || rec.Query != "gradle jdk" || len(rec.Facts) != 1 || rec.Host == "" {
 		t.Errorf("got %+v", rec)
+	}
+}
+
+// search.log records how a search was asked: its -in and -kind, whether an empty default search was widened, and the
+// MEMCUE_CALLER that ran it (#712).
+func TestSearchLogRecordsTheShapeOfASearch(t *testing.T) {
+	dir := env(t)
+	repo := filepath.Join(dir, "shop")
+	gitRepo(t, repo)
+	t.Chdir(repo)
+	addFactForTest(t, "-origin", "x 2026-10-26", "-scope", "repo:example.com/them/lib", "nats библиотеки на 4223.")
+	t.Setenv("MEMCUE_SEARCH_LOG", "1")
+	if err := runSearch([]string{"-in", "host", "-kind", "pitfall,environment", "библиотеки"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_CALLER", "recall-hook")
+	if err := runSearch([]string{"библиотеки"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "search.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("log %q: want a line per search", b)
+	}
+	var explicit, widened searchRecord
+	if err := json.Unmarshal([]byte(lines[0]), &explicit); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &widened); err != nil {
+		t.Fatal(err)
+	}
+	if explicit.In != "host" || explicit.Kind != "pitfall,environment" || explicit.Widened || explicit.Caller != "" ||
+		len(explicit.Facts) != 0 {
+		t.Errorf("explicit search logged %+v", explicit)
+	}
+	if widened.In != "" || widened.Kind != "" || !widened.Widened || widened.Caller != "recall-hook" || len(widened.Facts) != 1 {
+		t.Errorf("widened search logged %+v", widened)
 	}
 }
 

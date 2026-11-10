@@ -1287,6 +1287,7 @@ uses.
 | `MEMCUE_AUTO_INSTALL` | `0` stops the plugins from downloading the binary of their release (see [Binary from the plugin](#binary-from-the-plugin)) | on |
 | `MEMCUE_HOST` | name of this machine for fact scope and the search tie-break; set it where the host name is unstable, such as a container | `os.Hostname()` |
 | `MEMCUE_SEARCH_LOG` | `1` logs every search and the facts it found; the log keeps the query | off |
+| `MEMCUE_CALLER` | name of the hook or plugin that runs a search, recorded as `caller` in `search.log` | unset |
 | `MEMCUE_NUMBER_TERMS` | versions, dates, ports and addresses are indexed as one exact term (`1.27` becomes `nm1x27`, which never matches `1.20`), so a query that names a version finds the fact naming it: 0 of 11 version-shaped prompts before, 10 of 11 after, no change on 26 ordinary questions ([docs/research/number-terms-2026-10.md](docs/research/number-terms-2026-10.md)); `0` keeps the old word-only index, and a base indexed word-only is rebuilt on the first open without it | on |
 | `MEMCUE_EVENT_TTL_DAYS` | days a fact of `kind: event` stays recalled; `0` keeps event facts without an expiry | `7` |
 | `MEMCUE_DREAM_EVERY` | how long after a dream the next one is due (a Go duration, at least `1m`) | `24h` |
@@ -1307,8 +1308,10 @@ no longer read. Opening a base deletes the vectors an older memcue stored and co
 `fact_vectors` table stays, so the schema and older binaries are unaffected.
 
 With `MEMCUE_SEARCH_LOG=1`, `search.log` has one JSON line per search: the time, the session (when the host passes
-`-session`), the project, the host, the first 500 characters of the query and the ids of the facts it returned,
-searches that found nothing included. It stays on your machine and is what you judge the agent's searches by; it is off
+`-session`), the project, the host, the `-in` and `-kind` the caller gave (`in` and `kind`, absent for the default),
+`widened` when an empty default search ran again over every repository, the `MEMCUE_CALLER` of the hook or plugin
+that searched (`caller`), the first 500 characters of the query and the ids of the facts it returned, searches that
+found nothing included (#712). It stays on your machine and is what you judge the agent's searches by; it is off
 by default because it keeps the text of the queries.
 
 `cost_usd` in `dream.log` holds only what a caller reports in dollars: `claude -p`. A call to `MEMCUE_API_URL` reports tokens, not a price, so its `cost_usd` is 0 and its spend is

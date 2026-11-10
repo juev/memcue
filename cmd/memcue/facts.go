@@ -611,7 +611,8 @@ func (inv *invocation) runSearch(args []string, out io.Writer) error {
 			widened = true
 		}
 		query := q.Text
-		inv.logSearch(*session, *cwd, query, hits, time.Since(start))
+		inv.logSearch(searchShape{session: *session, cwd: *cwd, in: *in, kind: *kind, widened: widened}, query, hits,
+			time.Since(start))
 		// The lines that follow the facts, in the order the plain answer prints them; -json carries the same ones, so
 		// a host that parses the answer is told what a reader is (#453).
 		var hints []string
@@ -703,13 +704,25 @@ const cjkHint = "Facts use English by default; legacy facts may use other langua
 // searchRecord is one line of search.log: a query the agent wrote and the facts it got, the record the read side is
 // judged by since the agent searches itself (#361).
 type searchRecord struct {
-	Time    string   `json:"time"`
-	Session string   `json:"session,omitempty"`
-	Tier    string   `json:"tier,omitempty"`
-	Host    string   `json:"host,omitempty"`
+	Time    string `json:"time"`
+	Session string `json:"session,omitempty"`
+	Tier    string `json:"tier,omitempty"`
+	Host    string `json:"host,omitempty"`
+	// In and Kind are the -in and -kind the caller gave, empty for the default; Widened says an empty default search
+	// ran again over every repository; Caller is MEMCUE_CALLER, the hook or plugin that searched (#712).
+	In      string   `json:"in,omitempty"`
+	Kind    string   `json:"kind,omitempty"`
+	Widened bool     `json:"widened,omitempty"`
+	Caller  string   `json:"caller,omitempty"`
 	Query   string   `json:"query"`
 	Facts   []string `json:"facts,omitempty"`
 	Ms      float64  `json:"ms"`
+}
+
+// searchShape is how a search was asked, as search.log records it beside the query (#712).
+type searchShape struct {
+	session, cwd, in, kind string
+	widened                bool
 }
 
 // logQuery is how much of a query search.log keeps: an agent's query is a few words, a longer one is a pasted text.
@@ -717,7 +730,7 @@ const logQuery = 500
 
 // logSearch appends a search to search.log in the state directory, searches that found nothing included. It keeps
 // the text of queries, so it is off unless MEMCUE_SEARCH_LOG=1. A failure to log never fails the search.
-func (inv *invocation) logSearch(session, cwd, query string, hits []store.Hit, took time.Duration) {
+func (inv *invocation) logSearch(shape searchShape, query string, hits []store.Hit, took time.Duration) {
 	if inv.ctx.Err() != nil {
 		return
 	}
@@ -729,8 +742,10 @@ func (inv *invocation) logSearch(session, cwd, query string, hits []store.Hit, t
 	if err != nil {
 		return
 	}
-	rec := searchRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: session, Tier: tier.Of(cwd, claudeDir(), inv.ctx),
-		Host: currentHost(), Query: clip(query, logQuery), Ms: float64(took.Microseconds()) / 1000}
+	rec := searchRecord{Time: time.Now().UTC().Format(time.RFC3339), Session: shape.session,
+		Tier: tier.Of(shape.cwd, claudeDir(), inv.ctx), Host: currentHost(), In: strings.TrimSpace(shape.in),
+		Kind: strings.TrimSpace(shape.kind), Widened: shape.widened, Caller: clip(os.Getenv("MEMCUE_CALLER"), 64),
+		Query: clip(query, logQuery), Ms: float64(took.Microseconds()) / 1000}
 	for _, h := range hits {
 		rec.Facts = append(rec.Facts, h.ID)
 	}

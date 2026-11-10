@@ -124,6 +124,7 @@ environment:
   MEMCUE_CLAUDE_TOKEN_FILE  file of a Claude Code OAuth token (claude setup-token) claude -p runs with; ~/ is the
                   home directory, and a missing file leaves claude -p on its own login
   MEMCUE_SEARCH_LOG 1 logs every search and the facts it found (search.log in the state directory; holds the query)
+  MEMCUE_CALLER   name of the hook or plugin that runs a search, recorded in search.log
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
   MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 1h; dream.log in the state directory)
