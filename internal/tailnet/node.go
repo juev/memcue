@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"tailscale.com/client/local"
-	"tailscale.com/envknob"
 	"tailscale.com/tsnet"
 )
 
@@ -108,7 +107,7 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 	}
 	// The pinned release routes log uploads through a noop transport in this supported mode.
 	// This affects only the explicitly launched helper process, never host VPN configuration.
-	envknob.SetNoLogsNoSupport()
+	prepareProcess()
 	srv := &tsnet.Server{Dir: c.Dir, Hostname: c.Hostname, ControlURL: c.ControlURL, Ephemeral: false, AuthKey: authKey, UserLogf: func(string, ...any) {}, Logf: func(string, ...any) {}}
 	if err := srv.Start(); err != nil {
 		return errors.New("embedded node could not start; inspect state permissions and configuration")

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"tailscale.com/client/local"
-	"tailscale.com/envknob"
 	"tailscale.com/tsnet"
 )
 
@@ -43,7 +42,7 @@ func Listen(c Config, bootstrap bool, logf func(string, ...any)) (*Listener, err
 			return nil, err
 		}
 	}
-	envknob.SetNoLogsNoSupport()
+	prepareProcess()
 	srv := &tsnet.Server{Dir: c.Dir, Hostname: c.Hostname, ControlURL: c.ControlURL, AuthKey: authKey,
 		UserLogf: logf, Logf: func(string, ...any) {}}
 	if err := srv.Start(); err != nil {
