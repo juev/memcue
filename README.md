@@ -190,27 +190,56 @@ shares with one, which makes the rule stricter or looser. It writes
 nothing and calls no model. An entry marked `ok` can leave the file; a `new` one moves with
 `memcue add -kind K -scope S -- "TEXT"` first.
 
+### Moving the base to the shared place
+
+Claude Code, DSH and Codex share one base per machine, `~/.local/state/memcue/memory/facts` (under `$XDG_STATE_HOME`
+when it is set). A base created by 0.35 or earlier lives in `~/.claude/memory` and stays in use there until you move
+it; nothing moves it for you. To move it:
+
+1. Stop every agent session that uses the base and pause its sync (a git cron job, Syncthing and the like).
+2. Move the directory. If `~/.claude/memory` holds only the base and its git repository:
+
+   ```bash
+   mkdir -p ~/.local/state/memcue
+   mv ~/.claude/memory ~/.local/state/memcue/memory
+   ```
+
+   If it also holds Claude Code's own memory notes, create `~/.local/state/memcue/memory` and move only `facts` (or
+   `facts.db`) into it; a base synced with git then needs its repository moved or set up again with `memcue install`.
+3. Run `memcue search` once by hand. The state directory stays `~/.local/state/memcue`, so the dream schedule and the
+   logs carry over.
+
+As long as `~/.local/state/memcue/memory` holds no base, memcue keeps opening the old one; once it does, the old place
+is ignored. A base named by `MEMCUE_FACTS` or a plugin's `facts` setting is not affected.
+
 ### Binary from the plugin
 
 All three plugins (Claude Code, DSH, Hermes) find the binary in this order: the one configured explicitly
 (`MEMCUE_BIN`, or `binary` in the DSH and Hermes config); `memcue` on `PATH` when it is the plugin's release or newer;
 the copy the plugin installed; an older `memcue` on `PATH`, so search keeps working. When none of them is the plugin's
-release, the plugin downloads that release from GitHub, checks the archive against the release's `checksums.txt`,
-and installs it:
+release or newer, the plugin downloads its release from GitHub, checks the archive against the release's
+`checksums.txt`, and installs it:
 
 | Host | Where | When |
 |---|---|---|
-| Claude Code | `${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/memcue` | in `SessionStart`, before the first answer of the session; the directory goes on the session's `PATH`, so the skill finds `memcue` too |
-| DSH | the same directory, shared with Claude Code | in the background at plugin start |
+| Claude Code | `~/.local/bin/memcue`, the machine's one binary | in `SessionStart`, before the first answer of the session; the directory goes on the session's `PATH`, so the skill finds `memcue` too |
+| DSH | the same file, shared with Claude Code | in the background at plugin start |
 | Hermes | `$HERMES_HOME/memcue/bin/<version>/memcue`, which outlives the container | in the background at the first `initialize` |
+
+Claude Code and DSH share one binary per machine: a plugin replaces `~/.local/bin/memcue` only when it is older than
+the plugin's release, so a plugin of an older release keeps running the newer binary instead of installing its own.
+The new file is renamed over the old one, so a memcue that is running keeps its file. A symlink, or anything else at
+that path that is not a plain file, is yours: the plugins leave it alone and only log why. Copies that releases up to
+0.35 installed in `~/.local/share/memcue/<version>/` are no longer used and may be deleted. The Codex plugin never
+downloads; its `binary` setting defaults to `~/.local/bin/memcue`.
 
 A configured binary is never replaced. Set `MEMCUE_AUTO_INSTALL=0` to install nothing; the plugin then says that the
 binary is missing, as before. The checksum guards against a broken download, not against a replaced release:
 `checksums.txt` comes from the same release. Claude Code logs failed installs to
 `${XDG_STATE_HOME:-~/.local/state}/memcue/install.log` and tries again after an hour, since `SessionStart` waits for
 the download; DSH and Hermes download in the background and log failures as warnings. The Claude Code script
-needs `curl`, `tar` and `sha256sum` or `shasum`. A binary installed this way is not on your shell's `PATH`: to run
-`memcue install` or other commands by hand, call it by its path or add the directory to `PATH`.
+needs `curl`, `tar` and `sha256sum` or `shasum`. When `~/.local/bin` is on your shell's `PATH`, `memcue install` and
+the other commands run by hand use the same binary as the agents.
 
 ## Projects
 
@@ -1299,7 +1328,7 @@ uses.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | `$CLAUDE_CONFIG_DIR/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history)), else `$CLAUDE_CONFIG_DIR/memory/facts.db`; `~/.claude` without `CLAUDE_CONFIG_DIR` |
+| `MEMCUE_FACTS` | the fact base; a leading `~/` or `$HOME/` is expanded, and the DSH and Hermes adapters require the result to be absolute | the base every agent of the machine shares: `$XDG_STATE_HOME/memcue/memory/facts` when that directory exists (a text history, see [Moving to the text history](#moving-to-the-text-history)), else `$XDG_STATE_HOME/memcue/memory/facts.db`. A base still at the default of 0.35 and earlier, `$CLAUDE_CONFIG_DIR/memory/facts` or `facts.db` (`~/.claude` without `CLAUDE_CONFIG_DIR`), stays in use until it is moved ([Moving the base to the shared place](#moving-the-base-to-the-shared-place)) |
 | `MEMCUE_SERVER` | tailnet node name of a `memcue server`: every command then works on this machine's replica of it, `$XDG_STATE_HOME/memcue/server-<name>/replica.db`, whatever `MEMCUE_FACTS` says, and the tailnet helper syncs it ([server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet)) | unset |
 | `MEMCUE_STATE_DIR` | state directory for logs, locks and the dream schedule; a non-default base gets a per-base subdirectory under `$XDG_STATE_HOME/memcue` | unset |
 | `MEMCUE_MODEL` | model of `migrate` and `dream -run` | `claude-opus-5-5` |
@@ -1428,11 +1457,11 @@ The same base and binary serve all three hosts; the adapters differ at the edges
 State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
 `$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule. `MEMCUE_STATE_DIR`
 overrides the whole path. Hermes keeps its mirror file under `$HERMES_HOME/memcue`; the binary's logs, locks and dream
-schedule always follow the base. The fact base is `$CLAUDE_CONFIG_DIR/memory/facts.db`
-(or `~/.claude/memory/facts.db`) by default, `$HERMES_HOME/memcue/facts.db` for Hermes, and memcue's default for DSH
-unless `facts` is configured; each becomes a `facts` directory after `memcue migrate -text`, and the cache of a text
-history is `facts.db` in the state directory. A shared base is supported; point `MEMCUE_FACTS` or the plugin's `facts` option at the
-same file.
+schedule always follow the base. By default Claude Code, DSH and Codex share one base per machine,
+`$XDG_STATE_HOME/memcue/memory/facts.db` (a base still at the old default in `~/.claude/memory` stays in use until it
+is moved); Hermes keeps `$HERMES_HOME/memcue/facts.db`, because the home of a container may not outlive it. Each
+becomes a `facts` directory after `memcue migrate -text`, and the cache of a text history is `facts.db` in the state
+directory. To share the base with Hermes too, point its `facts` option at the same base.
 
 ## DeepSeek Harness
 

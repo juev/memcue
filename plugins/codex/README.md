@@ -20,7 +20,20 @@ only discovered, not validated. macOS, Linux arm64, Windows, remote sessions and
 ## Choose the base and configuration
 
 Install/build memcue by the repository's normal instructions. Keep this plugin in a stable local directory, or use
-the local marketplace below. It never downloads a binary. Create a dedicated JSON configuration with absolute paths:
+the local marketplace below. It never downloads a binary. Create a dedicated JSON configuration. The shortest one uses
+the machine's binary and the base every agent of the machine shares:
+
+```json
+{
+  "host": "my-workstation"
+}
+```
+
+Without `binary` the launcher runs `~/.local/bin/memcue`, the binary the Claude Code and DSH plugins install. Without
+`facts` and `state_dir` memcue uses its own defaults: the shared base `~/.local/state/memcue/memory/facts` (or a base
+still at `~/.claude/memory`, see [Moving the base to the shared place](../../README.md#moving-the-base-to-the-shared-place))
+and its state directory. Whether the Codex sandbox lets a model's shell command write there has not been checked; if
+it refuses, give paths the sandbox allows. A base of its own takes absolute paths:
 
 ```json
 {
@@ -40,8 +53,9 @@ API credentials, background dream, log overrides, number-term settings and event
 uses the CLI default of seven days unless an add explicitly passes `-expires`.
 
 `facts` without a `.db` suffix selects a new text history directory; `*.db` follows the native legacy SQLite rules,
-including a sibling directory after a migration. No base defaults to the Claude directory. To share an existing base,
-explicitly set `facts` to that base and choose its corresponding state directory; back it up first. This setup does
+including a sibling directory after a migration. A path that is given must be absolute; an empty or relative one is
+an error and never falls back to the default. To share another existing base, explicitly set `facts` to that base and
+choose its corresponding state directory; back it up first. This setup does
 not migrate or rewrite the base. Native CLI opens may update indexes/cache as usual; inspect compatibility before
 sharing with older binaries. State holds the text cache, the dream schedule and a digest of the last pitfall snapshot each session received; hooks and later calls must use this same file.
 

@@ -44,9 +44,9 @@ fact an older memcue left in the base is live too, unless it is retired or expir
 ## Supported dsh
 
 The plugin asks `memcue version -json` when it loads. Without a configured `binary` or `MEMCUE_BIN`, a missing binary
-or one older than the plugin's release is replaced by that release, installed into
-`$XDG_DATA_HOME/memcue/<version>/` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base
-the new one writes. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the hints
+or one older than the plugin's release is replaced by that release, installed into the machine's
+`~/.local/bin/memcue` (`MEMCUE_AUTO_INSTALL=0` turns that off): an older release may not open the base the new one
+writes. A machine binary of the plugin's release or newer is used as it is. A binary older than 0.4.0 that stays, a configured one or a failed install, turns the hints
 off with one warning (search keeps working). A build from source reports a suffixed version and counts
 as the current tree.
 
@@ -62,8 +62,8 @@ development. The entry is plain ESM (`src/index.mjs`) on purpose: dsh installs a
 Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from an installed package.
 
 1. Optional: put the `memcue` binary where the dsh process can run it and note its absolute path. Without a
-   configured `binary` and without a current `memcue` on `PATH`, the plugin installs the binary of its own release
-   into `${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/`, the directory the Claude Code plugin uses
+   configured `binary` and without a current `memcue` on `PATH`, the plugin uses the machine's `~/.local/bin/memcue`,
+   the binary the Claude Code plugin shares, and installs its own release there when that one is missing or older
    (`MEMCUE_AUTO_INSTALL=0` turns that off; see [Binary from the plugin](../../README.md#binary-from-the-plugin)).
 
 2. Install the bundle from the repository:
@@ -88,14 +88,15 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
    ```yaml
    - id: memcue
      config:
-       binary: /Users/you/.local/bin/memcue
-       facts: /Users/you/.claude/memory/facts.db
+       facts: /Users/you/work-memory/facts.db
    ```
 
-   `binary` is worth setting explicitly: an application launched from Finder may not have `~/.local/bin` on `PATH`.
-   `facts` may be omitted when the base is memcue's default (`~/.claude/memory/facts`, or `facts.db` before
-   `memcue migrate -text`). A path to `facts.db` keeps working after the move: memcue opens the `facts` directory next
-   to it.
+   Both settings are optional. Without `binary` the plugin finds the machine's `~/.local/bin/memcue` even when an
+   application launched from Finder does not have `~/.local/bin` on `PATH`; a configured `binary` is used as it is and
+   never replaced. Without `facts` the plugin uses memcue's default, the base every agent of the machine shares
+   (`~/.local/state/memcue/memory/facts`, or a base still at `~/.claude/memory`, see
+   [Moving the base to the shared place](../../README.md#moving-the-base-to-the-shared-place)). A path to `facts.db`
+   keeps working after `memcue migrate -text`: memcue opens the `facts` directory next to it.
 
 ## Model of `add`
 

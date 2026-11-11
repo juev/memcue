@@ -81,7 +81,7 @@ Server mode starts from one base. While the machines still sync through git, mer
 holds the merged base:
 
 ```sh
-export MEMCUE_FACTS=~/.claude/memory/facts     # the merged local base
+export MEMCUE_FACTS=~/.local/state/memcue/memory/facts   # the merged local base (~/.claude/memory/facts before it moved)
 export MEMCUE_SERVER=memcue-server
 memcue connect up
 memcue migrate -server          # report: facts, active and retired, and versions
