@@ -82,7 +82,7 @@ class RequestContext(unittest.TestCase):
      ('messages',{'model':'synthetic','messages':[{'role':'system','content':'Base instructions.'},{'role':'user','content':'ok'}]},'system'),
      ('messages',{'model':'synthetic','messages':[{'role':'developer','content':'Base instructions.'},{'role':'user','content':'ok'}]},'developer'),
      ('messages',{'model':'synthetic','messages':[{'role':'user','content':'ok'}]},'system'),
-     ('input',{'model':'synthetic','instructions':'Base instructions.','input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'ok'}]}]},None)):
+     ('input',{'model':'synthetic','instructions':'Base instructions.','input':[{'role':'user','content':'ok'}]},None)):
      mode='chat' if key=='messages' else 'codex_responses'
      request=copy.deepcopy(shape);original=copy.deepcopy(request)
      for i,repo in enumerate(repos):
@@ -244,19 +244,27 @@ class RequestContext(unittest.TestCase):
        self.assertTrue(all(m['role'] in {'system','developer','user','assistant','tool'} for m in out['messages']))
       # Codex Responses: only `instructions` takes system-level text. A message item with any role
       # but user/assistant raises in the released preflight, before the call ever leaves.
+      import inspect
       from agent.transports.codex import ResponsesApiTransport
       transport=ResponsesApiTransport()
-      codex={'model':'gpt-6.1-sol','instructions':'Base instructions.','input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'ok'}]}],'store':False}
+      def preflight(payload):
+       flags={'sanitize_harmony_tokens':True} if 'sanitize_harmony_tokens' in inspect.signature(transport.preflight_kwargs).parameters else {}
+       return transport.preflight_kwargs(copy.deepcopy(payload),allow_stream=False,**flags)
+      codex={'model':'gpt-6.1-sol','instructions':'Base instructions.','input':[{'role':'user','content':'ok'}],'store':False}
       out=send(copy.deepcopy(codex),'codex_responses')
       self.assertEqual(out['input'],codex['input'])
       self.assertTrue(out['instructions'].startswith('Base instructions.\n\n'+OPEN))
-      checked=transport.preflight_kwargs(copy.deepcopy(out),allow_stream=False,sanitize_harmony_tokens=True)
+      checked=preflight(out)
       self.assertIn('Failure-0 cause;',checked['instructions'],'the released preflight dropped the card')
       with self.assertRaises(ValueError):
-       transport.preflight_kwargs({**copy.deepcopy(codex),'input':[*codex['input'],{'type':'message','role':'developer','content':[{'type':'input_text','text':'card'}]}]},allow_stream=False)
+       preflight({**codex,'input':[*codex['input'],{'type':'message','role':'developer','content':[{'type':'input_text','text':'card'}]}]})
       # Anthropic messages: prompt text lives outside `messages`, as a string or a block list.
       from agent.anthropic_adapter import build_anthropic_kwargs
-      akw=build_anthropic_kwargs(model='claude-opus-4.8',messages=[{'role':'system','content':'Base instructions.'},{'role':'user','content':'ok'}],tools=None,max_tokens=None,reasoning_config=None)
+      def anthropic_kwargs(messages):
+       wanted={'model':'claude-opus-4.8','messages':messages,'tools':None,'max_tokens':None,'reasoning_config':None}
+       params=inspect.signature(build_anthropic_kwargs).parameters
+       return build_anthropic_kwargs(**{k:v for k,v in wanted.items() if k in params})
+      akw=anthropic_kwargs([{'role':'system','content':'Base instructions.'},{'role':'user','content':'ok'}])
       out=send(copy.deepcopy(akw),'anthropic_messages')
       self.assertEqual(out['messages'],akw['messages'],'a `system` role among converted anthropic messages is rejected')
       self.assertTrue(out['system'].startswith('Base instructions.\n\n'+OPEN))
@@ -277,7 +285,7 @@ class RequestContext(unittest.TestCase):
       # No prompt slot, or a converted payload whose prompt text lives elsewhere: send it back
       # untouched. A role the target never accepted costs the whole turn on the primary.
       for payload,mode in (({'contents':[{'role':'user','parts':[{'text':'ok'}]}],'systemInstruction':{'parts':[{'text':'Base'}]}},'gemini_native'),
-                           ({'model':'synthetic','input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'ok'}]}]},'codex_responses'),
+                           ({'model':'synthetic','input':[{'role':'user','content':'ok'}]},'codex_responses'),
                            ({'model':'claude-opus-4.8','max_tokens':64,'messages':[{'role':'user','content':[{'type':'text','text':'ok'}]}]},'anthropic_messages'),
                            ({'model':'synthetic','messages':[{'role':'user','content':'ok'}]},'anthropic_messages')):
        before=copy.deepcopy(payload)
