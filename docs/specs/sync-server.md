@@ -74,8 +74,11 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
 
 - **Server.** `memcue server` runs in the foreground under systemd or Docker, keeps its base in SQLite at
   `MEMCUE_FACTS`, and serves HTTP with JSON over `tsnet.Listen`:
-  - `GET /v1/changes?since=N&wait=60s&limit=L` returns the rows with `seq > N` in order, the head and the `base_id`;
-    it answers at once when a change exists, after `wait` otherwise.
+  - `GET /v1/changes?since=N&wait=25s&limit=L` returns the rows with `seq > N` in order, the head and the `base_id`;
+    it answers at once when a change exists, after `wait` otherwise. The helper waits 25 s and gives up on an answer
+    5 s later: a connection whose server went away without closing it (a restart, a laptop that slept) leaves the
+    replica deaf for 30 s at most. Its first pull, and the first after a failure, asks with `wait=0`, so a new replica
+    learns the base and the status loses a failure as soon as the server answers.
   - `POST /v1/changes` takes a batch of stamped field changes with `op_id` and returns each result with its `seq`.
   - `POST /v1/import` loads facts into an empty base only (R12).
 
@@ -128,8 +131,8 @@ Tests are named as the steps land.
 
 - R1: server mode, server down → search, session-start and add succeed without network delay
   (`TestServerModeKeepsOneReplicaPerMachine`, `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`).
-- R2, R3, R7, R16: end-to-end on a real tailnet (opt-in test next to `internal/tailnet/final_refresh_test.go`): a
-  server and two clients built from the tree.
+- R1, R2, R3, R5, R6, R7, R10: end-to-end on a real tailnet, a disposable Headscale with a server and two clients built
+  from the tree (`TestSyncServerOverTheTailnet`, opt-in with `MEMCUE_FINAL_HEADSCALE_BINARY` and `MEMCUE_TEST_BIN`).
 - R4, R6, R8, R12: server handler tests through `httptest` (`internal/server/server_test.go`:
   `TestRetryAfterALostReplyGetsTheEarlierAnswer`, `TestConcurrentContentReachesReplicasWithTheLoser`,
   `TestStampFarAheadIsRefusedAndNotRemembered`, `TestImportLoadsAnEmptyBaseOnly`); the long poll
@@ -147,5 +150,7 @@ Tests are named as the steps land.
   `TestDreamOnTheServerSeesANewTextAndNotNewLabels`, `TestServerDreamsWhenADreamIsDue`).
 - R12: `TestImportLoadsAnEmptyBaseOnly`, `TestMigrateServerReportsAndLoadsAnEmptyServerOnly`.
 - R14: `make test-plugins`.
-- R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`).
+- R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`); the helper's status of a new
+  replica and after a failure (`TestNewReplicaOfAnEmptyServerSyncsWithoutWaiting`,
+  `TestStatusClearsTheFailureWhenTheServerIsBack`).
 - R16: `TestServerModeKeepsOneReplicaPerMachine`, `TestPathDependsOnTheServerOnly`.
