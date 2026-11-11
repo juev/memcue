@@ -337,6 +337,48 @@ func TestStatusClearsTheFailureWhenTheServerIsBack(t *testing.T) {
 	}
 }
 
+func TestPullOfAServerThatWentAwayEndsAfterTheWaitAndTheSlack(t *testing.T) {
+	// A peer that went away without closing the connection: it takes the request and never answers.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held []net.Conn
+	var mu sync.Mutex
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			held = append(held, c)
+			mu.Unlock()
+		}
+	}()
+	t.Cleanup(func() {
+		_ = ln.Close()
+		mu.Lock()
+		for _, c := range held {
+			_ = c.Close()
+		}
+		mu.Unlock()
+	})
+	old := pullSlack
+	pullSlack = 300 * time.Millisecond
+	t.Cleanup(func() { pullSlack = old })
+	l := &link{addr: ln.Addr().String()}
+	start := time.Now()
+	_, err = NewHTTP(l.dial).Pull(context.Background(), 0, 200*time.Millisecond, 10)
+	took := time.Since(start)
+	if err == nil {
+		t.Fatal("a pull of a server that never answers succeeded")
+	}
+	if took < 500*time.Millisecond || took > 2*time.Second {
+		t.Fatalf("the pull ended after %v, want the wait and the slack, 500ms", took)
+	}
+}
+
 func TestWorkerReportsWhyItDoesNotRun(t *testing.T) {
 	w := NewWorker(filepath.Join(t.TempDir(), "replica.db"))
 	if st, ok := w.Status().(Status); !ok || st.Error != ErrNotRunning.Error() {

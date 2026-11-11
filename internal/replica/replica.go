@@ -79,9 +79,14 @@ func NewHTTP(dial func(context.Context) (net.Conn, error)) *HTTP {
 	return &HTTP{hc: &http.Client{Transport: tr}}
 }
 
+// pullSlack is how long a pull waits for its answer beyond the wait of the long poll. A connection whose peer went
+// away without closing it (a server restarted, a laptop that slept) answers nothing, so this bounds how long the
+// replica stays deaf to the server: wait plus pullSlack.
+var pullSlack = 5 * time.Second
+
 // Pull implements Client.
 func (h *HTTP) Pull(ctx context.Context, since int64, wait time.Duration, limit int) (server.Changes, error) {
-	ctx, cancel := context.WithTimeout(ctx, wait+30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, wait+pullSlack)
 	defer cancel()
 	q := url.Values{"since": {strconv.FormatInt(since, 10)}, "wait": {wait.String()}, "limit": {strconv.Itoa(limit)}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, httpBase+"/v1/changes?"+q.Encode(), nil)

@@ -34,7 +34,7 @@ type Syncer struct {
 	r *store.Store
 	c Client
 
-	wait  time.Duration // of a long poll
+	wait  time.Duration // of a long poll; with pullSlack it bounds how long a dead connection goes unnoticed
 	limit int
 	poll  time.Duration // how often the outbox is looked at for writes of other processes
 	retry time.Duration // when a change refused for a while (ahead, not_found) is sent again
@@ -53,7 +53,7 @@ type rejection struct {
 
 // New returns a Syncer of the replica r and the server c.
 func New(r *store.Store, c Client) *Syncer {
-	return &Syncer{r: r, c: c, wait: 55 * time.Second, limit: server.DefaultLimit, poll: 200 * time.Millisecond,
+	return &Syncer{r: r, c: c, wait: 25 * time.Second, limit: server.DefaultLimit, poll: 200 * time.Millisecond,
 		retry: time.Minute, now: time.Now, rejected: map[string]rejection{}}
 }
 
