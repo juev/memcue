@@ -1,10 +1,11 @@
 #!/bin/sh
 # memcue.sh runs the memcue binary for the Claude Code hooks: memcue.sh COMMAND [ARGS...].
 #
-# The binary is, in order: MEMCUE_BIN; `memcue` on PATH when it is this plugin's release or newer; the copy this
-# script installed in ${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/; an older `memcue` on PATH, so the hooks keep
-# working. session-start installs the plugin's release when none of them is current (MEMCUE_AUTO_INSTALL=0 turns that
-# off), exports its directory on the session's PATH for the skill, and says what is missing instead of failing.
+# The binary is, in order: MEMCUE_BIN; `memcue` on PATH when it is this plugin's release or newer; the machine's
+# binary ~/.local/bin/memcue, which every plugin shares (#718); an older `memcue` on PATH, so the hooks keep working.
+# session-start installs the plugin's release into ~/.local/bin when none of them is current (MEMCUE_AUTO_INSTALL=0
+# turns that off), exports that directory on the session's PATH for the skill, and says what is missing instead of
+# failing. A machine binary that is already this release or newer stays: a plugin never replaces it with an older one.
 # Every other command exits quietly without a binary.
 
 set -u
@@ -12,11 +13,13 @@ set -u
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 version=$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
 	"$root/.claude-plugin/plugin.json" | head -n 1)
-data=${XDG_DATA_HOME:-$HOME/.local/share}/memcue
-dir=$data/$version
+dir=$HOME/.local/bin
 installed=$dir/memcue
 release=${MEMCUE_RELEASE_URL:-https://github.com/juev/memcue/releases/download}
 logdir=${XDG_STATE_HOME:-$HOME/.local/state}/memcue
+# The lock is the one the DSH plugin takes, so two plugins of one machine do not install at once.
+lock=$logdir/install.lock
+failed=$logdir/install-$version.failed
 
 current() { "$1" version -minimum "$version" >/dev/null 2>&1; }
 
@@ -49,13 +52,19 @@ sha256() {
 	fi
 }
 
-# install downloads the release of this plugin, checks it against the release's checksums.txt and moves it into
-# place. A lock directory keeps two sessions from downloading at once; one left by a crash expires after ten minutes.
-# A failed install is not retried for an hour: SessionStart waits for it, and an unreachable GitHub would otherwise
-# delay the first answer of every session.
+# install downloads the release of this plugin, checks it against the release's checksums.txt and renames it over the
+# machine's binary, so a memcue that is running keeps its file. It does nothing when the machine's binary is this
+# release or newer, and leaves alone a symlink or anything else that is not a plain file: that one the user manages.
+# A lock directory keeps two sessions from downloading at once; one left by a crash expires after ten minutes. A failed
+# install is not retried for an hour: SessionStart waits for it, and an unreachable GitHub would otherwise delay the
+# first answer of every session.
 install() {
 	[ "${MEMCUE_AUTO_INSTALL:-}" = 0 ] && return 1
-	[ -x "$installed" ] && return 0
+	[ -x "$installed" ] && current "$installed" && return 0
+	if [ -L "$installed" ] || { [ -e "$installed" ] && [ ! -f "$installed" ]; }; then
+		log "install $version: $installed is not a plain file; leaving it to the user"
+		return 1
+	fi
 	case $(uname -s) in
 	Darwin) os=darwin ;;
 	Linux) os=linux ;;
@@ -70,18 +79,23 @@ install() {
 		log "install $version: curl is not on PATH"
 		return 1
 	fi
-	mkdir -p "$dir" || return 1
-	if [ -n "$(find "$dir/.failed" -maxdepth 0 -mmin -60 2>/dev/null)" ]; then
+	mkdir -p "$dir" "$logdir" || return 1
+	if [ -n "$(find "$failed" -maxdepth 0 -mmin -60 2>/dev/null)" ]; then
 		return 1
 	fi
-	if [ -d "$dir/.lock" ] && [ -n "$(find "$dir/.lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
-		rmdir "$dir/.lock" 2>/dev/null
+	if [ -d "$lock" ] && [ -n "$(find "$lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
+		rmdir "$lock" 2>/dev/null
 	fi
-	if ! mkdir "$dir/.lock" 2>/dev/null; then
+	if ! mkdir "$lock" 2>/dev/null; then
 		log "install $version: another session is installing"
 		return 1
 	fi
-	tmp=$(mktemp -d "$dir/.tmp.XXXXXX") || { rmdir "$dir/.lock"; return 1; }
+	# Another plugin may have put a current binary in place before this one took the lock.
+	if [ -x "$installed" ] && current "$installed"; then
+		rmdir "$lock"
+		return 0
+	fi
+	tmp=$(mktemp -d "$dir/.memcue-install.XXXXXX") || { rmdir "$lock"; return 1; }
 	archive=memcue_${version}_${os}_${arch}.tar.gz
 	ok=1
 	if ! curl -fsSL --max-time 45 -o "$tmp/$archive" "$release/v$version/$archive" ||
@@ -104,12 +118,12 @@ install() {
 	fi
 	rm -rf "$tmp"
 	if [ $ok = 1 ]; then
-		rm -f "$dir/.failed"
+		rm -f "$failed"
 		log "install $version: installed $installed"
 	else
-		touch "$dir/.failed"
+		touch "$failed"
 	fi
-	rmdir "$dir/.lock"
+	rmdir "$lock"
 	[ $ok = 1 ]
 }
 

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -35,7 +35,7 @@ before(async () => {
 		res.writeHead(200).end(body)
 	})
 	await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-	for (const key of ['XDG_DATA_HOME', 'MEMCUE_RELEASE_URL', 'MEMCUE_AUTO_INSTALL', 'MEMCUE_BIN', 'PATH']) saved[key] = process.env[key]
+	for (const key of ['HOME', 'XDG_STATE_HOME', 'MEMCUE_RELEASE_URL', 'MEMCUE_AUTO_INSTALL', 'MEMCUE_BIN', 'PATH']) saved[key] = process.env[key]
 })
 
 after(() => {
@@ -46,7 +46,7 @@ after(() => {
 	}
 })
 
-// Each test gets its own data directory and a release whose binary answers `version -json` with the plugin version.
+// Each test gets its own home and state directory, so nothing reaches the real ~/.local/bin, and a release whose binary answers `version -json` with the plugin version.
 beforeEach(() => {
 	const root = mkdtempSync(join(tmpdir(), 'memcue-dsh-install-'))
 	const build = join(root, 'build')
@@ -63,17 +63,18 @@ beforeEach(() => {
 		[`/v${version}/checksums.txt`, `${sum}  ${archive}\n`],
 	])
 	hits = 0
-	process.env.XDG_DATA_HOME = join(root, 'data')
+	process.env.HOME = join(root, 'home')
+	process.env.XDG_STATE_HOME = join(root, 'state')
 	process.env.MEMCUE_RELEASE_URL = `http://127.0.0.1:${server.address().port}`
 	process.env.PATH = '/usr/bin:/bin'
 	delete process.env.MEMCUE_AUTO_INSTALL
 	delete process.env.MEMCUE_BIN
 })
 
-test('install downloads the release, checks it and puts it in the shared directory', { skip }, async () => {
+test('install downloads the release, checks it and puts it in the machine binary', { skip }, async () => {
 	const path = await install(version)
-	assert.equal(path, installedPath(version))
-	assert.equal(path, join(process.env.XDG_DATA_HOME, 'memcue', version, 'memcue'))
+	assert.equal(path, installedPath())
+	assert.equal(path, join(process.env.HOME, '.local', 'bin', 'memcue'))
 	assert.match(spawnSync(path, ['version', '-json'], { encoding: 'utf8' }).stdout, new RegExp(version))
 	hits = 0
 	assert.equal(await install(version), path)
@@ -84,8 +85,8 @@ test('a checksum that does not match installs nothing', { skip }, async () => {
 	const key = `/v${version}/checksums.txt`
 	files.set(key, files.get(key).toString().replace(/^[0-9a-f]+/, '0'.repeat(64)))
 	await assert.rejects(install(version), /checksum/)
-	assert.equal(existsSync(installedPath(version)), false)
-	assert.equal(existsSync(join(installedPath(version), '..', '.lock')), false, 'the lock must be released')
+	assert.equal(existsSync(installedPath()), false)
+	assert.equal(existsSync(join(process.env.XDG_STATE_HOME, 'memcue', 'install.lock')), false, 'the lock must be released')
 })
 
 test('MEMCUE_AUTO_INSTALL=0 downloads nothing', { skip }, async () => {
@@ -109,7 +110,7 @@ async function waitFor(check, ms = 5_000) {
 
 test('the plugin installs its release when no binary is configured or on PATH', { skip }, async () => {
 	apply(context(), {})
-	assert.ok(await waitFor(() => existsSync(installedPath(version))), 'the plugin did not install the binary')
+	assert.ok(await waitFor(() => existsSync(installedPath())), 'the plugin did not install the binary')
 })
 
 // pathBinary puts on PATH a memcue that answers `version -json` with the given version.
@@ -125,7 +126,7 @@ function pathBinary(reported) {
 test('an older release on PATH is replaced by the plugin release', { skip }, async () => {
 	pathBinary('0.4.0')
 	apply(context(), {})
-	assert.ok(await waitFor(() => existsSync(installedPath(version))), 'the plugin kept the older binary')
+	assert.ok(await waitFor(() => existsSync(installedPath())), 'the plugin kept the older binary')
 	assert.ok(hits > 0)
 })
 
@@ -134,7 +135,7 @@ test('a binary on PATH as new as the plugin is kept, and nothing is downloaded',
 	apply(context(), {})
 	await new Promise((resolve) => setTimeout(resolve, 300))
 	assert.equal(hits, 0)
-	assert.equal(existsSync(installedPath(version)), false)
+	assert.equal(existsSync(installedPath()), false)
 })
 
 test('a configured binary is used as it is, and nothing is downloaded', { skip }, async () => {
@@ -147,5 +148,38 @@ test('a configured binary is used as it is, and nothing is downloaded', { skip }
 		console.warn = warn
 	}
 	assert.equal(hits, 0)
-	assert.equal(existsSync(installedPath(version)), false)
+	assert.equal(existsSync(installedPath()), false)
+})
+
+// machineBinary puts a memcue at the machine's path that passes `version -minimum` or not, as current says.
+function machineBinary(current) {
+	mkdirSync(join(installedPath(), '..'), { recursive: true })
+	writeFileSync(installedPath(), `#!/bin/sh\n# machine\nexit ${current ? 0 : 1}\n`)
+	chmodSync(installedPath(), 0o755)
+}
+
+// #718: the machine has one binary, which every plugin shares.
+test('a machine binary of this release or newer stays and nothing is downloaded', { skip }, async () => {
+	machineBinary(true)
+	assert.equal(await install(version), installedPath())
+	assert.equal(hits, 0)
+	assert.match(readFileSync(installedPath(), 'utf8'), /machine/)
+})
+
+test('an older machine binary is replaced by the release', { skip }, async () => {
+	machineBinary(false)
+	assert.equal(await install(version), installedPath())
+	assert.ok(hits > 0)
+	assert.match(spawnSync(installedPath(), ['version', '-json'], { encoding: 'utf8' }).stdout, new RegExp(version))
+})
+
+test('an older machine binary that is a symlink is left to the user', { skip }, async () => {
+	const own = join(process.env.HOME, 'own-memcue')
+	mkdirSync(join(installedPath(), '..'), { recursive: true })
+	writeFileSync(own, '#!/bin/sh\nexit 1\n')
+	chmodSync(own, 0o755)
+	symlinkSync(own, installedPath())
+	await assert.rejects(install(version), /not a plain file/)
+	assert.ok(lstatSync(installedPath()).isSymbolicLink())
+	assert.equal(hits, 0)
 })

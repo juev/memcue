@@ -1,13 +1,14 @@
 /**
  * Installs the memcue binary of this plugin's release when none is configured, the way the Claude Code plugin does:
- * into `${XDG_DATA_HOME:-~/.local/share}/memcue/<version>/memcue`, a directory the two plugins share, checked
- * against the release's `checksums.txt`. `MEMCUE_AUTO_INSTALL=0` turns it off.
+ * into the machine's `~/.local/bin/memcue`, the one binary every plugin of the machine shares (#718), checked against
+ * the release's `checksums.txt`. A machine binary of this release or newer stays, and so does a symlink or anything
+ * else that is not a plain file. `MEMCUE_AUTO_INSTALL=0` turns it off.
  *
  * @module memcue-dsh/install
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, constants, chmod, mkdir, mkdtemp, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
+import { access, chmod, constants, lstat, mkdir, mkdtemp, readFile, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -27,13 +28,19 @@ export async function pluginVersion() {
 }
 
 /**
- * Path of the installed binary of a release.
- * @param version - release version without the leading v.
+ * Path of the machine's binary.
  * @returns the absolute path, whether or not it exists.
  */
-export function installedPath(version) {
-	const data = process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share')
-	return join(data, 'memcue', version, 'memcue')
+export function installedPath() {
+	return join(homedir(), '.local', 'bin', 'memcue')
+}
+
+/**
+ * The lock both plugins take, in memcue's state directory, so two plugins of one machine do not install at once.
+ * @returns the absolute path of the lock directory.
+ */
+function lockPath() {
+	return join(process.env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'memcue', 'install.lock')
 }
 
 /**
@@ -48,6 +55,20 @@ export async function executable(path) {
 	} catch {
 		return false
 	}
+}
+
+/**
+ * Whether the binary at path is the given release or newer, by its own `version -minimum`.
+ * @param path - binary to ask.
+ * @param version - release version without the leading v.
+ * @returns true when it says so.
+ */
+export function current(path, version) {
+	return new Promise((resolve) => {
+		const child = spawn(path, ['version', '-minimum', version], { stdio: 'ignore' })
+		child.on('error', () => resolve(false))
+		child.on('close', (code) => resolve(code === 0))
+	})
 }
 
 function target() {
@@ -74,21 +95,26 @@ function untar(archive, dir) {
 }
 
 /**
- * Install the binary of a release unless it is there already. The archive must match its line in the release's
- * checksums.txt; it is unpacked next to the target and moved into place, so a reader never sees half a binary. A lock
- * directory, the same one the Claude Code plugin takes, keeps two installs from racing.
+ * Install the binary of a release unless the machine's binary is that release or newer. The archive must match its
+ * line in the release's checksums.txt; it is unpacked next to the target and renamed over it, so a reader never sees
+ * half a binary and a memcue that is running keeps its file. A symlink or anything else that is not a plain file is
+ * the user's and stays.
  * @param version - release version without the leading v.
  * @returns the path of the installed binary.
- * @throws when auto-install is off, the platform has no release, or the download or the checksum fails.
+ * @throws when auto-install is off, the platform has no release, the machine's binary is not a plain file, or the
+ *   download or the checksum fails.
  */
 export async function install(version) {
-	const path = installedPath(version)
-	if (await executable(path)) return path
+	const path = installedPath()
+	if (await executable(path) && await current(path, version)) return path
 	if (process.env.MEMCUE_AUTO_INSTALL === '0') throw new Error('MEMCUE_AUTO_INSTALL=0')
+	const info = await lstat(path).catch(() => null)
+	if (info && !info.isFile()) throw new Error(`${path} is not a plain file; leaving it to the user`)
 	const archive = `memcue_${version}_${target()}.tar.gz`
 	const dir = join(path, '..')
 	await mkdir(dir, { recursive: true })
-	const lock = join(dir, '.lock')
+	const lock = lockPath()
+	await mkdir(join(lock, '..'), { recursive: true })
 	try {
 		if (Date.now() - (await stat(lock)).mtimeMs > STALE_LOCK_MS) await rmdir(lock)
 	} catch {
@@ -99,8 +125,11 @@ export async function install(version) {
 	} catch {
 		throw new Error('another install of memcue is running')
 	}
-	const tmp = await mkdtemp(join(dir, '.tmp.'))
+	let tmp = ''
 	try {
+		// Another plugin may have put a current binary in place before this one took the lock.
+		if (await executable(path) && await current(path, version)) return path
+		tmp = await mkdtemp(join(dir, '.memcue-install.'))
 		const base = `${process.env.MEMCUE_RELEASE_URL || RELEASES}/v${version}`
 		const [data, sums] = await Promise.all([download(`${base}/${archive}`, 45_000),
 			download(`${base}/checksums.txt`, 15_000)])
@@ -114,7 +143,7 @@ export async function install(version) {
 		await rename(join(tmp, 'memcue'), path)
 		return path
 	} finally {
-		await rm(tmp, { recursive: true, force: true })
+		if (tmp) await rm(tmp, { recursive: true, force: true })
 		await rmdir(lock).catch(() => {})
 	}
 }

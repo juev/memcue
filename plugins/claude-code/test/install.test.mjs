@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -50,7 +50,7 @@ function setup(opts = {}) {
 		CLAUDE_ENV_FILE: join(root, 'env'),
 		MEMCUE_RELEASE_URL: release(root, opts),
 	}
-	return { root, bin, env, installed: join(root, 'data', 'memcue', version, 'memcue') }
+	return { root, bin, env, installed: join(root, '.local', 'bin', 'memcue') }
 }
 
 function run(env, args, input = '') {
@@ -64,7 +64,7 @@ test('session-start installs the release of the plugin when no binary is on PATH
 	const out = run(env, ['session-start'], '{}')
 	assert.ok(existsSync(installed), 'the binary was not installed')
 	assert.match(out, /^installed session-start/)
-	assert.match(readFileSync(join(root, 'env'), 'utf8'), new RegExp(`export PATH="${join(root, 'data', 'memcue', version)}:\\$PATH"`))
+	assert.match(readFileSync(join(root, 'env'), 'utf8'), new RegExp(`export PATH="${join(root, '.local', 'bin')}:\\$PATH"`))
 	assert.match(run(env, ['hook-extract'], 'payload'), /^installed hook-extract\npayload/, 'the next hook must use the installed copy')
 	assert.match(readFileSync(join(root, 'state', 'memcue', 'install.log'), 'utf8'), /installed/)
 })
@@ -83,7 +83,7 @@ test('a failed install is not retried for an hour', { skip: !os || !arch }, () =
 	release(root) // the release is fixed, but the next session must not try again yet
 	run(env, ['session-start'])
 	assert.equal(existsSync(installed), false, 'a second attempt ran within the hour')
-	const failed = join(root, 'data', 'memcue', version, '.failed')
+	const failed = join(root, 'state', 'memcue', `install-${version}.failed`)
 	spawnSync('touch', ['-t', '200001010000', failed])
 	assert.match(run(env, ['session-start']), /^installed session-start/, 'an old failure must not block the install')
 	assert.equal(existsSync(failed), false)
@@ -137,4 +137,31 @@ test('MEMCUE_BIN wins over everything', { skip: !os || !arch }, () => {
 test('a hook without a binary does nothing', { skip: !os || !arch }, () => {
 	const { env } = setup()
 	assert.equal(run(env, ['hook-extract'], '{"session_id":"x"}'), '')
+})
+
+// #718: the machine has one binary, which every plugin shares.
+test('a machine binary of this release or newer stays and nothing is downloaded', { skip: !os || !arch }, () => {
+	const { env, installed } = setup()
+	mkdirSync(join(installed, '..'), { recursive: true })
+	fakeBinary(installed, { name: 'machine' })
+	assert.match(run(env, ['session-start']), /^machine session-start/)
+	assert.match(readFileSync(installed, 'utf8'), /machine/, 'a plugin replaced a binary that is new enough')
+})
+
+test('an older machine binary is replaced by the release', { skip: !os || !arch }, () => {
+	const { env, installed } = setup()
+	mkdirSync(join(installed, '..'), { recursive: true })
+	fakeBinary(installed, { current: false, name: 'machine' })
+	assert.match(run(env, ['session-start']), /^installed session-start/)
+	assert.match(readFileSync(installed, 'utf8'), /installed/)
+})
+
+test('an older machine binary that is a symlink is left to the user', { skip: !os || !arch }, () => {
+	const { env, installed, root } = setup()
+	mkdirSync(join(installed, '..'), { recursive: true })
+	fakeBinary(join(root, 'own'), { current: false, name: 'own' })
+	symlinkSync(join(root, 'own'), installed)
+	assert.match(run(env, ['session-start']), /older than/)
+	assert.ok(lstatSync(installed).isSymbolicLink(), 'the plugin replaced the symlink')
+	assert.match(readFileSync(join(root, 'state', 'memcue', 'install.log'), 'utf8'), /not a plain file/)
 })
