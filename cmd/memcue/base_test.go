@@ -179,6 +179,47 @@ func TestStateFollowsTheBaseToText(t *testing.T) {
 	}
 }
 
+// Every agent of the machine shares one default base under XDG_STATE_HOME (#718). A base still at the old default in the
+// Claude config directory stays in use until it is moved, and once moved the shared one wins. Either keeps the
+// historical state directory, so the move keeps the dream schedule and the logs.
+func TestDefaultBaseIsSharedAndKeepsAnOldOne(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
+	t.Setenv("MEMCUE_STATE_DIR", "")
+	t.Setenv("MEMCUE_FACTS", "")
+	shared := filepath.Join(dir, "state", "memcue", "memory", "facts")
+	legacy := filepath.Join(dir, "claude", "memory", "facts")
+	check := func(step, want string, text bool) {
+		t.Helper()
+		b := factsBase()
+		if b.path != want || b.text != text {
+			t.Fatalf("%s: default base %+v, want %s (text %v)", step, b, want, text)
+		}
+		got, err := stateDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if root := filepath.Join(dir, "state", "memcue"); got != root {
+			t.Errorf("%s: state dir %s, want %s", step, got, root)
+		}
+	}
+	check("a new machine", shared+".db", false)
+	if err := os.MkdirAll(legacy, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	check("a base at the old default", legacy, true)
+	// The move of the guide: mv ~/.claude/memory ~/.local/state/memcue/memory.
+	if err := os.Rename(filepath.Dir(legacy), filepath.Dir(shared)); err != nil {
+		t.Fatal(err)
+	}
+	check("the base moved", shared, true)
+	if err := os.MkdirAll(legacy, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	check("an old base left behind", shared, true)
+}
+
 // The default text history keeps the historical state directory, as the default file did.
 func TestStateDirKeepsTheDefaultText(t *testing.T) {
 	dir := t.TempDir()

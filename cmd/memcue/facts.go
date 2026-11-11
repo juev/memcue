@@ -30,11 +30,47 @@ const stateWaysOut = "store what does not change with the next release or restar
 	"-shelf research (the shelf parameter of memcue_add). If the version, path or time is only incidental, drop it " +
 	"from the text and store the rest. The state of a machine here is not stored."
 
+// factsPath is the fact base of this process: MEMCUE_FACTS, else the base every agent of the machine shares (#718).
+// A base that still lives at the default of 0.35 and earlier, in the Claude config directory, stays in use until it is
+// moved, so an upgrade does not start an empty base next to it.
 func factsPath() string {
 	if p := os.Getenv("MEMCUE_FACTS"); p != "" {
 		return expandHome(p)
 	}
+	shared, legacy := sharedFactsPath(), legacyFactsPath()
+	if !baseWritten(shared) && baseWritten(legacy) {
+		return legacy
+	}
+	return shared
+}
+
+// sharedFactsPath is the default base: $XDG_STATE_HOME/memcue/memory/facts.db, the text history beside it in facts/.
+// memory/ is the directory a git clone of the base takes, as ~/.claude/memory was before.
+func sharedFactsPath() string {
+	return filepath.Join(stateRoot(), "memory", "facts.db")
+}
+
+// legacyFactsPath is the default base of memcue 0.35 and earlier.
+func legacyFactsPath() string {
 	return filepath.Join(claudeDir(), "memory", "facts.db")
+}
+
+// baseWritten says whether a default base path holds a base: the SQLite file or the text history next to it.
+func baseWritten(p string) bool {
+	if _, err := os.Stat(p); err == nil {
+		return true
+	}
+	return isDir(strings.TrimSuffix(p, ".db"))
+}
+
+// stateRoot is $XDG_STATE_HOME/memcue, ~/.local/state/memcue without it.
+func stateRoot() string {
+	base := os.Getenv("XDG_STATE_HOME")
+	if base == "" {
+		home, _ := os.UserHomeDir()
+		base = filepath.Join(home, ".local", "state")
+	}
+	return filepath.Join(base, "memcue")
 }
 
 // expandHome resolves a leading ~/ or $HOME/ that a shell would have expanded but an env set by a launcher or a YAML

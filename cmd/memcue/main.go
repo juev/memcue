@@ -118,7 +118,8 @@ environment:
   MEMCUE_POSTGRES_DSN  explicit PostgreSQL backend; empty keeps SQLite/text history offline
   MEMCUE_SERVER   tailnet name of a memcue server: work on this machine's replica of it, synced by the helper
   MEMCUE_TAILSCALE_MODE  off (default) or embedded; see docs/remote-backends.md
-  MEMCUE_FACTS    fact base (default $CLAUDE_CONFIG_DIR/memory/facts.db or ~/.claude/memory/facts.db)
+  MEMCUE_FACTS    fact base (default $XDG_STATE_HOME/memcue/memory/facts.db, shared by every agent of the machine; a
+                  base still at the old default $CLAUDE_CONFIG_DIR/memory/facts.db stays in use until it is moved)
   MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base
   MEMCUE_MODEL    model of migrate and dream -run (default claude-opus-5-5)
   MEMCUE_API_URL  OpenAI-compatible endpoint for migrate and dream instead of claude -p (with MEMCUE_API_KEY)

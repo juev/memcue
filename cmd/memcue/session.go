@@ -217,15 +217,10 @@ func stateDir() (string, error) {
 func stateDirOf(b factBase) (string, error) {
 	dir := strings.TrimSpace(os.Getenv("MEMCUE_STATE_DIR"))
 	if dir == "" {
-		base := os.Getenv("XDG_STATE_HOME")
-		if base == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", err
-			}
-			base = filepath.Join(home, ".local", "state")
+		if _, err := os.UserHomeDir(); err != nil && os.Getenv("XDG_STATE_HOME") == "" {
+			return "", err
 		}
-		dir = filepath.Join(base, "memcue")
+		dir = stateRoot()
 		if !isDefaultBase(b) {
 			root := dir
 			dir = filepath.Join(root, baseKey(b.path))
@@ -239,16 +234,21 @@ func stateDirOf(b factBase) (string, error) {
 	return dir, os.MkdirAll(dir, 0o700)
 }
 
-// isDefaultBase says whether b is memcue's own default, the file or the text history of the Claude config directory.
-// That base keeps the pre-0.5 state directory, so an existing Claude Code or DSH install does not lose its session
-// offsets or its dream schedule.
+// isDefaultBase says whether b is memcue's own default: the shared base of the machine or the base of the Claude config
+// directory it replaced (#718), as a file or a text history. Both keep the pre-0.5 state directory, so an existing
+// Claude Code or DSH install does not lose its session offsets or its dream schedule, nor when its base moves to the
+// shared place.
 func isDefaultBase(b factBase) bool {
 	base, err := filepath.Abs(b.path)
 	if err != nil {
 		return false
 	}
-	def, err := filepath.Abs(filepath.Join(claudeDir(), "memory", "facts.db"))
-	return err == nil && (base == def || base == strings.TrimSuffix(def, ".db"))
+	for _, p := range []string{sharedFactsPath(), legacyFactsPath()} {
+		if def, err := filepath.Abs(p); err == nil && (base == def || base == strings.TrimSuffix(def, ".db")) {
+			return true
+		}
+	}
+	return false
 }
 
 // baseKey names a state subdirectory for a base path: 12 hex characters of SHA-256 are enough to separate the bases
