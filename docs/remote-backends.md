@@ -59,7 +59,9 @@ machines correct the text at once, the later text wins and the other one is kept
 machine and corrected on another stays retired with the correction, and `reopen` brings back the corrected text.
 
 A session start or session card that finds no helper starts one in the background and answers without waiting. One
-that finds a helper of another memcue version asks it to exit and starts its own. They add a line when the helper
+that finds a helper of an older release asks it to exit and starts its own; a helper of a newer release stays, so two
+agents of different releases do not replace each other's helper (#718). A write (`add`, `correct`, `retire`,
+`reopen`, `import`) also starts a helper that is not running. They add a line when the helper
 waits for a login, when the replica has never synced, and when the server refused changes of the outbox (a clock far
 ahead, for example). `memcue connect status` prints the helper's version, the last sync, the outbox length and the
 refused changes.

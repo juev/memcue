@@ -58,7 +58,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.35.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.36.0`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -66,6 +66,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.36.0 | 9 | 0.36.0 | 0.36.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.0 (`hermes-agent` >=0.17.0) |
 | 0.35.0 | 9 | 0.35.0 | 0.35.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.35.0 (`hermes-agent` >=0.17.0) |
 | 0.34.0 | 9 | 0.34.0 | 0.34.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.34.0 (`hermes-agent` >=0.17.0) |
 | 0.33.0 | 9 | 0.33.0 | 0.33.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.33.0 (`hermes-agent` >=0.17.0) |
@@ -312,6 +313,25 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.36.0: a memcue server on the tailnet, one binary and one base per machine (#714, #718)
+
+- **Server mode (new, opt-in).** One machine runs `memcue server` and keeps the shared base in SQLite; every other
+  machine sets `MEMCUE_SERVER` and works on a local SQLite replica that the tailnet helper keeps in step with the
+  server. The CLI never waits for the network in this mode, and only the server dreams. `memcue migrate -server`
+  loads an existing base into an empty server. Without `MEMCUE_SERVER` nothing changes. See
+  [server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
+- **The default base moves to `~/.local/state/memcue/memory/` (`$XDG_STATE_HOME`), shared by Claude Code, DSH and
+  Codex.** A base still in `~/.claude/memory` stays in use until you move it; nothing moves it for you. Update every
+  memcue of the machine before moving it: a 0.35 or older binary would write a new base at the old place, which the
+  session start then names. See [Moving the base to the shared place](#moving-the-base-to-the-shared-place). A base
+  named by `MEMCUE_FACTS` or a plugin's `facts` setting is not affected; Hermes keeps its base in `$HERMES_HOME`.
+- **One binary per machine.** The Claude Code and DSH plugins install `~/.local/bin/memcue` instead of
+  `~/.local/share/memcue/<version>/memcue` and replace it only with a newer release. The old version directories are
+  no longer used and may be deleted. The Codex plugin's `binary`, `facts` and `state_dir` are now optional.
+- **The tailnet helper is replaced only by a newer release**, so sessions of two different releases no longer
+  restart it in turn. A write in server mode also starts a helper that is not running.
+- The fact-base schema stays 9.
 
 ### 0.35.0: one search scope less, no pre-command, pitfalls sent once (#712)
 
