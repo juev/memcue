@@ -119,9 +119,71 @@ func startHelperDetached() error {
 	return cmd.Process.Release()
 }
 
-// serverHints makes sure the helper of this machine runs the binary of this session, starting or replacing it without
-// waiting (R10), and returns the lines of R15: a helper that waits for a login, a replica that never synced, changes
-// the server refused. A hint that cannot be worked out says nothing: the session must start either way.
+// ensureHelper makes sure the helper of this machine runs a binary at least as new as this one, starting or replacing
+// it without waiting (R10). A helper of a newer release stays: two agents whose plugins ship different releases would
+// otherwise replace each other's helper on every session start (#718). It returns the state of a helper that stays
+// running, and ok false when there was none or it was replaced.
+func (inv *invocation) ensureHelper(cfg tailnet.Config) (state tailnet.State, ok bool) {
+	ctx, cancel := context.WithTimeout(inv.ctx, helperWait)
+	defer cancel()
+	state, err := tailnet.Admin(ctx, cfg, "status")
+	switch {
+	case err != nil:
+		if tailnet.ValidateExistingProfile(cfg) == nil {
+			_ = startHelper()
+		}
+		return state, false
+	case helperOlder(state.Version, version):
+		_, _ = tailnet.Admin(ctx, tailnet.Config{Dir: cfg.Dir}, "off")
+		_ = startHelper()
+		return state, false
+	}
+	return state, true
+}
+
+// helperOlder says whether a helper of version helper must give way to a session of version session. Two releases
+// compare by number. A source build cannot be ordered against a release, so there the session's binary wins, as it
+// did before #718: a developer who runs a build of the tree wants its helper.
+func helperOlder(helper, session string) bool {
+	if helper == session {
+		return false
+	}
+	h, ok1 := parseVersion(helper)
+	s, ok2 := parseVersion(session)
+	if !ok1 || !ok2 {
+		return true
+	}
+	for i := range h {
+		if h[i] != s[i] {
+			return h[i] < s[i]
+		}
+	}
+	return false
+}
+
+// wakeHelper starts the helper after a write in server mode, so that a helper which died during a session does not
+// leave the write in the outbox until the next session start (#718). It never waits for the helper.
+func (inv *invocation) wakeHelper() {
+	if serverName() == "" {
+		return
+	}
+	if cfg, err := helperConfig(); err == nil {
+		inv.ensureHelper(cfg)
+	}
+}
+
+// writesFacts says whether a command writes facts into the base, so a helper must carry them to the server.
+func writesFacts(cmd string) bool {
+	switch cmd {
+	case "add", "correct", "retire", "reopen", "import":
+		return true
+	}
+	return false
+}
+
+// serverHints makes sure the helper of this machine runs (ensureHelper) and returns the lines of R15: a helper that
+// waits for a login, a replica that never synced, changes the server refused. A hint that cannot be worked out says
+// nothing: the session must start either way.
 func (inv *invocation) serverHints() string {
 	if serverName() == "" {
 		return ""
@@ -130,19 +192,9 @@ func (inv *invocation) serverHints() string {
 	if err != nil {
 		return "memcue: " + err.Error()
 	}
-	ctx, cancel := context.WithTimeout(inv.ctx, helperWait)
-	defer cancel()
 	var lines []string
-	state, err := tailnet.Admin(ctx, cfg, "status")
-	switch {
-	case err != nil:
-		if tailnet.ValidateExistingProfile(cfg) == nil {
-			_ = startHelper()
-		}
-	case state.Version != version:
-		_, _ = tailnet.Admin(ctx, tailnet.Config{Dir: cfg.Dir}, "off")
-		_ = startHelper()
-	case state.State == "NeedsLogin" || state.State == "NeedsMachineAuth" || state.State == "Stopped":
+	state, running := inv.ensureHelper(cfg)
+	if running && (state.State == "NeedsLogin" || state.State == "NeedsMachineAuth" || state.State == "Stopped") {
 		lines = append(lines, fmt.Sprintf("memcue: the tailnet helper of this machine waits for a login (%s), so the "+
 			"replica of %s does not sync; tell the user to run memcue connect up.", state.State, cfg.Host))
 	}
@@ -154,7 +206,7 @@ func (inv *invocation) serverHints() string {
 				"written on other machines are not here yet.", cfg.Host))
 		}
 	}
-	if err == nil && state.Version == version {
+	if running {
 		if l := rejectedHint(state.Sync); l != "" {
 			lines = append(lines, l)
 		}

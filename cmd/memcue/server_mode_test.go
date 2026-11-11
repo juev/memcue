@@ -203,6 +203,74 @@ func TestSessionStartReplacesAHelperOfAnotherVersion(t *testing.T) {
 	}
 }
 
+// withVersion runs the test as a binary of release v.
+func withVersion(t *testing.T, v string) {
+	t.Helper()
+	old := version
+	version = v
+	t.Cleanup(func() { version = old })
+}
+
+// Two agents whose plugins ship different releases must not replace each other's helper on every session start
+// (#718): a session leaves a newer helper running, and only an older one gives way.
+func TestSessionStartReplacesOnlyAnOlderHelper(t *testing.T) {
+	for _, tc := range []struct {
+		helper  string
+		replace bool
+	}{{"0.36.0", false}, {"0.35.0", false}, {"0.34.9", true}, {"0.4.0-main.d6a4a9b", true}} {
+		t.Run(tc.helper, func(t *testing.T) {
+			withVersion(t, "0.35.0")
+			identity, starts := serverEnv(t)
+			sync := replica.Status{Rejected: []replica.Rejected{{OpID: "a", ID: "F1", Reason: "ahead"}}}
+			ops := fakeHelper(t, identity, map[string]any{"running": true, "state": "NeedsLogin", "version": tc.helper,
+				"sync": sync})
+			text, _ := sessionContext(t, true)
+			want, started := []string{"status"}, 0
+			if tc.replace {
+				want, started = []string{"status", "off"}, 1
+			}
+			if got := ops(); strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("helper was asked %v, want %v", got, want)
+			}
+			if got := starts(); got != started {
+				t.Fatalf("helper started %d times, want %d", got, started)
+			}
+			// A helper that stays reports its state; one that is being replaced says nothing for the new one.
+			for _, hint := range []string{"waits for a login (NeedsLogin)", "the server refused 1 changes"} {
+				if strings.Contains(text, hint) == tc.replace {
+					t.Errorf("hint %q present=%v with a helper that is replaced=%v: %q", hint, !tc.replace, tc.replace, text)
+				}
+			}
+		})
+	}
+}
+
+// A helper that died during a session must not leave the writes in the outbox until the next session start (#718):
+// a write starts it, without waiting for it.
+func TestAWriteStartsAMissingHelper(t *testing.T) {
+	_, starts := serverEnv(t)
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+	os.Args = []string{"memcue", "add", "--", "a write starts the helper of this machine when it is not running"}
+	start := time.Now()
+	if code := runMain(); code != 0 {
+		t.Fatalf("add exited %d", code)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("add took %s without a helper", took)
+	}
+	if got := starts(); got != 1 {
+		t.Fatalf("helper started %d times after a write, want 1", got)
+	}
+	os.Args = []string{"memcue", "search", "write starts helper"}
+	if code := runMain(); code != 0 {
+		t.Fatalf("search exited %d", code)
+	}
+	if got := starts(); got != 1 {
+		t.Fatalf("a search started the helper: %d starts", got)
+	}
+}
+
 func TestSessionStartReportsLoginAndRefusedChanges(t *testing.T) {
 	identity, starts := serverEnv(t)
 	sync := replica.Status{Outbox: 2, Rejected: []replica.Rejected{

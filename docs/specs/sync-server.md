@@ -114,8 +114,10 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
 - **Client commands.** Rejected in server mode: `install`, `dream`, `migrate` except `-server`, `merge`, `dump`. Working
   on the replica: `import`, `notes`, `reindex`. `MEMCUE_SERVER` needs no `MEMCUE_TAILSCALE_MODE`: the helper is the only
   transport there; with `MEMCUE_POSTGRES_DSN` too, every command refuses. A session start asks the helper for its
-  status for at most half a second; a helper of another version is told to exit, and its replacement
-  (`connect serve -takeover`) waits up to ten seconds for the identity. Implemented.
+  status for at most half a second; a helper of an older release, or of a source build that cannot be ordered against
+  this one, is told to exit, and its replacement (`connect serve -takeover`) waits up to ten seconds for the identity.
+  A helper of a newer release stays (#718). `add`, `correct`, `retire`, `reopen` and `import` do the same after a
+  write, so a helper that died during a session is back before the next one. Implemented.
 - **Migration.** From one base: loffe and Hermes are merged into the Mac base once by the existing git sync, then
   `migrate -server` loads that base. Each fact goes with the text and labels of its latest version and the creation
   time of its first. Implemented in `cmd/memcue/migrate_server.go`.

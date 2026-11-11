@@ -246,6 +246,9 @@ func runMain() (code int) {
 		_, _ = fmt.Fprintln(diagnostics, "memcue:", err)
 		return 1
 	}
+	if writesFacts(os.Args[1]) {
+		inv.wakeHelper()
+	}
 
 	return 0
 }
