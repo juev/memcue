@@ -58,7 +58,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.36.1`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.36.2`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -66,6 +66,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.36.2 | 9 | 0.36.2 | 0.36.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.2 (`hermes-agent` >=0.17.0) |
 | 0.36.1 | 9 | 0.36.1 | 0.36.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.1 (`hermes-agent` >=0.17.0) |
 | 0.36.0 | 9 | 0.36.0 | 0.36.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.0 (`hermes-agent` >=0.17.0) |
 | 0.35.0 | 9 | 0.35.0 | 0.35.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.35.0 (`hermes-agent` >=0.17.0) |
@@ -317,6 +318,13 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.36.2: the tailnet node logs in on a Linux host that serves its own control server (#726)
+
+- **The embedded tailnet node no longer binds its sockets to the default-route interface on Linux.** Run by a user
+  without `CAP_NET_ADMIN`, it did, and a control server that resolves to the same host behind Docker's DNAT (as
+  Headscale on loffe) was never reached: `memcue server` and the helper stayed waiting for a login.
+- The fact-base schema stays 9.
 
 ### 0.36.1: the card asks for `memcue install` after a synced base moved (#718)
 
