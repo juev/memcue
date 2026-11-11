@@ -196,8 +196,12 @@ Claude Code, DSH and Codex share one base per machine, `~/.local/state/memcue/me
 when it is set). A base created by 0.35 or earlier lives in `~/.claude/memory` and stays in use there until you move
 it; nothing moves it for you. To move it:
 
-1. Stop every agent session that uses the base and pause its sync (a git cron job, Syncthing and the like).
-2. Move the directory. If `~/.claude/memory` holds only the base and its git repository:
+1. Update every memcue of the machine first: each plugin (a DSH plugin is not updated by dsh itself), a pinned
+   `MEMCUE_BIN` or `binary` setting, and any copy in `~/.local/share/memcue/<version>/`. A memcue of 0.35 or older
+   still opens `~/.claude/memory` and, once the base has moved, writes a new one there that no search reads; the
+   session start then names it.
+2. Stop every agent session that uses the base and pause its sync (a git cron job, Syncthing and the like).
+3. Move the directory. If `~/.claude/memory` holds only the base and its git repository:
 
    ```bash
    mkdir -p ~/.local/state/memcue
@@ -206,7 +210,7 @@ it; nothing moves it for you. To move it:
 
    If it also holds Claude Code's own memory notes, create `~/.local/state/memcue/memory` and move only `facts` (or
    `facts.db`) into it; a base synced with git then needs its repository moved or set up again with `memcue install`.
-3. Run `memcue search` once by hand. The state directory stays `~/.local/state/memcue`, so the dream schedule and the
+4. Run `memcue search` once by hand. The state directory stays `~/.local/state/memcue`, so the dream schedule and the
    logs carry over.
 
 As long as `~/.local/state/memcue/memory` holds no base, memcue keeps opening the old one; once it does, the old place

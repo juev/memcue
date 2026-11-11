@@ -33,6 +33,40 @@ func sessionCardContext(t *testing.T, cwd string) string {
 	return resp.HookSpecificOutput.AdditionalContext
 }
 
+// A memcue of 0.35 or older left on the machine keeps writing a base at the old default after the base moved to the
+// shared place (#718); the default never opens it again, so the card says it is there.
+func TestCardNamesABaseLeftAtTheOldDefault(t *testing.T) {
+	dir := env(t)
+	t.Setenv("MEMCUE_FACTS", "")
+	t.Setenv("MEMCUE_STATE_DIR", "")
+	var out bytes.Buffer
+	if err := runAdd([]string{"--", "the shared base of the machine holds this fact"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !baseWritten(sharedFactsPath()) {
+		t.Fatalf("the add did not write the shared base %s", sharedFactsPath())
+	}
+	const hint = "is a fact base at "
+	if text := sessionCardContext(t, ""); strings.Contains(text, hint) {
+		t.Fatalf("a hint without an old base: %q", text)
+	}
+	old := filepath.Join(dir, "claude", "memory", "facts.db")
+	if err := os.MkdirAll(filepath.Dir(old), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	text := sessionCardContext(t, "")
+	if !strings.Contains(text, hint+filepath.Join(dir, "claude", "memory")) || !strings.Contains(text, "not searched") {
+		t.Fatalf("no hint of the old base in %q", text)
+	}
+	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "other.db"))
+	if text := sessionCardContext(t, ""); strings.Contains(text, hint) {
+		t.Fatalf("a hint for a base named by MEMCUE_FACTS: %q", text)
+	}
+}
+
 // Facts written under the directory name of the session's repository before #343 are named on the card of both
 // hosts with the exact pair that moves them, and the line goes once they are moved (#396).
 func TestCardNamesTheOldNameOfTheSessionRepository(t *testing.T) {

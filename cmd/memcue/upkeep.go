@@ -26,7 +26,26 @@ func (inv *invocation) upkeepHint(cwd string) string {
 	if l := inv.driverHint(); l != "" {
 		lines = append(lines, l)
 	}
+	if l := legacyBaseHint(); l != "" {
+		lines = append(lines, l)
+	}
 	return strings.Join(lines, "\n")
+}
+
+// legacyBaseHint is the line for a base at the old default in the Claude config directory next to the shared one
+// (#718). The default opens the shared base, so facts that a memcue of 0.35 or older on this machine keeps writing at
+// the old place reach no search. A base named by MEMCUE_FACTS, PostgreSQL and server mode do not use the default.
+func legacyBaseHint() string {
+	if os.Getenv("MEMCUE_FACTS") != "" || os.Getenv("MEMCUE_POSTGRES_DSN") != "" || serverName() != "" {
+		return ""
+	}
+	shared, legacy := sharedFactsPath(), legacyFactsPath()
+	if !baseWritten(shared) || !baseWritten(legacy) {
+		return ""
+	}
+	return fmt.Sprintf("memcue: there is a fact base at %s besides this machine's base in %s; facts written there, "+
+		"for example by an older memcue, are not searched. Tell the user to update every memcue of this machine and "+
+		"to merge or remove that base.", filepath.Dir(legacy), filepath.Dir(shared))
 }
 
 // oldNameHint is the line for facts written under the directory name of the session's repository before #343. Only
