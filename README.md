@@ -58,7 +58,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.36.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.36.1`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -66,6 +66,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.36.1 | 9 | 0.36.1 | 0.36.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.1 (`hermes-agent` >=0.17.0) |
 | 0.36.0 | 9 | 0.36.0 | 0.36.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.0 (`hermes-agent` >=0.17.0) |
 | 0.35.0 | 9 | 0.35.0 | 0.35.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.35.0 (`hermes-agent` >=0.17.0) |
 | 0.34.0 | 9 | 0.34.0 | 0.34.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.34.0 (`hermes-agent` >=0.17.0) |
@@ -316,6 +317,14 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.36.1: the card asks for `memcue install` after a synced base moved (#718)
+
+- **A moved clone is asked to set up its merge driver again.** `memcue install` registers the driver by the absolute
+  path of its script, so after a git-synced base moves (for example to `~/.local/state/memcue/memory`) git no longer
+  finds the driver. The session card now names such a clone; run `memcue install` inside it. The move guide has
+  that step.
+- The fact-base schema stays 9.
 
 ### 0.36.0: a memcue server on the tailnet, one binary and one base per machine (#714, #718)
 
