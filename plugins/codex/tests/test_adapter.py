@@ -145,6 +145,29 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.assertNotEqual(r.returncode,0)
         self.assertIn('missing',r.stderr)
 
+    def test_config_without_paths_uses_the_machine_binary_and_shared_base(self):
+        # #718: without binary, facts and state_dir the launcher runs ~/.local/bin/memcue on memcue's own default
+        # base, the one every agent of the machine shares.
+        machine = self.home/'.local'/'bin'/'memcue'
+        machine.parent.mkdir(parents=True)
+        log = self.home/'machine-calls'
+        machine.write_text('#!/usr/bin/env python3\nimport json,os,sys\n'
+                           f'open({str(log)!r},"a").write(json.dumps({{"args":sys.argv[1:],"env":{{k:v for k,v in os.environ.items() if k.startswith("MEMCUE_")}}}})+"\\n")\n'
+                           'if sys.argv[1]=="session-card":print("")\n')
+        machine.chmod(0o700)
+        self.config.write_text(json.dumps({'host': 'synthetic-host'}))
+        self.env.update(XDG_STATE_HOME=str(self.home/'xdg'), CLAUDE_CONFIG_DIR=str(self.home/'claude'))
+        r = self.run_adapter('hook', data=self.payload())
+        self.assertEqual(r.returncode, 0, r.stderr)
+        r = self.run_adapter('search', '-json', 'synthetic')
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = [json.loads(x) for x in log.read_text().splitlines()]
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertNotIn('MEMCUE_FACTS', call['env'], 'an inherited MEMCUE_FACTS must not pick the base')
+            self.assertNotIn('MEMCUE_STATE_DIR', call['env'])
+            self.assertEqual(call['env']['MEMCUE_HOST'], 'synthetic-host')
+
     def test_invalid_config_never_selects_default_base(self):
         valid = json.loads(self.config.read_text())
         for change in ({'facts':''},{'facts':'relative'}, {'state_dir':'relative'}, {'binary':'memcue'},

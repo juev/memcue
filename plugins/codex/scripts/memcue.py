@@ -136,10 +136,16 @@ def load_config(path):
     allowed = {'binary', 'facts', 'state_dir', 'host', 'background_dream', 'dream_every'}
     if not isinstance(config, dict) or config.keys() - allowed:
         raise AdapterError('configuration must be an object with documented keys only')
+    # Each path may be left out (#718): binary is then the machine's ~/.local/bin/memcue, and facts and state_dir are
+    # memcue's own defaults, the base every agent of the machine shares and its state. A key that is given must be an
+    # absolute path; an empty or relative one is an error, never the default.
     for key in ('binary', 'facts', 'state_dir'):
-        value = config.get(key)
+        if key not in config:
+            continue
+        value = config[key]
         if not isinstance(value, str) or not value or not Path(value).is_absolute():
             raise AdapterError(key + ' must be an absolute path')
+    config.setdefault('binary', str(Path.home() / '.local' / 'bin' / 'memcue'))
     if not Path(config['binary']).is_file() or not os.access(config['binary'], os.X_OK):
         raise AdapterError('configured memcue binary is missing or not executable')
     host = config.get('host')
@@ -162,8 +168,10 @@ def child_env(config):
                 'MEMCUE_TAILSCALE_CONNECT_TIMEOUT'):
         if key in os.environ:
             env[key] = os.environ[key]
-    env.update(MEMCUE_FACTS=config['facts'], MEMCUE_STATE_DIR=config['state_dir'],
-               MEMCUE_HOST=config['host'], MEMCUE_DREAM_BACKGROUND='0')
+    for key, name in (('facts', 'MEMCUE_FACTS'), ('state_dir', 'MEMCUE_STATE_DIR')):
+        if key in config:
+            env[name] = config[key]
+    env.update(MEMCUE_HOST=config['host'], MEMCUE_DREAM_BACKGROUND='0')
     if 'dream_every' in config:
         env['MEMCUE_DREAM_EVERY'] = config['dream_every']
     return env
@@ -312,6 +320,11 @@ SNAPSHOTS = 'codex-pitfall-snapshots.json'
 SNAPSHOT_SESSIONS = 128
 
 
+def default_state_dir():
+    """memcue's state directory of the default base, $XDG_STATE_HOME/memcue (stateRoot in cmd/memcue/facts.go)."""
+    return Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local' / 'state') / 'memcue'
+
+
 def snapshot_changed(config, session, text):
     """Say whether text differs from the last repository-pitfall snapshot this session received (#705).
 
@@ -319,7 +332,7 @@ def snapshot_changed(config, session, text):
     text None forgets the session: after startup, resume, clear or compaction the context may not hold it any more.
     A state that cannot be read or written delivers the snapshot rather than risk withholding a changed one.
     """
-    state = Path(config['state_dir'])
+    state = Path(config['state_dir']) if 'state_dir' in config else default_state_dir()
     key = hashlib.sha256(session.encode('utf-8')).hexdigest()
     digest = None if text is None else hashlib.sha256(text.encode('utf-8')).hexdigest()
     try:
