@@ -32,8 +32,11 @@ the machine's binary and the base every agent of the machine shares:
 Without `binary` the launcher runs `~/.local/bin/memcue`, the binary the Claude Code and DSH plugins install. Without
 `facts` and `state_dir` memcue uses its own defaults: the shared base `~/.local/state/memcue/memory/facts` (or a base
 still at `~/.claude/memory`, see [Moving the base to the shared place](../../README.md#moving-the-base-to-the-shared-place))
-and its state directory. Whether the Codex sandbox lets a model's shell command write there has not been checked; if
-it refuses, give paths the sandbox allows. A base of its own takes absolute paths:
+and its state directory. Under the workspace-write sandbox a model's shell command may not write outside the
+workspace: with Codex 0.167.0 on macOS, `codex sandbox -P :workspace` refused `memcue search` and `memcue add` alike,
+because memcue creates its state directory (`mkdir ~/.local/state/memcue/...: operation not permitted`). Run such a
+Codex with full disk access, or make `~/.local/state/memcue` writable to its sandbox; how a permissions profile does
+that has not been checked. A base of its own takes absolute paths:
 
 ```json
 {

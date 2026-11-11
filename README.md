@@ -211,7 +211,10 @@ it; nothing moves it for you. To move it:
 
    If it also holds Claude Code's own memory notes, create `~/.local/state/memcue/memory` and move only `facts` (or
    `facts.db`) into it; a base synced with git then needs its repository moved or set up again with `memcue install`.
-4. Run `memcue search` once by hand. The state directory stays `~/.local/state/memcue`, so the dream schedule and the
+4. If the base is synced with git, run `memcue install` inside the moved clone. The merge driver is registered in
+   `.git/config` by its absolute path, so after the move git no longer finds it; the session start asks for this
+   until it is done.
+5. Run `memcue search` once by hand. The state directory stays `~/.local/state/memcue`, so the dream schedule and the
    logs carry over.
 
 As long as `~/.local/state/memcue/memory` holds no base, memcue keeps opening the old one; once it does, the old place

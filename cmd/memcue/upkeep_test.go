@@ -146,6 +146,46 @@ func TestCardAsksForInstallUntilTheDriverIsSetUp(t *testing.T) {
 	}
 }
 
+// memcue install writes the absolute path of its driver script into .git/config, so a clone moved to another place
+// (the move of a base to ~/.local/state/memcue/memory, #718) points git at a script that is not there any more. The
+// card asks for memcue install again until it rewrites the path.
+func TestCardAsksForInstallAfterTheRepositoryMoved(t *testing.T) {
+	env(t)
+	dir := t.TempDir()
+	for _, kv := range gitEnv(dir) {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v)
+	}
+	old := filepath.Join(dir, "claude", "memory")
+	run(t, dir, nil, "git", "init", "-q", "-b", "main", old)
+	t.Setenv("MEMCUE_FACTS", filepath.Join(old, "facts.db"))
+	seedUpkeepBase(t)
+	if err := runInstall(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessionCardContext(t, ""); strings.Contains(got, "memcue install") {
+		t.Fatalf("the install line before the move:\n%s", got)
+	}
+	moved := filepath.Join(dir, "state", "memcue", "memory")
+	if err := os.MkdirAll(filepath.Dir(moved), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(old, moved); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MEMCUE_FACTS", filepath.Join(moved, "facts.db"))
+	if got := sessionCardContext(t, ""); !strings.Contains(got, "`memcue install`") {
+		t.Errorf("no install line for a driver left at the old path:\n%s", got)
+	}
+	t.Chdir(moved)
+	if err := runInstall(nil, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sessionCardContext(t, ""); strings.Contains(got, "memcue install") {
+		t.Errorf("the install line stays after memcue install in the moved clone:\n%s", got)
+	}
+}
+
 // A base of the old format synced through git is asked on the card to move to text; the line goes with the move,
 // which also routes the fact files to the driver (#530).
 func TestCardAsksToMoveASyncedBaseToText(t *testing.T) {

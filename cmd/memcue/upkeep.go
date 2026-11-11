@@ -111,8 +111,11 @@ func (inv *invocation) driverHint() string {
 	attrsPath, _ := attributesOf(b, top, rel)
 	config, _ := inv.readFile(filepath.Join(gitDir, "config"))
 	attrs, _ := inv.readFile(attrsPath)
-	_, script := os.Stat(filepath.Join(gitDir, "memcue-driver.sh"))
-	if bytes.Contains(config, []byte("memcue-driver.sh")) && script == nil && bytes.Contains(attrs, []byte("merge=memcue")) {
+	// The config must name the script of this repository: memcue install writes its absolute path, so a clone moved
+	// elsewhere still names the old one, where git finds no driver (#718).
+	driver := filepath.Join(gitDir, "memcue-driver.sh")
+	_, script := os.Stat(driver)
+	if bytes.Contains(config, []byte(driver)) && script == nil && bytes.Contains(attrs, []byte("merge=memcue")) {
 		if b.text {
 			return ""
 		}
