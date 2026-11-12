@@ -1115,8 +1115,8 @@ are respected. Transport failure or a real host ceiling produces an explicit dia
 
 Codex start/task/Bash hooks deliver complete native snapshots with `additionalContextLimit: 0`; its launcher read
 ceiling remains 4 MiB (an adapter limit, not a verified Codex host limit). DSH refreshes on turn/cwd changes and
-compaction. Hermes >=0.17.0 uses the normal `memcue-context` companion plugin: every messages/Responses provider
-request gets a transient developer context item from the active initialized provider for that profile/session.
+compaction. Hermes >=0.17.0 uses the normal `memcue-context` companion plugin: every provider request gets the
+card from the active initialized provider for that profile/session, appended to the current turn's user message.
 Enable the companion as part of installation, alongside `memory.provider: memcue`; it is not an optional recall
 feature. Runtime cwd is resolved per request, including within a turn and after compaction. Cached system/prefetch
 facts are suppressed in supported middleware mode. Legacy hosts report their turn-entry-only limitation explicitly.

@@ -1,23 +1,20 @@
 """Normal-plugin request bridge. Only an initialized active provider owns a base."""
 import json
 import os
-import re
 import hashlib
 import weakref
 
 
-# System-level text has one slot the transport accepts, and it is not always a message: the Codex
-# Responses preflight admits no message item beyond user/assistant (a developer-role item raises
-# before the call), Anthropic and Bedrock keep system text outside `messages`, and a
-# chat-completions payload rejects a role its own provider never used (DeepSeek-compatible
-# endpoints answer 422 for `developer`). A rejected role is invisible from here: the turn dies on
-# the primary and silently continues on an unrelated fallback provider. So the card goes into the
-# slot this very payload uses for its prompt, in the role that payload already carries, and a shape
-# with no such slot is left alone instead of inventing one.
+# The card rides in the current turn's user message, the slot Hermes itself uses for ephemeral
+# context (memory prefetch, `pre_llm_call` plugin context). Two reasons. Every transport accepts
+# the user role, while a system/developer message the provider never expected costs the whole turn
+# and silently moves it to a fallback provider (#730). And `system`/`instructions` precede the
+# entire history, so a card that changes there misses the prompt cache for the whole conversation;
+# the current turn's user message only moves the tail (#732). System, instructions, roles and tool
+# output stay exactly as the payload sent them; a payload with no user text is left alone.
 _FRAME_OPEN = '[memcue-context]'
 _FRAME_CLOSE = '[/memcue-context]'
-_FRAME = re.compile(re.escape(_FRAME_OPEN) + r'.*?' + re.escape(_FRAME_CLOSE) + r'\s*', re.S)
-_PROMPT_ROLES = {'system', 'developer'}
+_SEPARATOR = '\n\n'
 _TEXT_KEY = 'text'
 
 
@@ -32,67 +29,51 @@ def _framed(text):
     return f'{_FRAME_OPEN}\n{text}\n{_FRAME_CLOSE}'
 
 
-def _unframed(value):
-    """Drop the block an earlier pass left in a plain string slot, with its blank separator."""
-    return _FRAME.sub('', value).rstrip() if isinstance(value, str) else value
+def _without_trailing_frame(content):
+    """Drop a frame this plugin appended to a string, matched on the exact form it writes."""
+    if not content.endswith('\n' + _FRAME_CLOSE):
+        return content
+    start = content.rfind(_SEPARATOR + _FRAME_OPEN + '\n')
+    if start >= 0:
+        return content[:start]
+    return '' if content.startswith(_FRAME_OPEN + '\n') else content
 
 
-def _framed_after(value, text):
-    kept = _unframed(value)
-    return f'{kept}\n\n{_framed(text)}' if kept else _framed(text)
+def _is_text_part(part):
+    return isinstance(part, dict) and isinstance(part.get(_TEXT_KEY), str)
 
 
-def _text_blocks(carrier, text, api_mode):
-    """Append the card as one text block, mirroring the block shape this payload already carries."""
-    kept = []
-    for block in carrier:
-        if isinstance(block, dict) and isinstance(block.get(_TEXT_KEY), str):
-            stripped = _unframed(block[_TEXT_KEY])
-            if not stripped:
-                continue
-            block = {**block, _TEXT_KEY: stripped}
-        kept.append(block)
-    shape = next(
-        (block for block in kept if isinstance(block, dict) and isinstance(block.get(_TEXT_KEY), str)), None)
-    if shape is None:
-        # Anthropic needs a typed text block; Bedrock Converse takes a bare ``text``.
-        shape = {'type': 'text'} if 'anthropic' in str(api_mode or '') else {}
-    # ``cache_control`` marks a breakpoint, not a style: the fresh block never inherits the old one.
-    kept.append({**{key: value for key, value in shape.items() if key != 'cache_control'}, _TEXT_KEY: _framed(text)})
-    return kept
+def _carries_user_text(message):
+    """A user message with the user's own text, not a tool-result carrier (Anthropic, Bedrock)."""
+    if not isinstance(message, dict) or message.get('role') != 'user':
+        return False
+    if message.get('type') not in (None, 'message'):
+        return False
+    content = message.get('content')
+    return isinstance(content, str) or (isinstance(content, list) and any(map(_is_text_part, content)))
 
 
-def _slot(request, key, api_mode):
-    """``(kind, field)`` for the prompt slot this payload uses, or ``None`` when it has none."""
-    if isinstance(request.get('instructions'), str):
-        return 'text', 'instructions'
-    system = request.get('system')
-    if isinstance(system, str):
-        return 'text', 'system'
-    if isinstance(system, list):
-        return 'blocks', 'system'
-    # Chat completions take a trailing message. An Anthropic or Bedrock payload would reject a
-    # `system` role among its already-converted `messages`, so those modes never reach this branch.
-    if key == 'messages' and not any(mode in str(api_mode or '') for mode in ('anthropic', 'bedrock')):
-        return 'message', None
-    return None
+def _owned(part, owner):
+    return isinstance(part, _TransientContext) and part._owner() is owner
 
 
-def _prompt_role(messages):
-    """The role this chat-completions payload accepts: its own leading prompt role, else `system`."""
-    role = messages[0].get('role') if messages and isinstance(messages[0], dict) else None
-    return role if role in _PROMPT_ROLES else 'system'
+def _with_card(content, text, owner):
+    """The content with the card at its end, in the shape that content already has."""
+    if isinstance(content, str):
+        # A string carries no provenance, so only a frame at its very end is ours to replace.
+        kept = _without_trailing_frame(content)
+        return f'{kept}{_SEPARATOR}{_framed(text)}' if kept else _framed(text)
+    # The shape comes from the whole list: an earlier card part may be the only text part it has.
+    shape = next(part for part in reversed(content) if _is_text_part(part))
+    kept = [part for part in content if not _owned(part, owner)]
+    # ``cache_control`` marks a breakpoint, not a style: the fresh part never inherits the old one.
+    fields = {key: value for key, value in shape.items() if key not in (_TEXT_KEY, 'cache_control')}
+    return [*kept, _TransientContext({**fields, _TEXT_KEY: _framed(text)}, owner)]
 
 
-def _with_card(request, key, kind, field, text, owner, api_mode):
-    if kind == 'message':
-        item = _TransientContext({'role': _prompt_role(request[key]), 'content': text}, owner)
-        messages = [message for message in request[key] if not (
-            isinstance(message, _TransientContext) and message._owner() is owner)]
-        return {**request, key: [*messages, item]}
-    if kind == 'blocks':
-        return {**request, field: _text_blocks(request[field], text, api_mode)}
-    return {**request, field: _framed_after(request[field], text)}
+def _target(messages):
+    """Index of the current turn's user message: the last one carrying the user's own text."""
+    return next((i for i in range(len(messages) - 1, -1, -1) if _carries_user_text(messages[i])), None)
 
 
 def request_context(request, session_id='', **kwargs):
@@ -120,9 +101,8 @@ def request_context(request, session_id='', **kwargs):
     key = 'input' if isinstance(request.get('input'), list) else 'messages'
     if not isinstance(request.get(key), list):
         return None
-    api_mode = kwargs.get('api_mode')
-    slot = _slot(request, key, api_mode)
-    if slot is None:
+    target = _target(request[key])
+    if target is None:
         return None
     ok, raw = owner._run(['session-card', '-pitfalls-json'],
                          stdin=json.dumps({'cwd':str(resolve_agent_cwd())}), timeout=10,
@@ -140,10 +120,12 @@ def request_context(request, session_id='', **kwargs):
                 text = (snapshot.get('context') or 'No current repository pitfalls; this supersedes earlier snapshots.') + '\n\n' + '\n\n'.join(facts)
         except (ValueError, KeyError, TypeError):
             pass
-    # The released dispatcher deep-copies requests. A weak owner attribute survives those copies but
-    # dict/JSON serialization emits only provider-recognized keys; a framed block in a string slot
-    # carries no metadata at all and is replaced, never stacked, by the next pass.
-    return {'request': _with_card(request, key, *slot, text, owner, api_mode), 'source': 'memcue-context'}
+    # The released dispatcher deep-copies requests. A weak owner attribute on an appended part survives
+    # those copies, while dict/JSON serialization emits only provider-recognized keys.
+    messages = list(request[key])
+    message = messages[target]
+    messages[target] = {**message, 'content': _with_card(message['content'], text, owner)}
+    return {'request': {**request, key: messages}, 'source': 'memcue-context'}
 
 
 def register(ctx):

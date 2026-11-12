@@ -67,10 +67,15 @@ is weakly held, rekeyed on session switch, and released on shutdown. The active 
 every request. Subagents, other providers, unowned sessions and other profiles receive no facts from that owner.
 Native state is bound to the owner's profile and base, preventing an inherited state directory from merging caches.
 
-Each provider request reads the actual `agent.runtime_cwd.resolve_agent_cwd()` value. A copied request/list gets a
-transient developer item appended after complete existing messages or Responses function-call/output items. Existing
-system/history/tool output is unchanged; no extra user turn, forced retry or inference is introduced. An identical
-last transient item is not duplicated; failed reads emit an unavailable item and subsequent requests read afresh.
+Each provider request reads the actual `agent.runtime_cwd.resolve_agent_cwd()` value. The card is appended, in a
+`[memcue-context]…[/memcue-context]` frame, to the current turn's user message: the last user message with the user's
+own text, in chat completions, Responses, Anthropic and Bedrock payloads alike. This is where Hermes puts its own
+ephemeral context. Every transport accepts the user role, and `system`/`instructions` stay byte-stable, so a changed
+card misses the prompt cache only from that message on (#730, #732). A string content gets the frame appended; a
+list of parts gets one text part in the shape the list already uses, without its cache breakpoint. System prompt,
+instructions, roles, earlier turns and tool output are unchanged; no message, role, forced retry or inference is
+introduced. A payload with no user text, such as one carrying only tool output, is sent unchanged. A retry replaces
+the frame rather than stacking it; failed reads emit an unavailable card and subsequent requests read afresh.
 Compaction and trivial prompts do not depend on turn-entry prefetch. In this mode the provider emits maintenance
 hints and standing memcue instructions, with no duplicate automatic facts in its cached system/prefetch paths.
 
