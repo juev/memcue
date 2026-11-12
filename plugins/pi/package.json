@@ -1,6 +1,6 @@
 {
   "name": "memcue-pi",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "memcue long-term memory for the Pi coding agent: native tools, repository pitfalls and opt-in subagent memory",
   "type": "module",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "memcue",
-  "version": "0.36.2",
+  "version": "0.37.0",
   "description": "Pull-mode long-term memory over the memcue CLI",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json"
