@@ -1,0 +1,505 @@
+{
+ "queries": 23,
+ "active_facts": 3908,
+ "arms": {
+  "current": {
+   "u_at_5": 22,
+   "u_at_1": 18,
+   "empty": 0,
+   "widened": 0,
+   "facts": 99,
+   "U": 57,
+   "R": 33,
+   "N": 9,
+   "n_share": 0.091
+  },
+  "one-term": {
+   "u_at_5": 21,
+   "u_at_1": 18,
+   "empty": 0,
+   "widened": 0,
+   "facts": 101,
+   "U": 56,
+   "R": 34,
+   "N": 11,
+   "n_share": 0.109,
+   "versus_current": {
+    "gain": 0,
+    "loss": 1,
+    "same_list": 21
+   }
+  },
+  "search": {
+   "u_at_5": 21,
+   "u_at_1": 18,
+   "empty": 0,
+   "widened": 0,
+   "facts": 90,
+   "U": 53,
+   "R": 27,
+   "N": 10,
+   "n_share": 0.111,
+   "versus_current": {
+    "gain": 0,
+    "loss": 1,
+    "same_list": 15
+   }
+  },
+  "wide": {
+   "u_at_5": 21,
+   "u_at_1": 18,
+   "empty": 0,
+   "widened": 0,
+   "facts": 115,
+   "U": 57,
+   "R": 41,
+   "N": 17,
+   "n_share": 0.148,
+   "versus_current": {
+    "gain": 0,
+    "loss": 1,
+    "same_list": 17
+   }
+  }
+ },
+ "per_query": [
+  {
+   "qid": "Q0001",
+   "labels": {
+    "current": "UUNNR",
+    "one-term": "UUNNR",
+    "search": "UUNNR",
+    "wide": "UUNNR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0002",
+   "labels": {
+    "current": "UURNR",
+    "one-term": "UURNR",
+    "search": "UURNR",
+    "wide": "UURNR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0003",
+   "labels": {
+    "current": "UURRR",
+    "one-term": "UURRR",
+    "search": "UURRR",
+    "wide": "UURRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0004",
+   "labels": {
+    "current": "RUUUR",
+    "one-term": "RUUUR",
+    "search": "RUUUR",
+    "wide": "RUUUR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0005",
+   "labels": {
+    "current": "UUUUU",
+    "one-term": "UUUUU",
+    "search": "UUUUU",
+    "wide": "UUUUU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0006",
+   "labels": {
+    "current": "RRNNU",
+    "one-term": "RRNNN",
+    "search": "RRNNN",
+    "wide": "RRNNN"
+   },
+   "versus_current": {
+    "one-term": "loss",
+    "search": "loss",
+    "wide": "loss"
+   },
+   "same_as_current": {
+    "one-term": false,
+    "search": false,
+    "wide": false
+   }
+  },
+  {
+   "qid": "Q0007",
+   "labels": {
+    "current": "RRR",
+    "one-term": "RRNRR",
+    "search": "RR",
+    "wide": "RRNRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": false,
+    "search": false,
+    "wide": false
+   }
+  },
+  {
+   "qid": "Q0008",
+   "labels": {
+    "current": "UUURU",
+    "one-term": "UUURU",
+    "search": "UUURU",
+    "wide": "UUURU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0009",
+   "labels": {
+    "current": "UURRR",
+    "one-term": "UURRR",
+    "search": "UUR",
+    "wide": "UURRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0010",
+   "labels": {
+    "current": "UUURR",
+    "one-term": "UUURR",
+    "search": "UUURR",
+    "wide": "UUURR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0011",
+   "labels": {
+    "current": "RNRUR",
+    "one-term": "RNRUR",
+    "search": "RNRUR",
+    "wide": "RNRUR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0012",
+   "labels": {
+    "current": "UUUUU",
+    "one-term": "UUUUU",
+    "search": "UUUU",
+    "wide": "UUUUU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0013",
+   "labels": {
+    "current": "NNUNU",
+    "one-term": "NNUNU",
+    "search": "NNUNU",
+    "wide": "NNUNU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0014",
+   "labels": {
+    "current": "URRUU",
+    "one-term": "URRUU",
+    "search": "URRUU",
+    "wide": "URRUU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0015",
+   "labels": {
+    "current": "U",
+    "one-term": "U",
+    "search": "U",
+    "wide": "URRRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": false
+   }
+  },
+  {
+   "qid": "Q0016",
+   "labels": {
+    "current": "UUUUU",
+    "one-term": "UUUUU",
+    "search": "UUUUU",
+    "wide": "UUUUU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0017",
+   "labels": {
+    "current": "URRRR",
+    "one-term": "URRRR",
+    "search": "URRR",
+    "wide": "URRRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0018",
+   "labels": {
+    "current": "UURRU",
+    "one-term": "UURRU",
+    "search": "UURRU",
+    "wide": "UURRU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0019",
+   "labels": {
+    "current": "U",
+    "one-term": "U",
+    "search": "U",
+    "wide": "URNNR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": false
+   }
+  },
+  {
+   "qid": "Q0020",
+   "labels": {
+    "current": "UURRR",
+    "one-term": "UURRR",
+    "search": "UUR",
+    "wide": "UURRR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0021",
+   "labels": {
+    "current": "U",
+    "one-term": "U",
+    "search": "U",
+    "wide": "UNNNN"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": true,
+    "wide": false
+   }
+  },
+  {
+   "qid": "Q0022",
+   "labels": {
+    "current": "UUUUU",
+    "one-term": "UUUUU",
+    "search": "UUUU",
+    "wide": "UUUUU"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": true
+   }
+  },
+  {
+   "qid": "Q0023",
+   "labels": {
+    "current": "UUU",
+    "one-term": "UUU",
+    "search": "UU",
+    "wide": "UUUUR"
+   },
+   "versus_current": {
+    "one-term": "",
+    "search": "",
+    "wide": ""
+   },
+   "same_as_current": {
+    "one-term": true,
+    "search": false,
+    "wide": false
+   }
+  }
+ ],
+ "pool_ceiling": 22
+}

@@ -1,0 +1,54 @@
+{
+ "issue": 745,
+ "code_commit": "7ab7e24c445edb7c83e17865149194f23f1195fc",
+ "binaries_sha256": {
+  "memcue-current": "1bff194424f581465975dac55f74cc96561cda69e9607291f048255eaa19f59c",
+  "memcue-one-term": "ea86b4d4b388349aaca703d1dccdd2a22db272376b869abd6f1bd4d2693e3ff3",
+  "memcue-search": "3e8286ecbf251190d4f6624a00740d05e2df269db67b6cfe343dab559767eb4b"
+ },
+ "base": {
+  "source": "Mac server-mode replica, sqlite3 .backup, role stamp removed in the copy",
+  "copied_at": "2026-11-12T11:31:46Z",
+  "rows": 8239,
+  "active_facts": 3908,
+  "facts_sha256": "f115b9a34ace4282202041ea3f877f58c033be2b207c47ba05671ac89d34a9e7"
+ },
+ "extraction": {
+  "transcripts": 1398,
+  "transcripts_with_memcue_search": 573,
+  "calls": 1055,
+  "not_literal": 20,
+  "temp_session": 10,
+  "explicit_floor": 34,
+  "short": 966,
+  "long_default": 25,
+  "no_dir": 1,
+  "resolved_by_log": 2,
+  "kept_distinct": 23,
+  "kept_time_range": [
+   "2026-10-27",
+   "2026-11-12"
+  ],
+  "words_min": 9,
+  "words_max": 12,
+  "words_median": 9
+ },
+ "search_log_crosscheck": {
+  "log_start": "2026-10-25",
+  "batch_2026_10_29_14_16_utc": {
+   "searches": 5060,
+   "long": 2844,
+   "median_words_long": 19.0
+  },
+  "agent_searches_outside_batch": 3410,
+  "long": 39,
+  "distinct_long": 38,
+  "distinct_long_in_transcript_set": 22
+ },
+ "labels": {
+  "model": "claude-opus-5-5",
+  "pairs": 117,
+  "cost_usd": 2.4,
+  "passes": 1
+ }
+}
