@@ -1,0 +1,139 @@
+{
+ "reader": "the agent (Claude Opus 5.5); the user delegated the hand read to it before the freeze",
+ "sample_seed": 742,
+ "sample": 32,
+ "kept": 316,
+ "rejected": [],
+ "queries": [
+  {
+   "id": "Q006",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q016",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q019",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q026",
+   "verdict": "asks for its gold fact",
+   "note": "Written as a low-overlap paraphrase, measured overlap 2, so it sits in literal; it still asks for the tessera rate limit."
+  },
+  {
+   "id": "Q030",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q042",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q045",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q062",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q071",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q074",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q088",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q089",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q106",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q113",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q130",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q140",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q143",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q155",
+   "verdict": "asks for its gold fact",
+   "note": "'откатить' (roll back) where 'restore' is meant; still asks how to restore the custom-format crm dump."
+  },
+  {
+   "id": "Q160",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q172",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q179",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q183",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q185",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q212",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q213",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q219",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q221",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q253",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q279",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q299",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q305",
+   "verdict": "asks for its gold fact"
+  },
+  {
+   "id": "Q308",
+   "verdict": "asks for its gold fact"
+  }
+ ]
+}

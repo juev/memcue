@@ -1,0 +1,39 @@
+{
+ "kind": "memcue-742-paraphrase-method-v1",
+ "question": "On prepared facts, how much does the vector arm (and the hybrid) find that FTS5 misses when the query paraphrases the fact, and how much does it lose when the query repeats the fact's words?",
+ "corpus": "120 fictional facts in 40 groups of one subject each (20 English, 20 Russian): one target and two topical neighbours that differ in the detail the target's question asks for. Authored by the agent (Claude Opus 5.5) in the session; IDs F001-F120 in a seeded random order (build_fixture.py, seed 742). All active, version 1, scope global, no expiry.",
+ "writer": "claude-opus-5-5 via claude -p, no tools, no MCP, no hooks, temporary working directory (llm.py). One call per target sees that fact only and writes 1 literal, 2 low, 2 zero and 2 cross-language candidates from the need (gen_queries.py). One call per group sees the group's three facts and writes 1 negative.",
+ "checker": "claude-sonnet-5-5, same isolation. One call per candidate sees the whole corpus with IDs and the query, never the label, and lists every fact that answers it (check_unique.py). A positive stays only when the list is exactly its gold fact; a negative only when the list is empty.",
+ "overlap": "Measured by the harness (main.go overlap) with memcue's own tokenization: the distinct query terms of text.Terms that cover a stem of text.Stems(gold fact) by text.Covers, the prefix rule FTS5 matches with. Default number terms. A negative gets the largest count over its group's facts.",
+ "strata": {
+  "literal": "same language as the gold fact, overlap >= 2",
+  "low": "same language, overlap == 1",
+  "zero": "same language, overlap == 0",
+  "cross": "the other language than the gold fact; overlap reported, not filtered",
+  "negative": "no gold fact and the checker found none"
+ },
+ "assignment": "By measurement only; the writer's intent decides nothing except that a cross candidate written in the fact's language, or a same-language candidate written in the other language, is dropped. At most 2 queries per target and stratum, the first by candidate ID (select_queries.py).",
+ "hand_read": "A seeded random 10% of the kept queries (32 of 316, seed 742) is read before the freeze for whether each still asks for its gold fact, and each negative for whether no fact of its group answers it; a rejected query is dropped. The user delegated this read to the agent, so it is not a person's read (hand-read.json).",
+ "freeze": "fixture.json, queries.json and this file are committed before the first encoding or ranking. Nothing in them changes after results.",
+ "arms": {
+  "bm25": "Store.SearchFiltered over text.Terms(query), OR-joined, In=[global], up to 100 facts: the native FTS5 BM25 list.",
+  "production": "recall.Search with N=5, MinScore=0.6, In=[global]: what `memcue search` returns by default, floors included. Reported beside bm25, not fused.",
+  "vector-e5": "Exact cosine of intfloat/multilingual-e5-small (revision 614241f622f53c4eeff9890bdc4f31cfecc418b3, ONNX CPU, query:/passage: prefixes, mean pooling, L2) over all 120 eligible facts, positive scores only.",
+  "vector-bge": "Exact cosine of baai/bge-m3 on RouterAI over all 120 eligible facts, positive scores only.",
+  "hybrid-e5": "Equal-weight RRF, 1/(60+rank), of the bm25 list and the vector-e5 list, each up to 100.",
+  "hybrid-bge": "The same with vector-bge."
+ },
+ "eligibility": "The same 120 facts for every arm: all are active, global and unexpired; the harness checks the base holds exactly 120 active facts.",
+ "top_k": 5,
+ "ties": "score descending, then fact ID ascending, for bm25, vector and hybrid; production keeps recall.Search's own order.",
+ "metrics": {
+  "primary": "Hit@5 per stratum: the gold fact among the arm's first five.",
+  "secondary": "Hit@1 and MRR@5 per stratum; per stratum the queries an arm finds at top 5 and bm25 misses (rescues) and the reverse (losses), with an exact two-sided sign test on those discordant pairs; for negatives, how many return anything and how many of the 5 slots they fill; the top-1 cosine of negatives against that of positives found first.",
+  "uncertainty": "Wilson 95% intervals on Hit@5. Queries of one target are not independent; the target count per stratum is reported."
+ },
+ "timing": {
+  "search": "In-process wall clock per arm and query, query vectors read from the file, so encoding is excluded; 1 first pass and 20 warm passes, arm order rotated by (arm + query + pass). Every pass must rank identically.",
+  "encoding": "embed.py: each query encoded alone, 6 times (first and 5 warm). e5 on this machine's CPU; bge as one RouterAI HTTP request per query, network included."
+ },
+ "out_of_scope": "Production search, defaults and the backend are unchanged; this measures retrieval only, not agent outcomes."
+}

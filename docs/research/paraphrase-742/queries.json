@@ -1,0 +1,9684 @@
+{
+ "purpose": "memcue-742-paraphrase-queries-v1",
+ "counts": {
+  "literal": 49,
+  "low": 71,
+  "zero": 76,
+  "cross": 80,
+  "negative": 40
+ },
+ "targets": {
+  "literal": 40,
+  "low": 40,
+  "zero": 40,
+  "cross": 40,
+  "negative": 0
+ },
+ "dropped": {
+  "cap": 4
+ },
+ "candidates": 320,
+ "queries": [
+  {
+   "cid": "F002-literal-1",
+   "group": "G10",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "WireGuard tunnel to quarry drops behind office NAT, PersistentKeepalive setting on the client peer",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "wireguard",
+    "tunnel",
+    "quarri",
+    "drop",
+    "behind",
+    "offic",
+    "nat",
+    "persistentkeepal",
+    "set",
+    "client",
+    "peer"
+   ],
+   "shared_terms": [
+    "wireguard",
+    "tunnel",
+    "quarri",
+    "drop",
+    "behind",
+    "offic",
+    "nat",
+    "persistentkeepal",
+    "set",
+    "client",
+    "peer"
+   ],
+   "overlap": 11,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q001"
+  },
+  {
+   "cid": "F005-literal-1",
+   "group": "G18",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "lindel goose migration takes longer than 60 seconds and Kubernetes kills the pod",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "lindel",
+    "goos",
+    "migrat",
+    "take",
+    "longer",
+    "second",
+    "kubernet",
+    "kill",
+    "pod"
+   ],
+   "shared_terms": [
+    "lindel",
+    "goos",
+    "migrat",
+    "take",
+    "longer",
+    "second",
+    "kubernet",
+    "kill",
+    "pod"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q002"
+  },
+  {
+   "cid": "F006-literal-1",
+   "group": "G40",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "флаги функций в луковице действуют только после перезапуска подов?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "флаг",
+    "функц",
+    "луковиц",
+    "действ",
+    "перезапуск",
+    "под"
+   ],
+   "shared_terms": [
+    "флаг",
+    "функц",
+    "луковиц",
+    "действ",
+    "перезапуск",
+    "под"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q003"
+  },
+  {
+   "cid": "F007-literal-1",
+   "group": "G32",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "крот Wi-Fi пропадает после выхода из сна, power_save в iwlwifi.conf",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "крот",
+    "wi",
+    "fi",
+    "пропада",
+    "выход",
+    "сна",
+    "power",
+    "save",
+    "iwlwifi",
+    "conf"
+   ],
+   "shared_terms": [
+    "крот",
+    "wi",
+    "fi",
+    "пропада",
+    "выход",
+    "сна",
+    "power",
+    "save",
+    "iwlwifi",
+    "conf"
+   ],
+   "overlap": 10,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q004"
+  },
+  {
+   "cid": "F017-literal-1",
+   "group": "G12",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "SSH to moorgate via jump host gate.moorgate-fiction.org port 2202",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "ssh",
+    "moorgat",
+    "jump",
+    "host",
+    "gate",
+    "fiction",
+    "org",
+    "port"
+   ],
+   "shared_terms": [
+    "ssh",
+    "moorgat",
+    "jump",
+    "host",
+    "gate",
+    "fiction",
+    "org",
+    "port"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q005"
+  },
+  {
+   "cid": "F017-low-2",
+   "group": "G12",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which bastion do I have to go through to reach moorgate?",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "bastion",
+    "go",
+    "through",
+    "reach",
+    "moorgat"
+   ],
+   "shared_terms": [
+    "through",
+    "moorgat"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q006"
+  },
+  {
+   "cid": "F026-literal-1",
+   "group": "G34",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Grafana на филине: пароль admin не подходит, вход только через SSO?",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "grafana",
+    "филин",
+    "парол",
+    "admin",
+    "подход",
+    "вход",
+    "sso"
+   ],
+   "shared_terms": [
+    "grafana",
+    "филин",
+    "парол",
+    "admin",
+    "вход",
+    "sso"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q007"
+  },
+  {
+   "cid": "F027-literal-1",
+   "group": "G11",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "pippin web app build NODE_OPTIONS max-old-space-size for map bundle",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "pippin",
+    "web",
+    "app",
+    "build",
+    "node",
+    "option",
+    "max",
+    "old",
+    "space",
+    "size",
+    "map",
+    "bundl"
+   ],
+   "shared_terms": [
+    "pippin",
+    "web",
+    "app",
+    "build",
+    "node",
+    "option",
+    "max",
+    "old",
+    "space",
+    "size",
+    "map",
+    "bundl"
+   ],
+   "overlap": 12,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q008"
+  },
+  {
+   "cid": "F031-literal-1",
+   "group": "G09",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "marlow integration tests need Redis on port 6380, make test skips them?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "marlow",
+    "integr",
+    "test",
+    "need",
+    "redi",
+    "port",
+    "make",
+    "skip"
+   ],
+   "shared_terms": [
+    "marlow",
+    "integr",
+    "test",
+    "need",
+    "redi",
+    "port",
+    "make",
+    "skip"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q009"
+  },
+  {
+   "cid": "F035-literal-1",
+   "group": "G29",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "ёжик на Android 14 не показывает уведомления без разрешения POST_NOTIFICATIONS",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "ежик",
+    "android",
+    "показыва",
+    "уведомлен",
+    "разрешен",
+    "post",
+    "notif"
+   ],
+   "shared_terms": [
+    "ежик",
+    "android",
+    "показыва",
+    "уведомлен",
+    "разрешен",
+    "post",
+    "notif"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q010"
+  },
+  {
+   "cid": "F037-literal-1",
+   "group": "G13",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "saltmarsh orders.v2 consumers commit offsets by hand, auto-commit lost messages",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "saltmarsh",
+    "order",
+    "v2",
+    "consum",
+    "commit",
+    "offset",
+    "hand",
+    "auto",
+    "lost",
+    "messag"
+   ],
+   "shared_terms": [
+    "saltmarsh",
+    "order",
+    "v2",
+    "consum",
+    "commit",
+    "offset",
+    "hand",
+    "auto",
+    "lost",
+    "messag"
+   ],
+   "overlap": 10,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q011"
+  },
+  {
+   "cid": "F037-low-1",
+   "group": "G13",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "why did we drop events on orders.v2 after a restart?",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "drop",
+    "event",
+    "order",
+    "v2",
+    "after",
+    "restart"
+   ],
+   "shared_terms": [
+    "order",
+    "v2"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q012"
+  },
+  {
+   "cid": "F038-literal-1",
+   "group": "G37",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "проброс порта 25565 на роутере чайка — на какой адрес ведёт?",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "проброс",
+    "порт",
+    "роутер",
+    "чайк",
+    "адрес",
+    "ведет"
+   ],
+   "shared_terms": [
+    "проброс",
+    "порт",
+    "роутер",
+    "чайк",
+    "адрес",
+    "ведет"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q013"
+  },
+  {
+   "cid": "F041-literal-1",
+   "group": "G20",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "ambergate upload of files larger than 5 GB fails with EntityTooLarge, old uploader script single PUT",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "amberg",
+    "upload",
+    "file",
+    "larger",
+    "gb",
+    "fail",
+    "entitytoolarg",
+    "old",
+    "script",
+    "singl",
+    "put"
+   ],
+   "shared_terms": [
+    "amberg",
+    "upload",
+    "file",
+    "larger",
+    "gb",
+    "fail",
+    "entitytoolarg",
+    "old",
+    "script",
+    "singl",
+    "put"
+   ],
+   "overlap": 11,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q014"
+  },
+  {
+   "cid": "F045-literal-1",
+   "group": "G26",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "гречка пишет логи не в JSON, Loki не разбирает поля — какая переменная LOG_FORMAT?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "гречк",
+    "пишет",
+    "лог",
+    "json",
+    "loki",
+    "разбира",
+    "пол",
+    "перемен",
+    "log",
+    "format"
+   ],
+   "shared_terms": [
+    "гречк",
+    "пишет",
+    "лог",
+    "json",
+    "loki",
+    "разбира",
+    "пол",
+    "перемен",
+    "log",
+    "format"
+   ],
+   "overlap": 10,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q015"
+  },
+  {
+   "cid": "F051-literal-1",
+   "group": "G35",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему version в контейнере пчела показывает unknown, если не передать BUILD_SHA",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "поч",
+    "version",
+    "контейнер",
+    "пчел",
+    "показыва",
+    "unknown",
+    "переда",
+    "build",
+    "sha"
+   ],
+   "shared_terms": [
+    "version",
+    "контейнер",
+    "пчел",
+    "показыва",
+    "unknown",
+    "переда",
+    "build",
+    "sha"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q016"
+  },
+  {
+   "cid": "F053-literal-1",
+   "group": "G05",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "orchardlane.net records managed in terraform dns-orchard, hand-added Cloudflare dashboard record deleted on apply",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "orchardlan",
+    "net",
+    "record",
+    "manag",
+    "terraform",
+    "dns",
+    "orchard",
+    "hand",
+    "ad",
+    "cloudflar",
+    "dashboard",
+    "delet",
+    "appli"
+   ],
+   "shared_terms": [
+    "orchardlan",
+    "net",
+    "record",
+    "manag",
+    "terraform",
+    "dns",
+    "orchard",
+    "hand",
+    "ad",
+    "cloudflar",
+    "dashboard",
+    "delet",
+    "appli"
+   ],
+   "overlap": 13,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q017"
+  },
+  {
+   "cid": "F053-low-1",
+   "group": "G05",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why does an entry I created manually for orchardlane.net keep vanishing?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "entri",
+    "creat",
+    "manual",
+    "orchardlan",
+    "net",
+    "keep",
+    "vanish"
+   ],
+   "shared_terms": [
+    "orchardlan",
+    "net"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q018"
+  },
+  {
+   "cid": "F055-literal-1",
+   "group": "G01",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "when does the nightly restic backup of /srv/photos start on brackwater?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "night",
+    "restic",
+    "backup",
+    "srv",
+    "photo",
+    "start",
+    "brackwat"
+   ],
+   "shared_terms": [
+    "night",
+    "restic",
+    "backup",
+    "srv",
+    "photo",
+    "start",
+    "brackwat"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q019"
+  },
+  {
+   "cid": "F055-low-1",
+   "group": "G01",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "On brackwater, what schedules the picture archive job and what has to finish before it?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "brackwat",
+    "schedul",
+    "pictur",
+    "archiv",
+    "job",
+    "finish",
+    "before"
+   ],
+   "shared_terms": [
+    "brackwat",
+    "finish"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q020"
+  },
+  {
+   "cid": "F060-literal-1",
+   "group": "G25",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "На NAS бобр какой диск выдаёт ошибки SMART и где лежит запасной на 8 ТБ?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "nas",
+    "бобр",
+    "диск",
+    "выда",
+    "ошибк",
+    "smart",
+    "леж",
+    "запасн",
+    "тб"
+   ],
+   "shared_terms": [
+    "nas",
+    "бобр",
+    "диск",
+    "выда",
+    "ошибк",
+    "smart",
+    "леж",
+    "запасн",
+    "тб"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q021"
+  },
+  {
+   "cid": "F063-literal-1",
+   "group": "G21",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "как восстановить дамп базы crm на ольховке — через pg_restore или psql?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "восстанов",
+    "дамп",
+    "баз",
+    "crm",
+    "ольховк",
+    "pg",
+    "restor",
+    "psql"
+   ],
+   "shared_terms": [
+    "дамп",
+    "баз",
+    "crm",
+    "ольховк",
+    "pg",
+    "restor",
+    "psql"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q022"
+  },
+  {
+   "cid": "F064-literal-1",
+   "group": "G36",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "воркер трамвай: почему экспорт вынесли в отдельную очередь slow?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "воркер",
+    "трамва",
+    "поч",
+    "экспорт",
+    "вынесл",
+    "отдельн",
+    "очеред",
+    "slow"
+   ],
+   "shared_terms": [
+    "воркер",
+    "трамва",
+    "экспорт",
+    "вынесл",
+    "отдельн",
+    "очеред",
+    "slow"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q023"
+  },
+  {
+   "cid": "F064-low-1",
+   "group": "G36",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "трамвай: почему тяжёлые выгрузки обрабатываются отдельно от прочих джобов?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "трамва",
+    "поч",
+    "тяжел",
+    "выгрузк",
+    "обрабатыва",
+    "отдельн",
+    "проч",
+    "джоб"
+   ],
+   "shared_terms": [
+    "трамва",
+    "отдельн"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q024"
+  },
+  {
+   "cid": "F067-literal-1",
+   "group": "G17",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "tessera partner API rate limit per token and 429 Retry-After handling",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "tessera",
+    "partner",
+    "api",
+    "rate",
+    "limit",
+    "token",
+    "retri",
+    "after",
+    "handl"
+   ],
+   "shared_terms": [
+    "tessera",
+    "partner",
+    "api",
+    "token",
+    "retri",
+    "after"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q025"
+  },
+  {
+   "cid": "F067-low-2",
+   "group": "G17",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What throttling quota does the partner integration enforce, and what is the right delay strategy after being rate-limited?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "throttl",
+    "quota",
+    "partner",
+    "integr",
+    "enforc",
+    "right",
+    "delay",
+    "strategi",
+    "after",
+    "rate",
+    "limit"
+   ],
+   "shared_terms": [
+    "partner",
+    "after"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q026"
+  },
+  {
+   "cid": "F068-literal-1",
+   "group": "G27",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какая аннотация metallb address-pool нужна, чтобы LoadBalancer в ласточке получил внешний адрес?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "аннотац",
+    "metallb",
+    "address",
+    "pool",
+    "loadbalanc",
+    "ласточк",
+    "получ",
+    "внешн",
+    "адрес"
+   ],
+   "shared_terms": [
+    "аннотац",
+    "metallb",
+    "address",
+    "pool",
+    "loadbalanc",
+    "ласточк",
+    "внешн",
+    "адрес"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q027"
+  },
+  {
+   "cid": "F068-low-1",
+   "group": "G27",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему в ласточке балансировщик висит в pending и не получает IP?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "поч",
+    "ласточк",
+    "балансировщик",
+    "вис",
+    "pend",
+    "получа",
+    "ip"
+   ],
+   "shared_terms": [
+    "ласточк",
+    "получа"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q028"
+  },
+  {
+   "cid": "F071-literal-1",
+   "group": "G04",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "tallow API config path when TALLOW_CONFIG is unset, does it fall back to ./tallow.yaml or /etc/tallow?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "tallow",
+    "api",
+    "config",
+    "path",
+    "unset",
+    "fall",
+    "back",
+    "yaml",
+    "etc"
+   ],
+   "shared_terms": [
+    "tallow",
+    "api",
+    "config",
+    "path",
+    "unset",
+    "fall",
+    "back",
+    "yaml",
+    "etc"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q029"
+  },
+  {
+   "cid": "F076-literal-1",
+   "group": "G23",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "клевер не собирается на старом Rust — ошибка про let chains в parser, какая версия нужна?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "клевер",
+    "собира",
+    "стар",
+    "rust",
+    "ошибк",
+    "chain",
+    "parser",
+    "верс"
+   ],
+   "shared_terms": [
+    "клевер",
+    "собира",
+    "стар",
+    "rust",
+    "ошибк",
+    "chain",
+    "parser"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q030"
+  },
+  {
+   "cid": "F076-low-2",
+   "group": "G23",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Клевер не билдится, rustc ругается на новый синтаксис условий — что обновить?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "клевер",
+    "билд",
+    "rustc",
+    "руга",
+    "нов",
+    "синтаксис",
+    "услов",
+    "обнов"
+   ],
+   "shared_terms": [
+    "клевер",
+    "нов"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q031"
+  },
+  {
+   "cid": "F078-literal-1",
+   "group": "G16",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "glenrock acme.sh certificate renewal, nginx needs reload by hand?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "glenrock",
+    "acm",
+    "sh",
+    "certif",
+    "renew",
+    "nginx",
+    "need",
+    "reload",
+    "hand"
+   ],
+   "shared_terms": [
+    "glenrock",
+    "acm",
+    "sh",
+    "certif",
+    "renew",
+    "nginx",
+    "reload",
+    "hand"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q032"
+  },
+  {
+   "cid": "F079-literal-1",
+   "group": "G31",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "жаворонок старые стили после деплоя — CDN кэширует CSS, как сделать purge?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "жаворонок",
+    "стар",
+    "стил",
+    "депло",
+    "cdn",
+    "кэшир",
+    "css",
+    "purg"
+   ],
+   "shared_terms": [
+    "жаворонок",
+    "стар",
+    "стил",
+    "депло",
+    "cdn",
+    "кэшир",
+    "css",
+    "purg"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q033"
+  },
+  {
+   "cid": "F080-literal-1",
+   "group": "G30",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "отчёт по заказам в цапле строился минуту — какой составной индекс добавили?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "отчет",
+    "заказ",
+    "цапл",
+    "стро",
+    "минут",
+    "составн",
+    "индекс"
+   ],
+   "shared_terms": [
+    "отчет",
+    "заказ",
+    "цапл",
+    "стро",
+    "минут",
+    "составн",
+    "индекс"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q034"
+  },
+  {
+   "cid": "F083-literal-1",
+   "group": "G15",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "bramble game crashes on start with 'invalid texture header' after cloning the repository",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "brambl",
+    "game",
+    "crash",
+    "start",
+    "invalid",
+    "textur",
+    "header",
+    "after",
+    "clone",
+    "repositori"
+   ],
+   "shared_terms": [
+    "brambl",
+    "game",
+    "crash",
+    "start",
+    "invalid",
+    "textur",
+    "header",
+    "clone",
+    "repositori"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q035"
+  },
+  {
+   "cid": "F086-literal-1",
+   "group": "G02",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Larkspur Android CI build Gradle exit code 137, which runner tag to use?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "larkspur",
+    "android",
+    "ci",
+    "build",
+    "gradl",
+    "exit",
+    "code",
+    "runner",
+    "tag",
+    "use"
+   ],
+   "shared_terms": [
+    "larkspur",
+    "android",
+    "ci",
+    "build",
+    "gradl",
+    "exit",
+    "code",
+    "runner",
+    "tag"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q036"
+  },
+  {
+   "cid": "F088-literal-1",
+   "group": "G24",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "белый список адресов прокси сорока /etc/soroka/allow.txt",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "бел",
+    "список",
+    "адрес",
+    "прокс",
+    "сорок",
+    "etc",
+    "soroka",
+    "allow",
+    "txt"
+   ],
+   "shared_terms": [
+    "бел",
+    "адрес",
+    "прокс",
+    "сорок",
+    "etc",
+    "soroka",
+    "allow",
+    "txt"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q037"
+  },
+  {
+   "cid": "F089-literal-1",
+   "group": "G08",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "heron Prometheus alerts Telegram channel, and why was email turned off?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "heron",
+    "prometheus",
+    "alert",
+    "telegram",
+    "channel",
+    "email",
+    "turn"
+   ],
+   "shared_terms": [
+    "heron",
+    "prometheus",
+    "alert",
+    "telegram",
+    "channel",
+    "email",
+    "turn"
+   ],
+   "overlap": 7,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q038"
+  },
+  {
+   "cid": "F091-literal-1",
+   "group": "G22",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "пуговка не отвечает в новом чате, ALLOWED_CHATS",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "пуговк",
+    "отвеча",
+    "нов",
+    "чат",
+    "allow",
+    "chat"
+   ],
+   "shared_terms": [
+    "пуговк",
+    "отвеча",
+    "нов",
+    "чат",
+    "allow",
+    "chat"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q039"
+  },
+  {
+   "cid": "F092-literal-1",
+   "group": "G39",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Через какой драйвер принтер мышь печатает с Mac, если с фирменным задание зависает?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "драйвер",
+    "принтер",
+    "мыш",
+    "печата",
+    "mac",
+    "фирмен",
+    "задан",
+    "зависа"
+   ],
+   "shared_terms": [
+    "драйвер",
+    "принтер",
+    "мыш",
+    "печата",
+    "mac",
+    "фирмен",
+    "задан",
+    "зависа"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q040"
+  },
+  {
+   "cid": "F096-literal-1",
+   "group": "G07",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Kestrel release tag only after changelog pull request merged?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "kestrel",
+    "releas",
+    "tag",
+    "after",
+    "changelog",
+    "pull",
+    "request",
+    "merg"
+   ],
+   "shared_terms": [
+    "kestrel",
+    "releas",
+    "tag",
+    "after",
+    "changelog",
+    "pull",
+    "request",
+    "merg"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q041"
+  },
+  {
+   "cid": "F096-low-2",
+   "group": "G07",
+   "stratum": "literal",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why did the new Kestrel version go out with outdated release notes?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "new",
+    "kestrel",
+    "version",
+    "go",
+    "outdat",
+    "releas",
+    "note"
+   ],
+   "shared_terms": [
+    "kestrel",
+    "releas"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q042"
+  },
+  {
+   "cid": "F100-literal-1",
+   "group": "G33",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "вебхуки в копилке отбиваются с 401 после смены секрета X-Signature",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "вебхук",
+    "копилк",
+    "отбива",
+    "смен",
+    "секрет",
+    "signatur"
+   ],
+   "shared_terms": [
+    "вебхук",
+    "копилк",
+    "отбива",
+    "смен",
+    "секрет",
+    "signatur"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q043"
+  },
+  {
+   "cid": "F103-literal-1",
+   "group": "G28",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему письма с домена перепёлка попадают в спам Gmail, хотя SPF и DKIM настроены?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "поч",
+    "письм",
+    "дом",
+    "перепелк",
+    "попада",
+    "спам",
+    "gmail",
+    "хот",
+    "spf",
+    "dkim",
+    "настро"
+   ],
+   "shared_terms": [
+    "письм",
+    "дом",
+    "перепелк",
+    "попада",
+    "спам",
+    "gmail",
+    "spf",
+    "dkim",
+    "настро"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q044"
+  },
+  {
+   "cid": "F105-literal-1",
+   "group": "G38",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "стрекоза Parse на пустой строке возвращает ErrEmpty с версии 2.0?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "стрекоз",
+    "pars",
+    "пуст",
+    "строк",
+    "возвраща",
+    "errempti",
+    "верс",
+    "nm2x0"
+   ],
+   "shared_terms": [
+    "стрекоз",
+    "pars",
+    "пуст",
+    "строк",
+    "возвраща",
+    "errempti",
+    "верс",
+    "nm2x0"
+   ],
+   "overlap": 8,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q045"
+  },
+  {
+   "cid": "F106-literal-1",
+   "group": "G19",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "GPG signing git commits on osprey fails with Inappropriate ioctl for device",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "gpg",
+    "sign",
+    "git",
+    "commit",
+    "osprey",
+    "fail",
+    "inappropri",
+    "ioctl",
+    "devic"
+   ],
+   "shared_terms": [
+    "gpg",
+    "sign",
+    "git",
+    "commit",
+    "osprey",
+    "fail",
+    "inappropri",
+    "ioctl",
+    "devic"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q046"
+  },
+  {
+   "cid": "F110-literal-1",
+   "group": "G03",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "fernhill read replica falls behind during the 02:00 VACUUM of the events table",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "fernhil",
+    "read",
+    "replica",
+    "fall",
+    "behind",
+    "during",
+    "vacuum",
+    "event",
+    "tabl",
+    "nm02x00"
+   ],
+   "shared_terms": [
+    "fernhil",
+    "read",
+    "replica",
+    "fall",
+    "behind",
+    "during",
+    "vacuum",
+    "event",
+    "tabl",
+    "nm02x00"
+   ],
+   "overlap": 10,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q047"
+  },
+  {
+   "cid": "F116-literal-1",
+   "group": "G06",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "colima start flags on wren laptop instead of Docker Desktop",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "colima",
+    "start",
+    "flag",
+    "wren",
+    "laptop",
+    "instead",
+    "docker",
+    "desktop"
+   ],
+   "shared_terms": [
+    "colima",
+    "start",
+    "wren",
+    "laptop",
+    "docker",
+    "desktop"
+   ],
+   "overlap": 6,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q048"
+  },
+  {
+   "cid": "F119-literal-1",
+   "group": "G14",
+   "stratum": "literal",
+   "intent": "literal",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "nettlefield cron jobs run in UTC instead of Europe/Berlin, 06:00 report job",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "nettlefield",
+    "cron",
+    "job",
+    "run",
+    "utc",
+    "instead",
+    "europ",
+    "berlin",
+    "report",
+    "nm06x00"
+   ],
+   "shared_terms": [
+    "nettlefield",
+    "cron",
+    "job",
+    "run",
+    "utc",
+    "europ",
+    "berlin",
+    "report",
+    "nm06x00"
+   ],
+   "overlap": 9,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q049"
+  },
+  {
+   "cid": "F002-low-1",
+   "group": "G10",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "VPN connection to quarry keeps disconnecting periodically, what fixes it?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "vpn",
+    "connect",
+    "quarri",
+    "keep",
+    "disconnect",
+    "period",
+    "fix"
+   ],
+   "shared_terms": [
+    "quarri"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q050"
+  },
+  {
+   "cid": "F002-low-2",
+   "group": "G10",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "WireGuard link keeps cutting out while I'm at work, which config option stops it?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "wireguard",
+    "link",
+    "keep",
+    "cut",
+    "while",
+    "work",
+    "config",
+    "option",
+    "stop"
+   ],
+   "shared_terms": [
+    "wireguard"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q051"
+  },
+  {
+   "cid": "F005-low-1",
+   "group": "G18",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "why does lindel keep restarting during deploy when a slow schema change is applied",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "lindel",
+    "keep",
+    "restart",
+    "during",
+    "deploy",
+    "slow",
+    "schema",
+    "chang",
+    "appli"
+   ],
+   "shared_terms": [
+    "lindel"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q052"
+  },
+  {
+   "cid": "F005-low-2",
+   "group": "G18",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "goose schema update gets the container terminated halfway through on boot",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "goos",
+    "schema",
+    "updat",
+    "get",
+    "contain",
+    "termin",
+    "halfway",
+    "through",
+    "boot"
+   ],
+   "shared_terms": [
+    "goos"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q053"
+  },
+  {
+   "cid": "F006-low-1",
+   "group": "G40",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "луковица: почему переключатель фичи не применяется сразу?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "луковиц",
+    "поч",
+    "переключател",
+    "фич",
+    "применя",
+    "сраз"
+   ],
+   "shared_terms": [
+    "луковиц"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q054"
+  },
+  {
+   "cid": "F006-low-2",
+   "group": "G40",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "активировал feature toggle, а в луковице поведение прежнее, что делать?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "активирова",
+    "featur",
+    "toggl",
+    "луковиц",
+    "поведен",
+    "прежн"
+   ],
+   "shared_terms": [
+    "луковиц"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q055"
+  },
+  {
+   "cid": "F007-low-1",
+   "group": "G32",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "На кроте после пробуждения отваливается беспроводная сеть, что поправить в драйвере?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "крот",
+    "пробужден",
+    "отвалива",
+    "беспроводн",
+    "сет",
+    "драйвер"
+   ],
+   "shared_terms": [
+    "крот"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q056"
+  },
+  {
+   "cid": "F007-low-2",
+   "group": "G32",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему на лэптопе пропадает беспроводка после суспенда и как это починить?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "поч",
+    "лэптоп",
+    "пропада",
+    "беспроводк",
+    "суспенд"
+   ],
+   "shared_terms": [
+    "пропада"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q057"
+  },
+  {
+   "cid": "F017-low-1",
+   "group": "G12",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "how do I log into moorgate when the login just times out?",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "log",
+    "moorgat",
+    "login",
+    "time"
+   ],
+   "shared_terms": [
+    "moorgat"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q058"
+  },
+  {
+   "cid": "F017-zero-2",
+   "group": "G12",
+   "stratum": "low",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "my terminal session to that box never gets through, do I need to tunnel via some intermediate machine?",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "termin",
+    "session",
+    "box",
+    "never",
+    "get",
+    "through",
+    "need",
+    "tunnel",
+    "intermedi",
+    "machin"
+   ],
+   "shared_terms": [
+    "through"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q059"
+  },
+  {
+   "cid": "F026-low-1",
+   "group": "G34",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Как авторизоваться на филине, чтобы посмотреть графики мониторинга?",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "авторизова",
+    "филин",
+    "график",
+    "мониторинг"
+   ],
+   "shared_terms": [
+    "филин"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q060"
+  },
+  {
+   "cid": "F026-low-2",
+   "group": "G34",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему Grafana не пускает под учёткой администратора с правильными кредами?",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "поч",
+    "grafana",
+    "пуска",
+    "учетк",
+    "администратор",
+    "правильн",
+    "кред"
+   ],
+   "shared_terms": [
+    "grafana"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q061"
+  },
+  {
+   "cid": "F027-low-1",
+   "group": "G11",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "pippin frontend release compile fails running out of memory",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "pippin",
+    "frontend",
+    "releas",
+    "compil",
+    "fail",
+    "run",
+    "memori"
+   ],
+   "shared_terms": [
+    "pippin"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q062"
+  },
+  {
+   "cid": "F027-low-2",
+   "group": "G11",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "what memory limit fixes the OOM when compiling the pippin geo viewer for release?",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "memori",
+    "limit",
+    "fix",
+    "oom",
+    "compil",
+    "pippin",
+    "geo",
+    "viewer",
+    "releas"
+   ],
+   "shared_terms": [
+    "pippin"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q063"
+  },
+  {
+   "cid": "F031-low-1",
+   "group": "G09",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why do the marlow end-to-end checks never actually run on my laptop?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "marlow",
+    "end",
+    "check",
+    "never",
+    "actual",
+    "run",
+    "laptop"
+   ],
+   "shared_terms": [
+    "marlow"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q064"
+  },
+  {
+   "cid": "F031-low-2",
+   "group": "G09",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which cache server address has to be up before the marlow suite will execute?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "cach",
+    "server",
+    "address",
+    "before",
+    "marlow",
+    "suit",
+    "execut"
+   ],
+   "shared_terms": [
+    "marlow"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q065"
+  },
+  {
+   "cid": "F035-low-1",
+   "group": "G29",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему от ёжика не приходят пуши на новом телефоне",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "поч",
+    "ежик",
+    "приход",
+    "пуш",
+    "нов",
+    "телефон"
+   ],
+   "shared_terms": [
+    "ежик"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q066"
+  },
+  {
+   "cid": "F035-low-2",
+   "group": "G29",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "в какой момент ёжик спрашивает доступ к пушам",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "момент",
+    "ежик",
+    "спрашива",
+    "доступ",
+    "пуш"
+   ],
+   "shared_terms": [
+    "ежик"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q067"
+  },
+  {
+   "cid": "F037-low-2",
+   "group": "G13",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "saltmarsh queue reader has data disappearing whenever its container gets terminated mid-processing",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "saltmarsh",
+    "queue",
+    "reader",
+    "data",
+    "disappear",
+    "whenev",
+    "contain",
+    "get",
+    "termin",
+    "mid",
+    "process"
+   ],
+   "shared_terms": [
+    "saltmarsh"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q068"
+  },
+  {
+   "cid": "F038-low-2",
+   "group": "G37",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Майнкрафт перестал открываться извне после перезагрузки сервера, какой IP ему закрепить?",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "майнкрафт",
+    "переста",
+    "открыва",
+    "извн",
+    "перезагрузк",
+    "сервер",
+    "ip",
+    "закреп"
+   ],
+   "shared_terms": [
+    "сервер"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q069"
+  },
+  {
+   "cid": "F041-low-1",
+   "group": "G20",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "ambergate rejects big backups, what's going wrong?",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "amberg",
+    "reject",
+    "big",
+    "backup",
+    "go",
+    "wrong"
+   ],
+   "shared_terms": [
+    "amberg"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q070"
+  },
+  {
+   "cid": "F041-low-2",
+   "group": "G20",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "EntityTooLarge error when pushing a huge archive to the bucket",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "entitytoolarg",
+    "error",
+    "push",
+    "huge",
+    "archiv",
+    "bucket"
+   ],
+   "shared_terms": [
+    "entitytoolarg"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q071"
+  },
+  {
+   "cid": "F045-low-1",
+   "group": "G26",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему у гречки в графане атрибуты записей не парсятся?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "поч",
+    "гречк",
+    "графан",
+    "атрибут",
+    "запис",
+    "парс"
+   ],
+   "shared_terms": [
+    "гречк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q072"
+  },
+  {
+   "cid": "F045-low-2",
+   "group": "G26",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "как включить у гречки структурированный вывод журнала?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "включ",
+    "гречк",
+    "структурирова",
+    "вывод",
+    "журна"
+   ],
+   "shared_terms": [
+    "гречк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q073"
+  },
+  {
+   "cid": "F051-low-1",
+   "group": "G35",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "пчела не может сообщить хеш коммита, из которого её запустили",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "пчел",
+    "сообщ",
+    "хеш",
+    "коммит",
+    "котор"
+   ],
+   "shared_terms": [
+    "пчел"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q074"
+  },
+  {
+   "cid": "F051-low-2",
+   "group": "G35",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему в образе бинарник не знает хеш своего коммита",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "поч",
+    "образ",
+    "бинарник",
+    "знает",
+    "хеш",
+    "сво",
+    "коммит"
+   ],
+   "shared_terms": [
+    "образ"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q075"
+  },
+  {
+   "cid": "F053-low-2",
+   "group": "G05",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "My Cloudflare entry disappeared after someone ran the infra code, where should it be defined instead?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "cloudflar",
+    "entri",
+    "disappear",
+    "after",
+    "someon",
+    "ran",
+    "infra",
+    "code",
+    "defin",
+    "instead"
+   ],
+   "shared_terms": [
+    "cloudflar"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q076"
+  },
+  {
+   "cid": "F055-low-2",
+   "group": "G01",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "restic job schedule for the image collection, what time and which unit fires it?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "restic",
+    "job",
+    "schedul",
+    "imag",
+    "collect",
+    "time",
+    "unit",
+    "fire"
+   ],
+   "shared_terms": [
+    "restic"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q077"
+  },
+  {
+   "cid": "F060-low-1",
+   "group": "G25",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Где взять замену сбоящему накопителю в хранилище бобр?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "взят",
+    "замен",
+    "сбоя",
+    "накопител",
+    "хранилищ",
+    "бобр"
+   ],
+   "shared_terms": [
+    "бобр"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q078"
+  },
+  {
+   "cid": "F060-low-2",
+   "group": "G25",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какой винчестер в файлопомойке сыплет предупреждениями SMART и есть ли ему замена?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "винчестер",
+    "файлопомойк",
+    "сыплет",
+    "предупрежден",
+    "smart",
+    "зам"
+   ],
+   "shared_terms": [
+    "smart"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q079"
+  },
+  {
+   "cid": "F063-low-1",
+   "group": "G21",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Резервная копия CRM не заливается обратно — чем её разворачивать?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "резервн",
+    "коп",
+    "crm",
+    "залива",
+    "обратн",
+    "разворачива"
+   ],
+   "shared_terms": [
+    "crm"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q080"
+  },
+  {
+   "cid": "F063-low-2",
+   "group": "G21",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "psql выдаёт ошибку при загрузке бэкапа клиентской системы, что не так?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "psql",
+    "выда",
+    "ошибк",
+    "загрузк",
+    "бэкап",
+    "клиентск",
+    "систем"
+   ],
+   "shared_terms": [
+    "psql"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q081"
+  },
+  {
+   "cid": "F064-low-2",
+   "group": "G36",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "длинная выгрузка данных тормозит остальные фоновые джобы, как это решали?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "длин",
+    "выгрузк",
+    "дан",
+    "тормоз",
+    "остальн",
+    "фонов",
+    "джоб",
+    "реша"
+   ],
+   "shared_terms": [
+    "остальн"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q082"
+  },
+  {
+   "cid": "F067-low-1",
+   "group": "G17",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "How should our code react when tessera throttles us?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "code",
+    "react",
+    "tessera",
+    "throttl"
+   ],
+   "shared_terms": [
+    "tessera"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q083"
+  },
+  {
+   "cid": "F067-zero-1",
+   "group": "G17",
+   "stratum": "low",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Getting 'too many calls' errors from the external vendor service — how long do we pause before calling it again?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "get",
+    "mani",
+    "call",
+    "error",
+    "extern",
+    "vendor",
+    "servic",
+    "long",
+    "paus",
+    "before"
+   ],
+   "shared_terms": [
+    "long"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q084"
+  },
+  {
+   "cid": "F068-low-2",
+   "group": "G27",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Что дописать в манифест, чтобы в ласточке балансировщику выдали IP снаружи?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "дописа",
+    "манифест",
+    "ласточк",
+    "балансировщик",
+    "выда",
+    "ip",
+    "снаруж"
+   ],
+   "shared_terms": [
+    "ласточк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q085"
+  },
+  {
+   "cid": "F071-low-1",
+   "group": "G04",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which settings file does tallow pick up if nothing points it to one?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "set",
+    "file",
+    "tallow",
+    "pick",
+    "noth",
+    "point",
+    "one"
+   ],
+   "shared_terms": [
+    "tallow"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q086"
+  },
+  {
+   "cid": "F071-low-2",
+   "group": "G04",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why does the tallow service ignore the settings I put in the system-wide location?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "tallow",
+    "servic",
+    "ignor",
+    "set",
+    "put",
+    "system",
+    "wide",
+    "locat"
+   ],
+   "shared_terms": [
+    "tallow"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q087"
+  },
+  {
+   "cid": "F076-low-1",
+   "group": "G23",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какая минимальная версия тулчейна нужна для клевера?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "минимальн",
+    "верс",
+    "тулчейн",
+    "клевер"
+   ],
+   "shared_terms": [
+    "клевер"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q088"
+  },
+  {
+   "cid": "F078-low-1",
+   "group": "G16",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "glenrock serves stale HTTPS after the automatic Let's Encrypt refresh, why?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "glenrock",
+    "serv",
+    "stale",
+    "https",
+    "after",
+    "automat",
+    "encrypt",
+    "refresh"
+   ],
+   "shared_terms": [
+    "glenrock"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q089"
+  },
+  {
+   "cid": "F078-low-2",
+   "group": "G16",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "does nginx pick up freshly issued SSL keys on its own after Let's Encrypt runs on that box?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "nginx",
+    "pick",
+    "fresh",
+    "issu",
+    "ssl",
+    "key",
+    "after",
+    "encrypt",
+    "run",
+    "box"
+   ],
+   "shared_terms": [
+    "nginx"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q090"
+  },
+  {
+   "cid": "F079-low-1",
+   "group": "G31",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему после выкладки жаворонка браузеры показывают прежнее оформление?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "поч",
+    "выкладк",
+    "жаворонк",
+    "браузер",
+    "показыва",
+    "прежн",
+    "оформлен"
+   ],
+   "shared_terms": [
+    "жаворонк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q091"
+  },
+  {
+   "cid": "F079-low-2",
+   "group": "G31",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Как очистить CDN после релиза, чтобы клиенты увидели новую вёрстку?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "очист",
+    "cdn",
+    "релиз",
+    "клиент",
+    "увидел",
+    "нов",
+    "верстк"
+   ],
+   "shared_terms": [
+    "cdn"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q092"
+  },
+  {
+   "cid": "F080-low-1",
+   "group": "G30",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему выгрузка продаж в цапле так тормозила и как её ускорили?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "поч",
+    "выгрузк",
+    "продаж",
+    "цапл",
+    "тормоз",
+    "ускор"
+   ],
+   "shared_terms": [
+    "цапл"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q093"
+  },
+  {
+   "cid": "F080-low-2",
+   "group": "G30",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой индекс помог ускорить выборку по клиенту и дате создания?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "индекс",
+    "помог",
+    "ускор",
+    "выборк",
+    "клиент",
+    "дат",
+    "создан"
+   ],
+   "shared_terms": [
+    "индекс"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q094"
+  },
+  {
+   "cid": "F083-low-1",
+   "group": "G15",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "bramble segfaults right at launch after a fresh checkout, what's wrong?",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "brambl",
+    "segfault",
+    "right",
+    "launch",
+    "after",
+    "fresh",
+    "checkout",
+    "wrong"
+   ],
+   "shared_terms": [
+    "brambl"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q095"
+  },
+  {
+   "cid": "F086-low-1",
+   "group": "G02",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why does the Larkspur mobile pipeline keep getting OOM-killed?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "larkspur",
+    "mobil",
+    "pipelin",
+    "keep",
+    "get",
+    "oom",
+    "kill"
+   ],
+   "shared_terms": [
+    "larkspur"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q096"
+  },
+  {
+   "cid": "F086-low-2",
+   "group": "G02",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which agent should the Gradle compile be pinned to so it stops crashing from lack of memory?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "agent",
+    "gradl",
+    "compil",
+    "pin",
+    "stop",
+    "crash",
+    "lack",
+    "memori"
+   ],
+   "shared_terms": [
+    "gradl"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q097"
+  },
+  {
+   "cid": "F088-low-1",
+   "group": "G24",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему к soroka не подключиться с другого IP: обрыв без логов?",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "поч",
+    "soroka",
+    "подключ",
+    "друг",
+    "ip",
+    "обр",
+    "лог"
+   ],
+   "shared_terms": [
+    "soroka"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q098"
+  },
+  {
+   "cid": "F088-low-2",
+   "group": "G24",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Где разрешить доступ к прокси для свежеподнятой машины?",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "разреш",
+    "доступ",
+    "прокс",
+    "свежеподнят",
+    "машин"
+   ],
+   "shared_terms": [
+    "прокс"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q099"
+  },
+  {
+   "cid": "F089-low-1",
+   "group": "G08",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "where are monitoring notifications for heron delivered these days?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "monitor",
+    "notif",
+    "heron",
+    "deliv",
+    "day"
+   ],
+   "shared_terms": [
+    "heron"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q100"
+  },
+  {
+   "cid": "F089-low-2",
+   "group": "G08",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "why don't I get Prometheus warnings in my inbox anymore?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "don",
+    "get",
+    "prometheus",
+    "warn",
+    "inbox",
+    "anymor"
+   ],
+   "shared_terms": [
+    "prometheus"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q101"
+  },
+  {
+   "cid": "F091-low-1",
+   "group": "G22",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему пуговка игнорирует сообщения в свежесозданной группе?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "поч",
+    "пуговк",
+    "игнорир",
+    "сообщен",
+    "свежесозда",
+    "групп"
+   ],
+   "shared_terms": [
+    "пуговк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q102"
+  },
+  {
+   "cid": "F091-low-2",
+   "group": "G22",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Как разрешить пуговке работать ещё в одной группе?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "разреш",
+    "пуговк",
+    "работа",
+    "одн",
+    "групп"
+   ],
+   "shared_terms": [
+    "пуговк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q103"
+  },
+  {
+   "cid": "F092-low-1",
+   "group": "G39",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Документ с ноутбука Apple висит в очереди на мыши и не выходит, что выбрать?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "документ",
+    "ноутбук",
+    "appl",
+    "вис",
+    "очеред",
+    "мыш",
+    "выход",
+    "выбра"
+   ],
+   "shared_terms": [
+    "мыш"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q104"
+  },
+  {
+   "cid": "F092-low-2",
+   "group": "G39",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какой драйвер выбрать на ноутбуке Apple, чтобы бумага из устройства в кабинете наконец вышла?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "драйвер",
+    "выбра",
+    "ноутбук",
+    "appl",
+    "бумаг",
+    "устройств",
+    "кабинет",
+    "вышл"
+   ],
+   "shared_terms": [
+    "драйвер"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q105"
+  },
+  {
+   "cid": "F096-low-1",
+   "group": "G07",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What is the right order of steps when shipping a new Kestrel version?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "right",
+    "order",
+    "step",
+    "ship",
+    "new",
+    "kestrel",
+    "version"
+   ],
+   "shared_terms": [
+    "kestrel"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q106"
+  },
+  {
+   "cid": "F100-low-1",
+   "group": "G33",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему колбэки от эквайринга падают с unauthorized после ротации ключа в копилке?",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "поч",
+    "колбэк",
+    "эквайринг",
+    "пада",
+    "unauthor",
+    "ротац",
+    "ключ",
+    "копилк"
+   ],
+   "shared_terms": [
+    "копилк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q107"
+  },
+  {
+   "cid": "F100-zero-1",
+   "group": "G33",
+   "stratum": "low",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Сервис сбережений: колбэки об оплате, ждавшие повторной доставки, отвергаются как неавторизованные после ротации HMAC-ключа",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "сервис",
+    "сбережен",
+    "колбэк",
+    "оплат",
+    "ждавш",
+    "повторн",
+    "доставк",
+    "отверга",
+    "неавторизова",
+    "ротац",
+    "hmac",
+    "ключ"
+   ],
+   "shared_terms": [
+    "сервис"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q108"
+  },
+  {
+   "cid": "F103-low-1",
+   "group": "G28",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "рассылка с перепёлки у гугла помечается как нежелательная — чего не хватает?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "рассылк",
+    "перепелк",
+    "гугл",
+    "помеча",
+    "нежелательн",
+    "хвата"
+   ],
+   "shared_terms": [
+    "перепелк"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q109"
+  },
+  {
+   "cid": "F103-low-2",
+   "group": "G28",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почта от нас не доходит до входящих у гугловых ящиков, какой записи не хватает?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "почт",
+    "доход",
+    "входя",
+    "гуглов",
+    "ящик",
+    "запис",
+    "хвата"
+   ],
+   "shared_terms": [
+    "запис"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q110"
+  },
+  {
+   "cid": "F105-low-1",
+   "group": "G38",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "После обновления стрекозы разбор \"\" стал падать — почему?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "обновлен",
+    "стрекоз",
+    "разбор",
+    "стал",
+    "пада",
+    "поч"
+   ],
+   "shared_terms": [
+    "стрекоз"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q111"
+  },
+  {
+   "cid": "F105-low-2",
+   "group": "G38",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Parse после мажорного апгрейда ругается на вход без символов, что изменилось?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "pars",
+    "мажорн",
+    "апгрейд",
+    "руга",
+    "вход",
+    "символ",
+    "измен"
+   ],
+   "shared_terms": [
+    "pars"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q112"
+  },
+  {
+   "cid": "F106-low-1",
+   "group": "G19",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "pinentry can't find a terminal on osprey, how to fix?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "pinentri",
+    "find",
+    "termin",
+    "osprey",
+    "fix"
+   ],
+   "shared_terms": [
+    "osprey"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q113"
+  },
+  {
+   "cid": "F106-low-2",
+   "group": "G19",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "gpg passphrase prompt errors out with no terminal attached, which env variable is needed?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "gpg",
+    "passphras",
+    "prompt",
+    "error",
+    "termin",
+    "attach",
+    "env",
+    "variabl",
+    "need"
+   ],
+   "shared_terms": [
+    "gpg"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q114"
+  },
+  {
+   "cid": "F110-low-1",
+   "group": "G03",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why do early-morning analytics jobs on fernhill show stale numbers?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "earli",
+    "morn",
+    "analyt",
+    "job",
+    "fernhil",
+    "show",
+    "stale",
+    "number"
+   ],
+   "shared_terms": [
+    "fernhil"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q115"
+  },
+  {
+   "cid": "F110-low-2",
+   "group": "G03",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which server should batch dashboards use when the replica lags in the small hours?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "server",
+    "batch",
+    "dashboard",
+    "use",
+    "replica",
+    "lag",
+    "small",
+    "hour"
+   ],
+   "shared_terms": [
+    "replica"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q116"
+  },
+  {
+   "cid": "F116-low-1",
+   "group": "G06",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "How do I launch the container runtime on wren?",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "launch",
+    "contain",
+    "runtim",
+    "wren"
+   ],
+   "shared_terms": [
+    "wren"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q117"
+  },
+  {
+   "cid": "F116-low-2",
+   "group": "G06",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which VM flags give Colima enough RAM and cores?",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "vm",
+    "flag",
+    "give",
+    "colima",
+    "enough",
+    "ram",
+    "core"
+   ],
+   "shared_terms": [
+    "colima"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q118"
+  },
+  {
+   "cid": "F119-low-1",
+   "group": "G14",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "why does the morning scheduled task on nettlefield start an hour or two late?",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "morn",
+    "schedul",
+    "task",
+    "nettlefield",
+    "start",
+    "hour",
+    "two",
+    "late"
+   ],
+   "shared_terms": [
+    "nettlefield"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q119"
+  },
+  {
+   "cid": "F119-low-2",
+   "group": "G14",
+   "stratum": "low",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "report arrives an hour or two after its scheduled slot — which clock does the scheduler follow?",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "report",
+    "arriv",
+    "hour",
+    "two",
+    "after",
+    "schedul",
+    "slot",
+    "clock",
+    "follow"
+   ],
+   "shared_terms": [
+    "report"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q120"
+  },
+  {
+   "cid": "F002-zero-1",
+   "group": "G10",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "VPN session to the remote box goes silent after a short idle period at the workplace, how do I keep it alive?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "vpn",
+    "session",
+    "remot",
+    "box",
+    "goe",
+    "silent",
+    "after",
+    "short",
+    "idl",
+    "period",
+    "workplac",
+    "keep",
+    "aliv"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q121"
+  },
+  {
+   "cid": "F002-zero-2",
+   "group": "G10",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which heartbeat interval stops my encrypted link from timing out on the corporate network's address translation?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "heartbeat",
+    "interv",
+    "stop",
+    "encrypt",
+    "link",
+    "time",
+    "corpor",
+    "network",
+    "address",
+    "translat"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q122"
+  },
+  {
+   "cid": "F005-zero-1",
+   "group": "G18",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "app container restarted mid-way while applying a slow database schema upgrade on boot",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "app",
+    "contain",
+    "restart",
+    "mid",
+    "way",
+    "while",
+    "appli",
+    "slow",
+    "databas",
+    "schema",
+    "upgrad",
+    "boot"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q123"
+  },
+  {
+   "cid": "F005-zero-2",
+   "group": "G18",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "liveness probe terminating the deployment while a DB schema change is still in progress",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "live",
+    "probe",
+    "termin",
+    "deploy",
+    "while",
+    "db",
+    "schema",
+    "chang",
+    "still",
+    "progress"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q124"
+  },
+  {
+   "cid": "F006-zero-1",
+   "group": "G40",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "почему новый тоггл фичи не срабатывает, хотя в админке уже активирован?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "поч",
+    "нов",
+    "тоггл",
+    "фич",
+    "срабатыва",
+    "хот",
+    "админк",
+    "активирова"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q125"
+  },
+  {
+   "cid": "F006-zero-2",
+   "group": "G40",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "нужно ли рестартить контейнеры, чтобы применилась смена фичатоггла?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "рестарт",
+    "контейнер",
+    "примен",
+    "смен",
+    "фичатоггл"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q126"
+  },
+  {
+   "cid": "F007-zero-1",
+   "group": "G32",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Беспроводной адаптер Intel перестаёт работать после пробуждения лэптопа — какую опцию драйвера поменять?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "беспроводн",
+    "адаптер",
+    "intel",
+    "переста",
+    "работа",
+    "пробужден",
+    "лэптоп",
+    "как",
+    "опц",
+    "драйвер",
+    "поменя"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q127"
+  },
+  {
+   "cid": "F007-zero-2",
+   "group": "G32",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "После suspend на переносной машине отваливается беспроводная связь — что настроить в модуле ядра?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "suspend",
+    "переносн",
+    "машин",
+    "отвалива",
+    "беспроводн",
+    "связ",
+    "настро",
+    "модул",
+    "ядр"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q128"
+  },
+  {
+   "cid": "F017-zero-1",
+   "group": "G12",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "remote shell login keeps hanging with no reply — which bastion and non-standard listener should I use?",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "remot",
+    "shell",
+    "login",
+    "keep",
+    "hang",
+    "repli",
+    "bastion",
+    "non",
+    "standard",
+    "listen",
+    "use"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q129"
+  },
+  {
+   "cid": "F026-zero-1",
+   "group": "G34",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Встроенная учётка суперюзера не пускает в веб-панель с графиками метрик — как туда попасть?",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "встроен",
+    "учетк",
+    "суперюзер",
+    "пуска",
+    "веб",
+    "панел",
+    "график",
+    "метрик",
+    "туд",
+    "попаст"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q130"
+  },
+  {
+   "cid": "F026-zero-2",
+   "group": "G34",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Каким способом логиниться в интерфейс мониторинга, если штатный логин с секретом отвергается?",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "как",
+    "способ",
+    "логин",
+    "интерфейс",
+    "мониторинг",
+    "штатн",
+    "секрет",
+    "отверга"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q131"
+  },
+  {
+   "cid": "F027-zero-1",
+   "group": "G11",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What memory limit flag do I need so the frontend release compile with the geographic viewer stops OOMing?",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "memori",
+    "limit",
+    "flag",
+    "need",
+    "frontend",
+    "releas",
+    "compil",
+    "geograph",
+    "viewer",
+    "stop",
+    "oom"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q132"
+  },
+  {
+   "cid": "F027-zero-2",
+   "group": "G11",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "JS packager keeps aborting out of memory on the cartography module of our frontend",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "js",
+    "packag",
+    "keep",
+    "abort",
+    "memori",
+    "cartographi",
+    "modul",
+    "frontend"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q133"
+  },
+  {
+   "cid": "F031-zero-1",
+   "group": "G09",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Database-backed suites quietly not executing in our project: what key-value store setup do they expect?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "databas",
+    "back",
+    "suit",
+    "quiet",
+    "execut",
+    "project",
+    "key",
+    "valu",
+    "store",
+    "setup",
+    "expect"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q134"
+  },
+  {
+   "cid": "F031-zero-2",
+   "group": "G09",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Build tool's check target reports green but the end-to-end cases never ran, which local service is missing?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "build",
+    "tool",
+    "check",
+    "target",
+    "report",
+    "green",
+    "end",
+    "case",
+    "never",
+    "ran",
+    "local",
+    "servic",
+    "miss"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q135"
+  },
+  {
+   "cid": "F035-zero-1",
+   "group": "G29",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "пуши от нашей мобильной программы молчат на свежей версии ОС от Google, в чём дело",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "пуш",
+    "наш",
+    "мобильн",
+    "программ",
+    "молчат",
+    "свеж",
+    "верс",
+    "ос",
+    "googl",
+    "дел"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q136"
+  },
+  {
+   "cid": "F035-zero-2",
+   "group": "G29",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "когда мобилка просит у юзера согласие на всплывающие оповещения",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "мобилк",
+    "прос",
+    "юзер",
+    "всплыва",
+    "оповещен"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q137"
+  },
+  {
+   "cid": "F037-zero-1",
+   "group": "G13",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "how should the purchase event stream subscriber acknowledge progress so nothing goes missing on restart?",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "purchas",
+    "event",
+    "stream",
+    "subscrib",
+    "acknowledg",
+    "progress",
+    "noth",
+    "goe",
+    "miss",
+    "restart"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q138"
+  },
+  {
+   "cid": "F037-zero-2",
+   "group": "G13",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "purchase events vanish when a worker container dies partway through a chunk of records, what setting should change?",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "purchas",
+    "event",
+    "vanish",
+    "worker",
+    "contain",
+    "die",
+    "partway",
+    "through",
+    "chunk",
+    "record",
+    "set",
+    "chang"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q139"
+  },
+  {
+   "cid": "F038-low-1",
+   "group": "G37",
+   "stratum": "zero",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "На какой локальный IP смотрит форвардинг 25565?",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "локальн",
+    "ip",
+    "смотр",
+    "форвардинг"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q140"
+  },
+  {
+   "cid": "F038-zero-1",
+   "group": "G37",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Друзья не могут зайти в Minecraft из интернета после того, как машина сменила локальный IP",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "друз",
+    "могут",
+    "зайт",
+    "minecraft",
+    "интернет",
+    "машин",
+    "смен",
+    "локальн",
+    "ip"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q141"
+  },
+  {
+   "cid": "F041-zero-1",
+   "group": "G20",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Copying a huge tarball into our S3-compatible bucket gets rejected for size, why?",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "copi",
+    "huge",
+    "tarbal",
+    "s3",
+    "compat",
+    "bucket",
+    "get",
+    "reject",
+    "size"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q142"
+  },
+  {
+   "cid": "F041-zero-2",
+   "group": "G20",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "bucket refuses blobs past some size limit, does the legacy push tool need chunked transfer?",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "bucket",
+    "refus",
+    "blob",
+    "past",
+    "size",
+    "limit",
+    "legaci",
+    "push",
+    "tool",
+    "need",
+    "chunk",
+    "transfer"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q143"
+  },
+  {
+   "cid": "F045-zero-1",
+   "group": "G26",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой параметр окружения нужен приложению, чтобы его журнал парсился в графане по атрибутам?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "параметр",
+    "окружен",
+    "приложен",
+    "журна",
+    "парс",
+    "графан",
+    "атрибут"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q144"
+  },
+  {
+   "cid": "F045-zero-2",
+   "group": "G26",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "в Grafana записи приложения приходят сплошной строкой без разбивки на метки — что включить?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "grafana",
+    "запис",
+    "приложен",
+    "приход",
+    "сплошн",
+    "строк",
+    "разбивк",
+    "метк",
+    "включ"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q145"
+  },
+  {
+   "cid": "F051-zero-1",
+   "group": "G35",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "бинарь в проде выдаёт неизвестную ревизию вместо хеша коммита — что прокинуть?",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "бинар",
+    "прод",
+    "выда",
+    "неизвестн",
+    "ревиз",
+    "вмест",
+    "хеш",
+    "коммит",
+    "прокинут"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q146"
+  },
+  {
+   "cid": "F051-zero-2",
+   "group": "G35",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "как сделать, чтобы приложение, упакованное многоступенчато, выводило хеш коммита",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "приложен",
+    "упакова",
+    "многоступенчат",
+    "вывод",
+    "хеш",
+    "коммит"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q147"
+  },
+  {
+   "cid": "F053-zero-1",
+   "group": "G05",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "CNAME I created through the web UI got wiped overnight, who owns our domain's zone config?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "cname",
+    "creat",
+    "through",
+    "web",
+    "ui",
+    "got",
+    "wipe",
+    "overnight",
+    "own",
+    "domain",
+    "zone",
+    "config"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q148"
+  },
+  {
+   "cid": "F053-zero-2",
+   "group": "G05",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Which IaC repo controls the name-server entries for our main domain so manual changes stop getting reverted?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "iac",
+    "repo",
+    "control",
+    "name",
+    "server",
+    "entri",
+    "main",
+    "domain",
+    "manual",
+    "chang",
+    "stop",
+    "get",
+    "revert"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q149"
+  },
+  {
+   "cid": "F055-zero-1",
+   "group": "G01",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What hour does the scheduled snapshot of the picture library kick off, and which job must complete first?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "hour",
+    "schedul",
+    "snapshot",
+    "pictur",
+    "librari",
+    "kick",
+    "job",
+    "complet",
+    "first"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q150"
+  },
+  {
+   "cid": "F055-zero-2",
+   "group": "G01",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "picture archive copy might overlap with the gallery service's SQL export, when is it set to fire?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "pictur",
+    "archiv",
+    "copi",
+    "overlap",
+    "galleri",
+    "servic",
+    "sql",
+    "export",
+    "set",
+    "fire"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q151"
+  },
+  {
+   "cid": "F060-zero-1",
+   "group": "G25",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Где хранится резервный жёсткий на замену сбойному в сетевом хранилище?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "хран",
+    "резервн",
+    "жестк",
+    "замен",
+    "сбойн",
+    "сетев",
+    "хранилищ"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q152"
+  },
+  {
+   "cid": "F060-zero-2",
+   "group": "G25",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какой винчестер в домашней файлопомойке начал сыпаться и есть ли чем его поменять?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "винчестер",
+    "домашн",
+    "файлопомойк",
+    "нача",
+    "сыпа",
+    "поменя"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q153"
+  },
+  {
+   "cid": "F063-zero-1",
+   "group": "G21",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Бэкап системы учёта клиентов не разворачивается обычным SQL-клиентом Postgres — какой утилитой его загружать?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "бэкап",
+    "систем",
+    "учет",
+    "клиент",
+    "разворачива",
+    "обычн",
+    "sql",
+    "postgr",
+    "утилит",
+    "загружа"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q154"
+  },
+  {
+   "cid": "F063-zero-2",
+   "group": "G21",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Копия БД учёта клиентов оказалась бинарной, а не текстовым SQL — как её откатить обратно?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "коп",
+    "бд",
+    "учет",
+    "клиент",
+    "оказа",
+    "бинарн",
+    "текстов",
+    "sql",
+    "откат",
+    "обратн"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q155"
+  },
+  {
+   "cid": "F064-zero-1",
+   "group": "G36",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "фоновый обработчик застревает на тяжёлой выгрузке, прочие джобы ждут — что сделали?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "фонов",
+    "обработчик",
+    "застрева",
+    "тяжел",
+    "выгрузк",
+    "проч",
+    "джоб",
+    "ждут"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q156"
+  },
+  {
+   "cid": "F064-zero-2",
+   "group": "G36",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "куда перенесли медленные выгрузки, чтобы не стопорили прочие фоновые джобы?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "перенесл",
+    "медлен",
+    "выгрузк",
+    "стопор",
+    "проч",
+    "фонов",
+    "джоб"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q157"
+  },
+  {
+   "cid": "F067-zero-2",
+   "group": "G17",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "When the third-party vendor throttles us, should we use growing jittered delays or honor the delay its response header gives?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "third",
+    "parti",
+    "vendor",
+    "throttl",
+    "use",
+    "grow",
+    "jitter",
+    "delay",
+    "honor",
+    "respons",
+    "header",
+    "give"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q158"
+  },
+  {
+   "cid": "F068-zero-1",
+   "group": "G27",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "EXTERNAL-IP навсегда завис в <pending> у балансировщика в k8s — чего не хватает в манифесте?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "extern",
+    "ip",
+    "навсегд",
+    "завис",
+    "pend",
+    "балансировщик",
+    "k8s",
+    "хвата",
+    "манифест"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q159"
+  },
+  {
+   "cid": "F068-zero-2",
+   "group": "G27",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какой пометкой в yaml заставить балансировщик выдать IP, доступный извне?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "пометк",
+    "yaml",
+    "застав",
+    "балансировщик",
+    "выда",
+    "ip",
+    "доступн",
+    "извн"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q160"
+  },
+  {
+   "cid": "F071-zero-1",
+   "group": "G04",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Backend ignores my edits to the system-wide settings file; where does it look by default without an environment override?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "backend",
+    "ignor",
+    "edit",
+    "system",
+    "wide",
+    "set",
+    "file",
+    "look",
+    "default",
+    "environ",
+    "overrid"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q161"
+  },
+  {
+   "cid": "F071-zero-2",
+   "group": "G04",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Server loads different settings depending on which folder I launch it from, why?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "server",
+    "load",
+    "differ",
+    "set",
+    "depend",
+    "folder",
+    "launch"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q162"
+  },
+  {
+   "cid": "F076-zero-1",
+   "group": "G23",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Какую версию rustc ставить, чтобы билд не валился на синтаксисе цепочек условий в разборщике?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "как",
+    "верс",
+    "rustc",
+    "став",
+    "билд",
+    "вал",
+    "синтаксис",
+    "цепочек",
+    "услов",
+    "разборщик"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q163"
+  },
+  {
+   "cid": "F076-zero-2",
+   "group": "G23",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "cargo build валится на условных цепочках в синтаксическом анализаторе — какой минимальный тулчейн требуется?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "cargo",
+    "build",
+    "вал",
+    "условн",
+    "цепочк",
+    "синтаксическ",
+    "анализатор",
+    "минимальн",
+    "тулчейн",
+    "треб"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q164"
+  },
+  {
+   "cid": "F078-zero-1",
+   "group": "G16",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "web proxy keeps presenting the old SSL key pair after the scheduled Let's Encrypt job, is a manual step required?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "web",
+    "proxi",
+    "keep",
+    "present",
+    "old",
+    "ssl",
+    "key",
+    "pair",
+    "after",
+    "schedul",
+    "encrypt",
+    "job",
+    "manual",
+    "step",
+    "requir"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q165"
+  },
+  {
+   "cid": "F078-zero-2",
+   "group": "G16",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "browser shows expired HTTPS warning early in the cycle even though Let's Encrypt issued a new one, what to restart?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "browser",
+    "show",
+    "expir",
+    "https",
+    "warn",
+    "earli",
+    "cycl",
+    "even",
+    "though",
+    "encrypt",
+    "issu",
+    "new",
+    "one",
+    "restart"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q166"
+  },
+  {
+   "cid": "F079-zero-1",
+   "group": "G31",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Обновил фронт, а у посетителей до сих пор прежнее оформление — сколько это продлится?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "обнов",
+    "фронт",
+    "посетител",
+    "сих",
+    "пор",
+    "прежн",
+    "оформлен",
+    "скольк",
+    "продл"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q167"
+  },
+  {
+   "cid": "F079-zero-2",
+   "group": "G31",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Как заставить сеть доставки контента отдавать свежие файлы вёрстки сразу после выкладки?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "застав",
+    "сет",
+    "доставк",
+    "контент",
+    "отдава",
+    "свеж",
+    "файл",
+    "верстк",
+    "сраз",
+    "выкладк"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q168"
+  },
+  {
+   "cid": "F080-zero-1",
+   "group": "G30",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "сводка покупок по клиентам формировалась шестьдесят секунд, чем это вылечили?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "сводк",
+    "покупок",
+    "клиент",
+    "формирова",
+    "шестьдес",
+    "секунд",
+    "вылеч"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q169"
+  },
+  {
+   "cid": "F080-zero-2",
+   "group": "G30",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "как ускорили тяжёлую аналитическую выгрузку продаж с фильтром по покупателю и дате оформления?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "ускор",
+    "тяжел",
+    "аналитическ",
+    "выгрузк",
+    "продаж",
+    "фильтр",
+    "покупател",
+    "дат",
+    "оформлен"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q170"
+  },
+  {
+   "cid": "F083-low-2",
+   "group": "G15",
+   "stratum": "zero",
+   "intent": "low",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "after checkout the sprites in the project are tiny text stubs instead of real images, why?",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "after",
+    "checkout",
+    "sprite",
+    "project",
+    "tini",
+    "text",
+    "stub",
+    "instead",
+    "real",
+    "imag"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q171"
+  },
+  {
+   "cid": "F083-zero-1",
+   "group": "G15",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "freshly checked-out project dies immediately on launch complaining about a bad image format, what am I missing?",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "fresh",
+    "check",
+    "project",
+    "die",
+    "immedi",
+    "launch",
+    "complain",
+    "bad",
+    "imag",
+    "format",
+    "am",
+    "miss"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q172"
+  },
+  {
+   "cid": "F086-zero-1",
+   "group": "G02",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Mobile client compilation in the pipeline gets OOM-killed, which executor should those stages be pinned to?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "mobil",
+    "client",
+    "compil",
+    "pipelin",
+    "get",
+    "oom",
+    "kill",
+    "executor",
+    "stage",
+    "pin"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q173"
+  },
+  {
+   "cid": "F086-zero-2",
+   "group": "G02",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Out-of-memory SIGKILL while assembling the APK in the pipeline: which agents have enough memory for it?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "memori",
+    "sigkil",
+    "while",
+    "assembl",
+    "apk",
+    "pipelin",
+    "agent",
+    "enough"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q174"
+  },
+  {
+   "cid": "F088-zero-1",
+   "group": "G24",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Как добавить IP в разрешённые для исходящего шлюза, чтобы он перестал обрывать коннект после хендшейка?",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "ip",
+    "разрешен",
+    "исходя",
+    "шлюз",
+    "переста",
+    "обрыва",
+    "коннект",
+    "хендшейк"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q175"
+  },
+  {
+   "cid": "F089-zero-1",
+   "group": "G08",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which messenger group receives the metrics server's notifications?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "messeng",
+    "group",
+    "receiv",
+    "metric",
+    "server",
+    "notif"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q176"
+  },
+  {
+   "cid": "F089-zero-2",
+   "group": "G08",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "why did monitoring notifications stop arriving in my mailbox?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "monitor",
+    "notif",
+    "stop",
+    "arriv",
+    "mailbox"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q177"
+  },
+  {
+   "cid": "F091-zero-1",
+   "group": "G22",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Телеграм-ассистент игнорирует сообщения в только что созданной группе — где задаётся белый перечень бесед?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "телегр",
+    "ассистент",
+    "игнорир",
+    "сообщен",
+    "групп",
+    "зада",
+    "бел",
+    "перечен",
+    "бесед"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q178"
+  },
+  {
+   "cid": "F091-zero-2",
+   "group": "G22",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Пригласил нашего помощника в свежую беседу, а реакции ноль — что прописать в конфиге и как применить?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "приглас",
+    "наш",
+    "помощник",
+    "свеж",
+    "бесед",
+    "реакц",
+    "нол",
+    "прописа",
+    "конфиг",
+    "примен"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q179"
+  },
+  {
+   "cid": "F092-zero-1",
+   "group": "G39",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Отправляю документ с ноутбука Apple на МФУ в кабинете, а он молча висит в очереди",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "отправля",
+    "документ",
+    "ноутбук",
+    "appl",
+    "мфу",
+    "кабинет",
+    "молч",
+    "вис",
+    "очеред"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q180"
+  },
+  {
+   "cid": "F092-zero-2",
+   "group": "G39",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Что установить на яблочный ноутбук, чтобы сетевое МФУ перестало игнорировать отправленные листы?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "установ",
+    "яблочн",
+    "ноутбук",
+    "сетев",
+    "мфу",
+    "переста",
+    "игнорирова",
+    "отправлен",
+    "лист"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q181"
+  },
+  {
+   "cid": "F096-zero-1",
+   "group": "G07",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "The shipping job used stale version-history file contents. What did I do wrong in the sequence?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "ship",
+    "job",
+    "use",
+    "stale",
+    "version",
+    "histori",
+    "file",
+    "content",
+    "wrong",
+    "sequenc"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q182"
+  },
+  {
+   "cid": "F096-zero-2",
+   "group": "G07",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Before I mark a new version in git, what has to land on main first so the shipping pipeline sees the right notes?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "before",
+    "mark",
+    "new",
+    "version",
+    "git",
+    "land",
+    "main",
+    "first",
+    "ship",
+    "pipelin",
+    "see",
+    "right",
+    "note"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q183"
+  },
+  {
+   "cid": "F100-low-2",
+   "group": "G33",
+   "stratum": "zero",
+   "intent": "low",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Накопившиеся уведомления об оплате получают 401 после замены HMAC-ключа",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "накоп",
+    "уведомлен",
+    "оплат",
+    "получа",
+    "зам",
+    "hmac",
+    "ключ"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q184"
+  },
+  {
+   "cid": "F100-zero-2",
+   "group": "G33",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "После замены ключа у провайдера оплат отложенные callback'и в приложении накоплений получают отказ в авторизации — в чём причина?",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "зам",
+    "ключ",
+    "провайдер",
+    "оплат",
+    "отложен",
+    "callback",
+    "приложен",
+    "накоплен",
+    "получа",
+    "отказ",
+    "авторизац",
+    "причин"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q185"
+  },
+  {
+   "cid": "F103-zero-1",
+   "group": "G28",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Гугл отправляет нашу рассылку в нежелательные, хотя подпись и список разрешённых серверов уже есть — что ещё добавить?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "гугл",
+    "отправля",
+    "наш",
+    "рассылк",
+    "нежелательн",
+    "хот",
+    "подп",
+    "список",
+    "разрешен",
+    "сервер"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q186"
+  },
+  {
+   "cid": "F103-zero-2",
+   "group": "G28",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какую политику проверки отправителя прописать в зоне, чтобы гугловая почта перестала отбраковывать наши сообщения?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "как",
+    "политик",
+    "проверк",
+    "отправител",
+    "прописа",
+    "зон",
+    "гуглов",
+    "почт",
+    "переста",
+    "отбраковыва",
+    "сообщен"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q187"
+  },
+  {
+   "cid": "F105-zero-1",
+   "group": "G38",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "После перехода на новый мажор парсинг-либы разбор ввода без символов вдруг отдаёт err — что поменялось?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "переход",
+    "нов",
+    "мажор",
+    "парсинг",
+    "либ",
+    "разбор",
+    "ввод",
+    "символ",
+    "отда",
+    "err",
+    "поменя"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q188"
+  },
+  {
+   "cid": "F105-zero-2",
+   "group": "G38",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "Почему тесты упали на \"\" после бампа зависимости-парсера до второго мажора?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "поч",
+    "тест",
+    "упа",
+    "бамп",
+    "зависим",
+    "парсер",
+    "мажор"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q189"
+  },
+  {
+   "cid": "F106-zero-1",
+   "group": "G19",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "On the Apple CI runner, verified check-ins break with a terminal-related error — what environment variable is missing?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "appl",
+    "ci",
+    "runner",
+    "verifi",
+    "check",
+    "in",
+    "break",
+    "termin",
+    "relat",
+    "error",
+    "environ",
+    "variabl",
+    "miss"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q190"
+  },
+  {
+   "cid": "F106-zero-2",
+   "group": "G19",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Passphrase prompt for my OpenPGP key never appears on the Apple release runner, what do I add to bashrc?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "passphras",
+    "prompt",
+    "openpgp",
+    "key",
+    "never",
+    "appear",
+    "appl",
+    "releas",
+    "runner",
+    "add",
+    "bashrc"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q191"
+  },
+  {
+   "cid": "F110-zero-1",
+   "group": "G03",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Why do early-morning analytics pull outdated figures from the secondary DB server?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "earli",
+    "morn",
+    "analyt",
+    "pull",
+    "outdat",
+    "figur",
+    "secondari",
+    "db",
+    "server"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q192"
+  },
+  {
+   "cid": "F110-zero-2",
+   "group": "G03",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Standby database lags while the scheduled dead-tuple cleanup runs; which server should batch analytics hit?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "standbi",
+    "databas",
+    "lag",
+    "while",
+    "schedul",
+    "dead",
+    "tupl",
+    "cleanup",
+    "run",
+    "server",
+    "batch",
+    "analyt",
+    "hit"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q193"
+  },
+  {
+   "cid": "F116-zero-1",
+   "group": "G06",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "My container commands can't reach any daemon on the dev notebook: what engine runs there and how do I bring it up?",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "contain",
+    "command",
+    "reach",
+    "daemon",
+    "dev",
+    "notebook",
+    "engin",
+    "run",
+    "bring"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q194"
+  },
+  {
+   "cid": "F119-zero-1",
+   "group": "G14",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "morning summary email shows up one or two hours late, is the scheduler on that box using the wrong clock?",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "morn",
+    "summari",
+    "email",
+    "show",
+    "one",
+    "two",
+    "hour",
+    "late",
+    "schedul",
+    "box",
+    "use",
+    "wrong",
+    "clock"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q195"
+  },
+  {
+   "cid": "F119-zero-2",
+   "group": "G14",
+   "stratum": "zero",
+   "intent": "zero",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "periodic tasks on the server seem to ignore the German zone, six o'clock summary is shifted",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "period",
+    "task",
+    "server",
+    "seem",
+    "ignor",
+    "german",
+    "zone",
+    "six",
+    "clock",
+    "summari",
+    "shift"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q196"
+  },
+  {
+   "cid": "F002-cross-1",
+   "group": "G10",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Туннель WireGuard до quarry отваливается каждые несколько минут из офиса, что прописать в конфиге?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "туннел",
+    "wireguard",
+    "quarri",
+    "отвалива",
+    "кажд",
+    "нескольк",
+    "минут",
+    "офис",
+    "прописа",
+    "конфиг"
+   ],
+   "shared_terms": [
+    "wireguard",
+    "quarri"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q197"
+  },
+  {
+   "cid": "F002-cross-2",
+   "group": "G10",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "VPN из офисной сети рвётся после пары минут простоя, какой keepalive ставить на клиенте?",
+   "gold": [
+    "F002"
+   ],
+   "query_terms": [
+    "vpn",
+    "офисн",
+    "сет",
+    "рвет",
+    "пар",
+    "минут",
+    "просто",
+    "keepal",
+    "став",
+    "клиент"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F002"
+   ],
+   "id": "Q198"
+  },
+  {
+   "cid": "F005-cross-1",
+   "group": "G18",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "почему под lindel перезапускается при деплое, если миграция базы идёт долго?",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "поч",
+    "lindel",
+    "перезапуска",
+    "депл",
+    "миграц",
+    "баз",
+    "идет",
+    "долг"
+   ],
+   "shared_terms": [
+    "lindel"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q199"
+  },
+  {
+   "cid": "F005-cross-2",
+   "group": "G18",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "goose миграции на старте сервиса не успевают доехать, k8s убивает под по таймауту",
+   "gold": [
+    "F005"
+   ],
+   "query_terms": [
+    "goos",
+    "миграц",
+    "старт",
+    "сервис",
+    "успева",
+    "доеха",
+    "k8s",
+    "убива",
+    "таймаут"
+   ],
+   "shared_terms": [
+    "goos"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F005"
+   ],
+   "id": "Q200"
+  },
+  {
+   "cid": "F006-cross-1",
+   "group": "G40",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "turned on a feature flag for луковица in the dashboard but nothing changed, why?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "turn",
+    "featur",
+    "flag",
+    "луковиц",
+    "dashboard",
+    "noth",
+    "chang"
+   ],
+   "shared_terms": [
+    "луковиц"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q201"
+  },
+  {
+   "cid": "F006-cross-2",
+   "group": "G40",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "does луковица pick up feature flag changes at runtime or only on boot?",
+   "gold": [
+    "F006"
+   ],
+   "query_terms": [
+    "луковиц",
+    "pick",
+    "featur",
+    "flag",
+    "chang",
+    "runtim",
+    "boot"
+   ],
+   "shared_terms": [
+    "луковиц"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F006"
+   ],
+   "id": "Q202"
+  },
+  {
+   "cid": "F007-cross-1",
+   "group": "G32",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "krot laptop loses wifi after resume from suspend, how do I fix it?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "krot",
+    "laptop",
+    "lose",
+    "wifi",
+    "after",
+    "resum",
+    "suspend",
+    "fix"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q203"
+  },
+  {
+   "cid": "F007-cross-2",
+   "group": "G32",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "Intel wireless drops every time the laptop wakes up, which kernel module option stops that?",
+   "gold": [
+    "F007"
+   ],
+   "query_terms": [
+    "intel",
+    "wireless",
+    "drop",
+    "everi",
+    "time",
+    "laptop",
+    "wake",
+    "kernel",
+    "modul",
+    "option",
+    "stop"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F007"
+   ],
+   "id": "Q204"
+  },
+  {
+   "cid": "F017-cross-1",
+   "group": "G12",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "как зайти по ssh на moorgate, напрямую соединение висит по таймауту",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "зайт",
+    "ssh",
+    "moorgat",
+    "напрям",
+    "соединен",
+    "вис",
+    "таймаут"
+   ],
+   "shared_terms": [
+    "ssh",
+    "moorgat"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q205"
+  },
+  {
+   "cid": "F017-cross-2",
+   "group": "G12",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "через какой бастион и на каком порту подключаться к moorgate?",
+   "gold": [
+    "F017"
+   ],
+   "query_terms": [
+    "бастион",
+    "как",
+    "порт",
+    "подключа",
+    "moorgat"
+   ],
+   "shared_terms": [
+    "moorgat"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F017"
+   ],
+   "id": "Q206"
+  },
+  {
+   "cid": "F026-cross-1",
+   "group": "G34",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "how do I log into grafana on filin, the admin credentials get rejected",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "log",
+    "grafana",
+    "filin",
+    "admin",
+    "credenti",
+    "get",
+    "reject"
+   ],
+   "shared_terms": [
+    "grafana",
+    "admin"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q207"
+  },
+  {
+   "cid": "F026-cross-2",
+   "group": "G34",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "can't sign in to filin grafana dashboards with the built-in admin account",
+   "gold": [
+    "F026"
+   ],
+   "query_terms": [
+    "sign",
+    "filin",
+    "grafana",
+    "dashboard",
+    "built",
+    "admin",
+    "account"
+   ],
+   "shared_terms": [
+    "grafana",
+    "admin"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F026"
+   ],
+   "id": "Q208"
+  },
+  {
+   "cid": "F027-cross-1",
+   "group": "G11",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "сборка фронтенда pippin падает по памяти на модуле карты, какой лимит ставить?",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "сборк",
+    "фронтенд",
+    "pippin",
+    "пада",
+    "памят",
+    "модул",
+    "карт",
+    "лим",
+    "став"
+   ],
+   "shared_terms": [
+    "pippin"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q209"
+  },
+  {
+   "cid": "F027-cross-2",
+   "group": "G11",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "сколько памяти выделить Node, чтобы прод-сборка pippin с картой не вылетала",
+   "gold": [
+    "F027"
+   ],
+   "query_terms": [
+    "скольк",
+    "памят",
+    "выдел",
+    "node",
+    "прод",
+    "сборк",
+    "pippin",
+    "карт",
+    "вылета"
+   ],
+   "shared_terms": [
+    "node",
+    "pippin"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F027"
+   ],
+   "id": "Q210"
+  },
+  {
+   "cid": "F031-cross-1",
+   "group": "G09",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Почему в marlow интеграционные тесты молча не запускаются, хотя make test проходит зелёным?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "поч",
+    "marlow",
+    "интеграцион",
+    "тест",
+    "молч",
+    "хот",
+    "make",
+    "test",
+    "проход",
+    "зелен"
+   ],
+   "shared_terms": [
+    "marlow",
+    "make",
+    "test"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q211"
+  },
+  {
+   "cid": "F031-cross-2",
+   "group": "G09",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "На каком порту должен быть поднят Redis, чтобы тесты marlow реально выполнялись?",
+   "gold": [
+    "F031"
+   ],
+   "query_terms": [
+    "как",
+    "порт",
+    "долж",
+    "подн",
+    "redi",
+    "тест",
+    "marlow",
+    "реальн"
+   ],
+   "shared_terms": [
+    "redi",
+    "marlow"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F031"
+   ],
+   "id": "Q212"
+  },
+  {
+   "cid": "F035-cross-1",
+   "group": "G29",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "hedgehog app push notifications not appearing on Android 14",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "hedgehog",
+    "app",
+    "push",
+    "notif",
+    "appear",
+    "android"
+   ],
+   "shared_terms": [
+    "notif",
+    "android"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q213"
+  },
+  {
+   "cid": "F035-cross-2",
+   "group": "G29",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "when does our mobile app prompt the user for notification permission on Android 14",
+   "gold": [
+    "F035"
+   ],
+   "query_terms": [
+    "mobil",
+    "app",
+    "prompt",
+    "user",
+    "notif",
+    "permiss",
+    "android"
+   ],
+   "shared_terms": [
+    "notif",
+    "android"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F035"
+   ],
+   "id": "Q214"
+  },
+  {
+   "cid": "F037-cross-1",
+   "group": "G13",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "почему консьюмер orders.v2 в saltmarsh теряет сообщения, когда под перезапускается?",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "поч",
+    "консьюмер",
+    "order",
+    "v2",
+    "saltmarsh",
+    "теря",
+    "сообщен",
+    "перезапуска"
+   ],
+   "shared_terms": [
+    "order",
+    "v2",
+    "saltmarsh"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q215"
+  },
+  {
+   "cid": "F037-cross-2",
+   "group": "G13",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "как правильно подтверждать смещения в Kafka для заказов saltmarsh, чтобы не терять данные при падении",
+   "gold": [
+    "F037"
+   ],
+   "query_terms": [
+    "правильн",
+    "подтвержда",
+    "смещен",
+    "kafka",
+    "заказ",
+    "saltmarsh",
+    "теря",
+    "дан",
+    "паден"
+   ],
+   "shared_terms": [
+    "kafka",
+    "saltmarsh"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F037"
+   ],
+   "id": "Q216"
+  },
+  {
+   "cid": "F038-cross-1",
+   "group": "G37",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "Which LAN IP does the Minecraft port forward on the home router point to?",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "lan",
+    "ip",
+    "minecraft",
+    "port",
+    "forward",
+    "home",
+    "router",
+    "point"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q217"
+  },
+  {
+   "cid": "F038-cross-2",
+   "group": "G37",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "minecraft server unreachable from outside after its local IP changed, what address should it be pinned to",
+   "gold": [
+    "F038"
+   ],
+   "query_terms": [
+    "minecraft",
+    "server",
+    "unreach",
+    "outsid",
+    "after",
+    "local",
+    "ip",
+    "chang",
+    "address",
+    "pin"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F038"
+   ],
+   "id": "Q218"
+  },
+  {
+   "cid": "F041-cross-1",
+   "group": "G20",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Почему большие файлы не заливаются в ambergate и падают с EntityTooLarge?",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "поч",
+    "больш",
+    "файл",
+    "залива",
+    "amberg",
+    "пада",
+    "entitytoolarg"
+   ],
+   "shared_terms": [
+    "amberg",
+    "entitytoolarg"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q219"
+  },
+  {
+   "cid": "F041-cross-2",
+   "group": "G20",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Бэкап больше 5 ГБ не загружается в хранилище ambergate, в чём причина?",
+   "gold": [
+    "F041"
+   ],
+   "query_terms": [
+    "бэкап",
+    "гб",
+    "загружа",
+    "хранилищ",
+    "amberg",
+    "причин"
+   ],
+   "shared_terms": [
+    "amberg"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F041"
+   ],
+   "id": "Q220"
+  },
+  {
+   "cid": "F045-cross-1",
+   "group": "G26",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "grechka logs show up in Loki as plain lines, fields not extracted — how do I fix it?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "grechka",
+    "log",
+    "show",
+    "loki",
+    "plain",
+    "line",
+    "field",
+    "extract",
+    "fix"
+   ],
+   "shared_terms": [
+    "log",
+    "loki"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q221"
+  },
+  {
+   "cid": "F045-cross-2",
+   "group": "G26",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "which env var makes grechka emit structured JSON logs?",
+   "gold": [
+    "F045"
+   ],
+   "query_terms": [
+    "env",
+    "var",
+    "make",
+    "grechka",
+    "emit",
+    "structur",
+    "json",
+    "log"
+   ],
+   "shared_terms": [
+    "json",
+    "log"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F045"
+   ],
+   "id": "Q222"
+  },
+  {
+   "cid": "F051-cross-1",
+   "group": "G35",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "pchela container reports its version as unknown, how do I get the commit sha in",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "pchela",
+    "contain",
+    "report",
+    "version",
+    "unknown",
+    "get",
+    "commit",
+    "sha"
+   ],
+   "shared_terms": [
+    "version",
+    "unknown",
+    "sha"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q223"
+  },
+  {
+   "cid": "F051-cross-2",
+   "group": "G35",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "multi-stage docker build drops git info, what arg do I need for the revision to show up",
+   "gold": [
+    "F051"
+   ],
+   "query_terms": [
+    "multi",
+    "stage",
+    "docker",
+    "build",
+    "drop",
+    "git",
+    "info",
+    "arg",
+    "need",
+    "revis",
+    "show"
+   ],
+   "shared_terms": [
+    "docker",
+    "build",
+    "git"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F051"
+   ],
+   "id": "Q224"
+  },
+  {
+   "cid": "F053-cross-1",
+   "group": "G05",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Почему пропадает запись в Cloudflare для orchardlane.net, которую я завёл вручную через панель?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "поч",
+    "пропада",
+    "зап",
+    "cloudflar",
+    "orchardlan",
+    "net",
+    "котор",
+    "завел",
+    "вручн",
+    "панел"
+   ],
+   "shared_terms": [
+    "cloudflar",
+    "orchardlan",
+    "net"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q225"
+  },
+  {
+   "cid": "F053-cross-2",
+   "group": "G05",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "В каком репозитории terraform описана DNS-зона orchardlane.net?",
+   "gold": [
+    "F053"
+   ],
+   "query_terms": [
+    "как",
+    "репозитор",
+    "terraform",
+    "описа",
+    "dns",
+    "зон",
+    "orchardlan",
+    "net"
+   ],
+   "shared_terms": [
+    "terraform",
+    "dns",
+    "orchardlan",
+    "net"
+   ],
+   "overlap": 4,
+   "checker_answers": [
+    "F053"
+   ],
+   "id": "Q226"
+  },
+  {
+   "cid": "F055-cross-1",
+   "group": "G01",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Во сколько на brackwater запускается ночной бэкап фоток через restic и чего он ждёт?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "скольк",
+    "brackwat",
+    "ночн",
+    "бэкап",
+    "фоток",
+    "restic",
+    "ждет"
+   ],
+   "shared_terms": [
+    "brackwat",
+    "restic"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q227"
+  },
+  {
+   "cid": "F055-cross-2",
+   "group": "G01",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Каким таймером запускается резервное копирование фотографий на brackwater после дампа базы Immich?",
+   "gold": [
+    "F055"
+   ],
+   "query_terms": [
+    "как",
+    "таймер",
+    "резервн",
+    "копирован",
+    "фотограф",
+    "brackwat",
+    "дамп",
+    "баз",
+    "immich"
+   ],
+   "shared_terms": [
+    "brackwat",
+    "immich"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F055"
+   ],
+   "id": "Q228"
+  },
+  {
+   "cid": "F060-cross-1",
+   "group": "G25",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "which drive bay on the bobr NAS is failing and where's the spare drive?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "drive",
+    "bay",
+    "bobr",
+    "nas",
+    "fail",
+    "spare"
+   ],
+   "shared_terms": [
+    "nas"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q229"
+  },
+  {
+   "cid": "F060-cross-2",
+   "group": "G25",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "storage box throwing SMART warnings, do we have a replacement HDD somewhere in the rack?",
+   "gold": [
+    "F060"
+   ],
+   "query_terms": [
+    "storag",
+    "box",
+    "throw",
+    "smart",
+    "warn",
+    "replac",
+    "hdd",
+    "somewher",
+    "rack"
+   ],
+   "shared_terms": [
+    "smart"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F060"
+   ],
+   "id": "Q230"
+  },
+  {
+   "cid": "F063-cross-1",
+   "group": "G21",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "how do I restore the CRM Postgres backup taken on olkhovka?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "restor",
+    "crm",
+    "postgr",
+    "backup",
+    "taken",
+    "olkhovka"
+   ],
+   "shared_terms": [
+    "restor",
+    "crm"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q231"
+  },
+  {
+   "cid": "F063-cross-2",
+   "group": "G21",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "psql chokes on the crm backup file, which tool should I load it with instead?",
+   "gold": [
+    "F063"
+   ],
+   "query_terms": [
+    "psql",
+    "choke",
+    "crm",
+    "backup",
+    "file",
+    "tool",
+    "load",
+    "instead"
+   ],
+   "shared_terms": [
+    "psql",
+    "crm"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F063"
+   ],
+   "id": "Q232"
+  },
+  {
+   "cid": "F064-cross-1",
+   "group": "G36",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "tramvai worker: long export job holding up every other task, did we move it to a separate queue?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "tramvai",
+    "worker",
+    "long",
+    "export",
+    "job",
+    "hold",
+    "everi",
+    "task",
+    "move",
+    "separ",
+    "queue"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q233"
+  },
+  {
+   "cid": "F064-cross-2",
+   "group": "G36",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "why do export jobs run on their own queue instead of the main worker queue?",
+   "gold": [
+    "F064"
+   ],
+   "query_terms": [
+    "export",
+    "job",
+    "run",
+    "queue",
+    "instead",
+    "main",
+    "worker"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F064"
+   ],
+   "id": "Q234"
+  },
+  {
+   "cid": "F067-cross-1",
+   "group": "G17",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Какой лимит запросов у партнёрского API tessera и как правильно обрабатывать 429?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "лим",
+    "запрос",
+    "партнерск",
+    "api",
+    "tessera",
+    "правильн",
+    "обрабатыва"
+   ],
+   "shared_terms": [
+    "api",
+    "tessera"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q235"
+  },
+  {
+   "cid": "F067-cross-2",
+   "group": "G17",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "tessera начала отвечать 429 — сколько ждать перед повтором, экспоненциальный backoff тут подходит?",
+   "gold": [
+    "F067"
+   ],
+   "query_terms": [
+    "tessera",
+    "нача",
+    "отвеча",
+    "скольк",
+    "ждат",
+    "повтор",
+    "экспоненциальн",
+    "backoff",
+    "подход"
+   ],
+   "shared_terms": [
+    "tessera"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F067"
+   ],
+   "id": "Q236"
+  },
+  {
+   "cid": "F068-cross-1",
+   "group": "G27",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "LoadBalancer service on lastochka stuck in pending, never gets an external IP — why?",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "loadbalanc",
+    "servic",
+    "lastochka",
+    "stuck",
+    "pend",
+    "never",
+    "get",
+    "extern",
+    "ip"
+   ],
+   "shared_terms": [
+    "loadbalanc"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q237"
+  },
+  {
+   "cid": "F068-cross-2",
+   "group": "G27",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "which MetalLB annotation do I need so a LoadBalancer gets a public IP in the lastochka cluster",
+   "gold": [
+    "F068"
+   ],
+   "query_terms": [
+    "metallb",
+    "annot",
+    "need",
+    "loadbalanc",
+    "get",
+    "public",
+    "ip",
+    "lastochka",
+    "cluster"
+   ],
+   "shared_terms": [
+    "metallb",
+    "loadbalanc",
+    "public"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F068"
+   ],
+   "id": "Q238"
+  },
+  {
+   "cid": "F071-cross-1",
+   "group": "G04",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "tallow не видит настройки из /etc, откуда он берёт конфиг, если переменная окружения не задана?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "tallow",
+    "вид",
+    "настройк",
+    "etc",
+    "откуд",
+    "берет",
+    "конфиг",
+    "перемен",
+    "окружен",
+    "зада"
+   ],
+   "shared_terms": [
+    "tallow",
+    "etc"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q239"
+  },
+  {
+   "cid": "F071-cross-2",
+   "group": "G04",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Какой файл настроек грузит tallow при запуске без переменной окружения?",
+   "gold": [
+    "F071"
+   ],
+   "query_terms": [
+    "файл",
+    "настроек",
+    "груз",
+    "tallow",
+    "запуск",
+    "перемен",
+    "окружен"
+   ],
+   "shared_terms": [
+    "tallow"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F071"
+   ],
+   "id": "Q240"
+  },
+  {
+   "cid": "F076-cross-1",
+   "group": "G23",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "What minimum Rust version does klever need? Build breaks on let chains in the parser",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "minimum",
+    "rust",
+    "version",
+    "klever",
+    "need",
+    "build",
+    "break",
+    "chain",
+    "parser"
+   ],
+   "shared_terms": [
+    "rust",
+    "chain",
+    "parser"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q241"
+  },
+  {
+   "cid": "F076-cross-2",
+   "group": "G23",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "klever won't compile with an older rustc — which toolchain version is required?",
+   "gold": [
+    "F076"
+   ],
+   "query_terms": [
+    "klever",
+    "won",
+    "compil",
+    "older",
+    "rustc",
+    "toolchain",
+    "version",
+    "requir"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F076"
+   ],
+   "id": "Q242"
+  },
+  {
+   "cid": "F078-cross-1",
+   "group": "G16",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "на glenrock после продления сертификата сайт всё ещё отдаёт старый, что нужно перезапустить?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "glenrock",
+    "продлен",
+    "сертификат",
+    "сайт",
+    "отда",
+    "стар",
+    "перезапуст"
+   ],
+   "shared_terms": [
+    "glenrock"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q243"
+  },
+  {
+   "cid": "F078-cross-2",
+   "group": "G16",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "когда acme.sh обновляет серт на glenrock и надо ли потом вручную дёргать nginx?",
+   "gold": [
+    "F078"
+   ],
+   "query_terms": [
+    "acm",
+    "sh",
+    "обновля",
+    "серт",
+    "glenrock",
+    "вручн",
+    "дерга",
+    "nginx"
+   ],
+   "shared_terms": [
+    "acm",
+    "sh",
+    "glenrock",
+    "nginx"
+   ],
+   "overlap": 4,
+   "checker_answers": [
+    "F078"
+   ],
+   "id": "Q244"
+  },
+  {
+   "cid": "F079-cross-1",
+   "group": "G31",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "users still see stale stylesheets on zhavoronok after release, how long does the CDN hold them?",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "user",
+    "still",
+    "see",
+    "stale",
+    "stylesheet",
+    "zhavoronok",
+    "after",
+    "releas",
+    "long",
+    "cdn",
+    "hold"
+   ],
+   "shared_terms": [
+    "cdn"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q245"
+  },
+  {
+   "cid": "F079-cross-2",
+   "group": "G31",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "how do I flush the edge cache so visitors get the new styles right after shipping the site",
+   "gold": [
+    "F079"
+   ],
+   "query_terms": [
+    "flush",
+    "edg",
+    "cach",
+    "visitor",
+    "get",
+    "new",
+    "style",
+    "right",
+    "after",
+    "ship",
+    "site"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F079"
+   ],
+   "id": "Q246"
+  },
+  {
+   "cid": "F080-cross-1",
+   "group": "G30",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "orders report on the tsaplya database took about a minute, what index fixed it?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "order",
+    "report",
+    "tsaplya",
+    "databas",
+    "took",
+    "minut",
+    "index",
+    "fix"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q247"
+  },
+  {
+   "cid": "F080-cross-2",
+   "group": "G30",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "how did we speed up the slow per-customer orders query by date in tsaplya?",
+   "gold": [
+    "F080"
+   ],
+   "query_terms": [
+    "speed",
+    "slow",
+    "custom",
+    "order",
+    "queri",
+    "date",
+    "tsaplya"
+   ],
+   "shared_terms": [
+    "custom"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F080"
+   ],
+   "id": "Q248"
+  },
+  {
+   "cid": "F083-cross-1",
+   "group": "G15",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "bramble падает сразу при запуске с ошибкой про текстуру после клонирования — в чём дело?",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "brambl",
+    "пада",
+    "сраз",
+    "запуск",
+    "ошибк",
+    "текстур",
+    "клонирован",
+    "дел"
+   ],
+   "shared_terms": [
+    "brambl"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q249"
+  },
+  {
+   "cid": "F083-cross-2",
+   "group": "G15",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "почему после git clone в assets вместо картинок лежат маленькие текстовые файлы?",
+   "gold": [
+    "F083"
+   ],
+   "query_terms": [
+    "поч",
+    "git",
+    "clone",
+    "asset",
+    "вмест",
+    "картинок",
+    "лежат",
+    "маленьк",
+    "текстов",
+    "файл"
+   ],
+   "shared_terms": [
+    "git",
+    "clone",
+    "asset"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F083"
+   ],
+   "id": "Q250"
+  },
+  {
+   "cid": "F086-cross-1",
+   "group": "G02",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Сборка Android-приложения Larkspur в CI падает с кодом 137, на каком раннере её запускать?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "сборк",
+    "android",
+    "приложен",
+    "larkspur",
+    "ci",
+    "пада",
+    "код",
+    "как",
+    "раннер"
+   ],
+   "shared_terms": [
+    "android",
+    "larkspur",
+    "ci"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q251"
+  },
+  {
+   "cid": "F086-cross-2",
+   "group": "G02",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Мобильному пайплайну Larkspur не хватает памяти, какой тег раннера прописать в джобе?",
+   "gold": [
+    "F086"
+   ],
+   "query_terms": [
+    "мобильн",
+    "пайплайн",
+    "larkspur",
+    "хвата",
+    "памят",
+    "тег",
+    "раннер",
+    "прописа",
+    "джоб"
+   ],
+   "shared_terms": [
+    "larkspur"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F086"
+   ],
+   "id": "Q252"
+  },
+  {
+   "cid": "F088-cross-1",
+   "group": "G24",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "soroka proxy drops connection right after TLS handshake from a new host, no error logged",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "soroka",
+    "proxi",
+    "drop",
+    "connect",
+    "right",
+    "after",
+    "tls",
+    "handshak",
+    "new",
+    "host",
+    "error",
+    "log"
+   ],
+   "shared_terms": [
+    "soroka",
+    "tls"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q253"
+  },
+  {
+   "cid": "F088-cross-2",
+   "group": "G24",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "where do I allowlist a new IP for the soroka proxy?",
+   "gold": [
+    "F088"
+   ],
+   "query_terms": [
+    "allowlist",
+    "new",
+    "ip",
+    "soroka",
+    "proxi"
+   ],
+   "shared_terms": [
+    "soroka"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F088"
+   ],
+   "id": "Q254"
+  },
+  {
+   "cid": "F089-cross-1",
+   "group": "G08",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "куда приходят алерты с Prometheus на heron?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "приход",
+    "алерт",
+    "prometheus",
+    "heron"
+   ],
+   "shared_terms": [
+    "prometheus",
+    "heron"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q255"
+  },
+  {
+   "cid": "F089-cross-2",
+   "group": "G08",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "почему перестали приходить уведомления мониторинга на почту?",
+   "gold": [
+    "F089"
+   ],
+   "query_terms": [
+    "поч",
+    "переста",
+    "приход",
+    "уведомлен",
+    "мониторинг",
+    "почт"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F089"
+   ],
+   "id": "Q256"
+  },
+  {
+   "cid": "F091-cross-1",
+   "group": "G22",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "pugovka bot stays silent after I added it to a new group chat, how do I whitelist the group?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "pugovka",
+    "bot",
+    "stay",
+    "silent",
+    "after",
+    "ad",
+    "new",
+    "group",
+    "chat",
+    "whitelist"
+   ],
+   "shared_terms": [
+    "chat"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q257"
+  },
+  {
+   "cid": "F091-cross-2",
+   "group": "G22",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "where is the chat whitelist for the pugovka bot configured and does changing it need a restart?",
+   "gold": [
+    "F091"
+   ],
+   "query_terms": [
+    "chat",
+    "whitelist",
+    "pugovka",
+    "bot",
+    "configur",
+    "chang",
+    "need",
+    "restart"
+   ],
+   "shared_terms": [
+    "chat"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F091"
+   ],
+   "id": "Q258"
+  },
+  {
+   "cid": "F092-cross-1",
+   "group": "G39",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "Print jobs from my Mac to the office printer mysh just sit in the queue with no error, which driver works?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "print",
+    "job",
+    "mac",
+    "offic",
+    "printer",
+    "mysh",
+    "sit",
+    "queue",
+    "error",
+    "driver",
+    "work"
+   ],
+   "shared_terms": [
+    "mac"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q259"
+  },
+  {
+   "cid": "F092-cross-2",
+   "group": "G39",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "Vendor driver for the mysh printer hangs on macOS, what should I use instead?",
+   "gold": [
+    "F092"
+   ],
+   "query_terms": [
+    "vendor",
+    "driver",
+    "mysh",
+    "printer",
+    "hang",
+    "maco",
+    "use",
+    "instead"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F092"
+   ],
+   "id": "Q260"
+  },
+  {
+   "cid": "F096-cross-1",
+   "group": "G07",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Когда ставить тег на релиз Kestrel: до мержа ченджлога или после?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "став",
+    "тег",
+    "релиз",
+    "kestrel",
+    "мерж",
+    "ченджлог"
+   ],
+   "shared_terms": [
+    "kestrel"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q261"
+  },
+  {
+   "cid": "F096-cross-2",
+   "group": "G07",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Почему при выпуске новой версии Kestrel публикация подхватила старый CHANGELOG?",
+   "gold": [
+    "F096"
+   ],
+   "query_terms": [
+    "поч",
+    "выпуск",
+    "нов",
+    "верс",
+    "kestrel",
+    "публикац",
+    "подхват",
+    "стар",
+    "changelog"
+   ],
+   "shared_terms": [
+    "kestrel",
+    "changelog"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F096"
+   ],
+   "id": "Q262"
+  },
+  {
+   "cid": "F100-cross-1",
+   "group": "G33",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "kopilka payment webhooks failing with 401 after rotating the secret",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "kopilka",
+    "payment",
+    "webhook",
+    "fail",
+    "after",
+    "rotat",
+    "secret"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q263"
+  },
+  {
+   "cid": "F100-cross-2",
+   "group": "G33",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "queued payment provider callbacks rejected as unauthorized after signing key rotation in the savings service",
+   "gold": [
+    "F100"
+   ],
+   "query_terms": [
+    "queu",
+    "payment",
+    "provid",
+    "callback",
+    "reject",
+    "unauthor",
+    "after",
+    "sign",
+    "key",
+    "rotat",
+    "save",
+    "servic"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F100"
+   ],
+   "id": "Q264"
+  },
+  {
+   "cid": "F103-cross-1",
+   "group": "G28",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "emails from the perepelka domain keep landing in Gmail spam even though SPF and DKIM are set up — what's missing?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "email",
+    "perepelka",
+    "domain",
+    "keep",
+    "land",
+    "gmail",
+    "spam",
+    "even",
+    "though",
+    "spf",
+    "dkim",
+    "set",
+    "miss"
+   ],
+   "shared_terms": [
+    "gmail",
+    "spf",
+    "dkim"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q265"
+  },
+  {
+   "cid": "F103-cross-2",
+   "group": "G28",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "which DNS record do we still need so Google stops sending our outgoing mail to junk?",
+   "gold": [
+    "F103"
+   ],
+   "query_terms": [
+    "dns",
+    "record",
+    "still",
+    "need",
+    "googl",
+    "stop",
+    "send",
+    "outgo",
+    "mail",
+    "junk"
+   ],
+   "shared_terms": [
+    "dns"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F103"
+   ],
+   "id": "Q266"
+  },
+  {
+   "cid": "F105-cross-1",
+   "group": "G38",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "strekoza v2: what does Parse do with an empty string now?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "strekoza",
+    "v2",
+    "pars",
+    "empti",
+    "string",
+    "now"
+   ],
+   "shared_terms": [
+    "pars"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q267"
+  },
+  {
+   "cid": "F105-cross-2",
+   "group": "G38",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "en",
+   "fact_lang": "ru",
+   "text": "after upgrading strekoza to 2.x, parsing blank input started failing instead of giving a zero struct — what changed?",
+   "gold": [
+    "F105"
+   ],
+   "query_terms": [
+    "after",
+    "upgrad",
+    "strekoza",
+    "pars",
+    "blank",
+    "input",
+    "start",
+    "fail",
+    "instead",
+    "give",
+    "zero",
+    "struct",
+    "chang"
+   ],
+   "shared_terms": [
+    "pars"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F105"
+   ],
+   "id": "Q268"
+  },
+  {
+   "cid": "F106-cross-1",
+   "group": "G19",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "на osprey не подписываются коммиты через gpg, ошибка про ioctl — что сделать?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "osprey",
+    "подписыва",
+    "коммит",
+    "gpg",
+    "ошибк",
+    "ioctl"
+   ],
+   "shared_terms": [
+    "osprey",
+    "gpg",
+    "ioctl"
+   ],
+   "overlap": 3,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q269"
+  },
+  {
+   "cid": "F106-cross-2",
+   "group": "G19",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "на сборочном маке pinentry не видит терминал при подписи коммита, что прописать в профиле?",
+   "gold": [
+    "F106"
+   ],
+   "query_terms": [
+    "сборочн",
+    "мак",
+    "pinentri",
+    "вид",
+    "термина",
+    "подпис",
+    "коммит",
+    "прописа",
+    "профил"
+   ],
+   "shared_terms": [],
+   "overlap": 0,
+   "checker_answers": [
+    "F106"
+   ],
+   "id": "Q270"
+  },
+  {
+   "cid": "F110-cross-1",
+   "group": "G03",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Почему реплика на fernhill ночью отстаёт и откуда тогда брать свежие данные для отчётов?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "поч",
+    "реплик",
+    "fernhil",
+    "ноч",
+    "отста",
+    "откуд",
+    "брат",
+    "свеж",
+    "дан",
+    "отчет"
+   ],
+   "shared_terms": [
+    "fernhil"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q271"
+  },
+  {
+   "cid": "F110-cross-2",
+   "group": "G03",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Ночные выгрузки показывают устаревшие данные с реплики Postgres во время VACUUM — куда их перенаправить?",
+   "gold": [
+    "F110"
+   ],
+   "query_terms": [
+    "ночн",
+    "выгрузк",
+    "показыва",
+    "устаревш",
+    "дан",
+    "реплик",
+    "postgr",
+    "врем",
+    "vacuum",
+    "перенаправ"
+   ],
+   "shared_terms": [
+    "vacuum"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F110"
+   ],
+   "id": "Q272"
+  },
+  {
+   "cid": "F116-cross-1",
+   "group": "G06",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "Как на wren поднять Colima и сколько ей выделить ядер и памяти?",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "wren",
+    "подня",
+    "colima",
+    "скольк",
+    "выдел",
+    "ядер",
+    "памят"
+   ],
+   "shared_terms": [
+    "wren",
+    "colima"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q273"
+  },
+  {
+   "cid": "F116-cross-2",
+   "group": "G06",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "На ноутбуке нет Docker Desktop: через что работает docker и какой контекст выбрать?",
+   "gold": [
+    "F116"
+   ],
+   "query_terms": [
+    "ноутбук",
+    "docker",
+    "desktop",
+    "работа",
+    "контекст",
+    "выбра"
+   ],
+   "shared_terms": [
+    "docker",
+    "desktop"
+   ],
+   "overlap": 2,
+   "checker_answers": [
+    "F116"
+   ],
+   "id": "Q274"
+  },
+  {
+   "cid": "F119-cross-1",
+   "group": "G14",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "почему на nettlefield утренний отчёт по крону приходит на час-два позже, чем надо?",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "поч",
+    "nettlefield",
+    "утрен",
+    "отчет",
+    "крон",
+    "приход",
+    "час",
+    "позж"
+   ],
+   "shared_terms": [
+    "nettlefield"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q275"
+  },
+  {
+   "cid": "F119-cross-2",
+   "group": "G14",
+   "stratum": "cross",
+   "intent": "cross",
+   "lang": "ru",
+   "fact_lang": "en",
+   "text": "в каком часовом поясе работает планировщик на nettlefield, задачи сдвинуты относительно берлинского времени",
+   "gold": [
+    "F119"
+   ],
+   "query_terms": [
+    "как",
+    "часов",
+    "пояс",
+    "работа",
+    "планировщик",
+    "nettlefield",
+    "задач",
+    "сдвинут",
+    "относительн",
+    "берлинск",
+    "времен"
+   ],
+   "shared_terms": [
+    "nettlefield"
+   ],
+   "overlap": 1,
+   "checker_answers": [
+    "F119"
+   ],
+   "id": "Q276"
+  },
+  {
+   "cid": "G01-negative-1",
+   "group": "G01",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "where is the restic repository for brackwater /srv/photos backups stored (repo URL or target path)?",
+   "gold": [],
+   "query_terms": [
+    "restic",
+    "repositori",
+    "brackwat",
+    "srv",
+    "photo",
+    "backup",
+    "store",
+    "repo",
+    "url",
+    "target",
+    "path"
+   ],
+   "shared_terms": [
+    "restic",
+    "brackwat",
+    "srv",
+    "photo",
+    "backup"
+   ],
+   "overlap": 5,
+   "checker_answers": [],
+   "id": "Q277"
+  },
+  {
+   "cid": "G02-negative-1",
+   "group": "G02",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "Larkspur CI maximum job timeout for Android Gradle builds",
+   "gold": [],
+   "query_terms": [
+    "larkspur",
+    "ci",
+    "maximum",
+    "job",
+    "timeout",
+    "android",
+    "gradl",
+    "build"
+   ],
+   "shared_terms": [
+    "larkspur",
+    "ci",
+    "job",
+    "android",
+    "gradl",
+    "build"
+   ],
+   "overlap": 6,
+   "checker_answers": [],
+   "id": "Q278"
+  },
+  {
+   "cid": "G03-negative-1",
+   "group": "G03",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which user and password does the fernhill replica use to authenticate to the primary for streaming replication",
+   "gold": [],
+   "query_terms": [
+    "user",
+    "password",
+    "fernhil",
+    "replica",
+    "use",
+    "authent",
+    "primari",
+    "stream",
+    "replic"
+   ],
+   "shared_terms": [
+    "fernhil",
+    "replica",
+    "use",
+    "primari",
+    "replic"
+   ],
+   "overlap": 5,
+   "checker_answers": [],
+   "id": "Q279"
+  },
+  {
+   "cid": "G04-negative-1",
+   "group": "G04",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which port does the tallow API listen on by default when tallow.yaml sets no listen address",
+   "gold": [],
+   "query_terms": [
+    "port",
+    "tallow",
+    "api",
+    "listen",
+    "default",
+    "yaml",
+    "set",
+    "address"
+   ],
+   "shared_terms": [
+    "tallow",
+    "api",
+    "listen",
+    "address"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q280"
+  },
+  {
+   "cid": "G05-negative-1",
+   "group": "G05",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which DKIM selector is published for mail.orchardlane.net",
+   "gold": [],
+   "query_terms": [
+    "dkim",
+    "selector",
+    "publish",
+    "mail",
+    "orchardlan",
+    "net"
+   ],
+   "shared_terms": [
+    "mail",
+    "orchardlan",
+    "net"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q281"
+  },
+  {
+   "cid": "G06-negative-1",
+   "group": "G06",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which vmType does Colima use on wren, vz or qemu, and is Rosetta enabled for amd64 images?",
+   "gold": [],
+   "query_terms": [
+    "vmtype",
+    "colima",
+    "use",
+    "wren",
+    "vz",
+    "qemu",
+    "rosetta",
+    "enabl",
+    "amd64",
+    "imag"
+   ],
+   "shared_terms": [
+    "colima",
+    "wren",
+    "imag"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q282"
+  },
+  {
+   "cid": "G07-negative-1",
+   "group": "G07",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What staged rollout percentage does Kestrel use when a new release goes out to the store?",
+   "gold": [],
+   "query_terms": [
+    "stage",
+    "rollout",
+    "percentag",
+    "kestrel",
+    "use",
+    "new",
+    "releas",
+    "goe",
+    "store"
+   ],
+   "shared_terms": [
+    "kestrel",
+    "releas",
+    "store"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q283"
+  },
+  {
+   "cid": "G08-negative-1",
+   "group": "G08",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which disk path or volume does the heron Prometheus store its TSDB data on",
+   "gold": [],
+   "query_terms": [
+    "disk",
+    "path",
+    "volum",
+    "heron",
+    "prometheus",
+    "store",
+    "tsdb",
+    "data"
+   ],
+   "shared_terms": [
+    "heron",
+    "prometheus",
+    "data"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q284"
+  },
+  {
+   "cid": "G09-negative-1",
+   "group": "G09",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "marlow minimum test coverage threshold enforced in CI",
+   "gold": [],
+   "query_terms": [
+    "marlow",
+    "minimum",
+    "test",
+    "coverag",
+    "threshold",
+    "enforc",
+    "ci"
+   ],
+   "shared_terms": [
+    "marlow",
+    "test"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q285"
+  },
+  {
+   "cid": "G10-negative-1",
+   "group": "G10",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "what MTU should the WireGuard interface on quarry use",
+   "gold": [],
+   "query_terms": [
+    "mtu",
+    "wireguard",
+    "interfac",
+    "quarri",
+    "use"
+   ],
+   "shared_terms": [
+    "wireguard",
+    "quarri"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q286"
+  },
+  {
+   "cid": "G11-negative-1",
+   "group": "G11",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which Node.js version is pinned for the pippin web app CI pipeline",
+   "gold": [],
+   "query_terms": [
+    "node",
+    "js",
+    "version",
+    "pin",
+    "pippin",
+    "web",
+    "app",
+    "ci",
+    "pipelin"
+   ],
+   "shared_terms": [
+    "pippin",
+    "web",
+    "app",
+    "ci"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q287"
+  },
+  {
+   "cid": "G12-negative-1",
+   "group": "G12",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "moorgate SSH host key fingerprint to verify on first connect",
+   "gold": [],
+   "query_terms": [
+    "moorgat",
+    "ssh",
+    "host",
+    "key",
+    "fingerprint",
+    "verifi",
+    "first",
+    "connect"
+   ],
+   "shared_terms": [
+    "moorgat",
+    "ssh",
+    "host",
+    "connect"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q288"
+  },
+  {
+   "cid": "G13-negative-1",
+   "group": "G13",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "What replication factor and min.insync.replicas are set for the orders.v2 topic on the saltmarsh Kafka cluster?",
+   "gold": [],
+   "query_terms": [
+    "replic",
+    "factor",
+    "min",
+    "insync",
+    "replica",
+    "set",
+    "order",
+    "v2",
+    "topic",
+    "saltmarsh",
+    "kafka",
+    "cluster"
+   ],
+   "shared_terms": [
+    "order",
+    "v2",
+    "topic",
+    "saltmarsh",
+    "kafka"
+   ],
+   "overlap": 5,
+   "checker_answers": [],
+   "id": "Q289"
+  },
+  {
+   "cid": "G14-negative-1",
+   "group": "G14",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "nettlefield cron job failure alert MAILTO recipient",
+   "gold": [],
+   "query_terms": [
+    "nettlefield",
+    "cron",
+    "job",
+    "failur",
+    "alert",
+    "mailto",
+    "recipi"
+   ],
+   "shared_terms": [
+    "nettlefield",
+    "cron",
+    "job"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q290"
+  },
+  {
+   "cid": "G15-negative-1",
+   "group": "G15",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "how to authenticate git-lfs against lfs.bramble-fiction.dev (credentials or token setup)",
+   "gold": [],
+   "query_terms": [
+    "authent",
+    "git",
+    "lfs",
+    "against",
+    "brambl",
+    "fiction",
+    "dev",
+    "credenti",
+    "token",
+    "setup"
+   ],
+   "shared_terms": [
+    "lfs",
+    "brambl",
+    "fiction",
+    "dev"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q291"
+  },
+  {
+   "cid": "G16-negative-1",
+   "group": "G16",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which DNS provider API token does acme.sh use for the DNS-01 challenge on glenrock and where is it stored",
+   "gold": [],
+   "query_terms": [
+    "dns",
+    "provid",
+    "api",
+    "token",
+    "acm",
+    "sh",
+    "use",
+    "challeng",
+    "glenrock",
+    "store",
+    "tkdns01"
+   ],
+   "shared_terms": [
+    "acm",
+    "sh",
+    "glenrock"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q292"
+  },
+  {
+   "cid": "G17-negative-1",
+   "group": "G17",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "tessera partner API webhook signature verification secret header",
+   "gold": [],
+   "query_terms": [
+    "tessera",
+    "partner",
+    "api",
+    "webhook",
+    "signatur",
+    "verif",
+    "secret",
+    "header"
+   ],
+   "shared_terms": [
+    "tessera",
+    "partner",
+    "api"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q293"
+  },
+  {
+   "cid": "G18-negative-1",
+   "group": "G18",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "how does lindel stop two pods from running goose migrations at the same time during a rollout",
+   "gold": [],
+   "query_terms": [
+    "lindel",
+    "stop",
+    "two",
+    "pod",
+    "run",
+    "goos",
+    "migrat",
+    "time",
+    "during",
+    "rollout"
+   ],
+   "shared_terms": [
+    "lindel",
+    "pod",
+    "run",
+    "goos",
+    "migrat"
+   ],
+   "overlap": 5,
+   "checker_answers": [],
+   "id": "Q294"
+  },
+  {
+   "cid": "G19-negative-1",
+   "group": "G19",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "which pinentry program does gpg-agent use on osprey",
+   "gold": [],
+   "query_terms": [
+    "pinentri",
+    "program",
+    "gpg",
+    "agent",
+    "use",
+    "osprey"
+   ],
+   "shared_terms": [
+    "gpg",
+    "agent",
+    "osprey"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q295"
+  },
+  {
+   "cid": "G20-negative-1",
+   "group": "G20",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "en",
+   "fact_lang": "en",
+   "text": "ambergate object storage S3 endpoint URL and region name for client config",
+   "gold": [],
+   "query_terms": [
+    "amberg",
+    "object",
+    "storag",
+    "s3",
+    "endpoint",
+    "url",
+    "region",
+    "name",
+    "client",
+    "config"
+   ],
+   "shared_terms": [
+    "amberg",
+    "object",
+    "storag"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q296"
+  },
+  {
+   "cid": "G21-negative-1",
+   "group": "G21",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "куда копируются дампы crm с ольховки на внешний сервер или в S3",
+   "gold": [],
+   "query_terms": [
+    "копир",
+    "дамп",
+    "crm",
+    "ольховк",
+    "внешн",
+    "сервер",
+    "s3"
+   ],
+   "shared_terms": [
+    "дамп",
+    "crm",
+    "ольховк",
+    "сервер"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q297"
+  },
+  {
+   "cid": "G22-negative-1",
+   "group": "G22",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "куда и как часто бэкапится база бота пуговка",
+   "gold": [],
+   "query_terms": [
+    "част",
+    "бэкап",
+    "баз",
+    "бот",
+    "пуговк"
+   ],
+   "shared_terms": [
+    "бот",
+    "пуговк"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q298"
+  },
+  {
+   "cid": "G23-negative-1",
+   "group": "G23",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какие cargo features включать при сборке клевер для прода",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "cargo",
+    "featur",
+    "включа",
+    "сборк",
+    "клевер",
+    "прод"
+   ],
+   "shared_terms": [
+    "включа",
+    "сборк",
+    "клевер"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q299"
+  },
+  {
+   "cid": "G24-negative-1",
+   "group": "G24",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "где лежит TLS-сертификат прокси сорока и как его продлить",
+   "gold": [],
+   "query_terms": [
+    "леж",
+    "tls",
+    "сертификат",
+    "прокс",
+    "сорок",
+    "продл"
+   ],
+   "shared_terms": [
+    "tls",
+    "прокс",
+    "сорок"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q300"
+  },
+  {
+   "cid": "G25-negative-1",
+   "group": "G25",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "по какому адресу и порту открывается веб-интерфейс NAS бобр",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "адрес",
+    "порт",
+    "открыва",
+    "веб",
+    "интерфейс",
+    "nas",
+    "бобр"
+   ],
+   "shared_terms": [
+    "nas",
+    "бобр"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q301"
+  },
+  {
+   "cid": "G26-negative-1",
+   "group": "G26",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "по каким labels в Loki фильтровать логи сервиса гречка",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "label",
+    "loki",
+    "фильтрова",
+    "лог",
+    "сервис",
+    "гречк"
+   ],
+   "shared_terms": [
+    "loki",
+    "лог",
+    "сервис",
+    "гречк"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q302"
+  },
+  {
+   "cid": "G27-negative-1",
+   "group": "G27",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой storage class по умолчанию в кластере ласточка для PersistentVolumeClaim",
+   "gold": [],
+   "query_terms": [
+    "storag",
+    "class",
+    "умолчан",
+    "кластер",
+    "ласточк",
+    "persistentvolumeclaim"
+   ],
+   "shared_terms": [
+    "кластер",
+    "ласточк"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q303"
+  },
+  {
+   "cid": "G28-negative-1",
+   "group": "G28",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "на каком порту перепёлка отдаёт почту по IMAP и нужен ли там SSL",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "порт",
+    "перепелк",
+    "отда",
+    "почт",
+    "imap",
+    "ssl"
+   ],
+   "shared_terms": [
+    "порт",
+    "перепелк"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q304"
+  },
+  {
+   "cid": "G29-negative-1",
+   "group": "G29",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой targetSdk у приложения ёжик",
+   "gold": [],
+   "query_terms": [
+    "targetsdk",
+    "приложен",
+    "ежик"
+   ],
+   "shared_terms": [
+    "приложен",
+    "ежик"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q305"
+  },
+  {
+   "cid": "G30-negative-1",
+   "group": "G30",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "цапля orders: через сколько месяцев старые партиции отсоединяют или удаляют",
+   "gold": [],
+   "query_terms": [
+    "цапл",
+    "order",
+    "скольк",
+    "месяц",
+    "стар",
+    "партиц",
+    "отсоединя",
+    "удаля"
+   ],
+   "shared_terms": [
+    "цапл",
+    "order",
+    "месяц",
+    "партиц"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q306"
+  },
+  {
+   "cid": "G31-negative-1",
+   "group": "G31",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какая версия Hugo закреплена для сборки сайта жаворонок",
+   "gold": [],
+   "query_terms": [
+    "верс",
+    "hugo",
+    "закрепл",
+    "сборк",
+    "сайт",
+    "жаворонок"
+   ],
+   "shared_terms": [
+    "hugo",
+    "сайт",
+    "жаворонок"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q307"
+  },
+  {
+   "cid": "G32-negative-1",
+   "group": "G32",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой порог заряда батареи выставлен на ноутбуке крот и где он настраивается",
+   "gold": [],
+   "query_terms": [
+    "порог",
+    "заряд",
+    "батар",
+    "выставл",
+    "ноутбук",
+    "крот",
+    "настраива"
+   ],
+   "shared_terms": [
+    "ноутбук",
+    "крот"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q308"
+  },
+  {
+   "cid": "G33-negative-1",
+   "group": "G33",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "каким алгоритмом считается подпись X-Signature у вебхуков в копилке",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "алгоритм",
+    "счита",
+    "подп",
+    "signatur",
+    "вебхук",
+    "копилк"
+   ],
+   "shared_terms": [
+    "signatur",
+    "вебхук",
+    "копилк"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q309"
+  },
+  {
+   "cid": "G34-negative-1",
+   "group": "G34",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "на каком порту слушает Grafana на филине",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "порт",
+    "слуша",
+    "grafana",
+    "филин"
+   ],
+   "shared_terms": [
+    "grafana",
+    "филин"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q310"
+  },
+  {
+   "cid": "G35-negative-1",
+   "group": "G35",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "под каким UID запускается процесс в Docker-образе пчелы",
+   "gold": [],
+   "query_terms": [
+    "как",
+    "uid",
+    "процесс",
+    "docker",
+    "образ",
+    "пчел"
+   ],
+   "shared_terms": [
+    "docker",
+    "образ",
+    "пчел"
+   ],
+   "overlap": 3,
+   "checker_answers": [],
+   "id": "Q311"
+  },
+  {
+   "cid": "G36-negative-1",
+   "group": "G36",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой таймаут на выполнение одной задачи у воркера трамвай",
+   "gold": [],
+   "query_terms": [
+    "таймаут",
+    "выполнен",
+    "одн",
+    "задач",
+    "воркер",
+    "трамва"
+   ],
+   "shared_terms": [
+    "одн",
+    "задач",
+    "воркер",
+    "трамва"
+   ],
+   "overlap": 4,
+   "checker_answers": [],
+   "id": "Q312"
+  },
+  {
+   "cid": "G37-negative-1",
+   "group": "G37",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какая версия прошивки стоит на роутере чайка",
+   "gold": [],
+   "query_terms": [
+    "верс",
+    "прошивк",
+    "сто",
+    "роутер",
+    "чайк"
+   ],
+   "shared_terms": [
+    "роутер",
+    "чайк"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q313"
+  },
+  {
+   "cid": "G38-negative-1",
+   "group": "G38",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "какой лицензией распространяется библиотека стрекоза",
+   "gold": [],
+   "query_terms": [
+    "лиценз",
+    "распространя",
+    "библиотек",
+    "стрекоз"
+   ],
+   "shared_terms": [
+    "библиотек",
+    "стрекоз"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q314"
+  },
+  {
+   "cid": "G39-negative-1",
+   "group": "G39",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "как настроить на принтере мышь сканирование в почту",
+   "gold": [],
+   "query_terms": [
+    "настро",
+    "принтер",
+    "мыш",
+    "сканирован",
+    "почт"
+   ],
+   "shared_terms": [
+    "принтер",
+    "мыш"
+   ],
+   "overlap": 2,
+   "checker_answers": [],
+   "id": "Q315"
+  },
+  {
+   "cid": "G40-negative-1",
+   "group": "G40",
+   "stratum": "negative",
+   "intent": "negative",
+   "lang": "ru",
+   "fact_lang": "ru",
+   "text": "где лежит API-токен Unleash, которым сервис луковица читает флаги функций",
+   "gold": [],
+   "query_terms": [
+    "леж",
+    "api",
+    "ток",
+    "unleash",
+    "котор",
+    "сервис",
+    "луковиц",
+    "чита",
+    "флаг",
+    "функц"
+   ],
+   "shared_terms": [
+    "сервис",
+    "луковиц",
+    "чита",
+    "флаг",
+    "функц"
+   ],
+   "overlap": 5,
+   "checker_answers": [],
+   "id": "Q316"
+  }
+ ]
+}

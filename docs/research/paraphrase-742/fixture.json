@@ -1,0 +1,846 @@
+{
+ "purpose": "memcue-742-paraphrase-fixture-v1",
+ "corpus": "memcue #742: authored fictional corpus. Each group is one subject: the first fact is the target, the other two are topical neighbours that differ in the detail a question about the target asks for. Hosts, services, people and domains are invented.",
+ "facts": [
+  {
+   "id": "F001",
+   "group": "G36",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Воркер трамвай повторяет упавшую задачу три раза, а потом кладёт её в очередь dead."
+  },
+  {
+   "id": "F002",
+   "group": "G10",
+   "lang": "en",
+   "role": "target",
+   "content": "The WireGuard tunnel to quarry drops every few minutes behind the office NAT unless PersistentKeepalive = 25 is set on the client peer."
+  },
+  {
+   "id": "F003",
+   "group": "G14",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Cron jobs on nettlefield are defined in the ansible role cron_jobs; an entry added with crontab -e is overwritten on the next run."
+  },
+  {
+   "id": "F004",
+   "group": "G09",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "In the marlow repository the unit tests run with pytest-xdist on four workers, and tests that touch the shared tmp directory must be marked serial."
+  },
+  {
+   "id": "F005",
+   "group": "G18",
+   "lang": "en",
+   "role": "target",
+   "content": "Migrations of the lindel service run with goose at startup, and a migration that takes longer than 60 seconds makes Kubernetes kill the pod before it finishes."
+  },
+  {
+   "id": "F006",
+   "group": "G40",
+   "lang": "ru",
+   "role": "target",
+   "content": "Флаги функций в сервисе луковица читаются при старте, поэтому включённый в панели флаг начинает действовать только после перезапуска подов."
+  },
+  {
+   "id": "F007",
+   "group": "G32",
+   "lang": "ru",
+   "role": "target",
+   "content": "На ноутбуке крот Wi-Fi пропадает после выхода из сна, пока в /etc/modprobe.d/iwlwifi.conf не отключено энергосбережение параметром power_save=0."
+  },
+  {
+   "id": "F008",
+   "group": "G07",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Kestrel publishes its release notes to the store in English and German; the German text lives in fastlane/metadata/de-DE."
+  },
+  {
+   "id": "F009",
+   "group": "G01",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Restoring a restic snapshot of /srv/photos on brackwater needs the password file /etc/restic/photos.pass, which only root can read."
+  },
+  {
+   "id": "F010",
+   "group": "G37",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На роутере чайка гостевая сеть изолирована от основной и не видит принтер."
+  },
+  {
+   "id": "F011",
+   "group": "G02",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Larkspur CI runners tagged arm-heavy are shared with the nightly benchmark, so jobs queue there between 01:00 and 04:00."
+  },
+  {
+   "id": "F012",
+   "group": "G15",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The bramble repository limits LFS objects to 200 MB each; bigger assets go to the bucket bramble-raw."
+  },
+  {
+   "id": "F013",
+   "group": "G40",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "У каждого флага функций в сервисе луковица в описании должны быть владелец и дата удаления."
+  },
+  {
+   "id": "F014",
+   "group": "G28",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Почтовые ящики на перепёлке ограничены 5 ГБ, и письма в заполненный ящик отбиваются с кодом 552."
+  },
+  {
+   "id": "F015",
+   "group": "G17",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Tokens for the tessera partner API expire after 30 days and are rotated through the vault path partners/tessera."
+  },
+  {
+   "id": "F016",
+   "group": "G08",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The heron Prometheus scrapes node exporters every 15 seconds, but the Postgres exporter only every 60 seconds to spare the database."
+  },
+  {
+   "id": "F017",
+   "group": "G12",
+   "lang": "en",
+   "role": "target",
+   "content": "SSH to moorgate works only through the jump host gate.moorgate-fiction.org on port 2202; the firewall drops direct connections."
+  },
+  {
+   "id": "F018",
+   "group": "G11",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The pippin web app uses pnpm, and a package-lock.json committed by mistake makes CI install with npm and fail on peer dependencies."
+  },
+  {
+   "id": "F019",
+   "group": "G20",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The ambergate object storage bucket media-prod has versioning on, so deleted files still count against its 2 TB quota."
+  },
+  {
+   "id": "F020",
+   "group": "G33",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Сервис копилка повторяет неудачный вебхук платёжной системы пять раз с интервалом десять минут."
+  },
+  {
+   "id": "F021",
+   "group": "G20",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Access keys of the ambergate object storage are per bucket: a key for media-prod gets AccessDenied on media-staging."
+  },
+  {
+   "id": "F022",
+   "group": "G25",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На NAS бобр массив собран в RAID 6 из шести дисков по 8 ТБ."
+  },
+  {
+   "id": "F023",
+   "group": "G29",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Приложение ёжик поддерживает Android начиная с 8.0, minSdk 26."
+  },
+  {
+   "id": "F024",
+   "group": "G30",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "В базе цапля статистика таблицы orders обновляется через ANALYZE каждую ночь в 04:00."
+  },
+  {
+   "id": "F025",
+   "group": "G31",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Сайт жаворонок собирается Hugo и деплоится в бакет site-zhavoronok."
+  },
+  {
+   "id": "F026",
+   "group": "G34",
+   "lang": "ru",
+   "role": "target",
+   "content": "Дашборды Grafana на филине открываются только через вход по SSO; локальный пользователь admin отключён, и его пароль не поможет."
+  },
+  {
+   "id": "F027",
+   "group": "G11",
+   "lang": "en",
+   "role": "target",
+   "content": "The pippin web app must be built with NODE_OPTIONS=--max-old-space-size=6144; with the default heap the production build of the map bundle crashes."
+  },
+  {
+   "id": "F028",
+   "group": "G27",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "В кластере ласточка три рабочих узла по 16 ГБ памяти, и под с запросом больше 12 ГБ не планируется."
+  },
+  {
+   "id": "F029",
+   "group": "G05",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Every orchardlane.net record has a TTL of 300 seconds, so a changed address reaches clients within five minutes."
+  },
+  {
+   "id": "F030",
+   "group": "G23",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "В проекте клевер release-сборка включает LTO, поэтому идёт около двенадцати минут против двух у debug-сборки."
+  },
+  {
+   "id": "F031",
+   "group": "G09",
+   "lang": "en",
+   "role": "target",
+   "content": "In the marlow repository the integration tests need Redis listening on port 6380, and 'make test' skips them silently when nothing listens there."
+  },
+  {
+   "id": "F032",
+   "group": "G21",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На сервере ольховка дампы базы crm хранятся в /backup/crm десять дней, более старые удаляет скрипт prune-dumps."
+  },
+  {
+   "id": "F033",
+   "group": "G05",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The orchardlane.net zone has Cloudflare proxying turned off for mail.orchardlane.net, because Cloudflare does not proxy SMTP."
+  },
+  {
+   "id": "F034",
+   "group": "G30",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "База цапля хранит заказы в таблице orders, разбитой на партиции по месяцам."
+  },
+  {
+   "id": "F035",
+   "group": "G29",
+   "lang": "ru",
+   "role": "target",
+   "content": "Приложение ёжик на Android 14 не показывает уведомления, пока пользователь не выдаст разрешение POST_NOTIFICATIONS; запрос появляется при первом открытии экрана настроек."
+  },
+  {
+   "id": "F036",
+   "group": "G26",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Логи сервиса гречка хранятся в Loki четырнадцать дней."
+  },
+  {
+   "id": "F037",
+   "group": "G13",
+   "lang": "en",
+   "role": "target",
+   "content": "Consumers of the saltmarsh Kafka topic orders.v2 must commit offsets by hand: auto-commit lost messages when a pod was killed in the middle of a batch."
+  },
+  {
+   "id": "F038",
+   "group": "G37",
+   "lang": "ru",
+   "role": "target",
+   "content": "На роутере чайка проброс порта 25565 для игрового сервера ведёт на адрес 192.168.1.40, поэтому сервер должен получать этот адрес по резервированию DHCP."
+  },
+  {
+   "id": "F039",
+   "group": "G28",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Почтовый сервер перепёлка принимает отправку по SMTP только на порту 587 со STARTTLS."
+  },
+  {
+   "id": "F040",
+   "group": "G14",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Cron jobs on nettlefield write their output to /var/log/cron-jobs/<name>.log, which logrotate keeps for ten days."
+  },
+  {
+   "id": "F041",
+   "group": "G20",
+   "lang": "en",
+   "role": "target",
+   "content": "Uploads of files larger than 5 GB to the ambergate object storage fail with EntityTooLarge, because the old uploader script sends a single PUT instead of a multipart upload."
+  },
+  {
+   "id": "F042",
+   "group": "G10",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "New WireGuard peers on quarry get addresses from 10.66.0.0/24, and every peer's address is recorded in /etc/wireguard/peers.md."
+  },
+  {
+   "id": "F043",
+   "group": "G06",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On wren the Colima VM keeps its images on a 100 GB disk, and 'colima prune' frees it when builds fail with 'no space left on device'."
+  },
+  {
+   "id": "F044",
+   "group": "G36",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Воркер трамвай запущен в двух экземплярах, и задачи с одним ключом обрабатываются по порядку."
+  },
+  {
+   "id": "F045",
+   "group": "G26",
+   "lang": "ru",
+   "role": "target",
+   "content": "Сервис гречка пишет логи в JSON только при LOG_FORMAT=json; без этой переменной он пишет обычный текст, и Loki не разбирает поля."
+  },
+  {
+   "id": "F046",
+   "group": "G39",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Офисный принтер мышь стоит на третьем этаже у переговорной, его адрес в сети 10.2.3.15."
+  },
+  {
+   "id": "F047",
+   "group": "G34",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Grafana на филине берёт данные из Prometheus и Loki на том же хосте."
+  },
+  {
+   "id": "F048",
+   "group": "G24",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Прокси сорока пишет журнал в /var/log/soroka.log и ротирует его раз в неделю."
+  },
+  {
+   "id": "F049",
+   "group": "G19",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On osprey gpg-agent caches the GPG passphrase for eight hours, set by default-cache-ttl 28800 in gpg-agent.conf."
+  },
+  {
+   "id": "F050",
+   "group": "G24",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Прокси сорока слушает порт 8443, потому что порт 443 на том же хосте занят веб-сервером."
+  },
+  {
+   "id": "F051",
+   "group": "G35",
+   "lang": "ru",
+   "role": "target",
+   "content": "Docker-образ сервиса пчела собирается в два этапа, git в финальный образ не попадает, поэтому команда version в контейнере показывает unknown, если при сборке не передать BUILD_SHA."
+  },
+  {
+   "id": "F052",
+   "group": "G16",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On glenrock the TLS private keys live in /etc/ssl/glenrock with mode 600, and nginx fails to start when a key is world-readable."
+  },
+  {
+   "id": "F053",
+   "group": "G05",
+   "lang": "en",
+   "role": "target",
+   "content": "Records under orchardlane.net are managed in the terraform repository dns-orchard; a record added by hand in the Cloudflare dashboard is deleted on the next apply."
+  },
+  {
+   "id": "F054",
+   "group": "G21",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На сервере ольховка дамп базы crm снимается каждую ночь в 01:15 по таймеру systemd crm-dump.timer."
+  },
+  {
+   "id": "F055",
+   "group": "G01",
+   "lang": "en",
+   "role": "target",
+   "content": "On brackwater the nightly restic backup of /srv/photos starts at 03:40 from the systemd timer photos-backup.timer, after the Immich database dump has finished."
+  },
+  {
+   "id": "F056",
+   "group": "G22",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Токен бота пуговка лежит в секрете pugovka-token; после перевыпуска токена в BotFather старый перестаёт работать сразу."
+  },
+  {
+   "id": "F057",
+   "group": "G39",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Картриджи для офисного принтера мышь заказывает офис-менеджер, запас лежит в шкафу у кухни."
+  },
+  {
+   "id": "F058",
+   "group": "G33",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Сервис копилка хранит суммы платежей в копейках, целыми числами."
+  },
+  {
+   "id": "F059",
+   "group": "G34",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Дашборды Grafana на филине хранятся в репозитории dashboards и раскатываются через provisioning."
+  },
+  {
+   "id": "F060",
+   "group": "G25",
+   "lang": "ru",
+   "role": "target",
+   "content": "На NAS бобр диск в третьем отсеке с прошлого месяца выдаёт ошибки SMART, а запасной диск на 8 ТБ лежит в серверном шкафу на верхней полке."
+  },
+  {
+   "id": "F061",
+   "group": "G29",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Приложение ёжик хранит настройки в DataStore, а старые SharedPreferences переносятся при первом запуске новой версии."
+  },
+  {
+   "id": "F062",
+   "group": "G22",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Бот пуговка хранит историю диалогов в SQLite-файле /data/pugovka.db, и файл растёт примерно на 50 МБ в месяц."
+  },
+  {
+   "id": "F063",
+   "group": "G21",
+   "lang": "ru",
+   "role": "target",
+   "content": "На сервере ольховка дамп базы crm снимается pg_dump в формате custom, поэтому восстанавливать его нужно через pg_restore, а не через psql."
+  },
+  {
+   "id": "F064",
+   "group": "G36",
+   "lang": "ru",
+   "role": "target",
+   "content": "Воркер трамвай берёт задачи из очереди по одной, и долгая задача экспорта задерживала все остальные, поэтому экспорт вынесли в отдельную очередь slow."
+  },
+  {
+   "id": "F065",
+   "group": "G17",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The tessera partner API returns prices as integer cents; dividing them by 100 in floats caused rounding errors in invoices."
+  },
+  {
+   "id": "F066",
+   "group": "G03",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Replication from the fernhill PostgreSQL primary to its replica uses the slot replica_fernhill; a dropped slot makes the replica stop with 'requested WAL segment has already been removed'."
+  },
+  {
+   "id": "F067",
+   "group": "G17",
+   "lang": "en",
+   "role": "target",
+   "content": "The tessera partner API allows 120 requests per minute per token and answers 429 with Retry-After in seconds; the client must wait exactly that long instead of backing off exponentially."
+  },
+  {
+   "id": "F068",
+   "group": "G27",
+   "lang": "ru",
+   "role": "target",
+   "content": "В кластере ласточка сервис типа LoadBalancer не получает внешний адрес, пока у него нет аннотации metallb.universe.tf/address-pool: public."
+  },
+  {
+   "id": "F069",
+   "group": "G13",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The saltmarsh Kafka topic orders.v2 has 24 partitions keyed by customer ID, so the orders of one customer stay in order."
+  },
+  {
+   "id": "F070",
+   "group": "G23",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Проект клевер собирается в CI с флагом --locked, и необновлённый Cargo.lock валит сборку."
+  },
+  {
+   "id": "F071",
+   "group": "G04",
+   "lang": "en",
+   "role": "target",
+   "content": "The tallow API reads its config from the path in TALLOW_CONFIG, and when the variable is unset it silently falls back to ./tallow.yaml in the working directory, not to /etc/tallow."
+  },
+  {
+   "id": "F072",
+   "group": "G07",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Kestrel release builds are signed with the key in the CI secret KESTREL_SIGNING_KEY; a local build is unsigned and cannot be installed over a store build."
+  },
+  {
+   "id": "F073",
+   "group": "G32",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На ноутбуке крот раскладка клавиатуры переключается по Caps Lock, это настроено в GNOME Tweaks."
+  },
+  {
+   "id": "F074",
+   "group": "G35",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Docker-образ сервиса пчела весит около 40 МБ и публикуется в registry.pchela-fiction.ru."
+  },
+  {
+   "id": "F075",
+   "group": "G35",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Docker-образ сервиса пчела основан на distroless: в контейнере нет shell, и отлаживать его приходится через ephemeral container."
+  },
+  {
+   "id": "F076",
+   "group": "G23",
+   "lang": "ru",
+   "role": "target",
+   "content": "Проект клевер собирается только на Rust 1.88 и новее: на более старом компиляторе сборка падает с ошибкой про let chains в модуле parser."
+  },
+  {
+   "id": "F077",
+   "group": "G02",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Larkspur CI caches the Gradle directory per branch, and a cache older than seven days is dropped before the job starts."
+  },
+  {
+   "id": "F078",
+   "group": "G16",
+   "lang": "en",
+   "role": "target",
+   "content": "The TLS certificate of glenrock is renewed by acme.sh on the 1st of each month, and nginx has to be reloaded by hand afterwards: on this host acme.sh does not do it."
+  },
+  {
+   "id": "F079",
+   "group": "G31",
+   "lang": "ru",
+   "role": "target",
+   "content": "После деплоя сайта жаворонок старые стили держатся у пользователей до суток, потому что CDN кэширует CSS на 24 часа; сбросить кэш можно командой purge в панели CDN."
+  },
+  {
+   "id": "F080",
+   "group": "G30",
+   "lang": "ru",
+   "role": "target",
+   "content": "Отчёт по заказам в базе цапля строился минуту, пока не добавили составной индекс по (customer_id, created_at); теперь запрос укладывается в 200 мс."
+  },
+  {
+   "id": "F081",
+   "group": "G10",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The WireGuard server on quarry listens on UDP port 51871, because the hosting provider blocks the default 51820."
+  },
+  {
+   "id": "F082",
+   "group": "G40",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Флаги функций сервиса луковица хранятся в Unleash, в проекте lukovitsa-prod."
+  },
+  {
+   "id": "F083",
+   "group": "G15",
+   "lang": "en",
+   "role": "target",
+   "content": "Cloning the bramble repository without git-lfs installed leaves pointer files in assets/, and the game then crashes on start with 'invalid texture header'."
+  },
+  {
+   "id": "F084",
+   "group": "G01",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On brackwater restic keeps 14 daily, 8 weekly and 12 monthly snapshots of /srv/photos; the prune job runs on Sundays only."
+  },
+  {
+   "id": "F085",
+   "group": "G16",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The glenrock TLS certificate is a wildcard for *.glenrock-fiction.io, issued through the DNS-01 challenge."
+  },
+  {
+   "id": "F086",
+   "group": "G02",
+   "lang": "en",
+   "role": "target",
+   "content": "Larkspur CI jobs that build the Android app must run on the runner tagged arm-heavy: the default runners have 4 GB of RAM and Gradle dies with exit code 137."
+  },
+  {
+   "id": "F087",
+   "group": "G11",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The pippin web app loads map tiles from the CDN path /tiles/v3; the old path /tiles/v2 has returned 410 since October."
+  },
+  {
+   "id": "F088",
+   "group": "G24",
+   "lang": "ru",
+   "role": "target",
+   "content": "Прокси сорока пускает только адреса из белого списка /etc/soroka/allow.txt; с нового адреса соединение рвётся сразу после TLS-рукопожатия без сообщения об ошибке."
+  },
+  {
+   "id": "F089",
+   "group": "G08",
+   "lang": "en",
+   "role": "target",
+   "content": "Alerts from the heron Prometheus go to the Telegram channel ops-heron; email alerts were turned off in March because they landed in spam."
+  },
+  {
+   "id": "F090",
+   "group": "G03",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The fernhill PostgreSQL primary listens on port 5433, not 5432, because 5432 is taken by the old 13.x cluster kept for the archive."
+  },
+  {
+   "id": "F091",
+   "group": "G22",
+   "lang": "ru",
+   "role": "target",
+   "content": "Бот пуговка отвечает только в чатах из списка ALLOWED_CHATS: в новом чате он молчит, пока его ID не добавят в переменную и не перезапустят контейнер."
+  },
+  {
+   "id": "F092",
+   "group": "G39",
+   "lang": "ru",
+   "role": "target",
+   "content": "Офисный принтер мышь печатает с Mac только через драйвер IPP Everywhere: с фирменным драйвером задание зависает без ошибки."
+  },
+  {
+   "id": "F093",
+   "group": "G13",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The saltmarsh Kafka cluster keeps orders.v2 messages for 72 hours; replaying older orders needs the S3 export."
+  },
+  {
+   "id": "F094",
+   "group": "G18",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Lindel migration files carry a timestamp prefix, and goose skips a file with a sequence-number prefix without an error."
+  },
+  {
+   "id": "F095",
+   "group": "G12",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On moorgate SSH password login is disabled and keys must be ed25519; RSA keys are refused since the OpenSSH upgrade."
+  },
+  {
+   "id": "F096",
+   "group": "G07",
+   "lang": "en",
+   "role": "target",
+   "content": "Kestrel releases are tagged only after the changelog pull request is merged, because the publish workflow reads CHANGELOG.md at the tag."
+  },
+  {
+   "id": "F097",
+   "group": "G04",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The tallow API refuses to start when tallow.yaml holds an unknown key; the error names the key and its line."
+  },
+  {
+   "id": "F098",
+   "group": "G38",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Библиотека стрекоза ведёт changelog в файле CHANGES.md, а не в релизах GitHub."
+  },
+  {
+   "id": "F099",
+   "group": "G09",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The marlow repository pins Python 3.12 in .python-version; under 3.13 the lxml dependency fails to build."
+  },
+  {
+   "id": "F100",
+   "group": "G33",
+   "lang": "ru",
+   "role": "target",
+   "content": "Вебхуки платёжной системы в сервисе копилка проверяются по подписи в заголовке X-Signature, и после смены секрета вебхуки из очереди начинают отбиваться с кодом 401."
+  },
+  {
+   "id": "F101",
+   "group": "G32",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На ноутбуке крот стоит Fedora 41, обновления ставятся через dnf раз в неделю."
+  },
+  {
+   "id": "F102",
+   "group": "G15",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The bramble repository keeps its LFS objects on the self-hosted server lfs.bramble-fiction.dev, so a clone from the GitHub mirror gets no assets."
+  },
+  {
+   "id": "F103",
+   "group": "G28",
+   "lang": "ru",
+   "role": "target",
+   "content": "Письма с домена перепёлка попадают у Gmail в спам, пока в DNS нет записи DMARC; SPF и DKIM уже настроены."
+  },
+  {
+   "id": "F104",
+   "group": "G04",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The tallow API reloads its config on SIGHUP, but a changed listen address only takes effect after a full restart."
+  },
+  {
+   "id": "F105",
+   "group": "G38",
+   "lang": "ru",
+   "role": "target",
+   "content": "В библиотеке стрекоза функция Parse с версии 2.0 возвращает на пустой строке ошибку ErrEmpty, а не nil и пустую структуру, как раньше."
+  },
+  {
+   "id": "F106",
+   "group": "G19",
+   "lang": "en",
+   "role": "target",
+   "content": "Signing git commits with GPG on the build Mac osprey fails with 'Inappropriate ioctl for device' until GPG_TTY=$(tty) is exported in the shell profile."
+  },
+  {
+   "id": "F107",
+   "group": "G12",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On moorgate the SSH user deploy has no shell and can only run the rsync command fixed in authorized_keys."
+  },
+  {
+   "id": "F108",
+   "group": "G08",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "The heron Prometheus keeps metrics for 30 days; older data is in the Thanos bucket heron-archive."
+  },
+  {
+   "id": "F109",
+   "group": "G19",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On osprey git commits are signed with the GPG key 0xF1C7, which expires in 2027; its public key is in the team keyring repository."
+  },
+  {
+   "id": "F110",
+   "group": "G03",
+   "lang": "en",
+   "role": "target",
+   "content": "The PostgreSQL read replica on fernhill falls behind during the 02:00 VACUUM of the events table, so reports that need fresh data at night must query the primary."
+  },
+  {
+   "id": "F111",
+   "group": "G27",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Кластер ласточка обновляется до новой минорной версии Kubernetes раз в квартал, по выходным."
+  },
+  {
+   "id": "F112",
+   "group": "G37",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Роутер чайка перезагружается по расписанию каждую среду в 05:00."
+  },
+  {
+   "id": "F113",
+   "group": "G26",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Сервис гречка по умолчанию пишет логи с уровнем info, а уровень debug включается сигналом SIGUSR1 без перезапуска."
+  },
+  {
+   "id": "F114",
+   "group": "G38",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Библиотека стрекоза с версии 2.0 требует Go 1.24, потому что использует итераторы."
+  },
+  {
+   "id": "F115",
+   "group": "G31",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "Картинки сайта жаворонок при сборке сжимаются в WebP, исходники лежат в assets/raw."
+  },
+  {
+   "id": "F116",
+   "group": "G06",
+   "lang": "en",
+   "role": "target",
+   "content": "On the laptop wren Docker Desktop is replaced by Colima, started with 'colima start --cpu 6 --memory 12'; the docker CLI talks to it through the context colima."
+  },
+  {
+   "id": "F117",
+   "group": "G25",
+   "lang": "ru",
+   "role": "neighbour",
+   "content": "На NAS бобр проверка целостности массива запускается в первое воскресенье месяца и идёт около двадцати часов."
+  },
+  {
+   "id": "F118",
+   "group": "G06",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "On wren containers cannot reach the VPN subnet 10.40.0.0/16 until Colima is restarted after the VPN connects."
+  },
+  {
+   "id": "F119",
+   "group": "G14",
+   "lang": "en",
+   "role": "target",
+   "content": "Cron jobs on nettlefield run in UTC, not Europe/Berlin, so the 06:00 report job fires at 07:00 or 08:00 local time."
+  },
+  {
+   "id": "F120",
+   "group": "G18",
+   "lang": "en",
+   "role": "neighbour",
+   "content": "Lindel keeps down-migrations but never runs them in production; a rollback is a new up-migration."
+  }
+ ]
+}
