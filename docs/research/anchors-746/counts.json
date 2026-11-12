@@ -1,0 +1,124 @@
+{
+ "calls": 972,
+ "hand_read": {
+  "sample": 120,
+  "system": {
+   "count": 92,
+   "of": 120,
+   "wilson95": [
+    0.683,
+    0.833
+   ]
+  },
+  "identifier": {
+   "count": 45,
+   "of": 120,
+   "wilson95": [
+    0.294,
+    0.464
+   ]
+  },
+  "system_and_identifier": {
+   "count": 33,
+   "of": 120,
+   "wilson95": [
+    0.203,
+    0.361
+   ]
+  },
+  "system_or_identifier": {
+   "count": 104,
+   "of": 120,
+   "wilson95": [
+    0.794,
+    0.916
+   ]
+  },
+  "neither": {
+   "count": 16,
+   "of": 120,
+   "wilson95": [
+    0.084,
+    0.206
+   ]
+  },
+  "with_task": 101,
+  "with_task_no_identifier": 61,
+  "task_had_identifier_query_lacked": {
+   "count": 3,
+   "of": 101,
+   "wilson95": [
+    0.01,
+    0.084
+   ]
+  },
+  "gap_calls": [
+   "C0145",
+   "C0151",
+   "C0519"
+  ]
+ },
+ "identifier_rule": {
+  "all_calls": {
+   "count": 271,
+   "of": 972,
+   "wilson95": [
+    0.252,
+    0.308
+   ]
+  },
+  "against_hand_read": {
+   "agree": 107,
+   "of": 120,
+   "true_pos": 32,
+   "false_pos": 0,
+   "false_neg": 13
+  }
+ },
+ "answers_at_the_time": {
+  "found": 363,
+  "none": 5,
+  "other": 604
+ },
+ "empty_answers": [
+  {
+   "cid": "C0288",
+   "identifier_rule": true,
+   "attempt": 1,
+   "retry": false
+  },
+  {
+   "cid": "C0293",
+   "identifier_rule": true,
+   "attempt": 1,
+   "retry": false
+  },
+  {
+   "cid": "C0427",
+   "identifier_rule": false,
+   "attempt": 1,
+   "retry": false
+  },
+  {
+   "cid": "C0449",
+   "identifier_rule": false,
+   "attempt": 4,
+   "retry": false
+  },
+  {
+   "cid": "C0876",
+   "identifier_rule": false,
+   "attempt": 2,
+   "retry": false
+  }
+ ],
+ "misses_745": [
+  {
+   "qid": "Q0007",
+   "cid": "C0478",
+   "identifier_rule": true,
+   "hand_read": null
+  }
+ ],
+ "words_median": 5
+}

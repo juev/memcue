@@ -112,6 +112,7 @@ a source link is not a downloadable copy of the private evidence.
 | [Lexical, E5 and hybrid retrieval on authored synthetic data, November 2026 (#682)](hybrid-682-synthetic-pilot.md) |
 | [FTS5 and vectors on paraphrased queries, November 2026 (#742)](paraphrase-742-2026-11.md) |
 | [The message rule on long agent queries, November 2026 (#745)](message-rule-745-2026-11.md) |
+| [Anchors in agent search queries, November 2026 (#746)](anchors-746-2026-11.md) |
 | [The search alone on labelled synthetic cases, October 2026 (#510)](search-synthetic-510-2026-10.md) |
 | [A hint for a thin answer: what the model does when the floor hides facts, October 2026](thin-answer-hint-2026-10.md) |
 | [The thin-answer hint counted the limit, not the tail — fixed, October 2026](thin-hint-tail-423-2026-10.md) |
