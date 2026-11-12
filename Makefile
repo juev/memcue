@@ -1,13 +1,21 @@
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# Releases of the binary are the v* tags; the plugin tags (dsh-v*, pi-v*) share the namespace and must not count (#740).
+RELEASE_TAGS := --tags --match 'v*'
+VERSION ?= $(shell git describe $(RELEASE_TAGS) --always --dirty 2>/dev/null || echo dev)
 GOLANGCI_VERSION ?= v2.14.0
 GOLANGCI_LINT ?= golangci-lint
 CLAUDE_BIN ?= claude
 HERMES_PYTHON ?= python3
 
-.PHONY: build test test-plugins test-pi test-codex test-claude-mods test-hermes-request lint bench
+.PHONY: build test test-plugins test-pi test-codex test-claude-mods test-hermes-request lint bench previous-release
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
+
+# The release before TAG, which the release workflow hands to goreleaser for the changelog: left to itself, goreleaser
+# takes whatever tag is nearest, and a plugin tag one commit back cut the v0.37.0 notes to one line.
+previous-release:
+	@test -n "$(TAG)" || { echo "usage: make previous-release TAG=vX.Y.Z" >&2; exit 2; }
+	@git describe $(RELEASE_TAGS) --abbrev=0 '$(TAG)^'
 
 test: build test-codex test-claude-mods
 	go test -race -p 2 -parallel 2 -count=1 -json ./...

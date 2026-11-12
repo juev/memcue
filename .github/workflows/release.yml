@@ -46,9 +46,18 @@ jobs:
       - name: test
         run: make test CLAUDE_BIN="$RUNNER_TEMP/claude-client/node_modules/.bin/claude"
 
+      # The plugin tags (dsh-v*, pi-v*) share the namespace; goreleaser OSS cannot filter them, so it gets both tags (#740).
+      - name: previous release tag
+        id: tags
+        run: |
+          previous=$(make -s previous-release TAG="$GITHUB_REF_NAME")
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         with:
           version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
+          GORELEASER_PREVIOUS_TAG: ${{ steps.tags.outputs.previous }}
