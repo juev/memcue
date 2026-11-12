@@ -110,6 +110,7 @@ a source link is not a downloadable copy of the private evidence.
 | [The lexical search chain: what each step does to the answer, October 2026](search-chain-2026-10.md) |
 | [A floor for search: N as a maximum, October 2026](search-floor-2026-10.md) |
 | [Lexical, E5 and hybrid retrieval on authored synthetic data, November 2026 (#682)](hybrid-682-synthetic-pilot.md) |
+| [FTS5 and vectors on paraphrased queries, November 2026 (#742)](paraphrase-742-2026-11.md) |
 | [The search alone on labelled synthetic cases, October 2026 (#510)](search-synthetic-510-2026-10.md) |
 | [A hint for a thin answer: what the model does when the floor hides facts, October 2026](thin-answer-hint-2026-10.md) |
 | [The thin-answer hint counted the limit, not the tail — fixed, October 2026](thin-hint-tail-423-2026-10.md) |

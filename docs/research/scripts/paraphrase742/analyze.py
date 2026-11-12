@@ -71,6 +71,27 @@ for s in STRATA + ["all-positive"]:
         losses = [r["id"] for r in sel if rank5(r["arms"]["bm25"]) and not rank5(r["arms"][a])]
         versus[s][a] = {"rescues": rescues, "losses": losses, "sign_p": round(sign_p(len(rescues), len(losses)), 4)}
 
+# Exploratory splits, added after the first results; not part of the frozen metrics.
+exploratory = {"cross_by_overlap": {}, "by_fact_language": {}, "hybrid_vs_vector": {}, "bm25_gold_listed": {}}
+for label, test in (("0", lambda o: o == 0), (">=1", lambda o: o >= 1)):
+    sel = [r for r in rows if qs[r["id"]]["stratum"] == "cross" and test(qs[r["id"]]["overlap"])]
+    exploratory["cross_by_overlap"][label] = {"n": len(sel), **{a: sum(rank5(r["arms"][a]) > 0 for r in sel)
+                                                                 for a in arms}}
+for s in STRATA:
+    for lang in ("en", "ru"):
+        sel = [r for r in rows if qs[r["id"]]["stratum"] == s and qs[r["id"]]["fact_lang"] == lang]
+        exploratory["by_fact_language"][f"{s}/{lang}"] = {"n": len(sel), **{a: sum(rank5(r["arms"][a]) > 0
+                                                                                  for r in sel) for a in arms}}
+    sel = [r for r in rows if qs[r["id"]]["stratum"] == s]
+    exploratory["bm25_gold_listed"][s] = {"n": len(sel), "listed": sum(r["arms"]["bm25"]["gold_rank"] > 0 for r in sel),
+                                          "listed_below_5": sum(r["arms"]["bm25"]["gold_rank"] > 5 for r in sel)}
+    exploratory["hybrid_vs_vector"][s] = {}
+    for m in sorted({a[len("vector-"):] for a in arms if a.startswith("vector-")}):
+        v, h = f"vector-{m}", f"hybrid-{m}"
+        exploratory["hybrid_vs_vector"][s][m] = {
+            "hybrid_only": [r["id"] for r in sel if rank5(r["arms"][h]) and not rank5(r["arms"][v])],
+            "vector_only": [r["id"] for r in sel if rank5(r["arms"][v]) and not rank5(r["arms"][h])]}
+
 neg = [r for r in rows if qs[r["id"]]["stratum"] == "negative"]
 negatives = {"n": len(neg)}
 for a in arms:
@@ -105,12 +126,12 @@ for m in ("e5", "bge"):
                    "samples": len(first) + len(warm), "meta": enc[m]["meta"]}
 
 results = {"arms": arms, "passes": run["passes"], "eligible": run["eligible"], "quality": quality,
-           "versus_bm25": versus, "negatives": negatives, "vector_score_separation": separation,
+           "versus_bm25": versus, "exploratory": exploratory, "negatives": negatives, "vector_score_separation": separation,
            "search_ms": timing, "query_encoding_ms": encoding}
 (out_dir / "results.json").write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n")
 
 with open(out_dir / "query-results.csv", "w", newline="") as f:
-    w = csv.writer(f)
+    w = csv.writer(f, lineterminator="\n")
     w.writerow(["query", "stratum", "lang", "fact_lang", "overlap", "gold", "arm", "gold_rank", "hit1", "hit5",
                 "returned", "top5", "text"])
     for r in rows:
@@ -135,6 +156,12 @@ for metric in ("hit1", "mrr5"):
 print()
 for s in STRATA + ["all-positive"]:
     print(s, {a: (len(v["rescues"]), len(v["losses"]), v["sign_p"]) for a, v in versus[s].items()})
+print(json.dumps(exploratory["cross_by_overlap"]))
+print(json.dumps(exploratory["bm25_gold_listed"]))
+for k, v in exploratory["by_fact_language"].items():
+    print(k, v)
+for s_, v in exploratory["hybrid_vs_vector"].items():
+    print(s_, {m: (len(x["hybrid_only"]), len(x["vector_only"])) for m, x in v.items()})
 print(json.dumps(negatives))
 print(json.dumps(separation))
 print(json.dumps(timing))
