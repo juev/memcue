@@ -58,7 +58,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.37.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.37.1`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -66,6 +66,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.37.1 | 9 | 0.37.1 | 0.37.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.1 (`hermes-agent` >=0.17.0) |
 | 0.37.0 | 9 | 0.37.0 | 0.37.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.0 (`hermes-agent` >=0.17.0) |
 | 0.36.2 | 9 | 0.36.2 | 0.36.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.2 (`hermes-agent` >=0.17.0) |
 | 0.36.1 | 9 | 0.36.1 | 0.36.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.1 (`hermes-agent` >=0.17.0) |
@@ -319,6 +320,16 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.37.1: Pi session controls survive a reload, and full release notes (#743, #740)
+
+- **Pi: `/memcue off` now holds across `/reload`.** A new, resumed or forked session starts from the current
+  settings, not from an old off marker. A repeated `/memcue on` no longer aborts a memcue call in flight, and
+  `/memcue dream` waits until active work is done.
+- **Release notes cover the whole range again.** The release workflow takes the previous release from the `v*` tags
+  only, so a plugin tag (`dsh-v*`, `pi-v*`) one commit earlier no longer cuts the notes to one line, and `make build`
+  no longer stamps a version such as `dsh-v0.36.2-1-g…`.
+- The fact-base schema stays 9.
 
 ### 0.37.0: a plugin for the Pi coding agent, and the Hermes card in the user's turn (#733, #732)
 
