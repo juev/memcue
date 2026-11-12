@@ -11,6 +11,7 @@ async function json(path) {
 test('all plugin manifests carry the release version', async () => {
 	const rootPackage = await json('package.json')
 	const dsh = await json('plugins/deepseek-harness/package.json')
+	const pi = await json('plugins/pi/package.json')
 	const codex = await json('plugins/codex/.codex-plugin/plugin.json')
 	const companionYaml = await readFile(new URL('plugins/hermes/memcue-context/plugin.yaml', root), 'utf8')
 	const companion = companionYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
@@ -20,6 +21,7 @@ test('all plugin manifests carry the release version', async () => {
 
 	assert.equal(rootPackage.version, '0.36.2')
 	assert.equal(dsh.version, rootPackage.version)
+	assert.equal(pi.version, rootPackage.version)
 	assert.equal(claude.version, rootPackage.version)
 	assert.equal(hermes, rootPackage.version)
 	assert.equal(codex.version, rootPackage.version)

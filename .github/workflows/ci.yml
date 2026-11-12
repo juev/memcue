@@ -48,7 +48,7 @@ jobs:
           version: v2.14.0
 
   plugins:
-    name: dsh / claude-code plugins
+    name: dsh / claude-code / pi plugins
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -74,6 +74,18 @@ jobs:
 
       - name: test plugins
         run: MEMCUE_BIN="$PWD/bin/memcue" node --experimental-test-module-mocks --test --test-concurrency=2 plugins/deepseek-harness/test/*.test.mjs plugins/claude-code/test/*.test.mjs
+
+      # The Pi plugin pins the tested Pi SDK in its own devDependencies.
+      - name: install Pi SDK
+        run: npm install --prefix plugins/pi --no-package-lock --no-audit --no-fund
+
+      - name: typecheck Pi plugin
+        working-directory: plugins/pi
+        run: npx tsc --noEmit
+
+      - name: test Pi plugin
+        working-directory: plugins/pi
+        run: MEMCUE_BIN="$GITHUB_WORKSPACE/bin/memcue" node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts
 
   card-research:
     name: card research contracts

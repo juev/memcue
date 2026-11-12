@@ -42,8 +42,8 @@ and not another number; bare numbers, ports and versions are still left out of t
 The base can live in a git repository and be synced between machines; memcue ships a merge driver for it. Or one
 machine runs `memcue server` and the others keep a replica of its base, synced over a tailnet: set `MEMCUE_SERVER`
 (see [server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet)). The same
-base works for [Hermes Agent](plugins/hermes/README.md) and for
-[DeepSeek Harness](plugins/deepseek-harness/README.md).
+base works for [Hermes Agent](plugins/hermes/README.md), for
+[DeepSeek Harness](plugins/deepseek-harness/README.md) and for the [Pi coding agent](plugins/pi/README.md).
 
 memcue is young: the 0.4 line has been measured on one developer's memory and sessions (see [Results](#results)) and
 not yet run for long in daily work.

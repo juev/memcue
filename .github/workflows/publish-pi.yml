@@ -1,0 +1,57 @@
+name: Publish Pi plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and report without publishing"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "pi-v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Check the tag names the package version
+        if: startsWith(github.ref, 'refs/tags/pi-v')
+        working-directory: plugins/pi
+        run: test "pi-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Install the Pi SDK
+        working-directory: plugins/pi
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: plugins/pi
+        run: npx tsc --noEmit
+
+      # npm Trusted Publishing: the OIDC token comes from id-token: write, so
+      # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
+      - name: Publish
+        working-directory: plugins/pi
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            # A dry run still refuses a version that already exists, so pack a
+            # throwaway prerelease and never upload it.
+            npm version "$(node -p "require('./package.json').version")-dryrun.$(date +%s)" \
+              --no-git-tag-version --allow-same-version >/dev/null
+            npm publish --access public --dry-run --tag dryrun
+          else
+            npm publish --access public
+          fi

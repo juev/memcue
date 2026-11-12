@@ -4,7 +4,7 @@ GOLANGCI_LINT ?= golangci-lint
 CLAUDE_BIN ?= claude
 HERMES_PYTHON ?= python3
 
-.PHONY: build test test-plugins test-codex test-claude-mods test-hermes-request lint bench
+.PHONY: build test test-plugins test-pi test-codex test-claude-mods test-hermes-request lint bench
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -30,6 +30,17 @@ test-plugins: build
 	else \
 		echo "skipping plugin tests: node_modules lacks @deepseek-ai/dsh-llm and @deepseek-ai/dsh-tools"; \
 		echo "install them with: npm install --no-save --no-package-lock @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/dsh-tools@0.2.0-rc.2"; \
+	fi
+	$(MAKE) test-pi
+
+# The Pi plugin is TypeScript that Pi loads through jiti; its tests load it with the real Pi SDK from its own
+# node_modules, skipped the same way when they are not installed.
+test-pi: build
+	@if [ -d plugins/pi/node_modules/@earendil-works/pi-coding-agent ]; then \
+		cd plugins/pi && npx tsc --noEmit && MEMCUE_BIN="$(CURDIR)/bin/memcue" node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts; \
+	else \
+		echo "skipping Pi plugin tests: plugins/pi/node_modules lacks @earendil-works/pi-coding-agent"; \
+		echo "install them with: npm install --prefix plugins/pi --no-package-lock"; \
 	fi
 
 lint:

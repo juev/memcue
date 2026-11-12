@@ -124,6 +124,21 @@ class NoCardTest(unittest.TestCase):
                 self.assertIn("Skip it when the user's message and the repository's files hold everything", text)
                 self.assertNotIn("session card", text)
 
+class PiNoteTest(unittest.TestCase):
+    def test_pi_carries_the_dsh_note_word_for_word(self):
+        """#733: the Pi plugin has the same tool names as DSH, so it carries the DSH note as it is; every block the
+        tests above check in the DSH note (the shelf, the pitfall line, no card, what the repository shows) is in it."""
+        def note(path: Path) -> str:
+            match = re.search(r"const NOTE = `([^`]*)`", path.read_text(encoding="utf-8"))
+            self.assertIsNotNone(match, path)
+            return match.group(1)
+
+        pi = note(PLUGINS / "pi" / "src" / "instructions.ts")
+        self.assertEqual(pi, note(PLUGINS / "deepseek-harness" / "src" / "index.mjs"))
+        self.assertIn("what the repository", pi)
+        self.assertNotIn("memcue_sessions", pi)
+
+
 class CodexDeliveryTest(unittest.TestCase):
     def test_codex_delivers_pull_policy_without_other_hosts_history_or_card(self):
         """Exercise the installed entry point, not just an unused policy string."""
