@@ -1,7 +1,7 @@
 //go:build research
 
-// Command hook is the words-only recall hook of the size ladder of #325: what the UserPromptSubmit hook does without a
-// judge (decode the hook input, open the base, recall, encode the answer), with no HTTP client in the binary.
+// Command hook is the words-only recall hook of the size ladder of #325: what the UserPromptSubmit hook does
+// (decode the hook input, open the base, search, encode the answer), with no HTTP client in the binary.
 package main
 
 import (
@@ -25,7 +25,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	hits, err := recall.Recall(s, req.Prompt, tier.Keys(req.CWD, ""), recall.Default)
+	hits, err := recall.Search(s, recall.Query{Text: req.Prompt, N: 5, MinScore: recall.MinScore,
+		Project: tier.Keys(req.CWD, "")})
 	if err != nil {
 		panic(err)
 	}

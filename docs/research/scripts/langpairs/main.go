@@ -120,7 +120,7 @@ func main() {
 	for _, f := range active {
 		p := group
 		p.Seen = map[string]bool{f.ID: true}
-		hits, err := recall.Recall(s, f.Content+" "+strings.Join(f.Keywords, " "), p)
+		hits, err := recall.Recall(s, f.Content, p)
 		if err != nil {
 			panic(err)
 		}
