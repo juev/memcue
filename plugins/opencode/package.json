@@ -1,0 +1,41 @@
+{
+  "name": "memcue-opencode",
+  "version": "0.37.1",
+  "description": "memcue long-term memory for OpenCode: native tools, repository pitfalls and opt-in subagent memory",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "opencode-plugin",
+    "memory"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juev/memcue.git",
+    "directory": "plugins/opencode"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@opencode/plugin": "^2.0.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}
