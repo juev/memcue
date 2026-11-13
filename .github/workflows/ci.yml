@@ -41,6 +41,9 @@ jobs:
       - name: install pinned Pi test dependencies
         run: npm --prefix plugins/pi ci --ignore-scripts --no-audit --no-fund
 
+      - name: install the OpenCode plugin dependencies
+        run: npm --prefix plugins/opencode ci --ignore-scripts --no-audit --no-fund
+
       # Builds bin/memcue, runs the Go tests with -race and the Hermes plugin tests against that binary.
       - name: test
         run: make test CLAUDE_BIN="$RUNNER_TEMP/claude-client/node_modules/.bin/claude"

@@ -43,6 +43,9 @@ jobs:
       - name: install pinned Pi test dependencies
         run: npm --prefix plugins/pi ci --ignore-scripts --no-audit --no-fund
 
+      - name: install the OpenCode plugin dependencies
+        run: npm --prefix plugins/opencode ci --ignore-scripts --no-audit --no-fund
+
       - name: release prerequisite regression
         run: node --test --test-concurrency=2 plugins/claude-code/test/release-prerequisites.test.mjs
 
