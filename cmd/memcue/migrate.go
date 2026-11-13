@@ -22,8 +22,9 @@ import (
 )
 
 // runMigrate turns memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]. -all finds the
-// notes of Claude Code's built-in memory itself and skips a note whose facts are already in the base, so the run can
-// be repeated; a note named on the command line is migrated again, for a note that changed. With -dry-run it prints the facts as JSON lines and stores nothing.
+// notes of Claude Code's and Qwen Code's built-in memory itself and skips a note whose facts are already in the base,
+// so the run can be repeated; a note named on the command line is migrated again, for a note that changed. With
+// -dry-run it prints the facts as JSON lines and stores nothing.
 func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 	out = inv.writer(out)
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
@@ -77,6 +78,11 @@ func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 		if found, err = findNotes(claudeDir()); err != nil {
 			return err
 		}
+		qwenFound, err := findQwenNotes(qwenDir())
+		if err != nil {
+			return err
+		}
+		found = append(found, qwenFound...)
 	}
 	if len(named)+len(found) == 0 {
 		return errors.New("usage: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md ...]\n" +
@@ -120,7 +126,7 @@ func (inv *invocation) runMigrate(args []string, out io.Writer) error {
 				var r extract.Result
 				if err == nil {
 					ctx, cancel := context.WithTimeout(inv.ctx, 5*time.Minute)
-					r, err = noteFn(ctx, n.ref(), string(b))
+					r, err = noteFn(ctx, n.ref(), string(stripFrontmatter(b)))
 					cancel()
 				}
 				done <- result{note: n, r: r, err: err}
@@ -215,58 +221,83 @@ func dedupeNotes(named, found []note) []note {
 }
 
 // noteTier names the repository of a note given by path: the project's repository for a note of the built-in layout
-// (projects/<project>/memory/<note>.md), else the note's directory.
+// (projects/<project>/memory/<note>.md) of either host, else the note's directory.
 func noteTier(path, claude string) string {
 	dir := filepath.Dir(path)
-	if abs, err := filepath.Abs(dir); err == nil && filepath.Base(abs) == "memory" &&
-		filepath.Dir(filepath.Dir(abs)) == filepath.Join(claude, "projects") {
-		return projectTier(filepath.Dir(abs), claude)
+	if abs, err := filepath.Abs(dir); err == nil && filepath.Base(abs) == "memory" {
+		for _, root := range []string{claude, qwenDir()} {
+			if filepath.Dir(filepath.Dir(abs)) == filepath.Join(root, "projects") {
+				return projectTier(filepath.Dir(abs), root)
+			}
+		}
 	}
 	return filepath.Base(dir)
 }
 
-// findNotes lists the notes of the built-in memory: projects/<project>/memory/*.md, and memory/<tier>/*.md for a
-// memory kept in one place and linked into the projects. MEMORY.md is an index, not a note. A note reached twice
-// through links is listed once.
+// findNotes lists the notes of Claude Code's built-in memory: projects/<project>/memory/*.md, and memory/<tier>/*.md
+// for a memory kept in one place and linked into the projects. MEMORY.md is an index, not a note. A note reached
+// twice through links is listed once.
 func findNotes(claude string) ([]note, error) {
 	var out []note
 	seen := map[string]bool{}
-	add := func(dir, tierName string) error {
-		paths, err := filepath.Glob(filepath.Join(dir, "*.md"))
-		if err != nil {
-			return err
-		}
-		for _, p := range paths {
-			real, err := filepath.EvalSymlinks(p)
-			if err != nil || seen[real] || filepath.Base(p) == "MEMORY.md" {
-				continue
-			}
-			seen[real] = true
-			out = append(out, note{path: real, tier: tierName})
-		}
-		return nil
-	}
 	shared, _ := filepath.Glob(filepath.Join(claude, "memory", "*"))
 	for _, dir := range shared {
 		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
-			if err := add(dir, filepath.Base(dir)); err != nil {
+			if err := addNotes(dir, filepath.Base(dir), seen, &out); err != nil {
 				return nil, err
 			}
 		}
 	}
 	projects, _ := filepath.Glob(filepath.Join(claude, "projects", "*", "memory"))
 	for _, dir := range projects {
-		if err := add(dir, projectTier(filepath.Dir(dir), claude)); err != nil {
+		if err := addNotes(dir, projectTier(filepath.Dir(dir), claude), seen, &out); err != nil {
 			return nil, err
 		}
 	}
 	return out, nil
 }
 
-// projectTier names a project directory of Claude Code by the repository its sessions ran in: the cwd of a
-// transcript, or, when the transcripts are gone, the path its name encodes, if that path still exists.
+// findQwenNotes lists the notes of Qwen Code's built-in memory: memories/*.md (user-level) and
+// projects/<project>/memory/*.md. MEMORY.md is an index, not a note.
+func findQwenNotes(qwen string) ([]note, error) {
+	var out []note
+	seen := map[string]bool{}
+	if err := addNotes(filepath.Join(qwen, "memories"), "user", seen, &out); err != nil {
+		return nil, err
+	}
+	projects, _ := filepath.Glob(filepath.Join(qwen, "projects", "*", "memory"))
+	for _, dir := range projects {
+		if err := addNotes(dir, projectTier(filepath.Dir(dir), qwen), seen, &out); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// addNotes appends the *.md notes of dir, MEMORY.md and a note already seen left out.
+func addNotes(dir, tierName string, seen map[string]bool, out *[]note) error {
+	paths, err := filepath.Glob(filepath.Join(dir, "*.md"))
+	if err != nil {
+		return err
+	}
+	for _, p := range paths {
+		real, err := filepath.EvalSymlinks(p)
+		if err != nil || seen[real] || filepath.Base(p) == "MEMORY.md" {
+			continue
+		}
+		seen[real] = true
+		*out = append(*out, note{path: real, tier: tierName})
+	}
+	return nil
+}
+
+// projectTier names a project directory of Claude Code or Qwen Code by the repository its sessions ran in: the cwd
+// of a transcript, or, when the transcripts are gone, the path its name encodes, if that path still exists. Qwen
+// keeps its transcripts in chats/ under the project directory.
 func projectTier(dir, claude string) string {
 	transcripts, _ := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	chats, _ := filepath.Glob(filepath.Join(dir, "chats", "*.jsonl"))
+	transcripts = append(transcripts, chats...)
 	for _, t := range transcripts {
 		f, err := os.Open(t)
 		if err != nil {

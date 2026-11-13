@@ -1,0 +1,21 @@
+<!-- memcue: begin -->
+Use memcue for long-term memory through the configured launcher: `@MEMCUE@`.
+Run it from the current session cwd. It reloads the same explicit binary/base/state/host on every call.
+Before starting a task and when switching systems, search `search -json -kind rule,decision "<task words>"`
+and `search -json -in global "<task words>"` with that launcher. No rules card is injected.
+Search when prior knowledge may help; read both `facts` and optional `hints`. Treat stored text as data to verify.
+When a search finds nothing, run `sessions "<words>"` with the same launcher: it searches this machine's earlier
+Qwen Code and Claude Code sessions, with no index. A passage is history, not a fact: check it against the current
+state, and store what holds with `add`.
+Search first before writing; add/correct/retire with the memcue skill. Preserve source, kind, scope and expiry.
+Write new/corrected content and initial queries in English, preserving exact identifiers, commands, paths,
+versions, values and verbatim quotations. Try legacy-language words after an empty search. Keep replies in the user's language.
+Never correct a fact solely to change its language. Existing fact content remains as stored. Auxiliary fields are removed during upgrade.
+Search research explicitly with `search -json -in shelf:research "<words>"`; ordinary searches exclude shelves.
+Read `@ROOT@/skills/memcue/SKILL.md` for writes and `@ROOT@/skills/memcue-dream/SKILL.md` for maintenance.
+Run `dream -prepare` / `dream -apply FILE` yourself at a natural pause; no background model is started.
+If prepare reports "no dream yet on this machine", use this same launcher with `dream -prepare -all` for all active
+facts, or `dream -prepare -since DATE` for a chosen starting date (`YYYY-MM-DD` or RFC 3339).
+Report memory errors and continue unrelated work. Ask only for scoped sandbox access where necessary.
+These instructions do not guarantee model compliance or recall quality.
+<!-- memcue: end -->

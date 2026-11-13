@@ -22,10 +22,10 @@ const sessionsHalf = 200
 const sessionsHeader = "memcue sessions: passages of earlier sessions, newest first. They are history, not facts: " +
 	"they may be out of date, so check a find against the current state, and store what holds with memcue add."
 
-// runSessions is memcue sessions (#621): a word search over the text of this machine's Claude Code sessions, with
-// no index, for what an empty memcue search may have missed: what the agent forgot to store is often still in a
-// transcript. It reads the user's and the agent's text only (see history.ReadClaude), leaves out the current
-// session and every message at or after -before, and prints the newest windows.
+// runSessions is memcue sessions (#621): a word search over the text of this machine's Claude Code and Qwen Code
+// sessions, with no index, for what an empty memcue search may have missed: what the agent forgot to store is often
+// still in a transcript. It reads the user's and the agent's text only (see history.ReadClaude, history.ReadQwen),
+// leaves out the current session and every message at or after -before, and prints the newest windows.
 func runSessions(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
 	n := fs.Int("n", 5, "the most passages to return, one a message")
@@ -61,6 +61,11 @@ func runSessions(args []string, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("sessions: %w", err)
 	}
+	qwenMsgs, _, err := history.ReadQwen(filepath.Join(qwenDir(), "projects"))
+	if err != nil {
+		return fmt.Errorf("sessions: %w", err)
+	}
+	msgs = append(msgs, qwenMsgs...)
 	if dir != "" {
 		msgs = inDir(msgs, dir)
 	}
