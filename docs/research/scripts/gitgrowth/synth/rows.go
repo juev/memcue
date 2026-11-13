@@ -29,7 +29,6 @@ type Row struct {
 	ID            string `json:"id"`
 	Version       int    `json:"version"`
 	Content       string `json:"content"`
-	Keywords      string `json:"keywords"`
 	Origin        string `json:"origin"`
 	Created       string `json:"created"`
 	Status        string `json:"status"`
@@ -41,11 +40,12 @@ type Row struct {
 	Evidence      string `json:"evidence"`
 	Review        string `json:"review"`
 	PromptVersion int    `json:"prompt_version"`
-	Queries       string `json:"queries"`
+	Channel       string `json:"channel"`
+	WriteID       string `json:"write_id"`
 }
 
-const columns = `id, version, content, keywords, origin, created, status, author, expires, kind, scope, source, evidence,
-	review, prompt_version, queries`
+const columns = `id, version, content, origin, created, status, author, expires, kind, scope, source, evidence,
+	review, prompt_version, channel, write_id`
 
 func openRaw(path string, readOnly bool) (*sql.DB, error) {
 	abs, err := filepath.Abs(path)
@@ -85,8 +85,8 @@ func queryRows(db *sql.DB) ([]Row, error) {
 	var out []Row
 	for rs.Next() {
 		var r Row
-		if err := rs.Scan(&r.ID, &r.Version, &r.Content, &r.Keywords, &r.Origin, &r.Created, &r.Status, &r.Author,
-			&r.Expires, &r.Kind, &r.Scope, &r.Source, &r.Evidence, &r.Review, &r.PromptVersion, &r.Queries); err != nil {
+		if err := rs.Scan(&r.ID, &r.Version, &r.Content, &r.Origin, &r.Created, &r.Status, &r.Author,
+			&r.Expires, &r.Kind, &r.Scope, &r.Source, &r.Evidence, &r.Review, &r.PromptVersion, &r.Channel, &r.WriteID); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -200,8 +200,8 @@ func insertRows(db *sql.DB, rows []Row) error {
 		return err
 	}
 	for _, r := range rows {
-		if _, err := st.Exec(r.ID, r.Version, r.Content, r.Keywords, r.Origin, r.Created, r.Status, r.Author, r.Expires,
-			r.Kind, r.Scope, r.Source, r.Evidence, r.Review, r.PromptVersion, r.Queries); err != nil {
+		if _, err := st.Exec(r.ID, r.Version, r.Content, r.Origin, r.Created, r.Status, r.Author, r.Expires,
+			r.Kind, r.Scope, r.Source, r.Evidence, r.Review, r.PromptVersion, r.Channel, r.WriteID); err != nil {
 			return err
 		}
 	}

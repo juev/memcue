@@ -22,7 +22,7 @@ REQUIRED = ("synthetic", "roundtrip", "interrupt", "race", "semantics")
 ROUND_INVARIANTS = ("sqlite_both_orders_equal", "events_both_orders_equal", "sqlite_equals_events",
                     "sqlite_no_lost_or_invented_versions", "events_no_lost_or_invented_versions", "versions_contiguous",
                     "index_matches_live_facts")
-SEMANTIC_ROUNDS = 12
+SEMANTIC_ROUNDS = 11
 SYNTHETIC_VARIANTS = {"sqlite-every", "sqlite-batch5", "sqlite-batch20", "sqlite-vacuum", "text-single",
                       "text-perfact", "text-events"}
 
@@ -63,7 +63,7 @@ def check(root: Path) -> list[str]:
             fail.append("real: the replay does not have one commit per distinct blob")
 
     rt = data["roundtrip"]
-    for k in ("rows_equal", "jsonl_bytes_equal", "index_stats_equal", "card_equal", "memcue_dump_equal",
+    for k in ("rows_equal", "jsonl_bytes_equal", "index_stats_equal", "memcue_dump_equal",
               "truncated_refused", "conflict_markers_refused"):
         if rt.get(k) is not True:
             fail.append(f"roundtrip: {k} is {rt.get(k)!r}, want true")

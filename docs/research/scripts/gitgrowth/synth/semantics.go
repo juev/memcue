@@ -606,14 +606,11 @@ func baseFacts(s *store.Store) (map[string]string, error) {
 	ids := map[string]string{}
 	for i := range 12 {
 		in := g.input()
-		f, err := s.AddWith(in.Content, in.Keywords, in.Origin, in.Expires, in.Meta)
+		f, err := s.AddWith(in.Content, in.Origin, in.Expires, in.Meta)
 		if err != nil {
 			return nil, err
 		}
 		ids[fmt.Sprintf("f%d", i)] = f.ID
-	}
-	if _, err := s.SetQueries(ids["f0"], 1, []string{"first query", "second query"}); err != nil {
-		return nil, err
 	}
 	if _, err := s.Retire(ids["f3"]); err != nil {
 		return nil, err
@@ -627,7 +624,7 @@ func correct(name, text string) func(*store.Store, map[string]string) error {
 		if err != nil {
 			return err
 		}
-		_, err = s.Correct(ids[name], cur.Content+" "+text, cur.Keywords)
+		_, err = s.Correct(ids[name], cur.Content+" "+text)
 		return err
 	}
 }
@@ -638,17 +635,6 @@ func retire(name string) func(*store.Store, map[string]string) error {
 
 func restore(name string) func(*store.Store, map[string]string) error {
 	return func(s *store.Store, ids map[string]string) error { _, err := s.Restore(ids[name]); return err }
-}
-
-func queries(name string, qs ...string) func(*store.Store, map[string]string) error {
-	return func(s *store.Store, ids map[string]string) error {
-		cur, err := s.Get(ids[name])
-		if err != nil {
-			return err
-		}
-		_, err = s.SetQueries(ids[name], cur.Version, qs)
-		return err
-	}
 }
 
 func relabel(name, kind, scope string) func(*store.Store, map[string]string) error {
@@ -667,7 +653,7 @@ func adds(n int, seed uint64) func(*store.Store, map[string]string) error {
 		g := newGen(seed)
 		for range n {
 			in := g.input()
-			if _, err := s.AddWith(in.Content, in.Keywords, in.Origin, in.Expires, in.Meta); err != nil {
+			if _, err := s.AddWith(in.Content, in.Origin, in.Expires, in.Meta); err != nil {
 				return err
 			}
 		}
@@ -699,8 +685,6 @@ func scenarios() []scenario {
 			rounds: []round{{name: "a-reopens-b-retires-later", a: restore("f3"), b: retire("f3")}}},
 		{name: "retire-vs-reopen", watch: "f3",
 			rounds: []round{{name: "b-retires-a-reopens-later", bFirst: true, a: restore("f3"), b: retire("f3")}}},
-		{name: "relabel-vs-queries", watch: "f5",
-			rounds: []round{{name: "same-version", a: relabel("f5", "pitfall", "global"), b: queries("f5", "q on b")}}},
 		{name: "relabel-revert", watch: "f6",
 			rounds: []round{{name: "a-relabels-and-back", a: seq(relabel("f6", "event", "global"), func(s *store.Store,
 				ids map[string]string) error {
@@ -712,7 +696,7 @@ func scenarios() []scenario {
 			}), b: correct("f6", "b")}}},
 		{name: "repeated", watch: "f7", rounds: []round{
 			{name: "1-correct-both", a: correct("f7", "a1"), b: correct("f7", "b1")},
-			{name: "2-a-retires-b-corrects-later", a: retire("f7"), b: seq(correct("f7", "b2"), queries("f8", "b2"))},
+			{name: "2-a-retires-b-corrects-later", a: retire("f7"), b: seq(correct("f7", "b2"), correct("f8", "b2"))},
 			{name: "3-a-retires-again-b-adds", a: retire("f7"), b: adds(2, 13)},
 			{name: "4-no-writes"},
 		}},

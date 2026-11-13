@@ -24,8 +24,8 @@ import (
 )
 
 // runRoundTrip checks that the prototype text encoding carries a base without loss: export, decode, import into a new
-// file, and compare every stored column, the bytes of a second export, the search results, the index and the card. It
-// also counts what `memcue dump`, today's textconv, leaves out.
+// file, and compare every stored column, the bytes of a second export, the search results and the index. It also
+// counts what `memcue dump`, today's textconv, leaves out.
 func runRoundTrip(args []string) error {
 	fl := flag.NewFlagSet("roundtrip", flag.ContinueOnError)
 	src := fl.String("db", "", "base to start from (a copy is used)")
@@ -46,6 +46,15 @@ func runRoundTrip(args []string) error {
 		return err
 	}
 	if err := addEdgeCases(orig); err != nil {
+		return err
+	}
+	// An open gives the source-less legacy rows a version with source agent (#582): settle the base before the
+	// export, as the workload's export reads a base the store has opened. The raw rows stay in the history.
+	norm, err := store.Open(orig)
+	if err != nil {
+		return err
+	}
+	if err := norm.Close(); err != nil {
 		return err
 	}
 	res := map[string]any{}
@@ -110,16 +119,6 @@ func runRoundTrip(args []string) error {
 		}
 	}
 	res["search_same_results"] = fmt.Sprintf("%d/%d", same, queries)
-	// The facts the session card is built from, not the rendered card.
-	ca, _, err := a.CardFacts([]string{"repo:proj-01", "repo:proj-02"}, "")
-	if err != nil {
-		return err
-	}
-	cb, _, err := b.CardFacts([]string{"repo:proj-01", "repo:proj-02"}, "")
-	if err != nil {
-		return err
-	}
-	res["card_equal"] = reflect.DeepEqual(ca, cb)
 
 	var evidence, author, fraction, retiredThenActive int
 	last := map[string]string{}
@@ -195,7 +194,7 @@ func addEdgeCases(path string) error {
 	if err != nil {
 		return err
 	}
-	f, err := s.AddWith("line one\nline two\twith \"quotes\" and a back\\slash, ёлка", []string{"a, b", "c"},
+	f, err := s.AddWith("line one\nline two\twith \"quotes\" and a back\\slash, ёлка",
 		"proj-01/edge 2026-10-27", "2026-12-31", store.Meta{Kind: "rule", Scope: "repo:proj-01", Source: "user",
 			Evidence: "the user said so, verbatim: <b>&amp;</b>"})
 	if err != nil {
