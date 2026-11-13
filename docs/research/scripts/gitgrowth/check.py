@@ -102,17 +102,19 @@ def check(root: Path) -> list[str]:
                 fail.append(f"{where}: {k} is {r.get(k)!r}, want true")
         for e in r.get("errors") or []:
             fail.append(f"{where}: error {e}")
-    if not any(r.get("remerge_changes_nothing") is False for r in rounds):
-        fail.append("semantics: no round shows the duplicate of a repeated Merge the report describes")
+    # Write identities (067d37f, #683) made a repeated Merge a no-op: the October duplicate is fixed, see the
+    # report's addendum of 2026-11-13.
+    if not all(r.get("remerge_changes_nothing") is True for r in rounds):
+        fail.append("semantics: a repeated Merge changes the base; write identities should make it a no-op")
     reopened = [r for r in rounds if r["scenario"] == "retire-then-correct"]
     if not reopened or (reopened[0].get("watched_fact") or {}).get("status") != "active":
         fail.append("semantics: retire-then-correct does not end active, as the report says")
     st = sem["stale"]
     for e in st.get("errors") or []:
         fail.append(f"semantics: stale: error {e}")
-    if st["sqlite_rows"] != st["rows_expected"] + 1 or st["sqlite_duplicate_versions"] != 1:
+    if st["sqlite_rows"] != st["rows_expected"] or st["sqlite_duplicate_versions"] != 0:
         fail.append(f"semantics: stale: SQLite {st['sqlite_rows']} rows, {st['sqlite_duplicate_versions']} "
-                    f"duplicates; the report says {st['rows_expected'] + 1} and 1")
+                    f"duplicates; write identities should give {st['rows_expected']} and 0")
     if st["events_rows"] != st["rows_expected"] or st["events_no_lost_or_invented_versions"] is not True:
         fail.append("semantics: stale: the event log does not give the expected rows")
     return fail
