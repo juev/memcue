@@ -25,7 +25,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@opencode/plugin": "^2.0.13"
+    "@opencode/plugin": "^2.0.13",
+    "memcue-transport": "^0.37.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

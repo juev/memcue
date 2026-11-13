@@ -11,7 +11,15 @@ export const fixtureSource = String.raw`
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-const [mode, ...args] = process.argv.slice(2);
+const [command, ...rest] = process.argv.slice(2);
+// The DSH adapter detects a mutation by the command name, so the mutation commands delegate to a behaviour named
+// by their first argument: ['add', 'wait', path] waits, ['correct', 'invalid', kind] emits a broken receipt;
+// ['add', '--', text] commits.
+const behaviours = ['success', 'split-unicode', 'refusal', 'invalid', 'read-error', 'wait', 'overflow', 'signal', 'signal-with-pipe', 'echo', 'nonce'];
+const mutation = ['add', 'correct', 'retire', 'reopen'].includes(command);
+const named = mutation && behaviours.includes(rest[0]);
+const mode = mutation ? (named ? rest[0] : 'success') : command;
+const args = named ? rest.slice(1) : rest;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const receipt = (out, err, status = 'success', changes = {}) => ({
   version: 1, nonce: process.env.MEMCUE_OUTCOME_NONCE,

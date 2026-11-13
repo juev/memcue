@@ -78,8 +78,26 @@ jobs:
       - name: build memcue
         run: go build -p 2 -o bin/memcue ./cmd/memcue
 
+      # The conformance suite runs every host adapter, so this job needs the Pi and OpenCode dependencies and the
+      # pinned Hermes interpreter too, and refuses to skip an adapter.
+      - name: install pinned Pi test dependencies
+        run: npm --prefix plugins/pi ci --ignore-scripts --no-audit --no-fund
+
+      - name: install the OpenCode plugin dependencies
+        run: npm --prefix plugins/opencode ci --ignore-scripts --no-audit --no-fund
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: install pinned Hermes for the Python contract
+        run: python3 -m pip install --disable-pip-version-check 'hermes-agent==0.17.0'
+
       - name: test plugins
         run: MEMCUE_BIN="$PWD/bin/memcue" node --experimental-test-module-mocks --test --test-concurrency=2 plugins/deepseek-harness/test/*.test.mjs plugins/claude-code/test/*.test.mjs
+
+      - name: test the shared transport contract on every host
+        run: MEMCUE_CONFORMANCE_REQUIRE_ADAPTERS=1 make test-conformance
 
   pi:
     name: pi / ${{ matrix.os }}

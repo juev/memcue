@@ -39,6 +39,12 @@ jobs:
         working-directory: plugins/opencode
         run: npx tsc --noEmit
 
+      # The plugin depends on the shared transport (#754); publishing before its release version is on the
+      # registry would give users an uninstallable plugin. The transport publishes with the v* release tag.
+      - name: Check the shared transport is published first
+        working-directory: plugins/opencode
+        run: npm view "memcue-transport@$(node -p "require('./package.json').version")" version
+
       # npm Trusted Publishing: the OIDC token comes from id-token: write, so
       # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
       - name: Publish

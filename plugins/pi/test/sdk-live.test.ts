@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { access, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -103,7 +103,7 @@ test('SDK + CLI: current-model dream tools apply the exact packet and reject rep
   assert.equal(durable.facts.find((fact: { id: string }) => fact.id === id)?.content, content);
 });
 
-test('SDK + CLI: a packed standalone package loads via its manifest without local node_modules', live, async t => {
+test('SDK + CLI: a packed standalone package installs and loads via its manifest (#754)', live, async t => {
   const fixture = await liveFixture(t);
   const destination = join(fixture.root, 'installed');
   await mkdir(destination);
@@ -114,9 +114,16 @@ test('SDK + CLI: a packed standalone package loads via its manifest without loca
   const archive = join(destination, packed[0].filename);
   const names = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n');
   assert.ok(names.every(name => !name.startsWith('/') && !name.split('/').includes('..')));
-  execFileSync('tar', ['-xzf', archive, '-C', destination]);
-  const installed = join(destination, 'package');
-  await assert.rejects(access(join(installed, 'node_modules')), { code: 'ENOENT' });
+  // The shared transport is a published dependency since #754, and Pi's package manager installs dependencies
+  // (installNpm runs npm install). Pack the transport too and install both tarballs into a clean directory, so the
+  // test proves the released packaging without the developer's node_modules and without reaching the registry.
+  const transportRoot = fileURLToPath(new URL('../../transport/', import.meta.url));
+  const transportPacked = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', destination], {
+    cwd: transportRoot, encoding: 'utf8', timeout: 30_000,
+  }));
+  execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund',
+    archive, join(destination, transportPacked[0].filename)], { cwd: destination, encoding: 'utf8', timeout: 60_000 });
+  const installed = join(destination, 'node_modules', 'memcue-pi');
   const fact = 'Use a packed native extension to recall the release packaging decision.';
   const id = successful(await fixture.run(['add', '-source', 'user', '-kind', 'decision', '--', fact], true), true).trim();
   const pi = await openPi(fixture, { entry: installed });
