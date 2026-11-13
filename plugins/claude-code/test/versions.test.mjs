@@ -21,7 +21,7 @@ test('all plugin manifests carry the release version', async () => {
 	const hermesYaml = await readFile(new URL('plugins/hermes/memcue/plugin.yaml', root), 'utf8')
 	const hermes = hermesYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
 
-	assert.equal(rootPackage.version, '0.37.1')
+	assert.equal(rootPackage.version, '0.38.0')
 	assert.equal(transport.version, rootPackage.version)
 	assert.equal(pi.version, rootPackage.version)
 	assert.equal(opencode.version, rootPackage.version)
