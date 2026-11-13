@@ -17,13 +17,20 @@ fact base:
   learns it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the
   session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default; `tool` is
   what a tool's output showed, `agent` anything else, and memcue refuses installation state from either (#475).
+- **An empty search falls back to the history** (#630). A line of this plugin's own, beside the note every native
+  host shares, tells the model to call `memcue_sessions` with the same words when `memcue_search` finds nothing. The
+  command reads this harness's journal under `$DSH_HOME/sessions` (else `~/.dsh/sessions`) beside the other hosts'
+  transcripts, so a dsh session searches its own history too.
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
-- **Four tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_add` (one new fact;
+- **Five tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_sessions` (passages
+  of earlier sessions by words, newest first; optional `limit`, `cwd` and `before`), `memcue_add` (one new fact;
   with `shelf`, a finding read from outside sources that only a search naming the shelf returns, #545),
   `memcue_correct` (a new version of a stored fact, with optional `expires`) and `memcue_retire` (stop
   finding a fact; the history keeps it). `memcue_search` runs `memcue search` with the session's working directory
   and id, so facts of this host and of the session's repository win ties and `MEMCUE_SEARCH_LOG=1` can name the
-  session.
+  session. `memcue_sessions` runs `memcue sessions` with the harness's own session id, which is the id the journal
+  names, so the current session is left out; it returns the command's answer as it is, header included, and needs
+  memcue 0.28.0 or later.
 
 The binary owns the base. This plugin is only the seam between it and the harness; the [harness support matrix](../../README.md#harness-support) lists what differs from Claude Code and
 Hermes.
@@ -137,6 +144,12 @@ The suite mounts the plugin against a plain object context and a stub binary, so
 running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-ai/dsh-tools` resolve. It also checks
 the bundle metadata and that the bundle patch points at the loadable ESM entry. `make test` runs it together with the
 Go and Hermes suites when those packages are installed, and skips it with the install command otherwise.
+
+`sessions.test.mjs` drives the real binary named by `MEMCUE_BIN` over an invented journal under a `DSH_HOME` of its
+own, with every other host's history pointed at the same fixture: it checks that `memcue_sessions` returns the
+command's answer, that the current session, a delegated session, reasoning, tool output and the plugin's own notices
+stay out, and that the note carries the fallback line. The journal is plaintext, which dsh writes when its JSONL
+encoding is not zstd; `internal/history`'s tests cover the compressed form.
 
 ## Releasing
 

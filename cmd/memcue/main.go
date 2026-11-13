@@ -94,7 +94,7 @@ commands:
   session-start   SessionStart hook: repository pitfalls, memory instructions and hints: memcue session-start [-part N] (part 1 carries the text; 2 and 3 print nothing, for an older plugin)
   session-card    session-start without the note: repository pitfalls and maintenance hints: memcue session-card [-dream-tools] [-pitfalls-only | -pitfalls-json | -hints-only]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
-  sessions  passages of earlier Claude Code and OpenCode sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
+  sessions  passages of earlier Claude Code, Qwen Code, OpenCode and DSH sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   # add -batch FILE [-force] atomically adds a content-only JSON FactInput array
   correct   new version of a fact: memcue correct [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT

@@ -17,13 +17,14 @@ Codex CLI users: see the [local pull-mode integration](plugins/codex/README.md) 
   at most five facts, and only those that fit: a fact whose BM25 is below 0.6 of the best one's is left out, so a
   query one fact answers gets that fact alone (#407, [search-floor](docs/research/search-floor-2026-10.md)).
 - **When a search finds nothing** the agent runs `memcue sessions` with the same words (#621): a word search over
-  the text of this machine's earlier Claude Code sessions, with no index. What an earlier session forgot to store is
-  often still in its transcript: on the author's Mac a passage answered 5 of 14 empty searches of the agent's, none
-  of them outdated, for about 2,000 characters a query ([history-fallback-602-mac](docs/research/history-fallback-602-mac-2026-11.md)).
+  the text of this machine's earlier Claude Code, Qwen Code, OpenCode and DeepSeek Harness sessions, with no index.
+  What an earlier session forgot to store is often still in its transcript: on the author's Mac a passage answered
+  5 of 14 empty searches of the agent's, none of them outdated, for about 2,000 characters a query
+  ([history-fallback-602-mac](docs/research/history-fallback-602-mac-2026-11.md)).
   The command reads the user's and the agent's text only, never tool output, which carries secrets and fetched
   pages, and prints the newest passages under a header that says they are history, not facts: a lead to check
   against the current state, and what holds goes into the base with `memcue add`. Hermes searches its own history
-  with `session_search`; DSH gets its own reader in #630.
+  with `session_search`; DSH reaches its own journal through the `memcue_sessions` tool (#630).
 - **When the agent learns something that will matter later** (a rule or a correction you gave, a decision the code
   does not show, a pitfall, a host or a service outside the repository) it stores it at once with `memcue add`,
   through the bundled skill. Nothing is extracted from the transcript afterwards (#494): the agent decides what is
@@ -1190,7 +1191,7 @@ memcue search -in shelf:research rate limit  # facts read from pages and documen
 memcue search -in all,shelf:research rate limit  # places are a union: every fact off the shelves and that shelf
 memcue search -kind rule,decision -since 2026-10-01 release  # only rules and decisions learnt since that day
 memcue search -all-words -expired postgres port  # every word required; facts past their expiry included
-memcue sessions postgres port        # passages of earlier Claude Code sessions that hold the words, newest first, when search finds nothing
+memcue sessions postgres port        # passages of earlier sessions that hold the words, newest first, when search finds nothing
 memcue sessions -n 3 -before 2026-10-20 -cwd . -json postgres port  # before a day, one repository's sessions, as JSON
 memcue add -source user -origin "demo 2026-10-19" "The demo database is PostgreSQL 18 on port 55432."
 memcue add -source user -expires 2026-10-21 "Check how the nightly dream ran on 21 October."
@@ -1517,9 +1518,10 @@ The same base and binary serve every host here; the adapters differ at the edges
 | Capability | Claude Code | DeepSeek Harness | Hermes Agent | Pi | OpenCode |
 |---|---|---|---|---|---|
 | Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool | `memcue_search` tool | `memcue_search` tool |
+| History fallback | `memcue sessions` (Bash) | `memcue_sessions` tool, over its own journal (#630) | Hermes' own `session_search` | no tool | no tool; the CLI reads OpenCode's transcripts |
 | Rules and decisions | searched by the agent at the start of a task, as the `SessionStart` note says; no card | the same, as the system-prompt section says; `session-card` hints on first step and after compaction | the same, as the system prompt says; `session-card` hints in the system prompt, rebuilt after compression | the same, as the system-prompt section says; no per-step hints | the same, as a system-prompt part; the pitfall snapshot is rebuilt after a compaction |
 | Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool | `memcue_add` tool | `memcue_add` tool |
-| `add` / `correct` / `retire` | skill and CLI | four tools | four tools | four tools | four tools |
+| `add` / `correct` / `retire` | skill and CLI | five tools | four tools | four tools | four tools |
 | Expiry | CLI and skill | `add` / `correct` | `add` / `correct` | `add` / `correct` | `add` / `correct` |
 | Dream | background on the session start; else the `memcue-dream` skill on its hint | background on `session-card` with `apiUrl` | background on `session-card` with `api_url`; else dream tools on the system-prompt hint | dream tools, on the model's request | dream tools, on the model's request |
 | Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as live facts (#440) | not applicable | not applicable |
@@ -1541,8 +1543,9 @@ starting maintenance. See [plugins/opencode](plugins/opencode/README.md).
 
 ## DeepSeek Harness
 
-memcue also works as a native DSH plugin: a search tool the model is told to use, its rules and decisions included, and the fact
-tools it writes its memory with. See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
+memcue also works as a native DSH plugin: a search tool the model is told to use, its rules and decisions included, the fact
+tools it writes its memory with, and `memcue_sessions`, which searches this harness's own journal beside the other hosts'
+transcripts when a search finds nothing (#630). See [plugins/deepseek-harness](plugins/deepseek-harness/README.md).
 
 ## Hermes Agent
 
