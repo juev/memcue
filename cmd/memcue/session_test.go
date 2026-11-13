@@ -235,18 +235,21 @@ func TestSessionStartWarnsWhileAutoMemoryIsOn(t *testing.T) {
 	}
 }
 
-// #669 changes the language policy in the note measured in #647. The other instructions stay word for word;
-// the new policy has its own delivered-text test and has not been measured for agent compliance or recall.
+// #669 changes the language policy in the note measured in #647 and #764 drops the host list from the sessions
+// fallback, which reads every host's history. The other instructions stay word for word; the new policy has its own
+// delivered-text test and neither change has been measured for agent compliance or recall.
 func TestSessionNotePreservesOtherMeasured647Instructions(t *testing.T) {
 	measured, err := os.ReadFile(filepath.Join("..", "..", "docs", "research", "scripts", "card606e2e", "note-rule-647.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldLines := strings.Split(strings.ReplaceAll(strings.TrimSpace(string(measured)), ` -keywords "<words>"`, ""), "\n")
+	old := strings.ReplaceAll(strings.TrimSpace(string(measured)), ` -keywords "<words>"`, "")
+	old = strings.ReplaceAll(old, "this machine's earlier Claude Code sessions", "this machine's earlier sessions")
+	oldLines := strings.Split(old, "\n")
 	newLines := strings.Split(sessionNote, "\n")
 	// The introductory line stays; the new English fact rule and changed search-language line come next.
 	if newLines[0] != oldLines[0] || strings.Join(newLines[3:], "\n") != strings.Join(oldLines[2:], "\n") {
-		t.Error("instructions beyond the English language policy differ from #647")
+		t.Error("instructions beyond the English language policy and the sessions hosts differ from #647")
 	}
 }
 

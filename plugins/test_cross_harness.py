@@ -51,6 +51,25 @@ class HistoryFallbackTest(unittest.TestCase):
         self.assertIsNotNone(shared)
         self.assertNotIn("memcue_sessions", shared.group(1))
 
+    def test_the_history_fallback_names_no_host(self):
+        """#764: the command reads every host's history, so the four texts that send an empty search there say "this
+        machine's earlier sessions". A host list drifts with every reader added to internal/history, as it did in
+        #753, #755 and #630."""
+        texts = {
+            "session.go": PLUGINS.parent / "cmd" / "memcue" / "session.go",
+            "claude-code skill": PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md",
+            "QWEN.md.snippet": PLUGINS / "qwen-code" / "QWEN.md.snippet",
+            "qwen-code skill": PLUGINS / "qwen-code" / "skills" / "memcue" / "SKILL.md",
+        }
+        for name, path in texts.items():
+            with self.subTest(text=name):
+                flat = " ".join(path.read_text(encoding="utf-8").split())
+                marker = flat.index("with no index")
+                sentence = flat[flat.rfind(". ", 0, marker) + 2:flat.find(". ", marker)]
+                self.assertIn("this machine's earlier sessions", sentence)
+                for host in ("Claude Code", "Qwen Code", "OpenCode", "DeepSeek Harness", "DSH"):
+                    self.assertNotIn(host, sentence)
+
 
 class CaptureExclusionsTest(unittest.TestCase):
     def test_every_host_leaves_out_what_the_repository_shows(self):
