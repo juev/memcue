@@ -10,6 +10,8 @@
  * - the model keeps the memory itself (#494): it stores what it learns with
  *   `memcue_add` and fixes a fact with `memcue_correct` or `memcue_retire`;
  *   nothing is extracted from the session afterwards;
+ * - when a search finds nothing, `memcue_sessions` searches the text of the
+ *   earlier sessions of this machine, this harness's own journal included (#630);
  * - a short system-prompt section tells the model its memory is memcue.
  *
  * The file is plain ESM on purpose: dsh installs a bundle under `node_modules`, where
@@ -44,6 +46,12 @@ const NOTE = `Long-term memory is memcue, a base of short facts learnt in earlie
 - When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you finish if a later session in a fresh checkout would hit it again — even when the cause is in the repository's own files; what the repository shows is its documents, not a failure you found by running it.
 - Use memcue_search to find a fact and its id; memcue_correct or memcue_retire to fix or forget an existing fact.`
 
+/**
+ * What only this plugin has: the fallback over the session history (#630). NOTE stays the text every native host
+ * carries word for word (plugins/test_cross_harness.py checks it against the Pi and OpenCode plugins).
+ */
+const DSH_NOTE = `- When memcue_search finds nothing, search the history of earlier sessions with memcue_sessions and the same words: it reads this harness's own journal beside the other hosts' transcripts, with no index, and shows the newest passages that hold the words. A passage of an earlier session is history, not a fact, so check it against the current state, and store what holds with memcue_add.`
+
 /** Longest the hints of session-card may take before they are killed: a stall must not hold a step. */
 const HOOK_TIMEOUT_MS = 10_000
 
@@ -55,6 +63,7 @@ const SCOPED_SEARCH = '0.8.0'
 const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/u
 const CJK_HINT = 'Facts use English by default; legacy facts may use other languages: search first in English; if English misses, retry in Russian or another legacy language.'
 const SEARCH_CONTROLS = '0.14.0' // search -in, -kind, -since, -expired, -all-words (#409)
+const SESSIONS_HISTORY = '0.28.0' // sessions: the word search over the earlier sessions (#621)
 const ADD_SOURCES = ['user', 'user_confirmed', 'tool', 'agent'] // who said a fact memcue_add stores
 
 /** Defaults used when the bundle patch supplies no config. */
@@ -356,6 +365,7 @@ export function apply(ctx, config) {
 	let compatible = true // cleared when the binary is older than MIN_BINARY
 	let scopedSearch = true // cleared when the binary is older than SCOPED_SEARCH
 	let searchControls = true // cleared when the binary is older than SEARCH_CONTROLS
+	let sessionsHistory = true // cleared when the binary is older than SESSIONS_HISTORY
 	const pitfallTurns = new Map() // session -> latest task/cwd snapshot
 	let pitfallCapable = false
 	const hintSources = new Map() // session id -> "startup" | "compact" | "done"
@@ -364,7 +374,7 @@ export function apply(ctx, config) {
 	ctx.systemPrompt.section({
 		name,
 		order: 60,
-		text: NOTE,
+		text: `${NOTE}\n${DSH_NOTE}`,
 		interpolate: false,
 	})
 
@@ -403,6 +413,7 @@ export function apply(ctx, config) {
 		pitfallCapable = found && versionAtLeast(reported, '0.30.1')
 		scopedSearch = !found || versionAtLeast(reported, SCOPED_SEARCH)
 		searchControls = !found || versionAtLeast(reported, SEARCH_CONTROLS)
+		sessionsHistory = !found || versionAtLeast(reported, SESSIONS_HISTORY)
 		if (!found || versionAtLeast(reported, MIN_BINARY)) return
 		compatible = false
 		console.warn(`memcue: binary ${reported || 'unknown'} is older than ${MIN_BINARY}; the hints are off, search still works. Update memcue.`)
@@ -530,6 +541,44 @@ export function apply(ctx, config) {
 			// binary does not say so itself.
 			if (CJK.test(String(args.query)) && !hints.includes(CJK_HINT)) hints.push(CJK_HINT)
 			return hints.length > 0 ? { facts, hint: hints.join(' ') } : { facts }
+		},
+	}))
+
+	ctx.tools.register(defineTool({
+		name: 'memcue_sessions',
+		description: 'Search the text of this machine\'s earlier sessions by words, for what memcue_search did not find: what an earlier session forgot to store is often still in a transcript. It reads this harness\'s own journal beside the other hosts\' transcripts, with no index, and returns the newest passages that hold the words, about 400 characters each, with the time, the role and the session; the current session is left out. A passage is history, not a fact: it may be out of date, so check a find against the current state, and store what holds with memcue_add.',
+		parameters: {
+			query: { type: 'string', required: true, description: 'The words to look for: the same ones the empty memcue_search used.' },
+			limit: { type: 'integer', description: 'Most passages to return (default 5), one a message.' },
+			cwd: { type: 'string', description: 'Only sessions that ran in this directory or under it (default: every session of this machine).' },
+			before: { type: 'string', description: 'Only messages written before this time, RFC 3339 or YYYY-MM-DD (default: now).' },
+		},
+		output: {
+			schema: {
+				type: 'object',
+				additionalProperties: false,
+				properties: {
+					history: { type: 'string', required: true, description: 'The passages, newest first, under the header that says they are history, not facts; or the line that says nothing in the history holds the words.' },
+				},
+			},
+			render: (_args, value) => [{ type: 'text', text: value.history }],
+		},
+		async execute(args, exec) {
+			const query = String(args.query ?? '').trim()
+			if (!query) throw new Error('query is required')
+			await binaryChecked
+			if (!sessionsHistory) throw new Error(`memcue_sessions needs memcue ${SESSIONS_HISTORY} or later`)
+			const limit = Number.isInteger(args.limit) && args.limit > 0 ? args.limit : 5
+			const flags = ['sessions', '-n', String(limit)]
+			// The journal names a session by the harness's own id, so that is the id left out, not the mapped one.
+			const session = exec?.agent?.session?.id
+			if (session) flags.push('-session', String(session))
+			if (args.cwd) flags.push('-cwd', String(args.cwd))
+			if (args.before) flags.push('-before', String(args.before))
+			// The command reads every host's history, so it gets more time than a search of the base.
+			const { code, out, err } = await runMemcue(settings, [...flags, '--', query], { timeoutMs: 30_000 })
+			if (code !== 0) throw new Error(`memcue sessions exited ${code}: ${err.trim().slice(0, 500)}`)
+			return { history: out.trim() || 'memcue: nothing in the history holds those words' }
 		},
 	}))
 
