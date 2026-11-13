@@ -1,0 +1,40 @@
+{
+  "name": "memcue-transport",
+  "version": "0.37.1",
+  "description": "The memcue CLI transport and binary install shared by the native harness plugins",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "memcue",
+    "memory",
+    "transport"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juev/memcue.git",
+    "directory": "plugins/transport"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.mts",
+      "default": "./index.mjs"
+    }
+  },
+  "files": [
+    "index.mjs",
+    "transport.mjs",
+    "install.mjs",
+    "index.d.mts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test --test-concurrency=1 conformance/*.test.mjs"
+  }
+}
