@@ -1,0 +1,46 @@
+{
+  "issue": 756,
+  "measured": "2026-11-13",
+  "host": "OpenCode 2.3.0 (brew opencode-v2), `opencode run --standalone --auto --format json`",
+  "model": "opencode/iceman-free",
+  "prompt": "Make exactly one memcue_search call: query \"quarry pipeline checks\", limit 5. Do not search again. Then reply with the id and version of every fact you received, one line each, and stop.",
+  "binary": "bin/memcue of the branch (0.37.1 plus the rendering change; the CLI, its argv and its JSON are untouched)",
+  "facts": "five synthetic facts in a throwaway text base, scope global, one search returns all five; no private text",
+  "metric": "tokens.input + tokens.cache.read of the step that follows the tool result, from the step_finish events of --format json",
+  "arms": {
+    "before": {
+      "plugin": "main: JSON.stringify(answer, null, 2) plus a diagnostic text part",
+      "runs": [
+        { "tool_result_chars": 1903, "tool_result_lines": 44, "step2_prompt_tokens": 6897 },
+        { "tool_result_chars": 1903, "tool_result_lines": 44, "step2_prompt_tokens": 6928 },
+        { "tool_result_chars": 1903, "tool_result_lines": 44, "step2_prompt_tokens": 6913 },
+        { "tool_result_chars": 1903, "tool_result_lines": 44, "step2_prompt_tokens": 6910 }
+      ]
+    },
+    "after": {
+      "plugin": "branch: renderSearch one line per fact with id@version, scope and content, one trailer line",
+      "runs": [
+        { "tool_result_chars": 1006, "tool_result_lines": 6, "step2_prompt_tokens": 6571 },
+        { "tool_result_chars": 1006, "tool_result_lines": 6, "step2_prompt_tokens": 6587 },
+        { "tool_result_chars": 1006, "tool_result_lines": 6, "step2_prompt_tokens": 6576 }
+      ],
+      "failed_runs": ["one run ended in a provider timeout after 180 s (exit 124), no answer and no step_finish"]
+    }
+  },
+  "medians": {
+    "before_step2_prompt_tokens": 6911.5,
+    "after_step2_prompt_tokens": 6576,
+    "delta_tokens": 335.5,
+    "delta_share_of_step2_prompt": 0.0485,
+    "tool_result_chars_before": 1903,
+    "tool_result_chars_after": 1006,
+    "tool_result_chars_share_removed": 0.471,
+    "tool_result_lines_before": 44,
+    "tool_result_lines_after": 6
+  },
+  "notes": [
+    "The whole-plugin overhead measured in #752 (16,866 input units without the plugin against 18,345 with it) is not what this table removes: this is the share one search pays, on every search, in one step.",
+    "The free model answered with one tool call in every counted run; runs that deviated or failed were not counted.",
+    "The prompt, the facts, the binary and the model are identical in both arms; only the plugin's rendering differs."
+  ]
+}

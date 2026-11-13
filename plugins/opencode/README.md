@@ -60,6 +60,10 @@ Every field is optional; an unknown field is reported in the plugin log and memo
 
 - Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire`, and `memcue_dream_prepare` /
   `memcue_dream_apply` for maintenance with the session's own model.
+- `memcue_search` answers one line per fact — `id@version`, the scope that says where it holds, and the content —
+  then one trailer line with the count, an answer widened to other repositories and the binary's hints (#756). A
+  native diagnostic of a successful call stays in the tool metadata for the UI and the log; the model reads it only
+  when the call failed or its outcome is unknown.
 - The shared memory instruction, as a system-prompt part of every request.
 - A repository-pitfall snapshot, read once per session (`memcue session-card -pitfalls-json`) and again after a
   compaction. It covers the session's directory; a snapshot without pitfalls adds nothing, and a failed read says so

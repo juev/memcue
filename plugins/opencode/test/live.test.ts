@@ -19,7 +19,7 @@ interface Live {
   repo: string;
   fixture: ReturnType<typeof harness>;
   add: (input: Record<string, unknown>) => Promise<string>;
-  search: (query: string) => Promise<{ facts: Array<{ id: string; content: string; version: number }> }>;
+  search: (query: string) => Promise<string>;
 }
 
 async function fixture(t: TestContext): Promise<Live> {
@@ -60,40 +60,45 @@ async function fixture(t: TestContext): Promise<Live> {
     repo,
     fixture,
     add: input => call('memcue_add', input),
-    search: async (query) => JSON.parse(await call('memcue_search', { query })),
+    search: query => call('memcue_search', { query }),
   };
 }
 
-test('the real CLI stores, finds, corrects and retires a fact through the tools', live, async (t) => {
+/** The version the model reads in the one line of a fact (#756): `id@version scope content`. */
+function versionIn(text: string, id: string): number {
+  const match = new RegExp(`${id}@(\\d+) `).exec(text);
+  assert.ok(match, `the rendered search carries the version of ${id}: ${text}`);
+  return Number(match[1]);
+}
+
+test('the real CLI stores, finds, corrects and retires a fact from what the model reads', live, async (t) => {
   const live = await fixture(t);
   const id = (await live.add({ text: 'Live cobalt PROJ-9001 listens on port 6432.', source: 'agent' })).trim();
   assert.match(id, /^[0-9A-Z]+$/, `the add reported ${id}`);
 
+  // The rendering is the contract of #756: the model gets the fact in one line, with the version a correction
+  // needs, and the trailer says how many facts came back.
   const found = await live.search('cobalt PROJ-9001');
-  const fact = found.facts.find(item => item.id === id);
-  assert.ok(fact, 'the written fact is searchable at once');
-  assert.equal(fact.content, 'Live cobalt PROJ-9001 listens on port 6432.');
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?Live cobalt PROJ-9001 listens on port 6432\\.$`, 'm'),
+    `the written fact is searchable at once: ${found}`);
+  assert.match(found, /\n1 fact(\s*\|.*)?$/, `one fact and its trailer: ${found}`);
 
-  const corrected = await (async () => {
-    const tool = live.fixture.tools.get('memcue_correct');
-    assert.ok(tool);
-    const result = await tool.execute(
-      { id, text: 'Live cobalt PROJ-9001 listens on port 7432.', expectedVersion: fact.version },
-      { sessionID: 'live-session' },
-    );
-    return (result as { content: Array<{ text: string }> }).content[0].text;
-  })();
-  assert.match(corrected, new RegExp(id));
+  const tool = live.fixture.tools.get('memcue_correct');
+  assert.ok(tool);
+  await tool.execute(
+    { id, text: 'Live cobalt PROJ-9001 listens on port 7432.', expectedVersion: versionIn(found, id) },
+    { sessionID: 'live-session' },
+  );
 
   const after = await live.search('cobalt PROJ-9001');
-  assert.equal(after.facts.find(item => item.id === id)?.content, 'Live cobalt PROJ-9001 listens on port 7432.');
+  assert.match(after, new RegExp(`^${id}@2 (?:\\S+ )?Live cobalt PROJ-9001 listens on port 7432\\.$`, 'm'),
+    `the correction is current: ${after}`);
 
   const retire = live.fixture.tools.get('memcue_retire');
   assert.ok(retire);
-  const version = after.facts.find(item => item.id === id)?.version ?? 2;
-  await retire.execute({ id, expectedVersion: version }, { sessionID: 'live-session' });
+  await retire.execute({ id, expectedVersion: versionIn(after, id) }, { sessionID: 'live-session' });
   const gone = await live.search('cobalt PROJ-9001');
-  assert.equal(gone.facts.find(item => item.id === id), undefined, 'a retired fact leaves ordinary search');
+  assert.equal(gone, 'No stored facts match.', `a retired fact leaves ordinary search: ${gone}`);
 });
 
 test('the repository-pitfall snapshot comes from the real base and is refreshed after a compaction', live, async (t) => {

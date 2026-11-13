@@ -27,6 +27,16 @@ async function ok(pi: Pi, name: string, args: ToolCall['arguments']) {
   return result.text;
 }
 
+/** A literal for a regular expression, for the fact text a rendering must carry word for word. */
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The version the model reads in the one line of a fact (#756): `id@version scope content`. */
+function versionIn(text: string, id: string): number {
+  const match = new RegExp(`${id}@(\\d+) `).exec(text);
+  assert.ok(match, `the rendered search carries the version of ${id}: ${text}`);
+  return Number(match[1]);
+}
+
 test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed versions', live, async t => {
   const fixture = await liveFixture(t);
   const first = await openPi(fixture);
@@ -35,10 +45,11 @@ test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed
   await first.dispose();
   const pi = await openPi(fixture);
   t.after(() => pi.dispose());
-  const found = JSON.parse(await ok(pi, 'memcue_search', { query: 'concurrency examples', minScore: 0 }));
-  assert.equal(found.facts.find((fact: { id: string }) => fact.id === id)?.version, 1);
+  const found = await ok(pi, 'memcue_search', { query: 'concurrency examples', minScore: 0 });
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?${escape(content)}$`, 'm'),
+    `the written fact is rendered with its version: ${found}`);
   const corrected = 'Prefer short concrete concurrency examples in design explanations.';
-  await ok(pi, 'memcue_correct', { id, text: corrected, expectedVersion: 1 });
+  await ok(pi, 'memcue_correct', { id, text: corrected, expectedVersion: versionIn(found, id) });
   const refused = await call(pi, 'memcue_correct', { id, text: 'A stale decision must not be saved.', expectedVersion: 1 });
   assert.equal(refused.isError, true);
   assert.match(refused.text, /refused|version|changed|expected/i);
@@ -66,8 +77,9 @@ test('SDK + CLI: inherited remote backends cannot redirect synthetic writes', li
   t.after(() => pi.dispose());
   const content = 'Synthetic facts must remain in the temporary local base.';
   const id = (await ok(pi, 'memcue_add', { text: content, source: 'user', kind: 'rule', scope: 'global' })).trim();
-  const found = JSON.parse(await ok(pi, 'memcue_search', { query: 'temporary local base', minScore: 0 }));
-  assert.equal(found.facts.find((fact: { id: string }) => fact.id === id)?.content, content);
+  const found = await ok(pi, 'memcue_search', { query: 'temporary local base', minScore: 0 });
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?${escape(content)}$`, 'm'),
+    `the written fact is rendered with its version: ${found}`);
 });
 
 test('SDK + CLI: repo pitfalls refresh on the next prompt and do not leak into another repository', live, async t => {
@@ -128,7 +140,7 @@ test('SDK + CLI: a packed standalone package installs and loads via its manifest
   const id = successful(await fixture.run(['add', '-source', 'user', '-kind', 'decision', '--', fact], true), true).trim();
   const pi = await openPi(fixture, { entry: installed });
   t.after(() => pi.dispose());
-  const result = JSON.parse(await ok(pi, 'memcue_search', { query: 'release packaging decision', minScore: 0 }));
-  assert.equal(result.facts.find((value: { id: string }) => value.id === id)?.content, fact);
+  const result = await ok(pi, 'memcue_search', { query: 'release packaging decision', minScore: 0 });
+  assert.match(result, new RegExp(`^${id}@1 (?:\\S+ )?${escape(fact)}$`, 'm'), result);
   assert.deepEqual(pi.errors, []);
 });

@@ -22,7 +22,8 @@ fact base:
   command reads this harness's journal under `$DSH_HOME/sessions` (else `~/.dsh/sessions`) beside the other hosts'
   transcripts, so a dsh session searches its own history too.
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.
-- **Five tools**: `memcue_search` (facts by words, with their ids; an optional `limit`), `memcue_sessions` (passages
+- **Five tools**: `memcue_search` (facts by words, one line each with `id@version`, the scope and the content, and
+  one trailer line with the count, a widened answer and the binary's hints; an optional `limit`), `memcue_sessions` (passages
   of earlier sessions by words, newest first; optional `limit`, `cwd` and `before`), `memcue_add` (one new fact;
   with `shelf`, a finding read from outside sources that only a search naming the shelf returns, #545),
   `memcue_correct` (a new version of a stored fact, with optional `expires`) and `memcue_retire` (stop

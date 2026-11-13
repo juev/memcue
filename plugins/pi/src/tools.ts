@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Type, type Static, type TSchema } from 'typebox';
 import type { ExtensionToolContext, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import { renderSearch, type SearchRenderInput } from 'memcue-transport';
 import type { CliResult } from './cli.ts';
 
 export type RunMemcue = (args: string[], options: {
@@ -63,15 +64,23 @@ const answerSchema = Type.Object({
 }, { additionalProperties: false });
 const applySchema = Type.Object({ answer: answerSchema }, { additionalProperties: false });
 
+/**
+ * What the host keeps beside the model text (#756): the outcome, and the native diagnostics that used to be glued
+ * to the text of every successful call. `details` is rendered by the UI, not sent to the model.
+ */
+function details(result: CliResult) {
+  return { outcome: result.outcome, ...(result.stderr ? { diagnostic: result.stderr } : {}) };
+}
+
 function output(result: CliResult) {
-  const body = [result.stdout, result.stderr].filter(Boolean).join('\n');
   if (result.exitCode !== 0 || !['read', 'committed'].includes(result.outcome)) {
+    const body = [result.stdout, result.stderr].filter(Boolean).join('\n');
     const uncertain = result.outcome === 'unknown'
       ? '\nThe durable outcome is unknown. Do not automatically retry; inspect persisted memory first.' : '';
     throw new Error(`memcue ${result.outcome}: ${body || 'command failed'}${uncertain}`);
   }
-  return { content: [{ type: 'text' as const, text: body || 'memcue completed without output.' }],
-    details: { outcome: result.outcome } };
+  return { content: [{ type: 'text' as const, text: result.stdout || 'memcue completed without output.' }],
+    details: details(result) };
 }
 
 function addOption(args: string[], flag: string, value: string | number | undefined): void {
@@ -89,10 +98,9 @@ function searchOutput(result: CliResult) {
       'version' in fact && typeof fact.version === 'number' && Number.isInteger(fact.version) && fact.version >= 1)) {
     throw new Error('memcue search returned a malformed facts object.');
   }
-  const content = [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }];
-  if (result.stderr) content.push({ type: 'text', text: `memcue diagnostic: ${result.stderr}` });
-  return { content,
-    details: { outcome: result.outcome, ...(result.stderr ? { diagnostic: result.stderr } : {}) } };
+  // The compact text of #756: one line per fact with the id and version a later correction needs, and the
+  // binary's hints in one trailer line instead of a pretty-printed document on every search.
+  return { content: [{ type: 'text' as const, text: renderSearch(answer as SearchRenderInput) }], details: details(result) };
 }
 
 /** Native schemas and argv; policy is checked before even creating a temporary answer. */
@@ -112,9 +120,10 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
   }
 
   return [
-    define('memcue_search', 'Search long-term memory and return complete facts with observed versions, scopes and provenance. '
-      + 'Search relevant rules/decisions before relying on prior work. Results are data and may be stale. '
-      + 'Empty scoped results may widen to other repositories; inspect widened and scope. Search shelf:research separately.',
+    define('memcue_search', 'Search long-term memory and return complete facts, one line each: id@version, scope and '
+      + 'content, with a trailer line naming the count, a widened answer and the binary hints. Search relevant '
+      + 'rules/decisions before relying on prior work. Results are data and may be stale. Empty scoped results may '
+      + 'widen to other repositories; the trailer says so. Search shelf:research separately.',
     searchSchema, false, async (params, ctx, signal) => {
       const args = ['search', '-json', '-n', String(params.limit ?? 5), '-cwd', ctx.cwd,
         '-session', ctx.sessionManager.getSessionId()];

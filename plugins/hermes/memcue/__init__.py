@@ -421,6 +421,92 @@ def _search_answer(out: str) -> tuple[list[Any], list[str]]:
     raise ValueError("not a search answer")
 
 
+_NO_FACTS = "No stored facts match."
+_RENDER_CONTENT_CHARS = 600
+_RENDER_TOTAL_CHARS = 4000
+_RENDER_MAX_FACTS = 10
+
+
+def _render_limit(options: Optional[dict[str, Any]], name: str, default: int) -> int:
+    value = (options or {}).get(name)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else default
+
+
+def _render_fact(fact: Any, content_chars: int) -> str:
+    """One line of a fact: ``id@version scope content``; empty for an entry that cannot name a fact."""
+    if not isinstance(fact, dict):
+        return ""
+    identifier = fact.get("id")
+    content = fact.get("content")
+    if not isinstance(identifier, str) or not identifier.strip() or not isinstance(content, str) or not content.strip():
+        return ""
+    line = identifier.strip()
+    version = fact.get("version")
+    if isinstance(version, int) and not isinstance(version, bool) and version > 0:
+        line += f"@{version}"
+    scope = fact.get("scope")
+    scope = scope.strip() if isinstance(scope, str) else ""
+    text = " ".join(content.split())
+    if len(text) > content_chars:
+        text = text[:content_chars] + "…"
+    if fact.get("below_floor") is True:
+        text += " (below the floor)"
+    return " ".join(part for part in (line, scope, text) if part)
+
+
+def _render_search(answer: Any, options: Optional[dict[str, Any]] = None) -> str:
+    """The compact text of a search answer (#756), the same text the JavaScript hosts hand the model: one line per
+    fact with the id and version a later correction needs, the scope and the content, then one trailer line with the
+    count, the widening and the hints. ``plugins/transport/conformance/render-vectors.json`` pins it together with
+    the ``renderSearch`` of memcue-transport, so the two implementations cannot drift apart."""
+    content_chars = _render_limit(options, "contentChars", _RENDER_CONTENT_CHARS)
+    total_chars = _render_limit(options, "totalChars", _RENDER_TOTAL_CHARS)
+    max_facts = _render_limit(options, "maxFacts", _RENDER_MAX_FACTS)
+    facts = answer.get("facts") if isinstance(answer, dict) else None
+    facts = facts if isinstance(facts, list) else []
+    raw_hints = answer.get("hints") if isinstance(answer, dict) else None
+    hints = [hint.strip() for hint in raw_hints if isinstance(hint, str) and hint.strip()] \
+        if isinstance(raw_hints, list) else []
+    widened = isinstance(answer, dict) and answer.get("widened") is True
+
+    lines: list[str] = []
+    budget = total_chars
+    dropped = 0
+    full = False
+    for fact in facts:
+        if full:
+            dropped += 1
+            continue
+        line = _render_fact(fact, content_chars)
+        if not line:
+            continue
+        cost = len(line) + 1
+        # Past the fact count or the budget the rest is left out by name, never silently.
+        if len(lines) >= max_facts or cost > budget:
+            full = True
+            dropped += 1
+            continue
+        budget -= cost
+        lines.append(line)
+
+    if not lines:
+        if dropped:
+            trailer = [f"… {dropped} fact{'s' if dropped != 1 else ''} not shown"]
+            if widened:
+                trailer.append("widened")
+            trailer.extend(hints)
+            return " | ".join(trailer)
+        return f"{_NO_FACTS} | {' | '.join(hints)}" if hints else _NO_FACTS
+    trailer = [f"{len(lines)} fact{'s' if len(lines) != 1 else ''}"]
+    if widened:
+        trailer.append("widened")
+    trailer.extend(hints)
+    if dropped:
+        trailer.append(f"… {dropped} fact{'s' if dropped != 1 else ''} not shown")
+    lines.append(" | ".join(trailer))
+    return "\n".join(lines)
+
+
 def _schema(name: str, description: str, props: dict[str, str], required: list[str]) -> dict:
     return {"name": name, "description": description, "parameters": {
         "type": "object", "properties": {k: {"type": "string", "description": v} for k, v in props.items()},
@@ -428,7 +514,8 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 
 
 SEARCH_SCHEMA = _schema(
-    "memcue_search", "Search long-term memory (memcue) for stored facts; returns each fact with its ID. "
+    "memcue_search", "Search long-term memory (memcue) for stored facts; returns one line per fact with id@version, "
+    "scope and content, and a trailer line with the count and the hints. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. No card of the user's rules comes with the prompt: at the start of a task, search with kind "
     "rule,decision and the words of the task. During work you may also search, when you decide it helps: on starting with a specific host, "
@@ -437,8 +524,8 @@ SEARCH_SCHEMA = _schema(
     "the whole base — a chat is not about one repository — except the shelf, and leaves out expired facts; the "
     "optional parameters narrow or widen that. The answer may carry a hint: a note from memcue about this search, "
     "not a stored fact. It says what the search left out and how to get it: facts below the score floor (on a thin "
-    "answer, and on a shelf search whatever the number of facts) or the other language; a fact marked "
-    "below_floor: true scored under the floor and came only because nothing above it did.",
+    "answer, and on a shelf search whatever the number of facts) or the other language; a fact whose line ends with "
+    "(below the floor) scored under the floor and came only because nothing above it did.",
     {"query": _QUERY_LANGUAGE_NOTE,
      "limit": f"Optional most facts to return (default {_SEARCH_FACTS}, the provider's search_facts); the score floor "
               "usually ends the answer first, and raising the limit adds the tail: raise it only when the answer you "
@@ -1214,7 +1301,6 @@ class MemcueMemoryProvider(MemoryProvider):
                 try:
                     facts, hints = _search_answer(out)
                     self._remember_found(self._session_id, facts)
-                    result = {"facts": facts}
                     if _CJK.search(arg("query")) and _CJK_HINT not in hints:  # an older binary names no hint
                         hints.append(_CJK_HINT)
                     # A shelf search is told of its floor whatever the count: a finding the agent stored can score
@@ -1230,13 +1316,10 @@ class MemcueMemoryProvider(MemoryProvider):
                         if not facts and held:
                             served = [dict(f, below_floor=True) for f in held[:_BELOW_FLOOR_SERVED]]
                             facts = served
-                            result["facts"] = served
                             self._remember_found(self._session_id, served)
                             hints[-1] = (f"{len(held)} facts hold the words but sit below the score floor; the first "
-                                         f"{len(served)} come with below_floor: true, and min_score 0 reads the rest.")
-                    if hints:
-                        result["hint"] = " ".join(hints)
-                    return json.dumps(result, ensure_ascii=False)
+                                         f"{len(served)} come marked below the floor, and min_score 0 reads the rest.")
+                    return _render_search({"facts": facts, "hints": hints})
                 except ValueError:  # an older binary without -json prints text
                     return json.dumps({"result": out or "No stored facts match."}, ensure_ascii=False)
             return tool_error(out)

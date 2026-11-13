@@ -1,9 +1,10 @@
 # memcue-transport
 
-The memcue CLI transport and binary install shared by the native harness plugins (#754). One implementation,
-imported by the Pi and OpenCode plugins from npm and by the DeepSeek Harness plugin through the `memcue-dsh/transport`
-subpath of the unified root package, so a fix reaches every host at once. The conformance suite in `conformance/`
-runs the same contract against every host adapter, the shell wrapper and the Python provider included.
+The memcue CLI transport, the binary install and the compact search rendering shared by the native harness plugins
+(#754, #756). One implementation, imported by the Pi and OpenCode plugins from npm and by the DeepSeek Harness plugin
+through the `memcue-dsh/transport` subpath of the unified root package, so a fix reaches every host at once. The
+conformance suite in `conformance/` runs the same contract against every host adapter, the shell wrapper and the
+Python provider included.
 
 Plain ESM JavaScript with a hand-written declaration file: the DeepSeek Harness plugin loads from `node_modules`,
 where Node refuses to strip TypeScript types, and OpenCode runs plugins inside Bun. Node 24 and Bun are both
@@ -25,6 +26,22 @@ supported. There is no build step.
 - a command that never started is `not-started`, distinct from an unknown mutation;
 - ambient `MEMCUE_*` settings reach the CLI; the configured ones override them, and the ambient
   `MEMCUE_OUTCOME_NONCE` is always removed.
+
+## Search rendering
+
+`renderSearch(answer, options)` turns a parsed `memcue search -json` answer into the text a native host hands the
+model (#756): one line per fact — `<id>@<version> <scope> <content>` — and one trailer line with the count, the
+widening and the hints the binary printed, word for word. Nothing is dropped silently: a cut answer says how many
+facts it left out, and a fact served under the score floor carries `(below the floor)`.
+
+- `contentChars` (default 600) clips one fact's content with an ellipsis, and a fact never costs two lines;
+- `totalChars` (default 4000) bounds the fact lines; the trailer line is added on top of that budget;
+- `maxFacts` (default 10) bounds the number of fact lines.
+
+The form is the same in every host, and `conformance/render-vectors.json` pins the exact text for this renderer and
+for the Python one of the Hermes provider: `conformance/render.test.mjs` and `conformance/hermes_contract.py` run the
+same vectors, so the two implementations cannot drift apart. The rendering is host-side by design: no CLI flag, no
+argv and no receipt changes with it.
 
 ## Install contract
 
