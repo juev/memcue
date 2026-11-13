@@ -92,6 +92,14 @@ jobs:
         run: node --check plugins/transport/index.mjs
 
       # npm Trusted Publishing: the OIDC token comes from id-token: write, so there is no NPM_TOKEN.
+      # publish-transport.yml may have bootstrapped this version ahead of the tag, so an already-published
+      # version is a success, not a conflict.
       - name: Publish
         working-directory: plugins/transport
-        run: npm publish --access public
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "memcue-transport@$version" version >/dev/null 2>&1; then
+            echo "memcue-transport@$version is already published; skipping"
+          else
+            npm publish --access public
+          fi

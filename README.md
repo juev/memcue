@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.37.1`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.38.0`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.38.0 | 9 | 0.38.0 | 0.38.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.38.0 (`hermes-agent` >=0.17.0) |
 | 0.37.1 | 9 | 0.37.1 | 0.37.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.1 (`hermes-agent` >=0.17.0) |
 | 0.37.0 | 9 | 0.37.0 | 0.37.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.0 (`hermes-agent` >=0.17.0) |
 | 0.36.2 | 9 | 0.36.2 | 0.36.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.36.2 (`hermes-agent` >=0.17.0) |
@@ -324,6 +325,22 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.38.0: one CLI transport for every plugin, the Qwen Code plugin, and sessions across hosts (#754, #753, #755, #630)
+
+- **New: the Qwen Code plugin** (`qwen extensions install /path/to/memcue/plugins/qwen-code --scope user`, see
+  [plugins/qwen-code](plugins/qwen-code/README.md)). Pull-mode memory over classic hooks: the model searches and
+  writes facts itself, and the hooks deliver the instruction and the repository's pitfalls. It needs Python 3.9+ and
+  a release binary; the adapter never downloads one.
+- **`memcue sessions` reads the DeepSeek Harness journal and OpenCode transcripts** besides Claude Code and Qwen Code
+  (#630, #755, #753). The DSH plugin gains the `memcue_sessions` tool: when `memcue_search` finds nothing, the model
+  searches the harness's own journal with the same words.
+- **Every native plugin runs one CLI transport** (`memcue-transport`, #754): one spawn per call, the process-group
+  kill, the 4 MiB output budget and the outcome receipt. The `memcue-dsh` npm package and the GitHub bundle are now
+  one package at the repository root; install paths, locks and opt-outs are unchanged. Hermes reports a refusal with
+  a corrupted receipt as an unknown outcome, not a refusal. A conformance suite (`make test-conformance`) holds every
+  host to the same contract.
+- The fact-base schema stays 9.
 
 ### 0.37.1: Pi session controls survive a reload, and full release notes (#743, #740)
 
