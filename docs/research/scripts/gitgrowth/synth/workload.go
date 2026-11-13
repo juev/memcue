@@ -18,7 +18,7 @@ import (
 )
 
 // gen makes synthetic fact text: words from a fixed pseudo-vocabulary (Latin and Cyrillic syllables) drawn with a
-// Zipf distribution, at the average lengths of the inspected base (content 234, queries 128, keywords 57 characters).
+// Zipf distribution, at the average length of the inspected base (content 234 characters).
 // It is deterministic for a seed. Nothing in it comes from a real base.
 type gen struct {
 	r     *rand.Rand
@@ -66,18 +66,6 @@ func (g *gen) text(mean, sd, lo, hi float64) string {
 	return b.String()
 }
 
-func (g *gen) list(items, words int) []string {
-	out := make([]string, 0, items)
-	for range items {
-		parts := make([]string, 1+g.r.IntN(words))
-		for i := range parts {
-			parts[i] = g.word()
-		}
-		out = append(out, strings.Join(parts, " "))
-	}
-	return out
-}
-
 // edit changes about a fifth of the words of s: a correction rewrites part of a fact, not all of it.
 func (g *gen) edit(s string) string {
 	ws := strings.Fields(s)
@@ -111,7 +99,7 @@ func (g *gen) meta() store.Meta {
 }
 
 func (g *gen) input() store.FactInput {
-	in := store.FactInput{Content: g.text(234, 70, 60, 600), Keywords: g.list(5, 1),
+	in := store.FactInput{Content: g.text(234, 70, 60, 600),
 		Origin: fmt.Sprintf("proj-%02d/%s %s", g.r.IntN(30), g.word(), time.Now().UTC().Format(time.DateOnly)),
 		Meta:   g.meta()}
 	if g.r.IntN(10) == 0 {
@@ -145,14 +133,19 @@ func move(from, to *[]string, id string) {
 
 // The mix of writes between two syncs, calibrated on the inspected base: about 136 new versions per commit, of which
 // adds give the growth in ids (2 400 at the first commit, about 4 700 at the last), retirements about a fifth of the
-// ids, and the rest new versions of existing facts (queries and labels from the dream, corrections).
+// ids, and the rest new versions of existing facts (labels from the dream, corrections). The queries op went with the
+// feature; the remaining weights keep their ratios.
 var mix = []struct {
 	op     string
 	weight int
-}{{"add", 14}, {"queries", 45}, {"relabel", 20}, {"correct", 13}, {"retire", 7}, {"restore", 1}}
+}{{"add", 14}, {"relabel", 20}, {"correct", 13}, {"retire", 7}, {"restore", 1}}
 
 func (g *gen) op() string {
-	n := g.r.IntN(100)
+	total := 0
+	for _, m := range mix {
+		total += m.weight
+	}
+	n := g.r.IntN(total)
 	for _, m := range mix {
 		if n < m.weight {
 			return m.op
@@ -176,10 +169,7 @@ func (g *gen) apply(s *store.Store, fs *facts) (string, error) {
 	switch op {
 	case "add":
 		in := g.input()
-		f, err = s.AddWith(in.Content, in.Keywords, in.Origin, in.Expires, in.Meta)
-	case "queries":
-		id := fs.live[g.r.IntN(len(fs.live))]
-		f, err = s.SetQueries(id, fs.version[id], g.list(4, 4))
+		f, err = s.AddWith(in.Content, in.Origin, in.Expires, in.Meta)
 	case "relabel":
 		id := fs.live[g.r.IntN(len(fs.live))]
 		m := g.meta()
@@ -188,7 +178,7 @@ func (g *gen) apply(s *store.Store, fs *facts) (string, error) {
 		id := fs.live[g.r.IntN(len(fs.live))]
 		var cur store.Fact
 		if cur, err = s.Get(id); err == nil {
-			f, err = s.Correct(id, g.edit(cur.Content), cur.Keywords)
+			f, err = s.Correct(id, g.edit(cur.Content))
 		}
 	case "retire":
 		id := fs.live[g.r.IntN(len(fs.live))]
