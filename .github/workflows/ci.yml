@@ -103,6 +103,30 @@ jobs:
       - name: typecheck and test Pi with the real CLI
         run: make test-pi
 
+  opencode:
+    name: opencode / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: plugins/opencode/package-lock.json
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: install the OpenCode plugin dependencies
+        run: npm --prefix plugins/opencode ci --ignore-scripts --no-audit --no-fund
+      # The plugin is tested against a mock OpenCode context and the built memcue CLI: no model, no OpenCode binary.
+      - name: typecheck and test the OpenCode plugin
+        run: make test-opencode
+
   card-research:
     name: card research contracts
     runs-on: ubuntu-latest

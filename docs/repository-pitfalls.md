@@ -110,6 +110,25 @@ compaction, persisted resume/fork headers, replacement cwd, session controls, ca
 responses. The SDK-to-real-CLI path uses synthetic repositories/bases and a deterministic provider with network
 disabled. These checks do not prove real-model behavior or the full foreground/background pi-subagents runner.
 
+## OpenCode
+
+The standalone `memcue-opencode` package targets OpenCode **2** (tested 2.2.7) and memcue **0.36.1 or later**, and can
+install the matching released binary when no compatible binary is configured. See
+[installation and role policy](../plugins/opencode/README.md).
+
+The server part adds the memory instruction and the snapshot as system-prompt parts of every primary request; the
+snapshot itself is read once per session with `session-card -pitfalls-json` from the session's directory, and again
+after a compaction. An empty snapshot adds no part, and a failed read replaces it with an explicit unavailability
+diagnostic instead of reusing an older one. OpenCode 2.2.7 loads plugins inside the server process (Bun), where a
+plugin's console output is not kept: diagnostics go to `$XDG_STATE_HOME/opencode/memcue/plugin.log`, and a plugin
+that fails to load at all is reported only as `failed to load plugin` in OpenCode's own log.
+
+Child sessions (a subagent or a fork) get no memory unless the agent they run is enabled in `subagents.agents`; that
+is an adapter policy, not a sandbox, and it does not erase memory already copied into a parent's messages or
+compaction summaries. The tests run against a mock OpenCode context and a stand-in CLI, plus live CRUD and snapshot
+checks against a synthetic base and repository; they do not prove real-model behaviour, and no OpenCode binary or
+model runs in CI. The v1 plugin API is not supported, because OpenCode 2 does not run v1 plugins.
+
 ## Other integrations and verification limits
 
 Codex retains supported start/task/Bash hook payloads and `additionalContextLimit: 0`. Relative target fields are an

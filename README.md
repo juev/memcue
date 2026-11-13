@@ -43,7 +43,8 @@ The base can live in a git repository and be synced between machines; memcue shi
 machine runs `memcue server` and the others keep a replica of its base, synced over a tailnet: set `MEMCUE_SERVER`
 (see [server mode](docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet)). The same
 base works for [Hermes Agent](plugins/hermes/README.md), for
-[DeepSeek Harness](plugins/deepseek-harness/README.md) and for the [Pi coding agent](plugins/pi/README.md).
+[DeepSeek Harness](plugins/deepseek-harness/README.md), for the [Pi coding agent](plugins/pi/README.md) and for
+[OpenCode](plugins/opencode/README.md).
 
 memcue is young: the 0.4 line has been measured on one developer's memory and sessions (see [Results](#results)) and
 not yet run for long in daily work.
@@ -226,7 +227,7 @@ is ignored. A base named by `MEMCUE_FACTS` or a plugin's `facts` setting is not 
 
 ### Binary from the plugin
 
-All three plugins (Claude Code, DSH, Hermes) find the binary in this order: the one configured explicitly
+The plugins (Claude Code, DSH, Hermes, Pi, OpenCode) find the binary in this order: the one configured explicitly
 (`MEMCUE_BIN`, or `binary` in the DSH and Hermes config); `memcue` on `PATH` when it is the plugin's release or newer;
 the copy the plugin installed; an older `memcue` on `PATH`, so search keeps working. When none of them is the plugin's
 release or newer, the plugin downloads its release from GitHub, checks the archive against the release's
@@ -237,6 +238,8 @@ release or newer, the plugin downloads its release from GitHub, checks the archi
 | Claude Code | `~/.local/bin/memcue`, the machine's one binary | in `SessionStart`, before the first answer of the session; the directory goes on the session's `PATH`, so the skill finds `memcue` too |
 | DSH | the same file, shared with Claude Code | in the background at plugin start |
 | Hermes | `$HERMES_HOME/memcue/bin/<version>/memcue`, which outlives the container | in the background at the first `initialize` |
+| Pi | `~/.local/bin/memcue`, shared with the other plugins | on the first request of the session, before `session-card` |
+| OpenCode | the same file | on the first request that needs memcue: the system-prompt snapshot or a tool |
 
 Claude Code and DSH share one binary per machine: a plugin replaces `~/.local/bin/memcue` only when it is older than
 the plugin's release, so a plugin of an older release keeps running the newer binary instead of installing its own.
@@ -1509,17 +1512,17 @@ The local review page (`memcue review`) went in #325, `vet` in #494, `candidates
 
 ## Harness support
 
-The same base and binary serve all three hosts; the adapters differ at the edges:
+The same base and binary serve every host here; the adapters differ at the edges:
 
-| Capability | Claude Code | DeepSeek Harness | Hermes Agent |
-|---|---|---|---|
-| Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool |
-| Rules and decisions | searched by the agent at the start of a task, as the `SessionStart` note says; no card | the same, as the system-prompt section says; `session-card` hints on first step and after compaction | the same, as the system prompt says; `session-card` hints in the system prompt, rebuilt after compression |
-| Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool |
-| `add` / `correct` / `retire` | skill and CLI | four tools | four tools |
-| Expiry | CLI and skill | `add` / `correct` | `add` / `correct` |
-| Dream | background on the session start; else the `memcue-dream` skill on its hint | background on `session-card` with `apiUrl` | background on `session-card` with `api_url`; else dream tools on the system-prompt hint |
-| Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as live facts (#440) |
+| Capability | Claude Code | DeepSeek Harness | Hermes Agent | Pi | OpenCode |
+|---|---|---|---|---|---|
+| Search by the agent | `memcue search` (Bash) | `memcue_search` tool | `memcue_search` tool | `memcue_search` tool | `memcue_search` tool |
+| Rules and decisions | searched by the agent at the start of a task, as the `SessionStart` note says; no card | the same, as the system-prompt section says; `session-card` hints on first step and after compaction | the same, as the system prompt says; `session-card` hints in the system prompt, rebuilt after compression | the same, as the system-prompt section says; no per-step hints | the same, as a system-prompt part; the pitfall snapshot is rebuilt after a compaction |
+| Writing facts | the agent, `memcue add` through the skill | the agent, `memcue_add` tool | the agent, `memcue_add` tool | `memcue_add` tool | `memcue_add` tool |
+| `add` / `correct` / `retire` | skill and CLI | four tools | four tools | four tools | four tools |
+| Expiry | CLI and skill | `add` / `correct` | `add` / `correct` | `add` / `correct` | `add` / `correct` |
+| Dream | background on the session start; else the `memcue-dream` skill on its hint | background on `session-card` with `apiUrl` | background on `session-card` with `api_url`; else dream tools on the system-prompt hint | dream tools, on the model's request | dream tools, on the model's request |
+| Mirror of built-in memory | not applicable | no built-in memory files | `MEMORY.md` / `USER.md` mirrored as live facts (#440) | not applicable | not applicable |
 
 State and logs for the default base live in `$XDG_STATE_HOME/memcue`; any other base gets a per-base subdirectory,
 `$XDG_STATE_HOME/memcue/<hash>`, so two bases on one machine do not share a dream schedule. `MEMCUE_STATE_DIR`
@@ -1529,6 +1532,12 @@ schedule always follow the base. By default Claude Code, DSH and Codex share one
 is moved); Hermes keeps `$HERMES_HOME/memcue/facts.db`, because the home of a container may not outlive it. Each
 becomes a `facts` directory after `memcue migrate -text`, and the cache of a text history is `facts.db` in the state
 directory. To share the base with Hermes too, point its `facts` option at the same base.
+
+## OpenCode
+
+memcue also works as a native OpenCode 2 plugin: the tools the model writes its memory with, the memory instruction
+and the repository's pitfalls in the system prompt, and `/memcue` for status, switching memory off for a session or
+starting maintenance. See [plugins/opencode](plugins/opencode/README.md).
 
 ## DeepSeek Harness
 
