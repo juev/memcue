@@ -6,7 +6,7 @@ GOLANGCI_LINT ?= golangci-lint
 CLAUDE_BIN ?= claude
 HERMES_PYTHON ?= python3
 
-.PHONY: build test test-plugins test-pi test-codex test-qwen test-claude-mods test-hermes-request lint bench previous-release
+.PHONY: build test test-plugins test-opencode test-pi test-codex test-qwen test-claude-mods test-hermes-request lint bench previous-release
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -40,6 +40,7 @@ test-plugins: build
 		echo "install them with: npm install --no-save --no-package-lock @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/dsh-tools@0.2.0-rc.2"; \
 	fi
 	$(MAKE) test-pi
+	$(MAKE) test-opencode
 
 lint:
 	@have=$$($(GOLANGCI_LINT) version 2>&1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1); \
@@ -48,6 +49,11 @@ lint:
 	fi
 	go vet -p 2 ./...
 	$(GOLANGCI_LINT) run --concurrency 2 ./...
+
+# Install the plugin's dependencies first: npm --prefix plugins/opencode ci
+test-opencode: build
+	npm --prefix plugins/opencode run typecheck
+	MEMCUE_TEST_BINARY="$(CURDIR)/bin/memcue" npm --prefix plugins/opencode test
 
 # Install the pinned Pi test dependencies first: npm --prefix plugins/pi ci
 test-pi: build

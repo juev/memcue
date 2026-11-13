@@ -1,6 +1,6 @@
 # Releasing
 
-One release covers the binary and all three plugins: they carry the same version.
+One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, OpenCode): they carry the same version.
 
 ## Order
 
@@ -10,7 +10,11 @@ One release covers the binary and all three plugins: they carry the same version
    - `plugins/deepseek-harness/package.json`;
    - `plugins/claude-code/.claude-plugin/plugin.json`;
    - `plugins/hermes/memcue/plugin.yaml`;
-   - `plugins/claude-code/test/versions.test.mjs`, which checks the four above and the README.
+   - `plugins/hermes/memcue-context/plugin.yaml`;
+   - `plugins/pi/package.json`;
+   - `plugins/opencode/package.json`;
+   - `plugins/codex/.codex-plugin/plugin.json`;
+   - `plugins/claude-code/test/versions.test.mjs`, which checks the manifests above and the README.
 3. In `README.md`, update the release named in [Compatibility](../README.md#compatibility), add a row to its table, and
    add a section under [Upgrade](../README.md#upgrade): what changed for a user, and whether the schema or a flag did.
 4. Run `make test`. After CI passes, merge the PR with a rebase.
@@ -19,12 +23,17 @@ One release covers the binary and all three plugins: they carry the same version
    ```bash
    git tag vX.Y.Z
    git tag dsh-vX.Y.Z
-   git push origin vX.Y.Z dsh-vX.Y.Z
+   git tag pi-vX.Y.Z
+   git tag opencode-vX.Y.Z
+   git push origin vX.Y.Z dsh-vX.Y.Z pi-vX.Y.Z opencode-vX.Y.Z
    ```
 
    `v*` runs `release.yml`: tests, then GoReleaser publishes the binaries and `checksums.txt`. `dsh-v*` runs
    `publish-dsh.yml`, which publishes `memcue-dsh` to npm and refuses a tag that differs from the package version.
    Without the `dsh-v` tag npm keeps the previous plugin, and that is how npm stayed at 0.5.3 through 0.11.1.
+   `pi-v*` runs `publish-pi.yml` for `memcue-pi`, and `opencode-v*` runs `publish-opencode.yml` for `memcue-opencode`;
+   both refuse a tag that differs from their package version. The first publish of each package and its trusted
+   publisher on npmjs.com are manual steps.
 6. Check both results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version` prints `X.Y.Z`.
 
 ## After the release
@@ -37,3 +46,5 @@ release does so only when no configured binary is set.
 - **dsh:** installed plugins do not update (dsh 0.2.0-rc.2 says so in its plugin manager). Uninstall `memcue-dsh` and
   install it again. A profile owned by the desktop app is changed only from its **Plugins** page.
 - **Hermes:** copy `plugins/hermes/memcue` over `$HERMES_HOME/plugins/memcue` again.
+- **Pi:** `pi install npm:memcue-pi` again, or reload the installed package.
+- **OpenCode:** `opencode plugin update memcue-opencode`, then restart the session; `/memcue status` names the binary.

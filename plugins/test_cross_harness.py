@@ -139,6 +139,52 @@ class PiNoteTest(unittest.TestCase):
         self.assertNotIn("memcue_sessions", pi)
 
 
+class OpenCodeNoteTest(unittest.TestCase):
+    def test_opencode_carries_the_pi_note_word_for_word(self):
+        """#752: the OpenCode plugin has the same tools and the same write rules as the Pi plugin, so both notes are
+        the Pi plugin's text as it is; the instruction part is what the model reads every request."""
+        def constant(path: Path, name: str) -> str:
+            match = re.search(r"export const " + name + r" = `([^`]*)`", path.read_text(encoding="utf-8"))
+            self.assertIsNotNone(match, path)
+            return match.group(1)
+
+        pi = PLUGINS / "pi" / "src" / "instructions.ts"
+        opencode = PLUGINS / "opencode" / "src" / "instructions.ts"
+        self.assertEqual(constant(opencode, "NOTE"), constant(pi, "NOTE"))
+        self.assertEqual(constant(opencode, "OPENCODE_NOTE"), constant(pi, "PI_NOTE"))
+        self.assertIn("what the repository", constant(opencode, "NOTE"))
+        self.assertNotIn("memcue_sessions", constant(opencode, "NOTE"))
+
+
+class OpenCodePolicyTest(unittest.TestCase):
+    def test_opencode_memory_is_opt_in_for_children_without_harness_dependencies(self):
+        """Execute the delivered configuration policy with Node built-ins only; no OpenCode SDK, binary or model."""
+        config = (PLUGINS / "opencode/src/config.ts").as_uri()
+        script = f"""
+import {{readConfig, isEnabled}} from {json.dumps(config)};
+const defaults = readConfig(undefined);
+const configured = readConfig({{subagents: {{defaultEnabled: true,
+  agents: {{worker: true, 'maintainability-reviewer': false}}}}}});
+console.log(JSON.stringify({{
+  main: isEnabled(defaults, {{isChild: false}}),
+  child: isEnabled(defaults, {{isChild: true}}),
+  worker: isEnabled(configured, {{isChild: true, agent: 'worker'}}),
+  reviewer: isEnabled(configured, {{isChild: true, agent: 'maintainability-reviewer'}}),
+  ambientMain: isEnabled(configured, {{isChild: true}}),
+  switchedOff: isEnabled(configured, {{isChild: true, agent: 'worker', sessionDisabled: true}}),
+  inheritedRole: isEnabled(defaults, {{isChild: true, agent: 'constructor'}}),
+  globalOff: isEnabled(readConfig({{enabled: false}}), {{isChild: false}})
+}}));
+"""
+        result = subprocess.run(["node", "--experimental-strip-types", "--input-type=module", "-e", script],
+                                text=True, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {
+            "main": True, "child": False, "worker": True, "reviewer": False,
+            "ambientMain": False, "switchedOff": False, "inheritedRole": False, "globalOff": False,
+        })
+
+
 class CodexDeliveryTest(unittest.TestCase):
     def test_codex_delivers_pull_policy_without_other_hosts_history_or_card(self):
         """Exercise the installed entry point, not just an unused policy string."""
