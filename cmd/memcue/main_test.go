@@ -28,6 +28,10 @@ func env(t *testing.T) string {
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
 	// Qwen Code has no config-directory override; the sessions reading must not reach the machine's real ~/.qwen.
 	t.Setenv("HOME", dir)
+	// OpenCode keeps its transcripts in a SQLite base under the data directory; a test must not read the one of the
+	// machine that runs it.
+	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+	t.Setenv("OPENCODE_DB", "")
 	// The warning about Claude Code's built-in memory (#494) has its own test; elsewhere it would be one more line
 	// after the card.
 	t.Setenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")
