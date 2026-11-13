@@ -21,13 +21,12 @@
  *
  * @module memcue-dsh
  */
-import { spawn } from 'node:child_process'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { MemcueCli } from 'memcue-dsh/transport'
 import { install, pluginVersion } from './install.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -144,29 +143,8 @@ function settingsOf(config) {
 }
 
 /**
- * Environment every memcue child process gets.
- *
- * A configured value wins over the process environment. A field left out keeps the
- * ambient `MEMCUE_*` value, so an existing setup keeps working; when neither is set,
- * memcue's own default applies.
- * @param settings - resolved plugin configuration.
- * @returns the child environment.
- */
-function childEnv(settings) {
-	const env = { ...process.env }
-	if (settings.facts) env.MEMCUE_FACTS = settings.facts
-	if (settings.model) env.MEMCUE_MODEL = settings.model
-	if (settings.apiUrl) env.MEMCUE_API_URL = settings.apiUrl
-	if (settings.apiKey) env.MEMCUE_API_KEY = settings.apiKey
-	return env
-}
-
-/**
- * Run the memcue binary once and collect its output.
- * @param settings - resolved plugin configuration.
- * @param args - memcue command and its flags.
- * @param options - stdin text, extra environment, and a kill deadline.
- * @returns exit code and both streams; a spawn failure reports code -1.
+ * The message a mutation with an unproved outcome carries: it names the fact when the command does, and tells the
+ * model to inspect durable history instead of replaying.
  */
 function unknownMutation(args) {
  if (!['add','correct','retire','reopen'].includes(args[0])) return ''
@@ -176,66 +154,34 @@ function unknownMutation(args) {
  return `UNKNOWN OUTCOME${id ? ' for fact ' + id : ''}; mutation response unavailable. Inspect durable ID/history with memcue history before deciding whether to retry; do not automatically replay.`
 }
 
-function classifyOutcome(out, err, code, nonce) {
- const marker='\nMEMCUE_OUTCOME_V1 '
- const at=err.lastIndexOf(marker)
- if(at<0 || !err.endsWith('\n')) return {status:'unknown'}
- let r
- try {r=JSON.parse(err.slice(at+marker.length,-1))} catch {return {status:'unknown'}}
- const hash=s=>createHash('sha256').update(s).digest('hex')
- if(!r || typeof r!=='object' || Array.isArray(r)) return {status:'unknown'}
- if(r.version!==1 || r.nonce!==nonce || r.bytes!==Buffer.byteLength(out) || r.sha256!==hash(out)) return {status:'unknown'}
- if(r.status==='success' && code===0) return {status:'success'}
- if(r.status==='refused' && code>0){
-  const before=err.slice(0,at)
-  return {status:'refused',diagnostic:r.error_bytes===Buffer.byteLength(before)&&r.error_sha256===hash(before)?before.trim():'memcue refused the operation before any fact change; check input, authentication and observed version'}
- }
- return {status:'unknown'}
-}
-
-function runMemcue(settings, args, options = {}) {
- const timeoutMs=options.timeoutMs??HOOK_TIMEOUT_MS
- const nonce=unknownMutation(args)?randomBytes(16).toString('hex'):''
- return new Promise(resolve=>{
-  let child, out='',err='', settled=false, actualCode=null, spawnError=false, timedOut=false, attempted=false
-  const finish=result=>{
-   if(settled)return
-   settled=true;clearTimeout(timer);clearTimeout(limit)
-   for(const stream of [child?.stdin,child?.stdout,child?.stderr]){stream?.removeAllListeners();stream?.on('error',()=>{});stream?.destroy()}
-   child?.removeAllListeners('message')
-   resolve(result)
-  }
-  const uncertain=()=>({code:-1,out:'',err:unknownMutation(args)||'memcue: command transport unavailable',outcome:nonce?'unknown':undefined})
-  const stop=()=>{if(child?.connected)child.send({stop:true},()=>{})}
-  const timer=setTimeout(()=>{timedOut=true;stop()},Math.max(1,timeoutMs-40))
-  const limit=setTimeout(()=>finish(uncertain()),timeoutMs)
-  try{
-   child=spawn(process.execPath,[fileURLToPath(new URL('./process.mjs',import.meta.url))],{
-    detached:true,stdio:['pipe','pipe','pipe','ipc'],
-    env:{...childEnv(settings),...options.env,...(nonce?{MEMCUE_OUTCOME_NONCE:nonce}:{})}
-   })
-  }catch(error){finish({code:-1,out:'',err:String(error)});return}
-  child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8')
-  child.stdout.on('data',chunk=>{out+=chunk});child.stderr.on('data',chunk=>{err+=chunk})
-  child.stdin.on('error',()=>{})
-  child.on('message',message=>{
-   if(message.ready){attempted=true;child.send({binary:settings.binary,args},()=>{});child.stdin.end(options.input??'')}
-   if(message.spawnError){spawnError=true;stop()}
-   if(message.result){actualCode=message.code;stop()}
-  })
-  child.on('error',()=>finish(attempted?uncertain():{code:-1,out:'',err:'memcue: executable supervisor could not start'}))
-  child.on('close',()=>{
-   if(spawnError)return finish({code:-1,out:'',err:'memcue: configured executable could not start'})
-   if(timedOut || actualCode===null)return finish(uncertain())
-   if(nonce){
-    const outcome=classifyOutcome(out,err,actualCode,nonce)
-    if(outcome.status==='unknown')return finish(uncertain())
-    if(outcome.status==='refused')return finish({code:actualCode,out,err:outcome.diagnostic})
-    return finish({code:0,out,err:''})
-   }
-   finish({code:actualCode,out,err})
-  })
- })
+/**
+ * Run the memcue binary once through the shared transport (#754) and map its result to the shape this plugin's
+ * tools read. A configured value wins over the process environment; a field left out keeps the ambient `MEMCUE_*`
+ * value, so an existing setup keeps working.
+ * @param settings - resolved plugin configuration.
+ * @param args - memcue command and its flags.
+ * @param options - stdin text and a kill deadline.
+ * @returns exit code and both streams; a spawn failure reports code -1, an unproved mutation `outcome: 'unknown'`.
+ */
+export async function runMemcue(settings, args, options = {}) {
+	const cli = new MemcueCli({
+		binary: settings.binary,
+		...(settings.facts ? { facts: settings.facts } : {}),
+		env: {
+			...(settings.model ? { MEMCUE_MODEL: settings.model } : {}),
+			...(settings.apiUrl ? { MEMCUE_API_URL: settings.apiUrl } : {}),
+			...(settings.apiKey ? { MEMCUE_API_KEY: settings.apiKey } : {}),
+		},
+	})
+	const result = await cli.run(args, {
+		cwd: process.cwd(),
+		stdin: options.input,
+		mutation: ['add', 'correct', 'retire', 'reopen'].includes(args[0]),
+		timeoutMs: options.timeoutMs ?? HOOK_TIMEOUT_MS,
+	})
+	if (result.outcome === 'not-started') return { code: -1, out: '', err: result.stderr }
+	if (result.outcome === 'unknown') return { code: -1, out: '', err: unknownMutation(args) || result.stderr, outcome: 'unknown' }
+	return { code: result.exitCode ?? -1, out: result.stdout, err: result.stderr }
 }
 
 /**

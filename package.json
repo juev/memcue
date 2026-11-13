@@ -1,17 +1,37 @@
 {
   "name": "memcue-dsh",
   "version": "0.37.1",
-  "private": true,
-  "description": "Repository-root dsh bundle for the memcue plugin in plugins/deepseek-harness",
+  "description": "memcue long-term memory for DeepSeek Harness (dsh): the model searches and writes its facts itself",
   "type": "module",
   "license": "MIT",
   "main": "./plugins/deepseek-harness/src/index.mjs",
-  "exports": "./plugins/deepseek-harness/src/index.mjs",
+  "exports": {
+    ".": "./plugins/deepseek-harness/src/index.mjs",
+    "./transport": "./plugins/transport/index.mjs"
+  },
   "files": [
     "plugins/deepseek-harness/src",
     "plugins/deepseek-harness/cordis.patch.yml",
-    "plugins/deepseek-harness/README.md"
+    "plugins/deepseek-harness/README.md",
+    "plugins/transport/index.mjs",
+    "plugins/transport/transport.mjs",
+    "plugins/transport/install.mjs",
+    "plugins/transport/index.d.mts",
+    "plugins/transport/package.json",
+    "plugins/transport/README.md",
+    "plugins/transport/LICENSE"
   ],
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory"
+  ],
+  "scripts": {
+    "test": "node --test plugins/deepseek-harness/test/*.test.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/juev/memcue.git"

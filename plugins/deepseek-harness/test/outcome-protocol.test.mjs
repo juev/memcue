@@ -11,7 +11,8 @@ if(fixture){
   if(options.env?.MEMCUE_OUTCOME_NONCE&&fault){
    let actual='';const on=child.stderr.on.bind(child.stderr);on('data',b=>{actual+=b})
    child.stderr.on=(event,cb)=>on(event,event==='data'?b=>{if(fault==='partial-error')cb(String(b).slice(0,12))}:cb)
-   child.stdout.destroy();child.on('message',m=>{if(m.result)native.push({code:m.code,actual})})
+   // The shared transport (#754) spawns the executable directly: observe its own exit, not a supervisor's IPC.
+   child.stdout.destroy();child.on('exit',code=>native.push({code,actual}))
   }
   return child
  }}})

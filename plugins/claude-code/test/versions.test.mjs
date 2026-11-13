@@ -9,8 +9,9 @@ async function json(path) {
 }
 
 test('all plugin manifests carry the release version', async () => {
+	// The root package is the memcue-dsh plugin itself since #754; the transport package shares the release version.
 	const rootPackage = await json('package.json')
-	const dsh = await json('plugins/deepseek-harness/package.json')
+	const transport = await json('plugins/transport/package.json')
 	const pi = await json('plugins/pi/package.json')
 	const opencode = await json('plugins/opencode/package.json')
 	const codex = await json('plugins/codex/.codex-plugin/plugin.json')
@@ -21,7 +22,7 @@ test('all plugin manifests carry the release version', async () => {
 	const hermes = hermesYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
 
 	assert.equal(rootPackage.version, '0.37.1')
-	assert.equal(dsh.version, rootPackage.version)
+	assert.equal(transport.version, rootPackage.version)
 	assert.equal(pi.version, rootPackage.version)
 	assert.equal(opencode.version, rootPackage.version)
 	assert.equal(claude.version, rootPackage.version)

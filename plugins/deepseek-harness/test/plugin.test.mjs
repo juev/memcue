@@ -649,29 +649,36 @@ test('an incomplete dsh context fails loud', () => {
 	assert.throws(() => apply({}, {}), /lacks the event, tool or system-prompt service/)
 })
 
+// Since #754 the npm package and the GitHub bundle are one package at the repository root, installable without a
+// path parameter; the plugin directory keeps the source and the patch, not a second manifest.
 test('the package is a dsh bundle with a loadable entry', async () => {
-	const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
-	assert.equal(pkg.dsh?.bundle?.patch, './cordis.patch.yml')
-	assert.equal(pkg.exports, './src/index.mjs')
+	const rootUrl = new URL('../../../package.json', import.meta.url)
+	const pkg = JSON.parse(await readFile(rootUrl, 'utf8'))
+	const rootDir = new URL('./', rootUrl)
+	assert.equal(pkg.dsh?.bundle?.patch, 'plugins/deepseek-harness/cordis.patch.yml')
+	assert.equal(pkg.exports?.['.'], './plugins/deepseek-harness/src/index.mjs')
 	assert.equal(pkg.peerDependencies?.['@deepseek-ai/dsh-llm'], '>=0.2.0-rc.2 <0.3.0')
 	assert.equal(pkg.peerDependencies?.['@deepseek-ai/dsh-tools'], '>=0.2.0-rc.2 <0.3.0')
-	const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+	const patch = await readFile(new URL(pkg.dsh.bundle.patch, rootDir), 'utf8')
 	assert.match(patch, /- id: memcue/)
 	assert.match(patch, /name: \.\/src\/index\.mjs/)
+	await readFile(new URL(pkg.exports['.'], rootDir), 'utf8')
 	const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
 	assert.doesNotMatch(source, /\.eventAt\(|snapshotEvents/)
 })
 
-test('the repository root is installable without a path parameter', async () => {
+test('the plugin imports the shared transport through the package subpath (#754)', async () => {
 	const rootUrl = new URL('../../../package.json', import.meta.url)
 	const root = JSON.parse(await readFile(rootUrl, 'utf8'))
 	const rootDir = new URL('./', rootUrl)
-	assert.equal(root.dsh?.bundle?.patch, 'plugins/deepseek-harness/cordis.patch.yml')
-	assert.equal(root.exports, './plugins/deepseek-harness/src/index.mjs')
-	assert.equal(root.peerDependencies?.['@deepseek-ai/dsh-llm'], '>=0.2.0-rc.2 <0.3.0')
-	assert.equal(root.peerDependencies?.['@deepseek-ai/dsh-tools'], '>=0.2.0-rc.2 <0.3.0')
-	await readFile(new URL(root.dsh.bundle.patch, rootDir), 'utf8')
-	await readFile(new URL(root.exports, rootDir), 'utf8')
+	assert.equal(root.exports?.['./transport'], './plugins/transport/index.mjs')
+	const transport = JSON.parse(await readFile(new URL('plugins/transport/package.json', rootDir), 'utf8'))
+	assert.equal(transport.name, 'memcue-transport')
+	const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8')
+	assert.match(source, /from 'memcue-dsh\/transport'/)
+	// The self-reference resolves in the checkout, in the npm tarball and in the GitHub bundle alike.
+	const { MemcueCli } = await import('memcue-dsh/transport')
+	assert.equal(typeof MemcueCli, 'function')
 })
 
 // Instruction contract only: no measurement of model compliance or recall.

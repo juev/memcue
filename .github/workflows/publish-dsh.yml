@@ -26,19 +26,20 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
+      # Since #754 the npm package and the GitHub bundle are one package at the repository root, so the tag,
+      # the syntax check and the publish all read the root manifest.
       - name: Check the tag names the package version
         if: startsWith(github.ref, 'refs/tags/dsh-v')
-        working-directory: plugins/deepseek-harness
         run: test "dsh-v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
 
-      - name: Check the entry syntax
-        working-directory: plugins/deepseek-harness
-        run: node --check src/index.mjs
+      - name: Check the entry syntax and the transport subpath
+        run: |
+          node --check plugins/deepseek-harness/src/index.mjs
+          node --input-type=module -e "await import('memcue-dsh/transport')"
 
       # npm Trusted Publishing: the OIDC token comes from id-token: write, so
       # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
       - name: Publish
-        working-directory: plugins/deepseek-harness
         env:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
