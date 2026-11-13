@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -221,12 +222,14 @@ func syncFile(path string) error {
 }
 
 // The event log is the change-oriented prototype: every fact version is an immutable file named by the hash of its
-// bytes, events/<last two chars of the id>/<id>/<hash>.json, holding the row without its version number and the hash
-// of the event it was written on top of. Two machines only ever add files with distinct names, so git merges the
-// directory without conflicts; version numbers are derived (see materialize).
+// bytes, events/<last two chars of the id>/<id>/<hash>.json, holding the row without its version number, the hash
+// of the event it was written on top of, and the hashes of every version of the fact its writer saw (Base). Two
+// machines only ever add files with distinct names, so git merges the directory without conflicts; version numbers
+// are derived (see materialize).
 type Event struct {
-	Parent string `json:"parent"`
-	Row    Row    `json:"row"`
+	Parent string   `json:"parent"`
+	Base   []string `json:"base,omitempty"`
+	Row    Row      `json:"row"`
 }
 
 func eventBytes(e Event) []byte {
@@ -254,8 +257,8 @@ type EventMap map[string]string
 func mapKey(id string, version int) string { return fmt.Sprintf("%s/%d", id, version) }
 
 // record writes an event for every row of the base that the map does not know, parent being the event of the version
-// before it, and returns how many it wrote. A version a machine writes is always the latest, so its parent is the
-// version it saw as current.
+// before it and base the events of every version the writer saw, and returns how many it wrote. A version a machine
+// writes is always the latest, so its parent is the version it saw as current.
 func record(root string, rows []Row, m EventMap) (int, error) {
 	n := 0
 	for _, r := range rows { // ordered by id, version
@@ -263,15 +266,19 @@ func record(root string, rows []Row, m EventMap) (int, error) {
 		if _, ok := m[key]; ok {
 			continue
 		}
-		parent := ""
-		if r.Version > 1 {
-			p, ok := m[mapKey(r.ID, r.Version-1)]
+		var base []string
+		for k := 1; k < r.Version; k++ {
+			h, ok := m[mapKey(r.ID, k)]
 			if !ok {
-				return n, fmt.Errorf("record %s: version %d has no event", r.ID, r.Version-1)
+				return n, fmt.Errorf("record %s: version %d has no event", r.ID, k)
 			}
-			parent = p
+			base = append(base, h)
 		}
-		b := eventBytes(Event{Parent: parent, Row: r})
+		parent := ""
+		if len(base) > 0 {
+			parent = base[len(base)-1]
+		}
+		b := eventBytes(Event{Parent: parent, Base: base, Row: r})
 		h := eventHash(b)
 		p := eventPath(root, r.ID, h)
 		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
@@ -320,9 +327,10 @@ func loadEvents(root string) (map[string]Event, error) {
 }
 
 // materialize derives the rows of a base from the events: per fact, versions in causal order (an event after its
-// parent), and among the events whose parent is placed, the earliest by creation time, then author, then content, then
-// hash. On two lines of changes that diverged from a common version this is the order store.Merge gives their tails;
-// it is a prototype rule, checked against Merge in the semantics run, not a proof.
+// parent), and among the events whose parent is placed, the earliest by creation time, then author, then content,
+// then the fuller labels, then hash. A correction the retirement's writer never saw goes last (correctionLast). On
+// two lines of changes that diverged from a common version this is the order store.Merge gives their tails; it is a
+// prototype rule, checked against Merge in the semantics run, not a proof.
 func materialize(events map[string]Event) ([]Row, EventMap, error) {
 	byID := map[string][]string{}
 	for h, e := range events {
@@ -347,22 +355,71 @@ func materialize(events map[string]Event) ([]Row, EventMap, error) {
 			children[p] = append(children[p], h)
 		}
 		ready := append([]string(nil), children[""]...)
-		v := 0
+		var seq []string
 		for len(ready) > 0 {
 			sort.Slice(ready, func(i, j int) bool { return less(events[ready[i]], ready[i], events[ready[j]], ready[j]) })
 			h := ready[0]
 			ready = append(ready[1:], children[h]...)
-			v++
-			r := events[h].Row
-			r.Version = v
-			rows = append(rows, r)
-			m[mapKey(id, v)] = h
+			seq = append(seq, h)
 		}
-		if v != len(byID[id]) {
-			return nil, nil, fmt.Errorf("fact %s: %d of %d events reachable (cycle?)", id, v, len(byID[id]))
+		if len(seq) != len(byID[id]) {
+			return nil, nil, fmt.Errorf("fact %s: %d of %d events reachable (cycle?)", id, len(seq), len(byID[id]))
+		}
+		seq = correctionLast(seq, events)
+		for i, h := range seq {
+			r := events[h].Row
+			r.Version = i + 1
+			rows = append(rows, r)
+			m[mapKey(id, i+1)] = h
 		}
 	}
 	return rows, m, nil
+}
+
+// correctionLast mirrors store.Merge's rule of the same name (#544): when the last version is a retirement, the
+// active versions its writer never saw go after it if one of them corrects the text. The event records the base its
+// writer saw (Base), as Merge looks at the two sides' histories: a version outside that base is unseen, and a
+// version corrects when its text differs from both the retirement's and its parent's. The parent chain alone is not
+// enough: a version merged in before the retirement was written is seen without being an ancestor of it.
+func correctionLast(seq []string, events map[string]Event) []string {
+	if len(seq) == 0 {
+		return seq
+	}
+	rh := seq[len(seq)-1]
+	r := events[rh].Row
+	if r.Status != store.Retired {
+		return seq
+	}
+	seen := map[string]bool{}
+	for _, h := range events[rh].Base {
+		seen[h] = true
+	}
+	var unseen []string
+	correction := false
+	for _, h := range seq[:len(seq)-1] {
+		e := events[h]
+		if e.Row.Status != store.Active || seen[h] {
+			continue
+		}
+		unseen = append(unseen, h)
+		parent := ""
+		if e.Parent != "" {
+			parent = events[e.Parent].Row.Content
+		}
+		if e.Row.Content != r.Content && e.Row.Content != parent {
+			correction = true
+		}
+	}
+	if !correction {
+		return seq
+	}
+	out := make([]string, 0, len(seq))
+	for _, h := range seq {
+		if !slices.Contains(unseen, h) {
+			out = append(out, h)
+		}
+	}
+	return append(out, unseen...)
 }
 
 func less(a Event, ah string, b Event, bh string) bool {
@@ -379,6 +436,16 @@ func less(a Event, ah string, b Event, bh string) bool {
 	if a.Row.Content != b.Row.Content {
 		return a.Row.Content < b.Row.Content
 	}
+	// A label written later keeps the creation time of the version it labels, so the fuller version goes last, as
+	// in Merge's mergedBefore: a source before none, then a channel before none (#625).
+	if (a.Row.Source == "") != (b.Row.Source == "") {
+		return a.Row.Source == ""
+	}
+	if (a.Row.Channel == "") != (b.Row.Channel == "") {
+		return a.Row.Channel == ""
+	}
+	// Merge breaks a remaining tie by the written line, the prototype by the event hash; the two can disagree only
+	// on distinct events equal in every key above, which the checked scenarios do not write.
 	return ah < bh
 }
 
