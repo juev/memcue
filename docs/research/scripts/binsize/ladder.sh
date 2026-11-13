@@ -16,5 +16,4 @@ build empty $d/empty
 build sqlite $d/sqlite
 build store $d/store
 build hook $d/hook
-build hookjev $d/hookjev
 build memcue ./cmd/memcue
