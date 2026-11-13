@@ -82,9 +82,9 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
    No `path:` parameter and no local directory are needed. From a local checkout, `dsh plugin add /path/to/memcue`
    installs the same root package.
 
-   The plugin directory is also a standalone package, published as
-   [`memcue-dsh`](https://www.npmjs.com/package/memcue-dsh). `dsh plugin add memcue-dsh` installs it without the
-   repository; a local checkout can use `dsh plugin add /path/to/memcue/plugins/deepseek-harness`.
+   The same root package is published as [`memcue-dsh`](https://www.npmjs.com/package/memcue-dsh):
+   `dsh plugin add memcue-dsh` installs it without the repository. Since #754 the plugin directory no longer
+   carries a second manifest, so the npm package and the GitHub bundle are one package with one layout.
 
    The plugin manager adds the package to the profile's `dsh.profile.bundles`; the install dialog's **Enable now**
    switches the bundle on. dsh 0.2.0-rc.2 does not update installed plugins: to move to a new release, uninstall the
@@ -145,6 +145,10 @@ running harness — only a checkout where `@deepseek-ai/dsh-llm` and `@deepseek-
 the bundle metadata and that the bundle patch points at the loadable ESM entry. `make test` runs it together with the
 Go and Hermes suites when those packages are installed, and skips it with the install command otherwise.
 
+The CLI transport itself is the shared `memcue-transport` package (#754), imported as `memcue-dsh/transport`;
+`make test-conformance` runs its contract against this plugin's adapter and every other host, and the suite refuses
+a plugin that resolves a copy instead of the package.
+
 `sessions.test.mjs` drives the real binary named by `MEMCUE_BIN` over an invented journal under a `DSH_HOME` of its
 own, with every other host's history pointed at the same fixture: it checks that `memcue_sessions` returns the
 command's answer, that the current session, a delegated session, reasoning, tool output and the plugin's own notices
@@ -153,7 +157,9 @@ encoding is not zstd; `internal/history`'s tests cover the compressed form.
 
 ## Releasing
 
-The standalone package is published as `memcue-dsh`.
+The package is published as `memcue-dsh` from the repository root. It carries the shared CLI transport
+(`plugins/transport`, #754) inside itself and exports it as `memcue-dsh/transport`, which the plugin imports by
+self-reference; the Pi and OpenCode plugins import the same files as the standalone `memcue-transport` package.
 
 CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. It uses npm
 Trusted Publishing (OIDC): the workflow has `id-token: write`, no token, and no `NPM_TOKEN` secret. The trusted
@@ -164,8 +170,7 @@ uploads nothing.
 A maintainer can still publish manually; npm asks for the 2FA code:
 
 ```sh
-cd plugins/deepseek-harness
-npm publish --access public
+npm publish --access public   # from the repository root
 ```
 
 A fork needs its own trusted publisher, or a granular `NPM_TOKEN` on a `NODE_AUTH_TOKEN` environment variable. A

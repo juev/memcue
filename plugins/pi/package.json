@@ -28,6 +28,9 @@
     "README.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "memcue-transport": "^0.37.1"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"

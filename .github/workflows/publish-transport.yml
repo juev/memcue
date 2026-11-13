@@ -1,0 +1,47 @@
+name: Publish transport package
+
+# The shared transport normally publishes with the memcue release (the transport job of release.yml on a v* tag).
+# This manual run bootstraps a new package version ahead of a plugin release, or republishes a transport hotfix.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and report without publishing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Check the entry syntax
+        working-directory: plugins/transport
+        run: node --check index.mjs
+
+      # npm Trusted Publishing: the OIDC token comes from id-token: write, so
+      # there is no NPM_TOKEN. Provenance is added by the trusted publisher.
+      - name: Publish
+        working-directory: plugins/transport
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            # A dry run still refuses a version that already exists, so pack a
+            # throwaway prerelease and never upload it.
+            npm version "$(node -p "require('./package.json').version")-dryrun.$(date +%s)" \
+              --no-git-tag-version --allow-same-version >/dev/null
+            npm publish --access public --dry-run --tag dryrun
+          else
+            npm publish --access public
+          fi

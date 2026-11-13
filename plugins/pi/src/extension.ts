@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { MemcueCli } from "./cli.ts";
+import { MemcueCli, transportConfig } from "./cli.ts";
 import { isEnabled, readConfig, type MemcueConfig } from "./config.ts";
 import { current, install, pluginVersion } from "./install.ts";
 import { MEMORY_INSTRUCTIONS } from "./instructions.ts";
@@ -74,7 +74,7 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
               if (!await current(binary, release)) binary = await install(release);
             } catch (error) { installError = error instanceof Error ? error.message : String(error); }
           }
-          const probe = new MemcueCli({ ...config!, binary });
+          const probe = new MemcueCli(transportConfig(config!, binary));
           const result = await probe.run(["version", "-minimum", MIN_BINARY], {
             cwd: ctx.cwd, signal: combinedSignal(ctx.signal), timeoutMs: 5_000,
           });

@@ -520,6 +520,8 @@ def _unknown_mutation(args: list[str]) -> str:
 
 
 def classify_outcome(output, diagnostic, code, nonce):
+    # The shared receipt contract (#754): the diagnostics before the marker are hashed too, so a corrupted
+    # refusal cannot prove the operation was refused; it is unknown, as in the Node transport.
     marker = '\nMEMCUE_OUTCOME_V1 '
     at = diagnostic.rfind(marker)
     if at < 0 or not diagnostic.endswith('\n'):
@@ -530,19 +532,18 @@ def classify_outcome(output, diagnostic, code, nonce):
         return 'unknown', ''
     if not isinstance(receipt, dict):
         return 'unknown', ''
+    prelude = diagnostic[:at]
     if (receipt.get('version') != 1 or receipt.get('nonce') != nonce or
             receipt.get('bytes') != len(output.encode('utf-8')) or
-            receipt.get('sha256') != hashlib.sha256(output.encode('utf-8')).hexdigest()):
+            receipt.get('sha256') != hashlib.sha256(output.encode('utf-8')).hexdigest() or
+            receipt.get('error_bytes') != len(prelude.encode('utf-8')) or
+            receipt.get('error_sha256') != hashlib.sha256(prelude.encode('utf-8')).hexdigest()):
         return 'unknown', ''
     status = receipt.get('status')
     if status == 'success' and code == 0:
         return 'success', ''
     if status == 'refused' and code > 0:
-        prelude = diagnostic[:at]
-        if (receipt.get('error_bytes') == len(prelude.encode('utf-8')) and
-                receipt.get('error_sha256') == hashlib.sha256(prelude.encode('utf-8')).hexdigest()):
-            return 'refused', prelude.strip()
-        return 'refused', 'memcue refused the operation before any fact change; check input, authentication and observed version'
+        return 'refused', prelude.strip()
     return 'unknown', ''
 
 

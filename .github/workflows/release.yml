@@ -67,3 +67,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.tags.outputs.previous }}
+
+  # The shared transport is published with the memcue release (#754): the Pi and OpenCode plugins depend on it,
+  # and their publish workflows refuse to run before this version is on the registry. The DSH plugin carries the
+  # same files inside its own package and needs no registry dependency.
+  transport:
+    name: publish memcue-transport
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Check the tag names the package version
+        run: test "v$(node -p "require('./plugins/transport/package.json').version")" = "$GITHUB_REF_NAME"
+
+      - name: Check the entry syntax
+        run: node --check plugins/transport/index.mjs
+
+      # npm Trusted Publishing: the OIDC token comes from id-token: write, so there is no NPM_TOKEN.
+      - name: Publish
+        working-directory: plugins/transport
+        run: npm publish --access public

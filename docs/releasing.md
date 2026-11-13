@@ -6,8 +6,8 @@ One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, Ope
 
 1. Open an issue for the release, then a PR for the version bump. A merged task does not ship until this PR does.
 2. In that PR, set the new version in:
-   - `package.json` (the repository-root dsh bundle);
-   - `plugins/deepseek-harness/package.json`;
+   - `package.json` (the repository root is the `memcue-dsh` plugin itself since #754);
+   - `plugins/transport/package.json` (the shared CLI transport, `memcue-transport`);
    - `plugins/claude-code/.claude-plugin/plugin.json`;
    - `plugins/hermes/memcue/plugin.yaml`;
    - `plugins/hermes/memcue-context/plugin.yaml`;
@@ -28,13 +28,19 @@ One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, Ope
    git push origin vX.Y.Z dsh-vX.Y.Z pi-vX.Y.Z opencode-vX.Y.Z
    ```
 
-   `v*` runs `release.yml`: tests, then GoReleaser publishes the binaries and `checksums.txt`. `dsh-v*` runs
-   `publish-dsh.yml`, which publishes `memcue-dsh` to npm and refuses a tag that differs from the package version.
-   Without the `dsh-v` tag npm keeps the previous plugin, and that is how npm stayed at 0.5.3 through 0.11.1.
-   `pi-v*` runs `publish-pi.yml` for `memcue-pi`, and `opencode-v*` runs `publish-opencode.yml` for `memcue-opencode`;
-   both refuse a tag that differs from their package version. The first publish of each package and its trusted
-   publisher on npmjs.com are manual steps.
-6. Check both results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version` prints `X.Y.Z`.
+   `v*` runs `release.yml`: tests, then GoReleaser publishes the binaries and `checksums.txt`, and the `transport`
+   job publishes `memcue-transport` to npm. `dsh-v*` runs `publish-dsh.yml`, which publishes `memcue-dsh` from the
+   repository root and refuses a tag that differs from the package version; the package carries the transport files
+   inside itself, so it does not depend on the registry. Without the `dsh-v` tag npm keeps the previous plugin, and
+   that is how npm stayed at 0.5.3 through 0.11.1. `pi-v*` runs `publish-pi.yml` for `memcue-pi`, and `opencode-v*`
+   runs `publish-opencode.yml` for `memcue-opencode`; both refuse a tag that differs from their package version, and
+   both refuse to publish before `memcue-transport` of that version is on the registry, because they depend on it.
+   Tag `v*` first and wait for its transport job. The first publish of each package and its trusted publisher on
+   npmjs.com are manual steps; `publish-transport.yml` (workflow_dispatch) bootstraps or hotfixes the transport
+   outside a release.
+6. Check the results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version`,
+   `npm view memcue-transport version`, `npm view memcue-pi version` and `npm view memcue-opencode version` print
+   `X.Y.Z`.
 
 ## After the release
 

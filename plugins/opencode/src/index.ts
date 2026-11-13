@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Plugin } from '@opencode/plugin';
-import { MemcueCli } from './cli.ts';
+import { MemcueCli, transportConfig } from './cli.ts';
 import { isEnabled, readConfig, type MemcueConfig } from './config.ts';
 import { install, current, pluginVersion } from './install.ts';
 import { MEMORY_INSTRUCTIONS } from './instructions.ts';
@@ -105,7 +105,7 @@ export default Plugin.define({
             log(`automatic install failed: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
-        const probe = new MemcueCli({ ...config, binary });
+        const probe = new MemcueCli(transportConfig(config, binary));
         const result = await probe.run(['version', '-minimum', MIN_BINARY], {
           cwd: ctx.location.directory, timeoutMs: 5_000,
         });
