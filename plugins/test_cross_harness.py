@@ -34,8 +34,8 @@ class RecallDuringWorkTest(unittest.TestCase):
 class HistoryFallbackTest(unittest.TestCase):
     def test_each_host_sends_an_empty_search_to_its_own_history(self):
         """#621: after an empty search, Claude Code runs memcue sessions over its transcripts, in the note and in the
-        skill; Hermes has its own session_search; DSH keeps its sessions in its own journal, which nothing reads yet
-        (#630), so its note names neither."""
+        skill; Hermes has its own session_search; DSH reads its own journal through memcue_sessions (#630), in a line
+        of its own beside the note every native host shares word for word."""
         go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
         skill = (PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md").read_text(encoding="utf-8")
         for text in (go, skill):
@@ -45,8 +45,11 @@ class HistoryFallbackTest(unittest.TestCase):
         self.assertIn("session_search", hermes)
         self.assertNotIn("memcue sessions", hermes)
         dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
-        self.assertNotIn("memcue_sessions", dsh)
+        self.assertIn("memcue_sessions", dsh)
         self.assertNotIn("session_search", dsh)
+        shared = re.search(r"const NOTE = `([^`]*)`", dsh)
+        self.assertIsNotNone(shared)
+        self.assertNotIn("memcue_sessions", shared.group(1))
 
 
 class CaptureExclusionsTest(unittest.TestCase):

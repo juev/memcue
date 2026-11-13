@@ -726,3 +726,47 @@ test('recovery never identifies correction content as its durable target', async
  assert.equal(result.outcome,'unknown');assert.equal(result.stored,null)
  assert.ok(!result.message.includes(payload),'fact body must not become recovery target')
 })
+
+/** A stub of a binary that has `sessions`: it records the arguments and answers with one passage. */
+async function sessionsStub(name, version) {
+	const log = join(dir, `${name}.log`)
+	const binary = join(dir, `memcue-${name}.sh`)
+	await writeFile(binary, `#!/bin/sh
+case "$1" in
+  version) printf '{"version":"${version}"}\\n' ;;
+  sessions) printf '%s\\n' "$*" >> "${log}"; printf 'memcue sessions: passages of earlier sessions, newest first.\\n- 2026-11-10 12:00, assistant in session dsh-answer: the port is 6432.\\n' ;;
+esac
+exit 0
+`)
+	await chmod(binary, 0o755)
+	return { binary, log }
+}
+
+test('memcue_sessions passes the words and the harness session id, and renders the command answer (#630)', async () => {
+	const { binary, log } = await sessionsStub('sessions', '0.28.0')
+	const { tools } = mount({ binary })
+	const exec = { agent: { session: { id: 'session-7', header: { cwd: '/repo/demo' } } } }
+	const tool = tools.get('memcue_sessions')
+	const result = await tool.execute({ query: 'порт прокси' }, exec)
+	// The journal names a session by the harness's own id, so that id is left out, not the mapped one.
+	assert.equal((await readFile(log, 'utf8')).trim(), 'sessions -n 5 -session session-7 -- порт прокси')
+	assert.match(result.history, /passages of earlier sessions, newest first/)
+	assert.deepEqual(tool.output.render({}, result), [{ type: 'text', text: result.history }])
+})
+
+test('memcue_sessions takes a limit and narrows by directory and time', async () => {
+	const { binary, log } = await sessionsStub('sessions-narrow', '0.28.0')
+	const { tools } = mount({ binary })
+	const exec = { agent: { session: { id: 'session-7', header: { cwd: '/repo/demo' } } } }
+	await tools.get('memcue_sessions').execute({ query: 'порт', limit: 3, cwd: '/repo/demo', before: '2026-11-01' }, exec)
+	assert.equal((await readFile(log, 'utf8')).trim(),
+		'sessions -n 3 -session session-7 -cwd /repo/demo -before 2026-11-01 -- порт')
+})
+
+test('memcue_sessions needs words and a binary that has the command', async () => {
+	const { binary } = await sessionsStub('sessions-empty', '0.28.0')
+	const { tools } = mount({ binary })
+	await assert.rejects(tools.get('memcue_sessions').execute({ query: '  ' }, {}), /query is required/)
+	const old = mount() // the stub of the suite reports 0.8.0, which has no sessions command
+	await assert.rejects(old.tools.get('memcue_sessions').execute({ query: 'порт' }, {}), /needs memcue 0\.28\.0 or later/)
+})
