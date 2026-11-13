@@ -102,11 +102,13 @@ func (inv *invocation) writeContext(out io.Writer, event, text string) error {
 	return inv.encoder(out).Encode(resp)
 }
 
-// autoMemoryHint is the line the Claude Code session start adds while the host's built-in memory is on: the model
-// then keeps notes in files next to memcue, a second memory the user turns off, not memcue (#494). It is off when
-// CLAUDE_CODE_DISABLE_AUTO_MEMORY is set to a true value or the user settings say "autoMemoryEnabled": false; project
-// settings are not read.
+// autoMemoryHint is the line the session start adds while the host's built-in memory is on: the model then keeps
+// notes in files next to memcue, a second memory the user turns off, not memcue (#494). MEMCUE_AGENT names the host
+// the launcher runs for; without it the host is Claude Code.
 func (inv *invocation) autoMemoryHint() string {
+	if os.Getenv("MEMCUE_AGENT") == "qwen" {
+		return inv.qwenAutoMemoryHint()
+	}
 	if on, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY"))); err == nil && on {
 		return ""
 	}
@@ -121,6 +123,24 @@ func (inv *invocation) autoMemoryHint() string {
 	return "memcue: Claude Code's built-in memory is on, so notes are also written to memory files next to memcue. " +
 		"Tell the user once in this session: it turns off with \"autoMemoryEnabled\": false in " +
 		filepath.Join(claudeDir(), "settings.json") + " or CLAUDE_CODE_DISABLE_AUTO_MEMORY=1. Keep facts in memcue only."
+}
+
+// qwenAutoMemoryHint is autoMemoryHint for Qwen Code: the built-in memory is off when the user settings say
+// "memory.enableManagedAutoMemory": false; project settings are not read. Qwen Code has no environment override.
+func (inv *invocation) qwenAutoMemoryHint() string {
+	if data, err := inv.readFile(filepath.Join(qwenDir(), "settings.json")); err == nil {
+		var settings struct {
+			Memory struct {
+				EnableManagedAutoMemory *bool `json:"enableManagedAutoMemory"`
+			} `json:"memory"`
+		}
+		if jsonctx.Unmarshal(inv.ctx, data, &settings) == nil && settings.Memory.EnableManagedAutoMemory != nil && !*settings.Memory.EnableManagedAutoMemory {
+			return ""
+		}
+	}
+	return "memcue: Qwen Code's built-in memory is on, so notes are also written to memory files next to memcue. " +
+		"Tell the user once in this session: it turns off with \"memory.enableManagedAutoMemory\": false and " +
+		"\"memory.enableManagedAutoDream\": false in " + filepath.Join(qwenDir(), "settings.json") + ". Keep facts in memcue only."
 }
 
 // dreamHint is the line the session start adds when a dream is due: the session's model does it with the
@@ -356,7 +376,8 @@ func (inv *invocation) runSessionPitfalls(in io.Reader, out io.Writer) error {
 		if event == "SessionCard" {
 			return nil
 		}
-		header = "Repository pitfalls: no git repository or no fact base. This supersedes earlier repository-pitfall snapshots."
+		// The trailing newline separates the header from the line, as the repository header does.
+		header = "Repository pitfalls: no git repository or no fact base. This supersedes earlier repository-pitfall snapshots.\n"
 	}
 	if header == repositoryPitfallsUnavailable {
 		return inv.encoder(out).Encode(map[string]any{"hookSpecificOutput": map[string]any{"hookEventName": event, "additionalContext": header}})

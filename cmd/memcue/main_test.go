@@ -26,6 +26,8 @@ func env(t *testing.T) string {
 	t.Setenv("MEMCUE_USAGE_LOG", "")
 	t.Setenv("MEMCUE_NUMBER_TERMS", "")
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "claude"))
+	// Qwen Code has no config-directory override; the sessions reading must not reach the machine's real ~/.qwen.
+	t.Setenv("HOME", dir)
 	// The warning about Claude Code's built-in memory (#494) has its own test; elsewhere it would be one more line
 	// after the card.
 	t.Setenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")

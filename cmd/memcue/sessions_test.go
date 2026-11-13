@@ -145,6 +145,80 @@ func TestSessionsSaysWhenNothingFits(t *testing.T) {
 	}
 }
 
+// qwenTranscripts writes invented Qwen Code transcripts under the config directory of the test: a session of the
+// shop repository with a user message, an assistant answer, a tool result and a hook-context part that hold the
+// words too, and the current session.
+func qwenTranscripts(t *testing.T, dir string) time.Time {
+	t.Helper()
+	root := filepath.Join(dir, ".qwen", "projects")
+	at := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	line := func(kind, provenance, session, uuid, text string, when time.Time) string {
+		b, _ := json.Marshal(text)
+		return `{"type":"` + kind + `","provenance":"` + provenance + `","sessionId":"` + session + `","uuid":"` + uuid +
+			`","cwd":"/w/shop","timestamp":"` + when.Format(time.RFC3339Nano) +
+			`","message":{"role":"` + kind + `","parts":[{"text":` + string(b) + `}]}}`
+	}
+	write := func(name string, lines ...string) {
+		t.Helper()
+		path := filepath.Join(root, "-w-shop", "chats", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hook, _ := json.Marshal("Какой порт у прокси в shop?")
+	hookCtx, _ := json.Marshal("<qwen:user-prompt-submit-context>\nhook порт прокси\n</qwen:user-prompt-submit-context>")
+	write("q-old.jsonl",
+		`{"type":"user","provenance":"real_user","sessionId":"q-old","uuid":"qu1","cwd":"/w/shop","timestamp":"`+
+			at.Format(time.RFC3339Nano)+`","message":{"role":"user","parts":[{"text":`+string(hook)+`},{"text":`+string(hookCtx)+`}]}}`,
+		line("assistant", "assistant_output", "q-old", "qa1", "Прокси shop слушает порт 7070.", at.Add(time.Minute)),
+		`{"type":"tool_result","provenance":"tool_result","sessionId":"q-old","uuid":"qt1","cwd":"/w/shop","timestamp":"`+
+			at.Add(2*time.Minute).Format(time.RFC3339Nano)+
+			`","message":{"role":"user","parts":[{"functionResponse":{"response":"PROXY_TOKEN=secret порт прокси 7070"}}]}}`,
+		line("user", "hook", "q-old", "qu2", "hook порт прокси", at.Add(3*time.Minute)),
+	)
+	write("q-cur.jsonl",
+		line("user", "real_user", "q-cur", "qu3", "Напомни порт прокси в shop", at.Add(48*time.Hour)),
+	)
+	return at
+}
+
+// The history search reads the Qwen Code transcripts next to the Claude Code ones: the passages of both hosts
+// come newest first, while a tool result, a hook-context part, a program-written user message and the current
+// session of either host stay out.
+func TestSessionsFindsQwenPassagesAmongClaude(t *testing.T) {
+	dir := env(t)
+	older, newer, other, _ := transcripts(t, dir)
+	qtime := qwenTranscripts(t, dir)
+	var out bytes.Buffer
+	if err := runSessions([]string{"-session", "s-cur,q-cur", "порт", "прокси"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	lines := strings.Split(strings.TrimSpace(got), "\n")
+	if len(lines) != 6 {
+		t.Fatalf("output:\n%s", got)
+	}
+	for i, want := range []string{
+		newer.Local().Format("2006-01-02 15:04") + ", assistant in session s-new: Порт прокси в shop переехал на 9090",
+		qtime.Add(time.Minute).Local().Format("2006-01-02 15:04") + ", assistant in session q-old: Прокси shop слушает порт 7070",
+		qtime.Local().Format("2006-01-02 15:04") + ", user in session q-old: Какой порт у прокси в shop?",
+		other.Local().Format("2006-01-02 15:04") + ", user in session s-other: В lists прокси нет",
+		older.Add(time.Minute).Local().Format("2006-01-02 15:04") + ", assistant in session s-old: Прокси shop слушает порт 8080",
+	} {
+		if !strings.Contains(lines[i+1], want) {
+			t.Errorf("line %d %q, want it to hold %q", i+1, lines[i+1], want)
+		}
+	}
+	for _, leak := range []string{"secret", "hook", "Напомни"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("output holds %q:\n%s", leak, got)
+		}
+	}
+}
+
 // The note of the session start sends an empty search to memcue sessions and says a passage is history (#621).
 func TestSessionNoteNamesTheHistorySearch(t *testing.T) {
 	for _, want := range []string{"`memcue sessions \"<words>\"`", "history, not a fact", "store what holds with `memcue add`"} {

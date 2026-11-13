@@ -6,7 +6,7 @@ GOLANGCI_LINT ?= golangci-lint
 CLAUDE_BIN ?= claude
 HERMES_PYTHON ?= python3
 
-.PHONY: build test test-plugins test-pi test-codex test-claude-mods test-hermes-request lint bench previous-release
+.PHONY: build test test-plugins test-pi test-codex test-qwen test-claude-mods test-hermes-request lint bench previous-release
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -17,7 +17,7 @@ previous-release:
 	@test -n "$(TAG)" || { echo "usage: make previous-release TAG=vX.Y.Z" >&2; exit 2; }
 	@git describe $(RELEASE_TAGS) --abbrev=0 '$(TAG)^'
 
-test: build test-codex test-claude-mods
+test: build test-codex test-qwen test-claude-mods
 	go test -race -p 2 -parallel 2 -count=1 -json ./...
 	MEMCUE_BIN=$(CURDIR)/bin/memcue $(HERMES_PYTHON) -I plugins/hermes/memcue/tests/test_provider.py
 	MEMCUE_BIN=$(CURDIR)/bin/memcue $(HERMES_PYTHON) -I -m unittest discover -s plugins/hermes -p 'test_*.py'
@@ -57,6 +57,10 @@ test-pi: build
 # Synthetic CLI/configuration coverage; requires the built binary, never a live memory base.
 test-codex: build
 	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I -m unittest discover -s plugins/codex/tests -p 'test_*.py'
+
+# Synthetic CLI/configuration coverage for the Qwen Code adapter; requires the built binary, never a live base.
+test-qwen: build
+	MEMCUE_BIN=$(CURDIR)/bin/memcue python3 -I -m unittest discover -s plugins/qwen-code/tests -p 'test_*.py'
 
 # Model-free native clients; no authentication or inference is needed.
 test-claude-mods:

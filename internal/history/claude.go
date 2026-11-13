@@ -87,6 +87,13 @@ type block struct {
 // A reading of the author's 2.5 GB of transcripts takes about a second and a half on a laptop; a prefilter of the raw
 // lines by the words of the query did not make it faster, since lowercasing the lines costs as much as parsing them.
 func ReadClaude(root string) ([]Message, Stats, error) {
+	return readTranscripts(root, readFile)
+}
+
+// readTranscripts walks root for *.jsonl transcripts and reads them with read, as many at once as there are
+// processors. The messages keep the order of the file paths, and an entry repeated across files counts once,
+// the first in that order.
+func readTranscripts(root string, read func(string, *Stats) ([]Message, error)) ([]Message, Stats, error) {
 	var st Stats
 	var paths []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -106,14 +113,13 @@ func ReadClaude(root string) ([]Message, Stats, error) {
 	}
 	sort.Strings(paths)
 	// The files are read at once, as many as there are processors: a reading is bound by the parsing of a few
-	// gigabytes of lines, and the files are independent. The messages keep the order of the paths, and an entry
-	// repeated across files counts once, the first in that order.
-	type read struct {
+	// gigabytes of lines, and the files are independent.
+	type result struct {
 		msgs []Message
 		st   Stats
 		err  error
 	}
-	reads := make([]read, len(paths))
+	reads := make([]result, len(paths))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, max(1, min(runtime.NumCPU(), 8)))
 	for i, path := range paths {
@@ -122,7 +128,7 @@ func ReadClaude(root string) ([]Message, Stats, error) {
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			reads[i].msgs, reads[i].err = readFile(path, &reads[i].st)
+			reads[i].msgs, reads[i].err = read(path, &reads[i].st)
 		}()
 	}
 	wg.Wait()
@@ -169,9 +175,17 @@ func readFile(path string, st *Stats) ([]Message, error) {
 	}
 	st.Files++
 	stem := strings.TrimSuffix(filepath.Base(path), ".jsonl")
-	var out []Message
 	seen := map[string]bool{}
 	entry := ""
+	return eachLine(data, st, func(raw []byte) (Message, bool) {
+		return parse(raw, stem, &entry, seen, st)
+	}), nil
+}
+
+// eachLine walks the lines of a transcript in place: a line is a slice of the file, so a transcript of tool
+// results costs one read and no copy a line. An oversized line is counted and skipped whole.
+func eachLine(data []byte, st *Stats, parse func([]byte) (Message, bool)) []Message {
+	var out []Message
 	for len(data) > 0 {
 		raw := data
 		if i := bytes.IndexByte(data, '\n'); i >= 0 {
@@ -185,11 +199,11 @@ func readFile(path string, st *Stats) ([]Message, error) {
 		st.Lines++
 		if len(raw) > MaxLine {
 			st.Oversized++
-		} else if m, ok := parse(raw, stem, &entry, seen, st); ok {
+		} else if m, ok := parse(raw); ok {
 			out = append(out, m)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // parse reads one transcript line into a message, or says why not through the stats. entry keeps the entrypoint of

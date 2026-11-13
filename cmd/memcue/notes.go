@@ -37,6 +37,18 @@ type notesReport struct {
 // a §.
 var noteSeparator = regexp.MustCompile(`\n\s*\n|§`)
 
+// frontmatter is the YAML metadata block Qwen Code writes at the top of a memory file: a --- line, the metadata,
+// a closing --- line. A file without the block is left whole.
+var frontmatter = regexp.MustCompile(`(?s)\A---\r?\n.*?\n---[ \t]*\r?\n?`)
+
+func stripFrontmatter(data []byte) []byte {
+	return frontmatter.ReplaceAll(data, nil)
+}
+
+func hasFrontmatter(data []byte) bool {
+	return frontmatter.Match(data)
+}
+
 // noteWord is a word of the text comparison: a run of Latin or Cyrillic letters and digits.
 var noteWord = regexp.MustCompile(`[0-9A-Za-zА-Яа-яЁё]+`)
 
@@ -145,6 +157,13 @@ func readNoteEntries(dir string) ([]noteEntry, error) {
 		data, err := os.ReadFile(filepath.Join(dir, f.Name()))
 		if err != nil {
 			return nil, err
+		}
+		if hasFrontmatter(data) {
+			// A Qwen Code memory file holds one note in its body; the frontmatter is metadata, not text.
+			if text := strings.TrimSpace(string(stripFrontmatter(data))); text != "" {
+				entries = append(entries, noteEntry{File: f.Name(), Index: 1, Chars: utf8.RuneCountInString(text), Text: text})
+			}
+			continue
 		}
 		index := 0
 		for _, part := range noteSeparator.Split(string(data), -1) {

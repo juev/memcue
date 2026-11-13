@@ -261,3 +261,9 @@ func claudeDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".claude")
 }
+
+// qwenDir is the Qwen Code config directory. Qwen Code has no config-directory override of its own.
+func qwenDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".qwen")
+}
