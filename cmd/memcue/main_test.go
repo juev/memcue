@@ -32,6 +32,8 @@ func env(t *testing.T) string {
 	// machine that runs it.
 	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
 	t.Setenv("OPENCODE_DB", "")
+	// DeepSeek Harness keeps its journals under DSH_HOME, else ~/.dsh; neither may be the machine's own.
+	t.Setenv("DSH_HOME", "")
 	// The warning about Claude Code's built-in memory (#494) has its own test; elsewhere it would be one more line
 	// after the card.
 	t.Setenv("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")

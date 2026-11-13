@@ -22,11 +22,11 @@ const sessionsHalf = 200
 const sessionsHeader = "memcue sessions: passages of earlier sessions, newest first. They are history, not facts: " +
 	"they may be out of date, so check a find against the current state, and store what holds with memcue add."
 
-// runSessions is memcue sessions (#621): a word search over the text of this machine's Claude Code, Qwen Code and
-// OpenCode sessions, with no index, for what an empty memcue search may have missed: what the agent forgot to store
-// is often still in a transcript. It reads the user's and the agent's text only (see history.ReadClaude,
-// history.ReadQwen, history.ReadOpenCode), leaves out the current session and every message at or after -before, and
-// prints the newest windows.
+// runSessions is memcue sessions (#621): a word search over the text of this machine's Claude Code, Qwen Code,
+// OpenCode and DeepSeek Harness sessions, with no index, for what an empty memcue search may have missed: what the
+// agent forgot to store is often still in a transcript. It reads the user's and the agent's text only (see
+// history.ReadClaude, history.ReadQwen, history.ReadOpenCode, history.ReadDSH), leaves out the current session and
+// every message at or after -before, and prints the newest windows.
 func runSessions(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("sessions", flag.ContinueOnError)
 	n := fs.Int("n", 5, "the most passages to return, one a message")
@@ -74,6 +74,12 @@ func runSessions(args []string, out io.Writer) error {
 		return fmt.Errorf("sessions: %w", err)
 	}
 	msgs = append(msgs, openCode...)
+	// DeepSeek Harness keeps a journal per session under its home; a home without one is silence, not an error.
+	dsh, _, err := history.ReadDSH(filepath.Join(dshDir(), "sessions"))
+	if err != nil {
+		return fmt.Errorf("sessions: %w", err)
+	}
+	msgs = append(msgs, dsh...)
 	if dir != "" {
 		msgs = inDir(msgs, dir)
 	}

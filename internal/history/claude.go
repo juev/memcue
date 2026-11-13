@@ -94,6 +94,12 @@ func ReadClaude(root string) ([]Message, Stats, error) {
 // processors. The messages keep the order of the file paths, and an entry repeated across files counts once,
 // the first in that order.
 func readTranscripts(root string, read func(string, *Stats) ([]Message, error)) ([]Message, Stats, error) {
+	return readTranscriptsMatching(root, func(path string) bool { return strings.HasSuffix(path, ".jsonl") }, read)
+}
+
+// readTranscriptsMatching is readTranscripts for transcripts named another way: a dsh journal is zstd-compressed,
+// and dsh can also keep it plaintext.
+func readTranscriptsMatching(root string, match func(string) bool, read func(string, *Stats) ([]Message, error)) ([]Message, Stats, error) {
 	var st Stats
 	var paths []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -103,7 +109,7 @@ func readTranscripts(root string, read func(string, *Stats) ([]Message, error)) 
 			}
 			return err
 		}
-		if !d.IsDir() && strings.HasSuffix(path, ".jsonl") {
+		if !d.IsDir() && match(path) {
 			paths = append(paths, path)
 		}
 		return nil

@@ -277,3 +277,13 @@ func openCodeDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "share", "opencode")
 }
+
+// dshDir is the DeepSeek Harness home, whose sessions directory keeps the journal of every session. DSH_HOME names
+// another home; the harness treats a blank one as unset, and so does this.
+func dshDir() string {
+	if d := strings.TrimSpace(os.Getenv("DSH_HOME")); d != "" {
+		return d
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".dsh")
+}
