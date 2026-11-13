@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/klauspost/compress v1.20.2
 	github.com/kljensen/snowball v0.10.0
 	github.com/oklog/ulid/v2 v2.1.2
 	golang.org/x/sys v0.49.0
@@ -36,7 +37,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.2 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
-	github.com/klauspost/compress v1.20.2 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.7.0 // indirect
