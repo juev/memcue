@@ -59,6 +59,17 @@ _spec.loader.exec_module(memcue_provider)
 BIN = os.environ.get("MEMCUE_BIN") or shutil.which("memcue")
 
 
+def rendered(text: str) -> tuple[list[str], str]:
+    """The fact lines and the trailer line of a #756 rendering: what the model reads."""
+    lines = text.splitlines()
+    return (lines[:-1], lines[-1]) if len(lines) > 1 else ([], lines[0] if lines else "")
+
+
+def rendered_ids(text: str) -> list[str]:
+    """The ids of the rendered facts, in order."""
+    return [line.split("@", 1)[0].split(" ", 1)[0] for line in rendered(text)[0]]
+
+
 def _shell_memcue_vars() -> list:
     """The memcue settings of the developer's shell. Any of them can
     change what the hook serves, so the suite runs without any of them (MEMCUE_BIN only names the binary)."""
@@ -312,8 +323,8 @@ class ProviderTest(unittest.TestCase):
         listed = self.facts()
         self.assertEqual(len(listed), 1)
         self.assertIn("55432", listed[0])
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
-        self.assertIn("55432", found["facts"][0]["content"])
+        found = self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"})
+        self.assertIn("55432", found)
         self.assertIn("hermes-memory", "\n".join(self.memcue("dump", self.p._facts)))
 
     def test_no_fact_comes_with_a_message(self):
@@ -321,8 +332,8 @@ class ProviderTest(unittest.TestCase):
         self.add_fact("Проект demo: база PostgreSQL 18 слушает порт 55432, пользователь demo_app.")
         self.assertNotIn("55432", self.p.prefetch("на каком порту слушает база postgres проекта demo?",
                                                   session_id="s1"))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"}))
-        self.assertIn("55432", found["facts"][0]["content"])
+        found = self.p.handle_tool_call("memcue_search", {"query": "порт postgres demo"})
+        self.assertIn("55432", found)
 
     def test_replace_corrects_the_same_fact_and_remove_retires_it(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
@@ -597,8 +608,9 @@ class ProviderTest(unittest.TestCase):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Сервер server1: Caddy-private перечитывает Caddyfile только после пересоздания контейнера."}))
         fact_id = added["result"].split()[0]
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
-        self.assertEqual([f["id"] for f in found["facts"]], [fact_id])
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})
+        self.assertEqual(rendered_ids(found), [fact_id])
+        self.assertIn(f"{fact_id}@1 ", found)
         self.assertIn(f"{fact_id} v1 active", "\n".join(l for l in self.memcue("dump", self.p._facts) if "source=agent" in l))
         corrected = json.loads(self.p.handle_tool_call("memcue_correct", {"id": fact_id, "content": "Новый текст."}))
         self.assertIn("v2", corrected["result"])
@@ -771,12 +783,14 @@ class ProviderTest(unittest.TestCase):
         fact_id = added["result"].split()[0]
         line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
         self.assertIn("scope=shelf:research", line)
-        empty = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит"}))
-        self.assertEqual(empty["facts"], [])
+        empty = self.p.handle_tool_call("memcue_search", {"query": "example лимит"})
+        self.assertEqual(rendered(empty)[0], [])
+        self.assertTrue(empty.startswith("No stored facts match."), empty)
         # The shelf hint of the binary reaches the model: it is the only way back to a shelved fact (#453).
-        self.assertIn("-in shelf:research", empty.get("hint", ""))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "example лимит", "in": "shelf:research"}))
-        self.assertEqual([(f["id"], f.get("scope")) for f in found["facts"]], [(fact_id, "shelf:research")])
+        self.assertIn("-in shelf:research", empty)
+        found = self.p.handle_tool_call("memcue_search", {"query": "example лимит", "in": "shelf:research"})
+        self.assertEqual(rendered_ids(found), [fact_id])
+        self.assertIn(" shelf:research ", f" {found} ")
 
     def test_search_documents_the_shelf(self):
         schema = next(s for s in self.p.get_tool_schemas() if s["name"] == "memcue_search")
@@ -788,17 +802,17 @@ class ProviderTest(unittest.TestCase):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Сервер server1: Caddy перечитывает Caddyfile после пересоздания контейнера."}))
         fact_id = added["result"].split()[0]
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
-        self.assertEqual(len(found["facts"]), 1)
-        self.assertEqual(found["facts"][0]["id"], fact_id)
-        self.assertTrue(found["facts"][0]["content"].startswith("Сервер server1"))
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})
+        self.assertEqual(rendered_ids(found), [fact_id])
+        self.assertIn(f"{fact_id}@1 ", found)
+        self.assertIn("Сервер server1", found)
 
     def test_search_takes_a_limit(self):
         for i in range(3):
             json.loads(self.p.handle_tool_call("memcue_add", {
                 "content": f"Сервер server{i}: Caddy перечитывает Caddyfile после пересоздания контейнера."}))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": "2"}))
-        self.assertEqual(len(found["facts"]), 2)
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": "2"})
+        self.assertEqual(len(rendered(found)[0]), 2)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": "x"})))
 
     def test_search_refuses_a_zero_limit(self):
@@ -810,12 +824,12 @@ class ProviderTest(unittest.TestCase):
             with self.subTest(limit=limit):
                 found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy", "limit": limit}))
                 self.assertEqual(found.get("error"), "limit must be a positive integer")
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": 3}))
-        self.assertEqual(len(found["facts"]), 3)
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", "limit": 3})
+        self.assertEqual(len(rendered(found)[0]), 3)
         for args in ({}, {"limit": None}, {"limit": ""}, {"limit": False}):
             with self.subTest(args=args):
-                found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", **args}))
-                self.assertEqual(len(found["facts"]), memcue_provider._SEARCH_FACTS)
+                found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание", **args})
+                self.assertEqual(len(rendered(found)[0]), memcue_provider._SEARCH_FACTS)
 
     def test_search_passes_the_controls(self):
         """in, kind, words and expired reach memcue search (#409); a wrong value comes back as an error."""
@@ -828,8 +842,7 @@ class ProviderTest(unittest.TestCase):
             "content": "Caddy на server2 падает без конфига.",  "kind": "pitfall",
             "scope": "host:server2"}))
         def ids(**kw):
-            found = json.loads(self.p.handle_tool_call("memcue_search", dict(query="caddy server1", **kw)))
-            return [f["id"] for f in found["facts"]]
+            return rendered_ids(self.p.handle_tool_call("memcue_search", dict(query="caddy server1", **kw)))
         self.assertEqual(ids(kind="rule", min_score="0"), [rule])
         self.assertEqual(len(ids(**{"in": "all"}, min_score=0)), 2)  # a number 0 widens too
         self.assertEqual(ids(words="all"), [rule])
@@ -850,17 +863,17 @@ class ProviderTest(unittest.TestCase):
         (repo / ".git" / "config").write_text('[remote "origin"]\n\turl = https://example.com/us/app.git\n',
                                               encoding="utf-8")
         self.p._workspace = str(repo)
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3"}))
-        self.assertEqual([f["id"] for f in found["facts"]], [other])
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy server3"})
+        self.assertEqual(rendered_ids(found), [other])
         # -in project is gone (#712): the tool hands memcue's refusal back.
         gone = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy server3", "in": "project"}))
         self.assertIn("-in project is gone", gone["error"])
         # A fact of this repository is found by naming the repository.
         own = self.memcue("add", "-origin", "example.com/us/app 2026-10-27", "-scope", "repo:example.com/us/app",
                           "Nginx на server3 слушает порт 8443.")[0].split()[0]
-        mine = json.loads(self.p.handle_tool_call("memcue_search", {"query": "nginx server3",
-                                                                    "in": "repo:example.com/us/app"}))
-        self.assertEqual([f["id"] for f in mine["facts"]], [own])
+        mine = self.p.handle_tool_call("memcue_search", {"query": "nginx server3",
+                                                         "in": "repo:example.com/us/app"})
+        self.assertEqual(rendered_ids(mine), [own])
 
     def test_search_answer_reads_both_shapes(self):
         """search -json is an object with facts and hints (#453); an older binary prints a bare array."""
@@ -873,12 +886,14 @@ class ProviderTest(unittest.TestCase):
         """A Chinese query gets the hint to search in the facts' languages, found or not; a Russian one does not (#410)."""
         json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Caddy на server1 перечитывает Caddyfile после пересоздания."}))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启 caddy"}))
-        self.assertEqual(len(found["facts"]), 1)
-        self.assertIn("English by default; legacy facts may use other languages", found["hint"])
-        self.assertEqual(found["hint"].count("English by default; legacy facts may use other languages"), 1)  # the binary's hint and the plugin's are one
-        self.assertIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "如何重启"})))
-        self.assertNotIn("hint", json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})))
+        found = self.p.handle_tool_call("memcue_search", {"query": "如何重启 caddy"})
+        self.assertEqual(len(rendered(found)[0]), 1)
+        # The binary's hint and the plugin's are one line in the trailer, said once (#410).
+        self.assertEqual(found.count("English by default; legacy facts may use other languages"), 1)
+        self.assertIn("English by default; legacy facts may use other languages",
+                      self.p.handle_tool_call("memcue_search", {"query": "如何重启"}))
+        self.assertNotIn("English by default",
+                         self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
 
     def test_search_hints_when_the_floor_holds_facts_back(self):
         """A single fact may be all the score floor allows: the answer says so and names the lever (#407)."""
@@ -888,15 +903,15 @@ class ProviderTest(unittest.TestCase):
             json.loads(self.p.handle_tool_call("memcue_add", {
                 "content": f"Заметка {i} о Caddy: сертификаты обновляются через ACME на стенде."}))
         query = "caddy пересоздание контейнера server1"
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": query}))
-        self.assertEqual([f["id"] for f in found["facts"]], [strong])
-        self.assertIn("min_score 0", found["hint"])
-        wide = json.loads(self.p.handle_tool_call("memcue_search", {"query": query, "min_score": "0"}))
-        self.assertGreater(len(wide["facts"]), 1)  # the hint named what the floor held back
-        self.assertNotIn("hint", wide)  # a search that already asks wide needs no hint
-        nothing = json.loads(self.p.handle_tool_call("memcue_search", {"query": "квазар антигравитация"}))
-        self.assertEqual(nothing["facts"], [])  # nothing below the floor to name
-        self.assertNotIn("hint", nothing)
+        found = self.p.handle_tool_call("memcue_search", {"query": query})
+        self.assertEqual(rendered_ids(found), [strong])
+        self.assertIn("min_score 0", found)
+        wide = self.p.handle_tool_call("memcue_search", {"query": query, "min_score": "0"})
+        self.assertGreater(len(rendered(wide)[0]), 1)  # the hint named what the floor held back
+        self.assertNotIn("min_score 0", wide)  # a search that already asks wide needs no hint
+        nothing = self.p.handle_tool_call("memcue_search", {"query": "квазар антигравитация"})
+        self.assertEqual(rendered(nothing)[0], [])  # nothing below the floor to name
+        self.assertEqual(nothing, "No stored facts match.")
 
     def test_floor_hint_counts_the_tail_with_its_own_limit(self):
         """The wide call asks for min(4 * limit, 20) facts while the answer keeps the caller's -n, and the hint counts
@@ -920,9 +935,9 @@ class ProviderTest(unittest.TestCase):
                 p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
                 p.initialize("s1", hermes_home=self.home, agent_context="primary")
                 args = {"query": "caddy"} if limit is None else {"query": "caddy", "limit": limit}
-                found = json.loads(p.handle_tool_call("memcue_search", args))
-                self.assertEqual([f["id"] for f in found["facts"]], ["a"])
-                self.assertTrue(found["hint"].startswith("6 more facts hold the words"), found["hint"])
+                found = p.handle_tool_call("memcue_search", args)
+                self.assertEqual(rendered_ids(found), ["a"])
+                self.assertIn("6 more facts hold the words", found)
                 first, second = [c.strip("\n").split("\n") for c in
                                  calls.read_text(encoding="utf-8").split("---\n") if c.strip()]
                 self.assertEqual(first[first.index("-n") + 1], limit or str(memcue_provider._SEARCH_FACTS))
@@ -951,16 +966,16 @@ class ProviderTest(unittest.TestCase):
                 stub.chmod(0o755)
                 p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
                 p.initialize("s-shelf", hermes_home=self.home, agent_context="primary")
-                found = json.loads(p.handle_tool_call("memcue_search", dict(query="quarrel", **extra)))
-                self.assertEqual([f["id"] for f in found["facts"]], ["a", "b"])
+                found = p.handle_tool_call("memcue_search", dict(query="quarrel", **extra))
+                self.assertEqual(rendered_ids(found), ["a", "b"])
                 calls = len(count.read_text(encoding="utf-8").split())
                 if hinted:
-                    self.assertTrue(found["hint"].startswith("1 more facts hold the words but sit below the score "
-                                                             "floor and are not in this answer"), found["hint"])
-                    self.assertIn("min_score 0", found["hint"])
+                    self.assertIn("1 more facts hold the words but sit below the score floor and are not in this "
+                                  "answer", found)
+                    self.assertIn("min_score 0", found)
                     self.assertEqual(calls, 2)
                 else:
-                    self.assertNotIn("hint", found)
+                    self.assertNotIn("min_score 0", found)
                     self.assertEqual(calls, 1)  # the ordinary answer pays for no second search
 
     def test_a_shelf_fact_below_the_floor_is_named_behind_two_others(self):
@@ -971,20 +986,19 @@ class ProviderTest(unittest.TestCase):
                                   ("Quarrel: the project was archived by its author in 2025.", "quarrel")):
             json.loads(self.p.handle_tool_call("memcue_add", {"content": content,
                                                               "shelf": "research"}))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
-                                                                     "in": "shelf:research"}))
-        self.assertEqual(len(found["facts"]), 2)
-        self.assertTrue(found.get("hint", "").startswith("1 more facts hold the words but sit below the score floor"),
-                        found)
-        wide = json.loads(self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
-                                                                    "in": "shelf:research", "min_score": "0"}))
-        self.assertIn("archived", " ".join(f["content"] for f in wide["facts"]))
+        found = self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
+                                                          "in": "shelf:research"})
+        self.assertEqual(len(rendered(found)[0]), 2)
+        self.assertIn("1 more facts hold the words but sit below the score floor", found)
+        wide = self.p.handle_tool_call("memcue_search", {"query": "quarrel queue postgres",
+                                                         "in": "shelf:research", "min_score": "0"})
+        self.assertIn("archived", wide)
 
     def test_the_search_description_says_what_a_hint_is(self):
-        """The model reads a hint as a note about the search, not as a fact, and knows below_floor (#546)."""
+        """The model reads a hint as a note about the search, not as a fact, and knows the below-the-floor mark (#546)."""
         search = memcue_provider.SEARCH_SCHEMA["description"]
         self.assertIn("not a stored fact", search)
-        self.assertIn("below_floor: true", search)
+        self.assertIn("(below the floor)", search)
         self.assertIn("shelf search whatever the number of facts", search)
 
     def test_an_empty_answer_hands_over_the_first_facts_below_the_floor(self):
@@ -1004,27 +1018,28 @@ class ProviderTest(unittest.TestCase):
         stub.chmod(0o755)
         p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
         p.initialize("s-empty", hermes_home=self.home, agent_context="primary")
-        found = json.loads(p.handle_tool_call("memcue_search", {"query": "caddy"}))
-        self.assertEqual([f["id"] for f in found["facts"]], ["t1", "t2"])
-        self.assertTrue(all(f.get("below_floor") is True for f in found["facts"]), found["facts"])
-        self.assertIn("2 facts hold the words but sit below the score floor", found["hint"])
-        self.assertIn("below_floor: true", found["hint"])
+        found = p.handle_tool_call("memcue_search", {"query": "caddy"})
+        fact_lines, trailer = rendered(found)
+        self.assertEqual([line.split(" ", 1)[0] for line in fact_lines], ["t1", "t2"])
+        self.assertTrue(all(line.endswith("(below the floor)") for line in fact_lines), fact_lines)
+        self.assertIn("2 facts hold the words but sit below the score floor", trailer)
+        self.assertIn("come marked below the floor", trailer)
 
     def test_search_defaults_to_the_configured_number(self):
         """Five facts by default and a config key overrides it (#372): ten were noise on a live base."""
         for i in range(7):
             json.loads(self.p.handle_tool_call("memcue_add", {
                 "content": f"Сервер server{i}: Caddy перечитывает Caddyfile после пересоздания контейнера."}))
-        found = json.loads(self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
-        self.assertEqual(len(found["facts"]), memcue_provider._SEARCH_FACTS)
+        found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})
+        self.assertEqual(len(rendered(found)[0]), memcue_provider._SEARCH_FACTS)
         self.assertEqual(memcue_provider._SEARCH_FACTS, 5)
         # Raising the limit adds the tail, not better facts (#425): the schema names the default and that cost.
         limit = memcue_provider.SEARCH_SCHEMA["parameters"]["properties"]["limit"]["description"]
         self.assertIn("default 5", limit)
         self.assertIn("adds the tail", limit)
         few = memcue_provider.MemcueMemoryProvider({"binary": BIN, "facts": self.p._facts, "search_facts": "2"})
-        found = json.loads(few.handle_tool_call("memcue_search", {"query": "caddy пересоздание"}))
-        self.assertEqual(len(found["facts"]), 2)
+        found = few.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})
+        self.assertEqual(len(rendered(found)[0]), 2)
         self.assertEqual(memcue_provider.MemcueMemoryProvider({"binary": BIN, "search_facts": "many"})._search_facts, 5)
         self.assertEqual(memcue_provider.MemcueMemoryProvider({"binary": BIN, "search_facts": "99"})._search_facts, 50)
 
@@ -1161,7 +1176,7 @@ class ProviderTest(unittest.TestCase):
                 stub.chmod(0o755)
                 p = memcue_provider.MemcueMemoryProvider({"binary": str(stub)})
                 p.initialize("s1", hermes_home=self.home, agent_context="primary")
-                self.assertNotIn("error", json.loads(p.handle_tool_call("memcue_search", {"query": "порт"})))
+                self.assertEqual(p.handle_tool_call("memcue_search", {"query": "порт"}), "No stored facts match.")
                 args = calls.read_text(encoding="utf-8").splitlines()
                 self.assertEqual("-cwd" in args, scoped, args)
                 self.assertEqual("-session" in args, scoped, args)

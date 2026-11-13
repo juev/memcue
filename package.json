@@ -15,6 +15,7 @@
     "plugins/deepseek-harness/README.md",
     "plugins/transport/index.mjs",
     "plugins/transport/transport.mjs",
+    "plugins/transport/render.mjs",
     "plugins/transport/install.mjs",
     "plugins/transport/index.d.mts",
     "plugins/transport/package.json",

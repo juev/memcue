@@ -229,5 +229,24 @@ class InstallContract(unittest.TestCase):
         self.assertTrue(marker.exists(), "the running binary lost its file")
 
 
+class RenderContract(unittest.TestCase):
+    """The rendering of a search answer (#756): the Hermes provider's Python renderer must produce the same text as
+    the JavaScript renderSearch of memcue-transport for every vector, or two hosts show the model two documents."""
+
+    def test_every_vector_renders_the_same_way(self):
+        vectors = json.loads(
+            (PLUGINS / "transport" / "conformance" / "render-vectors.json").read_text(encoding="utf-8"))
+        for vector in vectors["cases"]:
+            with self.subTest(vector=vector["name"]):
+                self.assertEqual(m._render_search(vector["answer"], vector.get("options")), vector["expected"])
+
+    def test_the_defaults_are_the_published_ones(self):
+        vectors = json.loads(
+            (PLUGINS / "transport" / "conformance" / "render-vectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(m._RENDER_CONTENT_CHARS, vectors["defaults"]["contentChars"])
+        self.assertEqual(m._RENDER_TOTAL_CHARS, vectors["defaults"]["totalChars"])
+        self.assertEqual(m._RENDER_MAX_FACTS, vectors["defaults"]["maxFacts"])
+
+
 if __name__ == "__main__":
     unittest.main()

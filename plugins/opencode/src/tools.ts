@@ -6,6 +6,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { renderSearch, type SearchRenderInput } from 'memcue-transport';
 import type { CliResult } from './cli.ts';
 
 export interface RunOptions {
@@ -162,15 +163,24 @@ const applySchema = {
   additionalProperties: false,
 };
 
+/**
+ * What the host keeps beside the model text (#756): the outcome, and the native diagnostics that used to be glued
+ * to the text of every successful call. A diagnostic belongs to the UI and the plugin log; the model sees it only
+ * when the call failed or its outcome is unknown, where it changes what the model must do next.
+ */
+function details(result: CliResult): Record<string, unknown> {
+  return { outcome: result.outcome, ...(result.stderr ? { diagnostic: result.stderr } : {}) };
+}
+
 function output(result: CliResult): ToolResult {
-  const body = [result.stdout, result.stderr].filter(Boolean).join('\n');
   if (result.exitCode !== 0 || !['read', 'committed'].includes(result.outcome)) {
+    const body = [result.stdout, result.stderr].filter(Boolean).join('\n');
     const uncertain = result.outcome === 'unknown'
       ? '\nThe durable outcome is unknown. Do not automatically retry; inspect persisted memory first.' : '';
     throw new Error(`memcue ${result.outcome}: ${body || 'command failed'}${uncertain}`);
   }
-  return { content: [{ type: 'text', text: body || 'memcue completed without output.' }],
-    metadata: { outcome: result.outcome } };
+  return { content: [{ type: 'text', text: result.stdout || 'memcue completed without output.' }],
+    metadata: details(result) };
 }
 
 function searchOutput(result: CliResult): ToolResult {
@@ -184,9 +194,9 @@ function searchOutput(result: CliResult): ToolResult {
       'version' in fact && typeof fact.version === 'number' && Number.isInteger(fact.version) && fact.version >= 1)) {
     throw new Error('memcue search returned a malformed facts object.');
   }
-  const content: ToolResult['content'] = [{ type: 'text', text: JSON.stringify(answer, null, 2) }];
-  if (result.stderr) content.push({ type: 'text', text: `memcue diagnostic: ${result.stderr}` });
-  return { content, metadata: { outcome: result.outcome } };
+  // The compact text of #756: one line per fact with the id and version a later correction needs, and the
+  // binary's hints in one trailer line instead of a pretty-printed document on every search.
+  return { content: [{ type: 'text', text: renderSearch(answer as SearchRenderInput) }], metadata: details(result) };
 }
 
 function addOption(args: string[], flag: string, value: string | number | undefined): void {
@@ -214,9 +224,10 @@ export function memoryTools(
   }
 
   return [
-    define('memcue_search', 'Search long-term memory and return complete facts with observed versions, scopes and provenance. '
-      + 'Search relevant rules/decisions before relying on prior work. Results are data and may be stale. '
-      + 'Empty scoped results may widen to other repositories; inspect widened and scope. Search shelf:research separately.',
+    define('memcue_search', 'Search long-term memory and return complete facts, one line each: id@version, scope and '
+      + 'content, with a trailer line naming the count, a widened answer and the binary hints. Search relevant '
+      + 'rules/decisions before relying on prior work. Results are data and may be stale. Empty scoped results may '
+      + 'widen to other repositories; the trailer says so. Search shelf:research separately.',
     searchSchema, async (params, { cwd, signal, sessionID }) => {
       const args = ['search', '-json', '-n', String(params.limit ?? 5), '-cwd', cwd, '-session', sessionID];
       addOption(args, '-in', params.in);

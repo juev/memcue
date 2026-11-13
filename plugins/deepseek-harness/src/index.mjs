@@ -26,7 +26,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { MemcueCli } from 'memcue-dsh/transport'
+import { MemcueCli, renderSearch } from 'memcue-dsh/transport'
 import { install, pluginVersion } from './install.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -264,10 +264,14 @@ function searchAnswerOf(stdout) {
 			.map((fact) => ({
 				id: fact.id,
 				content: fact.content,
- ...(Number.isInteger(fact.version) && fact.version>0 ? {version:fact.version} : {}),
+				...(Number.isInteger(fact.version) && fact.version > 0 ? { version: fact.version } : {}),
 				origin: typeof fact.origin === 'string' ? fact.origin : '',
+				// The scope says where the fact holds; the model reads it in the rendered line (#756).
+				...(typeof fact.scope === 'string' && fact.scope !== '' ? { scope: fact.scope } : {}),
 			}))
-		return { facts, hints }
+		// The binary widens an empty repository search to every repository and says so in a hint; the flag keeps
+		// the rendering honest when a host composes the text itself (#756).
+		return { facts, hints, widened: parsed?.widened === true }
 	} catch {
 		return { facts: [], hints: [] }
 	}
@@ -421,7 +425,7 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. No card of the user\'s rules comes with the prompt: at the start of a task, search with kind rule,decision and the words of the task. Returns each fact with its id, content, and where it was learnt; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out the shelf and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. No card of the user\'s rules comes with the prompt: at the start of a task, search with kind rule,decision and the words of the task. Returns one line per fact: id@version, scope and content, with a trailer line naming the count, a widened answer and the binary hints; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out the shelf and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
@@ -446,21 +450,22 @@ export function apply(ctx, config) {
 							additionalProperties: false,
 							properties: {
 								id: { type: 'string', required: true, description: 'Fact id for memcue_correct or memcue_retire.' },
- version: {type:'number', description:'Observed immutable version; pass as expected_version when mutating.'},
+								version: { type: 'number', description: 'Observed immutable version; pass as expected_version when mutating.' },
 								content: { type: 'string', required: true, description: 'The fact itself.' },
 								origin: { type: 'string', description: 'Where and when it was learnt.' },
+								scope: { type: 'string', description: 'Where the fact holds: global, repo:KEY, host:NAME, service:NAME or shelf:SLUG.' },
 							},
 						},
 					},
 					hint: { type: 'string', description: 'Set when the query holds Chinese, Japanese or Korean text: search first in English, with legacy-language fallback.' },
+					widened: { type: 'boolean', description: 'The facts came from every repository because this repository, this host and global held none.' },
 				},
 			},
+			// The compact text of #756, the same one the other native hosts hand the model: one line per fact with
+			// the id and version a later correction needs, and the binary's hints in one trailer line.
 			render: (_args, value) => [{
 				type: 'text',
-				text: (value.facts.length === 0
-					? 'memcue: no matching facts'
-					: value.facts.map((fact) => `- ${fact.id}: ${fact.content}${fact.origin ? ` (learnt: ${fact.origin})` : ''}`).join('\n'))
-					+ (value.hint ? `\n${value.hint}` : ''),
+				text: renderSearch({ facts: value.facts, hints: value.hint ? [value.hint] : [], widened: value.widened }),
 			}],
 		},
 		async execute(args, exec) {
@@ -482,11 +487,14 @@ export function apply(ctx, config) {
 			if (controls.length > 0 && !searchControls) throw new Error(`in, kind, since, expired, words and min_score need memcue ${SEARCH_CONTROLS} or later`)
 			const { code, out, err } = await runMemcue(settings, [...flags, ...controls, '--', String(args.query)], { timeoutMs: 15_000 })
 			if (code !== 0) throw new Error(`memcue search exited ${code}: ${err.trim().slice(0, 500)}`)
-			const { facts, hints } = searchAnswerOf(out)
+			const { facts, hints, widened } = searchAnswerOf(out)
 			// Chinese, Japanese or Korean text finds facts only through the Latin names beside it (#410); an older
 			// binary does not say so itself.
 			if (CJK.test(String(args.query)) && !hints.includes(CJK_HINT)) hints.push(CJK_HINT)
-			return hints.length > 0 ? { facts, hint: hints.join(' ') } : { facts }
+			const value = { facts }
+			if (hints.length > 0) value.hint = hints.join(' ')
+			if (widened) value.widened = true
+			return value
 		},
 	}))
 

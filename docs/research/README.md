@@ -77,6 +77,7 @@ a source link is not a downloadable copy of the private evidence.
 | [The research shelf: a confirming run on an isolated stand, October 2026 (#531)](research-shelf-confirm-531-2026-10.md) |
 | [When the agent searches, without a card, on real prompts, November 2026 (#647)](search-policy-647-2026-11.md) |
 | [The source of an agent's fact, October 2026 (#574)](source-default-574-2026-10.md) |
+| [The text one search costs the model, November 2026 (#756)](tool-rendering-756-2026-11.md) |
 
 ## Cards and scope
 

@@ -65,3 +65,45 @@ export function current(path: string, version: string): Promise<boolean>;
  *   download or the checksum fails.
  */
 export function install(version: string): Promise<string>;
+
+/** One fact of a parsed `memcue search -json` answer; only `id` and `content` are required to render it. */
+export interface SearchRenderFact {
+  id?: unknown;
+  version?: unknown;
+  content?: unknown;
+  /** `global`, `repo:KEY`, `host:NAME`, `service:NAME` or `shelf:SLUG`. */
+  scope?: unknown;
+  /** Served under the score floor; the Hermes provider sets it and the line says so. */
+  below_floor?: unknown;
+}
+
+export interface SearchRenderInput {
+  facts?: readonly SearchRenderFact[];
+  /** The lines the binary prints after its facts, kept word for word. */
+  hints?: readonly unknown[];
+  widened?: unknown;
+}
+
+export interface SearchRenderOptions {
+  /** The most content characters of one fact, clipped with an ellipsis; default 600. */
+  contentChars?: number;
+  /** The budget of the fact lines; default 4000. The trailer line is added on top. */
+  totalChars?: number;
+  /** The most fact lines; default 10. */
+  maxFacts?: number;
+}
+
+/** What a host shows when a search found nothing, the wording the CLI itself prints. */
+export const NO_FACTS: string;
+
+/** The default bound of a rendered answer. */
+export const SEARCH_RENDER_DEFAULTS: Readonly<{ contentChars: number; totalChars: number; maxFacts: number }>;
+
+/**
+ * The text a native host gives the model for a search answer (#756): one line per fact with `<id>@<version>`, the
+ * scope and the content, then one trailer line with the count, the widening and the binary's hints. A cut answer
+ * says how many facts it left out.
+ * @param answer - what `memcue search -json` printed, parsed.
+ * @param options - the bounds of the rendering.
+ */
+export function renderSearch(answer: SearchRenderInput | null | undefined, options?: SearchRenderOptions): string;

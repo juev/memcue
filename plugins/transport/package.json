@@ -27,6 +27,7 @@
     "index.mjs",
     "transport.mjs",
     "install.mjs",
+    "render.mjs",
     "index.d.mts",
     "README.md",
     "LICENSE"

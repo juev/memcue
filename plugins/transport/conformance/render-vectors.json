@@ -1,0 +1,112 @@
+{
+  "comment": "The exact text every native host hands the model for a memcue search answer (#756). Read by conformance/render.test.mjs for the JavaScript renderer and by conformance/hermes_contract.py for the Python one of the Hermes provider, so the two cannot drift apart.",
+  "defaults": { "contentChars": 600, "totalChars": 4000, "maxFacts": 10 },
+  "cases": [
+    {
+      "name": "two facts keep the id, the version, the scope and the content",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 3, "scope": "repo:example.com/app", "content": "The build runs make test before the commit." },
+          { "id": "f2", "version": 1, "scope": "global", "content": "Facts are written in English." }
+        ]
+      },
+      "expected": "f1@3 repo:example.com/app The build runs make test before the commit.\nf2@1 global Facts are written in English.\n2 facts"
+    },
+    {
+      "name": "a fact of an older binary prints no version",
+      "answer": { "facts": [{ "id": "f1", "content": "An older binary prints no version." }] },
+      "expected": "f1 An older binary prints no version.\n1 fact"
+    },
+    {
+      "name": "a fact without a scope keeps id, version and content",
+      "answer": { "facts": [{ "id": "f1", "version": 2, "content": "A fact without a scope." }] },
+      "expected": "f1@2 A fact without a scope.\n1 fact"
+    },
+    {
+      "name": "widening is named in the trailer and the hints stay word for word",
+      "answer": {
+        "facts": [{ "id": "f1", "version": 1, "scope": "repo:example.com/other", "content": "A fact of another repository." }],
+        "widened": true,
+        "hints": ["No facts of this repository, this host or global match; these come from other repositories: check that they apply."]
+      },
+      "expected": "f1@1 repo:example.com/other A fact of another repository.\n1 fact | widened | No facts of this repository, this host or global match; these come from other repositories: check that they apply."
+    },
+    {
+      "name": "an empty answer keeps the wording of the CLI",
+      "answer": { "facts": [] },
+      "expected": "No stored facts match."
+    },
+    {
+      "name": "an empty answer with a shelf hint names where the facts are",
+      "answer": { "facts": [], "hints": ["3 facts on the shelf match: -in shelf:research"] },
+      "expected": "No stored facts match. | 3 facts on the shelf match: -in shelf:research"
+    },
+    {
+      "name": "the language hint follows the facts in the trailer",
+      "answer": {
+        "facts": [{ "id": "f1", "version": 1, "scope": "global", "content": "A fact." }],
+        "hints": ["Facts use English by default; legacy facts may use other languages: search first in English; if English misses, retry in Russian or another legacy language."]
+      },
+      "expected": "f1@1 global A fact.\n1 fact | Facts use English by default; legacy facts may use other languages: search first in English; if English misses, retry in Russian or another legacy language."
+    },
+    {
+      "name": "a fact served under the score floor says so",
+      "answer": { "facts": [{ "id": "f1", "version": 2, "scope": "global", "content": "A fact under the floor.", "below_floor": true }] },
+      "expected": "f1@2 global A fact under the floor. (below the floor)\n1 fact"
+    },
+    {
+      "name": "a long fact is clipped with an ellipsis",
+      "answer": { "facts": [{ "id": "f1", "version": 1, "scope": "global", "content": "0123456789012345678901234567890" }] },
+      "options": { "contentChars": 20 },
+      "expected": "f1@1 global 01234567890123456789…\n1 fact"
+    },
+    {
+      "name": "a fact never costs two lines",
+      "answer": { "facts": [{ "id": "f1", "version": 1, "scope": "global", "content": "first line\nsecond   line" }] },
+      "expected": "f1@1 global first line second line\n1 fact"
+    },
+    {
+      "name": "more facts than the bound are counted, not silently dropped",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 1, "scope": "global", "content": "One." },
+          { "id": "f2", "version": 1, "scope": "global", "content": "Two." },
+          { "id": "f3", "version": 1, "scope": "global", "content": "Three." },
+          { "id": "f4", "version": 1, "scope": "global", "content": "Four." }
+        ]
+      },
+      "options": { "maxFacts": 2 },
+      "expected": "f1@1 global One.\nf2@1 global Two.\n2 facts | … 2 facts not shown"
+    },
+    {
+      "name": "the character budget bounds the fact lines",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 1, "scope": "global", "content": "First fact." },
+          { "id": "f2", "version": 1, "scope": "global", "content": "Second fact." }
+        ]
+      },
+      "options": { "totalChars": 30 },
+      "expected": "f1@1 global First fact.\n1 fact | … 1 fact not shown"
+    },
+    {
+      "name": "entries that cannot name a fact are left out",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 1, "scope": "global", "content": "Kept." },
+          { "content": "No id." },
+          { "id": "f3" }
+        ]
+      },
+      "expected": "f1@1 global Kept.\n1 fact"
+    },
+    {
+      "name": "an empty hint is not a line",
+      "answer": {
+        "facts": [{ "id": "f1", "version": 1, "scope": "global", "content": "A fact." }],
+        "hints": ["", "   ", 5, "The real hint."]
+      },
+      "expected": "f1@1 global A fact.\n1 fact | The real hint."
+    }
+  ]
+}
