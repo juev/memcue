@@ -17,8 +17,15 @@ One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, Ope
    - `plugins/claude-code/test/versions.test.mjs`, which checks the manifests above and the README.
 3. In `README.md`, update the release named in [Compatibility](../README.md#compatibility), add a row to its table, and
    add a section under [Upgrade](../README.md#upgrade): what changed for a user, and whether the schema or a flag did.
-4. Run `make test`. After CI passes, merge the PR with a rebase.
-5. Tag the merge commit twice and push both tags:
+4. Publish the transport of this version ahead of the tag, then point Pi and OpenCode at it. Push the release branch,
+   run `publish-transport.yml` from it (`gh workflow run publish-transport.yml --ref <branch> -f dry_run=true`, then
+   `-f dry_run=false`), and once `npm pack memcue-transport@X.Y.Z` fetches it, run
+   `npm --prefix plugins/pi install memcue-transport@^X.Y.Z --save` and the same for `plugins/opencode`. Both plugins
+   declare `^X.Y.Z` and their locks resolve `X.Y.Z` from the registry; `versions.test.mjs` fails otherwise. On 0.x a
+   caret admits only its own minor, so a plugin left on the previous range installs the previous transport and fails
+   to load when it imports anything added since; `make link-transport` hides that from every local and CI run.
+5. Run `make test`. After CI passes, merge the PR with a rebase.
+6. Tag the merge commit twice and push both tags:
 
    ```bash
    git tag vX.Y.Z
@@ -38,7 +45,7 @@ One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, Ope
    Tag `v*` first and wait for its transport job. The first publish of each package and its trusted publisher on
    npmjs.com are manual steps; `publish-transport.yml` (workflow_dispatch) bootstraps or hotfixes the transport
    outside a release.
-6. Check the results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version`,
+7. Check the results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version`,
    `npm view memcue-transport version`, `npm view memcue-pi version` and `npm view memcue-opencode version` print
    `X.Y.Z`.
 

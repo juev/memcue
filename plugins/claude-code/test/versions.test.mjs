@@ -31,6 +31,22 @@ test('all plugin manifests carry the release version', async () => {
 	assert.equal(companion, rootPackage.version)
 })
 
+test('Pi and OpenCode depend on the transport of this release, and their locks resolve it', async () => {
+	// A plugin that imports a transport export the declared range cannot reach fails to load once published: on 0.x
+	// a caret admits only its own minor, and `make link-transport` hides the gap from every local and CI run (#770).
+	const transport = await json('plugins/transport/package.json')
+	for (const plugin of ['pi', 'opencode']) {
+		const manifest = await json(`plugins/${plugin}/package.json`)
+		assert.equal(manifest.dependencies['memcue-transport'], `^${transport.version}`,
+			`plugins/${plugin} must declare the transport of this release`)
+		const lock = await json(`plugins/${plugin}/package-lock.json`)
+		assert.equal(lock.packages[''].dependencies['memcue-transport'], `^${transport.version}`,
+			`plugins/${plugin}/package-lock.json must be rebuilt after the range changes`)
+		assert.equal(lock.packages['node_modules/memcue-transport']?.version, transport.version,
+			`plugins/${plugin}/package-lock.json must resolve memcue-transport ${transport.version}`)
+	}
+})
+
 test('the README compatibility table names the same release', async () => {
 	const readme = await readFile(new URL('README.md', root), 'utf8')
 	const version = (await json('package.json')).version.replaceAll('.', '\\.')
