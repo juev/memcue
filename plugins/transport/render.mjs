@@ -2,11 +2,11 @@
  * The compact text of a `memcue search -json` answer (#756), the one rendering every native host shares.
  *
  * A native host hands the model the text it composes itself. The whole pretty-printed answer put braces, repeated
- * field names and the `created`/`origin` pair into every search, and every later request carried them again. One
- * line per fact keeps what a later `memcue_correct` or `memcue_retire` needs beside the fact: `<id>@<version>`, the
- * scope that says where it holds, and the content; one trailer line carries the count, the widening and the hints
- * the binary printed, word for word. The form is the same in every host, and `conformance/render-vectors.json`
- * pins it for this renderer and for the Python one of the Hermes provider.
+ * field names and the full `created`/`origin` pair into every search, and every later request carried them again.
+ * One line per fact keeps what a later `memcue_correct` or `memcue_retire` needs beside the fact: `<id>@<version>`,
+ * the scope that says where it holds, the day it was written, and the content; one trailer line carries the count,
+ * the widening and the hints the binary printed, word for word. The form is the same in every host, and
+ * `conformance/render-vectors.json` pins it for this renderer and for the Python one of the Hermes provider.
  *
  * @module memcue-transport/render
  */
@@ -17,6 +17,7 @@
  * @property {unknown} [version]
  * @property {unknown} [content]
  * @property {unknown} [scope]
+ * @property {unknown} [created] - RFC 3339; the line shows its day.
  * @property {unknown} [below_floor] - served under the score floor; the Hermes provider sets it.
  */
 
@@ -75,7 +76,18 @@ function factLine(fact, limits) {
   const version = Number.isInteger(fact.version) && fact.version > 0 ? `@${fact.version}` : '';
   const scope = typeof fact.scope === 'string' ? fact.scope.trim() : '';
   const below = fact.below_floor === true ? ' (below the floor)' : '';
-  return [id + version, scope, clip(content, limits.contentChars) + below].filter(Boolean).join(' ');
+  return [id + version, scope, dayOf(fact.created), clip(content, limits.contentChars) + below]
+    .filter(Boolean).join(' ');
+}
+
+/**
+ * The day a fact was written, `YYYY-MM-DD`, from the RFC 3339 `created` of `search -json`; empty for anything else.
+ * The shared memory instruction tells the model that every result says when it was learnt, and a staleness judgement
+ * needs it, so the date stays in the line while the rest of the timestamp and the origin do not.
+ */
+function dayOf(created) {
+  const match = typeof created === 'string' ? /^(\d{4}-\d{2}-\d{2})(?:T|$)/u.exec(created.trim()) : null;
+  return match ? match[1] : '';
 }
 
 /**

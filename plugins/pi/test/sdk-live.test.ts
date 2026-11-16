@@ -31,7 +31,7 @@ async function ok(pi: Pi, name: string, args: ToolCall['arguments']) {
 /** A literal for a regular expression, for the fact text a rendering must carry word for word. */
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** The version the model reads in the one line of a fact (#756): `id@version scope content`. */
+/** The version the model reads in the one line of a fact (#756): `id@version scope day content`. */
 function versionIn(text: string, id: string): number {
   const match = new RegExp(`${id}@(\\d+) `).exec(text);
   assert.ok(match, `the rendered search carries the version of ${id}: ${text}`);
@@ -47,7 +47,7 @@ test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed
   const pi = await openPi(fixture);
   t.after(() => pi.dispose());
   const found = await ok(pi, 'memcue_search', { query: 'concurrency examples', minScore: 0 });
-  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?${escape(content)}$`, 'm'),
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(content)}$`, 'm'),
     `the written fact is rendered with its version: ${found}`);
   const corrected = 'Prefer short concrete concurrency examples in design explanations.';
   await ok(pi, 'memcue_correct', { id, text: corrected, expectedVersion: versionIn(found, id) });
@@ -79,7 +79,7 @@ test('SDK + CLI: inherited remote backends cannot redirect synthetic writes', li
   const content = 'Synthetic facts must remain in the temporary local base.';
   const id = (await ok(pi, 'memcue_add', { text: content, source: 'user', kind: 'rule', scope: 'global' })).trim();
   const found = await ok(pi, 'memcue_search', { query: 'temporary local base', minScore: 0 });
-  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?${escape(content)}$`, 'm'),
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(content)}$`, 'm'),
     `the written fact is rendered with its version: ${found}`);
 });
 
@@ -151,6 +151,6 @@ test('SDK + CLI: a packed standalone package installs and loads via its manifest
   const pi = await openPi(fixture, { entry: installed });
   t.after(() => pi.dispose());
   const result = await ok(pi, 'memcue_search', { query: 'release packaging decision', minScore: 0 });
-  assert.match(result, new RegExp(`^${id}@1 (?:\\S+ )?${escape(fact)}$`, 'm'), result);
+  assert.match(result, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(fact)}$`, 'm'), result);
   assert.deepEqual(pi.errors, []);
 });

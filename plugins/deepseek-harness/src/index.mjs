@@ -268,6 +268,8 @@ function searchAnswerOf(stdout) {
 				origin: typeof fact.origin === 'string' ? fact.origin : '',
 				// The scope says where the fact holds; the model reads it in the rendered line (#756).
 				...(typeof fact.scope === 'string' && fact.scope !== '' ? { scope: fact.scope } : {}),
+				// The rendered line shows the day it was written: the memory note promises when each fact was learnt.
+				...(typeof fact.created === 'string' && fact.created !== '' ? { created: fact.created } : {}),
 			}))
 		// The binary widens an empty repository search to every repository and says so in a hint; the flag keeps
 		// the rendering honest when a host composes the text itself (#756).
@@ -425,7 +427,7 @@ export function apply(ctx, config) {
 
 	ctx.tools.register(defineTool({
 		name: 'memcue_search',
-		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. No card of the user\'s rules comes with the prompt: at the start of a task, search with kind rule,decision and the words of the task. Returns one line per fact: id@version, scope and content, with a trailer line naming the count, a widened answer and the binary hints; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out the shelf and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
+		description: 'Search long-term memory (memcue facts) by words. Use it before answering a question that may depend on earlier sessions, and to find a fact to fix. No card of the user\'s rules comes with the prompt: at the start of a task, search with kind rule,decision and the words of the task. Returns one line per fact: id@version, scope, the day it was written and content, with a trailer line naming the count, a widened answer and the binary hints; only the facts that fit the words come back, so one fact means one fits and an empty list means the base has nothing close. In a repository it searches the facts of that repository, this host and the global facts by default, elsewhere the whole base, and leaves out the shelf and expired facts; the optional parameters narrow or widen that. Use the id with memcue_correct or memcue_retire.',
 		parameters: {
 			query: { type: 'string', required: true, description: 'Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.' },
 			limit: { type: 'integer', description: `Most facts to return (default ${settings.searchLimit}); fewer come when the rest do not fit.` },
@@ -454,6 +456,7 @@ export function apply(ctx, config) {
 								content: { type: 'string', required: true, description: 'The fact itself.' },
 								origin: { type: 'string', description: 'Where and when it was learnt.' },
 								scope: { type: 'string', description: 'Where the fact holds: global, repo:KEY, host:NAME, service:NAME or shelf:SLUG.' },
+								created: { type: 'string', description: 'RFC 3339 time this version was written.' },
 							},
 						},
 					},

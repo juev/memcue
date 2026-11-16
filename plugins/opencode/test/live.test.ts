@@ -64,7 +64,7 @@ async function fixture(t: TestContext): Promise<Live> {
   };
 }
 
-/** The version the model reads in the one line of a fact (#756): `id@version scope content`. */
+/** The version the model reads in the one line of a fact (#756): `id@version scope day content`. */
 function versionIn(text: string, id: string): number {
   const match = new RegExp(`${id}@(\\d+) `).exec(text);
   assert.ok(match, `the rendered search carries the version of ${id}: ${text}`);
@@ -79,7 +79,7 @@ test('the real CLI stores, finds, corrects and retires a fact from what the mode
   // The rendering is the contract of #756: the model gets the fact in one line, with the version a correction
   // needs, and the trailer says how many facts came back.
   const found = await live.search('cobalt PROJ-9001');
-  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?Live cobalt PROJ-9001 listens on port 6432\\.$`, 'm'),
+  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} Live cobalt PROJ-9001 listens on port 6432\\.$`, 'm'),
     `the written fact is searchable at once: ${found}`);
   assert.match(found, /\n1 fact(\s*\|.*)?$/, `one fact and its trailer: ${found}`);
 
@@ -91,7 +91,7 @@ test('the real CLI stores, finds, corrects and retires a fact from what the mode
   );
 
   const after = await live.search('cobalt PROJ-9001');
-  assert.match(after, new RegExp(`^${id}@2 (?:\\S+ )?Live cobalt PROJ-9001 listens on port 7432\\.$`, 'm'),
+  assert.match(after, new RegExp(`^${id}@2 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} Live cobalt PROJ-9001 listens on port 7432\\.$`, 'm'),
     `the correction is current: ${after}`);
 
   const retire = live.fixture.tools.get('memcue_retire');

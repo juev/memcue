@@ -40,7 +40,7 @@ case "$1" in
   search)
     case "$*" in
       *shelved*) printf '{"facts":[],"hints":["1 fact on the shelf matches: -in shelf:research"]}\\n' ;;
-      *versioned*) printf '{"facts":[{"id":"f1","version":2,"scope":"repo:example.com/test/harness","content":"${FACT}"},{"id":"f2","version":1,"scope":"global","content":"A second fact."}],"hints":["No facts of this repository, this host or global match; these come from other repositories: check that they apply."],"widened":true}\\n' ;;
+      *versioned*) printf '{"facts":[{"id":"f1","version":2,"scope":"repo:example.com/test/harness","created":"2026-11-13T09:08:46Z","content":"${FACT}"},{"id":"f2","version":1,"scope":"global","content":"A second fact."}],"hints":["No facts of this repository, this host or global match; these come from other repositories: check that they apply."],"widened":true}\\n' ;;
       *) printf '[{"id":"f1","content":"${FACT}","origin":"test 2026-10-20"}]\\n' ;;
     esac
     ;;
@@ -453,10 +453,10 @@ test('memcue_search renders one line per fact with its version, scope and a trai
 	const result = await search.execute({ query: 'versioned words' }, {})
 	assert.equal(result.widened, true)
 	assert.deepEqual(result.facts[0],
-		{ id: 'f1', version: 2, content: FACT, origin: '', scope: 'repo:example.com/test/harness' })
+		{ id: 'f1', version: 2, content: FACT, origin: '', scope: 'repo:example.com/test/harness', created: '2026-11-13T09:08:46Z' })
 	const [part] = search.output.render({}, result)
 	assert.equal(part.text,
-		`f1@2 repo:example.com/test/harness ${FACT}\n`
+		`f1@2 repo:example.com/test/harness 2026-11-13 ${FACT}\n`
 		+ 'f2@1 global A second fact.\n'
 		+ '2 facts | widened | No facts of this repository, this host or global match; these come from other repositories: check that they apply.')
 })

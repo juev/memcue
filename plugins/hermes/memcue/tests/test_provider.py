@@ -611,6 +611,8 @@ class ProviderTest(unittest.TestCase):
         found = self.p.handle_tool_call("memcue_search", {"query": "caddy пересоздание"})
         self.assertEqual(rendered_ids(found), [fact_id])
         self.assertIn(f"{fact_id}@1 ", found)
+        # The line names the day the fact was written: the memory note promises when each result was learnt.
+        self.assertRegex(found, rf"(?m)^{fact_id}@1 (?:\S+ )?\d{{4}}-\d{{2}}-\d{{2}} Сервер server1:")
         self.assertIn(f"{fact_id} v1 active", "\n".join(l for l in self.memcue("dump", self.p._facts) if "source=agent" in l))
         corrected = json.loads(self.p.handle_tool_call("memcue_correct", {"id": fact_id, "content": "Новый текст."}))
         self.assertIn("v2", corrected["result"])

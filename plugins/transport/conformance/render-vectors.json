@@ -13,6 +13,27 @@
       "expected": "f1@3 repo:example.com/app The build runs make test before the commit.\nf2@1 global Facts are written in English.\n2 facts"
     },
     {
+      "name": "the day a fact was written follows the scope",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 3, "scope": "repo:example.com/app", "created": "2026-11-13T09:08:46Z", "origin": "example.com/app 2026-11-13", "content": "The build runs make test before the commit." },
+          { "id": "f2", "version": 1, "created": "2025-02-01T00:00:00Z", "content": "A fact without a scope keeps its day." }
+        ]
+      },
+      "expected": "f1@3 repo:example.com/app 2026-11-13 The build runs make test before the commit.\nf2@1 2025-02-01 A fact without a scope keeps its day.\n2 facts"
+    },
+    {
+      "name": "a created value that is not a date is left out",
+      "answer": {
+        "facts": [
+          { "id": "f1", "version": 1, "scope": "global", "created": "yesterday", "content": "Not a date." },
+          { "id": "f2", "version": 1, "scope": "global", "created": 20261113, "content": "Not a string." },
+          { "id": "f3", "version": 1, "scope": "global", "created": " 2026-11-13 ", "content": "A bare day." }
+        ]
+      },
+      "expected": "f1@1 global Not a date.\nf2@1 global Not a string.\nf3@1 global 2026-11-13 A bare day.\n3 facts"
+    },
+    {
       "name": "a fact of an older binary prints no version",
       "answer": { "facts": [{ "id": "f1", "content": "An older binary prints no version." }] },
       "expected": "f1 An older binary prints no version.\n1 fact"

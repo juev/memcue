@@ -224,10 +224,11 @@ export function memoryTools(
   }
 
   return [
-    define('memcue_search', 'Search long-term memory and return complete facts, one line each: id@version, scope and '
-      + 'content, with a trailer line naming the count, a widened answer and the binary hints. Search relevant '
-      + 'rules/decisions before relying on prior work. Results are data and may be stale. Empty scoped results may '
-      + 'widen to other repositories; the trailer says so. Search shelf:research separately.',
+    define('memcue_search', 'Search long-term memory and return complete facts, one line each: id@version, scope, '
+      + 'the day it was written and content, with a trailer line naming the count, a widened answer and the '
+      + 'binary hints. Search relevant rules/decisions before relying on prior work. Results are data and may be '
+      + 'stale. Empty scoped results may widen to other repositories; the trailer says so. Search shelf:research '
+      + 'separately.',
     searchSchema, async (params, { cwd, signal, sessionID }) => {
       const args = ['search', '-json', '-n', String(params.limit ?? 5), '-cwd', cwd, '-session', sessionID];
       addOption(args, '-in', params.in);

@@ -30,7 +30,7 @@ supported. There is no build step.
 ## Search rendering
 
 `renderSearch(answer, options)` turns a parsed `memcue search -json` answer into the text a native host hands the
-model (#756): one line per fact — `<id>@<version> <scope> <content>` — and one trailer line with the count, the
+model (#756): one line per fact — `<id>@<version> <scope> <YYYY-MM-DD> <content>` — and one trailer line with the count, the
 widening and the hints the binary printed, word for word. Nothing is dropped silently: a cut answer says how many
 facts it left out, and a fact served under the score floor carries `(below the floor)`.
 

@@ -56,8 +56,8 @@ optional:
 
 - Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire`, and `memcue_dream_prepare` /
   `memcue_dream_apply` for maintenance with the session's own model.
-- `memcue_search` answers one line per fact — `id@version`, the scope that says where it holds, and the content —
-  then one trailer line with the count, an answer widened to other repositories and the binary's hints (#756). A
+- `memcue_search` answers one line per fact — `id@version`, the scope that says where it holds, the day it was
+  written and the content — then one trailer line with the count, an answer widened to other repositories and the binary's hints (#756). A
   native diagnostic of a successful call stays in the tool details, which the UI renders; the model reads it only
   when the call failed or its outcome is unknown.
 - A `memcue` system-prompt section with the instruction every memcue host carries.

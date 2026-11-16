@@ -35,7 +35,7 @@ test('search passes exact argv and renders one line per fact (#756)', async () =
     minScore: 0, expired: true, allWords: true,
   }, { ...context, signal });
   assert.equal((result.content[0] as { text: string }).text,
-    'fact-1@3 global Привет\n1 fact | widened | Check the research shelf');
+    'fact-1@3 global 2026-11-11 Привет\n1 fact | widened | Check the research shelf');
 });
 
 test('an empty search keeps the CLI wording and the hint in one line (#756)', async () => {

@@ -432,8 +432,18 @@ def _render_limit(options: Optional[dict[str, Any]], name: str, default: int) ->
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else default
 
 
+_RENDER_DAY = re.compile(r"(\d{4}-\d{2}-\d{2})(?:T|$)", re.ASCII)
+
+
+def _render_day(created: Any) -> str:
+    """The day a fact was written, ``YYYY-MM-DD``, from the RFC 3339 ``created`` of ``search -json``; empty for
+    anything else. The memory note promises that every result says when it was learnt."""
+    match = _RENDER_DAY.match(created.strip()) if isinstance(created, str) else None
+    return match.group(1) if match else ""
+
+
 def _render_fact(fact: Any, content_chars: int) -> str:
-    """One line of a fact: ``id@version scope content``; empty for an entry that cannot name a fact."""
+    """One line of a fact: ``id@version scope day content``; empty for an entry that cannot name a fact."""
     if not isinstance(fact, dict):
         return ""
     identifier = fact.get("id")
@@ -451,14 +461,14 @@ def _render_fact(fact: Any, content_chars: int) -> str:
         text = text[:content_chars] + "…"
     if fact.get("below_floor") is True:
         text += " (below the floor)"
-    return " ".join(part for part in (line, scope, text) if part)
+    return " ".join(part for part in (line, scope, _render_day(fact.get("created")), text) if part)
 
 
 def _render_search(answer: Any, options: Optional[dict[str, Any]] = None) -> str:
     """The compact text of a search answer (#756), the same text the JavaScript hosts hand the model: one line per
-    fact with the id and version a later correction needs, the scope and the content, then one trailer line with the
-    count, the widening and the hints. ``plugins/transport/conformance/render-vectors.json`` pins it together with
-    the ``renderSearch`` of memcue-transport, so the two implementations cannot drift apart."""
+    fact with the id and version a later correction needs, the scope, the day and the content, then one trailer line
+    with the count, the widening and the hints. ``plugins/transport/conformance/render-vectors.json`` pins it
+    together with the ``renderSearch`` of memcue-transport, so the two implementations cannot drift apart."""
     content_chars = _render_limit(options, "contentChars", _RENDER_CONTENT_CHARS)
     total_chars = _render_limit(options, "totalChars", _RENDER_TOTAL_CHARS)
     max_facts = _render_limit(options, "maxFacts", _RENDER_MAX_FACTS)
@@ -515,7 +525,7 @@ def _schema(name: str, description: str, props: dict[str, str], required: list[s
 
 SEARCH_SCHEMA = _schema(
     "memcue_search", "Search long-term memory (memcue) for stored facts; returns one line per fact with id@version, "
-    "scope and content, and a trailer line with the count and the hints. "
+    "scope, the day it was written and content, and a trailer line with the count and the hints. "
     "Use it before answering a question that may depend on earlier sessions, and to find a fact before correcting "
     "or retiring it. No card of the user's rules comes with the prompt: at the start of a task, search with kind "
     "rule,decision and the words of the task. During work you may also search, when you decide it helps: on starting with a specific host, "

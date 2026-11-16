@@ -45,8 +45,8 @@ memcue fact base:
   can set an `expires` date, as the CLI does. The call hands over at most **five** facts unless `limit`
   says otherwise (on a live base ten doubled the characters and reached no prompt five did not), and only those that
   fit the query: a fact far below the best one is left out, so one fitting fact comes alone (#407). `search_facts`
-  (default 5, 1–50) sets the most. Each fact comes as one line — `id@version`, its scope and the content — and one
-  trailer line names the count, an answer from other repositories and the binary's hints; a fact served under the
+  (default 5, 1–50) sets the most. Each fact comes as one line — `id@version`, its scope, the day it was written and the
+  content — and one trailer line names the count, an answer from other repositories and the binary's hints; a fact served under the
   score floor, because nothing above it did, ends its line with `(below the floor)` (#756).
   Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
   tools below.

@@ -73,6 +73,8 @@ export interface SearchRenderFact {
   content?: unknown;
   /** `global`, `repo:KEY`, `host:NAME`, `service:NAME` or `shelf:SLUG`. */
   scope?: unknown;
+  /** RFC 3339 time the version was written; the line shows its day, `YYYY-MM-DD`. */
+  created?: unknown;
   /** Served under the score floor; the Hermes provider sets it and the line says so. */
   below_floor?: unknown;
 }
@@ -101,8 +103,8 @@ export const SEARCH_RENDER_DEFAULTS: Readonly<{ contentChars: number; totalChars
 
 /**
  * The text a native host gives the model for a search answer (#756): one line per fact with `<id>@<version>`, the
- * scope and the content, then one trailer line with the count, the widening and the binary's hints. A cut answer
- * says how many facts it left out.
+ * scope, the day it was written and the content, then one trailer line with the count, the widening and the binary's
+ * hints. A cut answer says how many facts it left out.
  * @param answer - what `memcue search -json` printed, parsed.
  * @param options - the bounds of the rendering.
  */
