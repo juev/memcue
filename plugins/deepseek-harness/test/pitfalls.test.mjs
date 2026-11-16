@@ -6,6 +6,12 @@ import { execFileSync } from 'node:child_process'
 import { test } from 'node:test'
 import { apply } from '../src/index.mjs'
 
+// The real binary must write only the throwaway base: an inherited server or PostgreSQL backend wins over
+// MEMCUE_FACTS, and a run with the developer's MEMCUE_SERVER wrote this fixture into the live base.
+for (const key of Object.keys(process.env)) {
+ if (key === 'MEMCUE_SERVER' || key === 'MEMCUE_POSTGRES_DSN' || key.startsWith('MEMCUE_TAILSCALE_')) delete process.env[key]
+}
+
 test('repository pitfalls follow tasks, compaction and repository switches through native DSH delivery', async () => {
  const root = await mkdtemp(join(tmpdir(), 'memcue-pitfalls-dsh-'))
  try {

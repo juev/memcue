@@ -7,6 +7,12 @@ import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { apply } from '../src/index.mjs'
 
+// The real binary must write only the throwaway base: an inherited server or PostgreSQL backend wins over
+// MEMCUE_FACTS, and a run with the developer's MEMCUE_SERVER wrote this fixture into the live base.
+for (const key of Object.keys(process.env)) {
+ if (key === 'MEMCUE_SERVER' || key === 'MEMCUE_POSTGRES_DSN' || key.startsWith('MEMCUE_TAILSCALE_')) delete process.env[key]
+}
+
 test('native candidate: DSH content-only add/search/correct/retire and obsolete refusal', async () => {
  const binary = process.env.MEMCUE_BIN
  assert.ok(binary, 'MEMCUE_BIN must name the candidate build; native coverage cannot skip')
