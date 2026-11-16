@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.38.0`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.39.0`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.39.0 | 9 | 0.39.0 | 0.39.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.39.0 (`hermes-agent` >=0.17.0) |
 | 0.38.0 | 9 | 0.38.0 | 0.38.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.38.0 (`hermes-agent` >=0.17.0) |
 | 0.37.1 | 9 | 0.37.1 | 0.37.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.1 (`hermes-agent` >=0.17.0) |
 | 0.37.0 | 9 | 0.37.0 | 0.37.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.37.0 (`hermes-agent` >=0.17.0) |
@@ -325,6 +326,17 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.39.0: the npm plugins on the transport of their release (#772)
+
+- **`memcue-opencode` is on npm for the first time** (`opencode plugin add memcue-opencode`), and `memcue-pi` gets
+  the 0.38.0 changes (the shared CLI transport): the 0.38.0 plugin packages were never published.
+- **`memcue-pi` and `memcue-opencode` depend on `memcue-transport` ^0.39.0**, the transport of this release. On 0.x
+  a caret admits only its own minor, so the previous `^0.37.1` kept them on the 0.37 transport; a release check now
+  fails when a plugin's range or lock lags behind the transport version.
+- The search answer the model reads is unchanged: the compact line of #756 was withdrawn before this release. The
+  published `memcue-transport` 0.39.0 still carries its unused `render.mjs`.
+- The CLI, its flags and the fact-base schema (9) are unchanged.
 
 ### 0.38.0: one CLI transport for every plugin, the Qwen Code plugin, and sessions across hosts (#754, #753, #755, #630)
 
