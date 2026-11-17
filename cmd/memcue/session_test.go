@@ -245,6 +245,9 @@ func TestSessionNotePreservesOtherMeasured647Instructions(t *testing.T) {
 	}
 	old := strings.ReplaceAll(strings.TrimSpace(string(measured)), ` -keywords "<words>"`, "")
 	old = strings.ReplaceAll(old, "this machine's earlier Claude Code sessions", "this machine's earlier sessions")
+	// #771, not measured: a fact is corrected or retired on the session's evidence, never on a newer fact alone.
+	const retire = "use the memcue skill (memcue add / correct / retire)."
+	old = strings.ReplaceAll(old, retire, retire+" Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name the conflict, and ask before you correct or retire one.")
 	oldLines := strings.Split(old, "\n")
 	newLines := strings.Split(sessionNote, "\n")
 	// The introductory line stays; the new English fact rule and changed search-language line come next.

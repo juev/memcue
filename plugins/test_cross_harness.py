@@ -178,6 +178,36 @@ class OpenCodeNoteTest(unittest.TestCase):
         self.assertNotIn("memcue_sessions", constant(opencode, "NOTE"))
 
 
+class EvidenceBeforeChangeTest(unittest.TestCase):
+    EVIDENCE = ("Correct or retire a stored fact only when the user says it is wrong or a command or a file of this "
+                "session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in "
+                "the session settles it, answer from the facts and their days, name the conflict, and ask before you "
+                "correct or retire one.")
+
+    def test_every_host_asks_for_evidence_before_it_changes_a_fact(self):
+        """#771: asked only where the CI runs, the model retired the older of two conflicting facts in 5 of 10 sessions
+        on its day alone. Every text a host's model reads about correct and retire says, word for word, what counts as
+        evidence and that a newer fact is not."""
+        texts = {
+            "session.go": PLUGINS.parent / "cmd" / "memcue" / "session.go",
+            "claude-code skill": PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md",
+            "hermes": PLUGINS / "hermes" / "memcue" / "__init__.py",
+            "dsh": PLUGINS / "deepseek-harness" / "src" / "index.mjs",
+            "pi": PLUGINS / "pi" / "src" / "instructions.ts",
+            "opencode": PLUGINS / "opencode" / "src" / "instructions.ts",
+            "QWEN.md.snippet": PLUGINS / "qwen-code" / "QWEN.md.snippet",
+            "qwen-code skill": PLUGINS / "qwen-code" / "skills" / "memcue" / "SKILL.md",
+            "AGENTS.md.snippet": PLUGINS / "codex" / "AGENTS.md.snippet",
+            "codex skill": PLUGINS / "codex" / "skills" / "memcue" / "SKILL.md",
+        }
+        for name, path in texts.items():
+            with self.subTest(text=name):
+                text = path.read_text(encoding="utf-8")
+                if name == "hermes":
+                    text = re.sub(r'"\s*\n\s*"', "", text)  # the note is adjacent string literals; read it joined
+                self.assertIn(self.EVIDENCE, " ".join(text.split()))
+
+
 class OpenCodePolicyTest(unittest.TestCase):
     def test_opencode_memory_is_opt_in_for_children_without_harness_dependencies(self):
         """Execute the delivered configuration policy with Node built-ins only; no OpenCode SDK, binary or model."""

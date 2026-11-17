@@ -766,7 +766,11 @@ class MemcueMemoryProvider(MemoryProvider):
                 "When the user states a rule or a correction, makes a decision the code does not show, or you find a "
                 "pitfall, a host, a service or a pointer that a later session will need, store it at once with "
                 "memcue_add. Search first, and correct a stored fact instead of adding a second copy. To fix a "
-                "stored fact, find it with memcue_search, then memcue_correct or memcue_retire."
+                "stored fact, find it with memcue_search, then memcue_correct or memcue_retire. Correct or retire a "
+                "stored fact only when the user says it is wrong or a command or a file of this session shows it: a "
+                "newer fact that says otherwise is not that evidence on its own. When nothing in the session settles "
+                "it, answer from the facts and their days, name the conflict, and ask before you correct or retire "
+                "one."
                 + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + ("\n\n" + hints if hints else ""))
 
     def _memory_notes(self) -> list[str]:

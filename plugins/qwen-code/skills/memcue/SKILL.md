@@ -29,6 +29,9 @@ Read the actual search object: `facts` is an array, `hints` is optional. A fact 
 Inspect the configured base history when persisted provenance is needed. Correct the matching fact instead of adding a duplicate.
 `correct` preserves source, kind, scope and expiry; `-expires YYYY-MM-DD` changes expiry,
 and `-no-expires` removes it. `retire` keeps the history; `reopen` undoes retirement. Tell the user what changed.
+Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it:
+a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from
+the facts and their days, name the conflict, and ask before you correct or retire one.
 
 Choose metadata deliberately on add:
 

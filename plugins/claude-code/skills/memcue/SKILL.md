@@ -78,8 +78,10 @@ memcue retire -expected-version VERSION ID                       # no longer rec
 memcue reopen ID                       # undo a retire made by mistake
 ```
 
-Correct when the fact changed; retire when it no longer holds and nothing replaces it. Tell the user which fact you
-changed.
+Correct when the fact changed; retire when it no longer holds and nothing replaces it. Correct or retire a stored fact
+only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise
+is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name
+the conflict, and ask before you correct or retire one. Tell the user which fact you changed.
 
 ## Findings from outside sources: the research shelf
 
