@@ -38,5 +38,9 @@
   "scripts": {
     "test": "node --experimental-strip-types --test --test-concurrency=1 test/*.test.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "overrides": {
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
   }
 }
