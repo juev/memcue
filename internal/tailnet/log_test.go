@@ -80,6 +80,21 @@ func TestARepeatedLineIsWrittenOnceAndCounted(t *testing.T) {
 	}
 }
 
+func TestAlwaysIsNotHeldBack(t *testing.T) {
+	var buf bytes.Buffer
+	now := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
+	l := newBoundedLog(&buf)
+	l.now = func() time.Time { return now }
+	l.start = now
+	for i := range logBudget {
+		l.Logf("line %d", i)
+	}
+	l.always("no control connection for %s: the helper exits", "15m0s")
+	if !strings.Contains(buf.String(), "no control connection for 15m0s") {
+		t.Fatalf("the reason a helper exits was held back: %q", buf.String())
+	}
+}
+
 func TestCloseReportsWhatItHeldBack(t *testing.T) {
 	var buf bytes.Buffer
 	now := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)

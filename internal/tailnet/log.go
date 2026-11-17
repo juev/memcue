@@ -84,6 +84,14 @@ func (l *boundedLog) Close() error {
 	return nil
 }
 
+// always writes a message the reader is owed whatever the window holds: the reason a helper gives up must not be
+// counted as one more line of the flood it explains.
+func (l *boundedLog) always(format string, a ...any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.write(l.now(), strings.TrimRight(fmt.Sprintf(format, a...), "\n"))
+}
+
 func (l *boundedLog) heldBack(now time.Time) {
 	if l.held == 0 {
 		return

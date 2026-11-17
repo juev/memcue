@@ -155,7 +155,7 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 	watched := make(chan struct{})
 	go func() {
 		defer close(watched)
-		watchControl(served, node, controlPoll, controlGiveUp, diag.Logf, func() { close(gaveUp); stopServe() })
+		watchControl(served, node, controlPoll, controlGiveUp, diag.always, func() { close(gaveUp); stopServe() })
 	}()
 	err = serveOwned(served, c, node, ready)
 	stopServe()
@@ -172,10 +172,10 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 }
 
 // watchControl ends the helper when its node has had no control connection for giveUp (#777). A helper that
-// retries for hours is one nobody sees: it says so once, and the next session start or memcue connect up starts a
-// new one. A node that never gets its first connection counts as down from the start, so a hopeless key or an
-// unreachable control server ends the same way.
-func watchControl(ctx context.Context, n node, every, giveUp time.Duration, logf func(string, ...any), end func()) {
+// retries for hours is one nobody sees: it says so once, through note, which the throttle does not hold back, and
+// the next session start or memcue connect up starts a new one. A node that never gets its first connection counts
+// as down from the start, so a hopeless key or an unreachable control server ends the same way.
+func watchControl(ctx context.Context, n node, every, giveUp time.Duration, note func(string, ...any), end func()) {
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	down := time.Now()
@@ -191,7 +191,7 @@ func watchControl(ctx context.Context, n node, every, giveUp time.Duration, logf
 			continue
 		}
 		if wait := time.Since(down); wait >= giveUp {
-			logf("no control connection for %s: the helper exits; the next session start or memcue connect up starts a new one", wait.Round(time.Second))
+			note("no control connection for %s: the helper exits; the next session start or memcue connect up starts a new one", wait.Round(time.Second))
 			end()
 			return
 		}
