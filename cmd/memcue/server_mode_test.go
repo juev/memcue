@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -13,7 +14,25 @@ import (
 
 	"github.com/juev/memcue/internal/replica"
 	"github.com/juev/memcue/internal/store"
+	"github.com/juev/memcue/internal/tailnet"
 )
+
+// TestAStartedHelperWritesItsOwnLog: both ways this machine starts a helper name its log, so neither a session
+// nor connect up leaves a control outage without a trace (#777).
+func TestAStartedHelperWritesItsOwnLog(t *testing.T) {
+	cfg := tailnet.Config{Dir: t.TempDir()}
+	logPath := filepath.Join(cfg.Dir, "helper.log")
+	for _, c := range []struct {
+		extra, want []string
+	}{
+		{nil, []string{"connect", "serve", "-log", logPath}},
+		{[]string{"-takeover"}, []string{"connect", "serve", "-takeover", "-log", logPath}},
+	} {
+		if got := helperServeArgs(cfg, c.extra...); !slices.Equal(got, c.want) {
+			t.Errorf("helper command line %q, want %q", got, c.want)
+		}
+	}
+}
 
 const serverProfile = `{"Version":1,"Hostname":"memcue","ControlURL":"https://controlplane.tailscale.com","Host":"memcue-server","Port":"80","Server":true}`
 
@@ -35,7 +54,7 @@ func serverEnv(t *testing.T) (identity string, starts func() int) {
 	var mu sync.Mutex
 	started := 0
 	old := startHelper
-	startHelper = func() error {
+	startHelper = func(tailnet.Config) error {
 		mu.Lock()
 		started++
 		mu.Unlock()

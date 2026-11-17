@@ -25,3 +25,17 @@ func TestConnectInServerModeNeedsNoPostgres(t *testing.T) {
 		}
 	}
 }
+
+// TestConnectServeTakesItsOwnLog: the flag reaches the helper's configuration, so serve opens the file it names
+// before it starts a node (#777). A path that cannot be created stops it there.
+func TestConnectServeTakesItsOwnLog(t *testing.T) {
+	t.Setenv("MEMCUE_TAILSCALE_MODE", "")
+	t.Setenv("MEMCUE_POSTGRES_DSN", "")
+	t.Setenv("MEMCUE_TAILSCALE_STATE_DIR", filepath.Join(t.TempDir(), "tailnet"))
+	t.Setenv("MEMCUE_SERVER", "memcue-server")
+	logPath := filepath.Join(t.TempDir(), "missing", "helper.log")
+	err := runConnect([]string{"serve", "-log", logPath}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "helper log") {
+		t.Fatalf("serve -log %s: %v, want a helper log failure", logPath, err)
+	}
+}

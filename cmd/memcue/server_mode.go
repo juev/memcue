@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -88,6 +89,17 @@ func helperConfig() (tailnet.Config, error) {
 // session must not wait for a helper that hangs (R1).
 const helperWait = 500 * time.Millisecond
 
+// helperLogPath is where a helper started by this machine writes its diagnostics: beside its identity, so an
+// outage leaves a trace instead of nothing at all (#777).
+func helperLogPath(cfg tailnet.Config) string { return filepath.Join(cfg.Dir, "helper.log") }
+
+// helperServeArgs is the command line of a helper this machine starts. It names the helper's own capped log, so
+// neither a session nor connect up starts a run that leaves nothing behind (#777).
+func helperServeArgs(cfg tailnet.Config, extra ...string) []string {
+	args := append([]string{"connect", "serve"}, extra...)
+	return append(args, "-log", helperLogPath(cfg))
+}
+
 // startHelper starts the helper detached; tests replace it.
 var startHelper = startHelperDetached
 
@@ -95,7 +107,7 @@ var startHelper = startHelperDetached
 // The new helper waits for one that is exiting to let go of the tailnet identity: a helper asked to exit closes its
 // socket at once but holds the identity until its node is down, and a plain start in that window would find it owned
 // and exit, leaving the machine without a helper.
-func startHelperDetached() error {
+func startHelperDetached(cfg tailnet.Config) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -105,7 +117,7 @@ func startHelperDetached() error {
 		return err
 	}
 	defer func() { _ = null.Close() }()
-	cmd := exec.Command(exe, "connect", "serve", "-takeover")
+	cmd := exec.Command(exe, helperServeArgs(cfg, "-takeover")...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = null, null, null
 	for _, entry := range os.Environ() {
@@ -130,12 +142,12 @@ func (inv *invocation) ensureHelper(cfg tailnet.Config) (state tailnet.State, ok
 	switch {
 	case err != nil:
 		if tailnet.ValidateExistingProfile(cfg) == nil {
-			_ = startHelper()
+			_ = startHelper(cfg)
 		}
 		return state, false
 	case helperOlder(state.Version, version):
 		_, _ = tailnet.Admin(ctx, tailnet.Config{Dir: cfg.Dir}, "off")
-		_ = startHelper()
+		_ = startHelper(cfg)
 		return state, false
 	}
 	return state, true

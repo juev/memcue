@@ -24,7 +24,7 @@ func runConnect(args []string, out io.Writer) error {
 
 func runConnectContext(parent context.Context, args []string, out io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: memcue connect up [-bootstrap]|status|serve [-bootstrap]|login|off")
+		return errors.New("usage: memcue connect up [-bootstrap]|status|serve [-bootstrap] [-log path]|login|off")
 	}
 	mode, err := tailnet.Mode()
 	if err != nil {
@@ -106,12 +106,14 @@ func runConnectContext(parent context.Context, args []string, out io.Writer) err
 		fs := flag.NewFlagSet("connect serve", flag.ContinueOnError)
 		bootstrap := fs.Bool("bootstrap", false, "explicitly bootstrap from MEMCUE_TAILSCALE_AUTH_KEY_FILE")
 		takeover := fs.Bool("takeover", false, "wait for a helper that was asked to exit to release the identity")
+		logPath := fs.String("log", "", "write diagnostics to this file instead of stderr; it is capped and rotated")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
 		if fs.NArg() != 0 {
-			return errors.New("connect serve accepts only -bootstrap and -takeover")
+			return errors.New("connect serve accepts only -bootstrap, -takeover and -log")
 		}
+		cfg.LogPath = *logPath
 		if replicaPath != "" {
 			cfg.Worker = replica.NewWorker(replicaPath)
 		}
@@ -142,6 +144,6 @@ func runConnectContext(parent context.Context, args []string, out io.Writer) err
 		_, err = fmt.Fprintln(out, "Node authorization state: "+state.State)
 		return err
 	default:
-		return errors.New("usage: memcue connect up [-bootstrap]|status|serve [-bootstrap]|login|off")
+		return errors.New("usage: memcue connect up [-bootstrap]|status|serve [-bootstrap] [-log path]|login|off")
 	}
 }

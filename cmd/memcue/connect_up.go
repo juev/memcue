@@ -24,7 +24,7 @@ func connectUp(ctx context.Context, cfg tailnet.Config, bootstrap bool, out io.W
 	}
 	state, err := tailnet.Admin(ctx, cfg, "status")
 	if err != nil {
-		if err = startConnectHelper(ctx, bootstrap); err != nil {
+		if err = startConnectHelper(ctx, cfg, bootstrap); err != nil {
 			return err
 		}
 		state, err = tailnet.Admin(ctx, cfg, "status")
@@ -97,7 +97,7 @@ func settled(ctx context.Context, cfg tailnet.Config, state tailnet.State) (tail
 
 // startConnectHelper never inherits terminal/consumer pipes. Only the private
 // startup pipe is retained, and the child closes it as soon as IPC is ready.
-func startConnectHelper(ctx context.Context, bootstrap bool) error {
+func startConnectHelper(ctx context.Context, cfg tailnet.Config, bootstrap bool) error {
 	unavailable := errors.New("could not start the tailnet helper; check private state/configuration with memcue connect serve")
 	exe, err := os.Executable()
 	if err != nil {
@@ -113,7 +113,7 @@ func startConnectHelper(ctx context.Context, bootstrap bool) error {
 		return unavailable
 	}
 	defer func() { _ = null.Close() }()
-	args := []string{"connect", "serve"}
+	args := helperServeArgs(cfg)
 	if bootstrap {
 		args = append(args, "-bootstrap")
 	}

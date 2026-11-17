@@ -29,12 +29,17 @@ type Config struct {
 	Version string
 	// Worker, when set, runs for the helper's life with a dialer to Host:Port; status reports its state.
 	Worker Worker
+	// LogPath, when set, is the file the helper writes diagnostics to instead of its stderr (#777).
+	LogPath string
 }
 type State struct {
 	NodeID  string `json:"node_id,omitempty"`
 	Running bool   `json:"running"`
 	State   string `json:"state"`
 	AuthURL string `json:"auth_url,omitempty"`
+	// Online is whether the node holds a control connection. A running node without one is in a control
+	// outage, and status says so instead of reporting health it does not have (#777).
+	Online bool `json:"online"`
 	// Version is the helper's binary version; Sync the state of its Worker.
 	Version string          `json:"version,omitempty"`
 	Sync    json.RawMessage `json:"sync,omitempty"`

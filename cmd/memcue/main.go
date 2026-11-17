@@ -100,7 +100,7 @@ commands:
   correct   new version of a fact: memcue correct [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT
   retire    take a fact out of recall: memcue retire ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
-  connect   explicit tailnet lifecycle: up [-bootstrap] | status | serve [-bootstrap] | login | off
+  connect   explicit tailnet lifecycle: up [-bootstrap] | status | serve [-bootstrap] [-log path] | login | off
   history   immutable fact versions: memcue history [-json] ID
   facts     list the active facts
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -13,6 +14,16 @@ import (
 	"tailscale.com/client/local"
 	"tailscale.com/tsnet"
 )
+
+const (
+	// controlPoll is how often the helper asks its node whether it holds a control connection, and
+	// controlGiveUp how long it waits for one before it exits (#777).
+	controlPoll   = 30 * time.Second
+	controlGiveUp = 15 * time.Minute
+)
+
+// errNoControl ends a helper that waited controlGiveUp without a control connection (#777).
+var errNoControl = errors.New("control connection is gone; the helper exits, and the next session start or memcue connect up starts a new one")
 
 type realNode struct {
 	server *tsnet.Server
@@ -25,10 +36,12 @@ func (n *realNode) Status(ctx context.Context) (State, error) {
 		return State{}, errHelper
 	}
 	id := ""
+	online := false
 	if st.Self != nil {
 		id = string(st.Self.ID)
+		online = st.Self.Online
 	}
-	return State{Running: true, State: st.BackendState, AuthURL: st.AuthURL, NodeID: id}, nil
+	return State{Running: true, State: st.BackendState, AuthURL: st.AuthURL, NodeID: id, Online: online}, nil
 }
 func (n *realNode) Login(ctx context.Context) error {
 	if err := n.client.StartLoginInteractive(ctx); err != nil {
@@ -108,7 +121,16 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 	// The pinned release routes log uploads through a noop transport in this supported mode.
 	// This affects only the explicitly launched helper process, never host VPN configuration.
 	prepareProcess()
-	srv := &tsnet.Server{Dir: c.Dir, Hostname: c.Hostname, ControlURL: c.ControlURL, Ephemeral: false, AuthKey: authKey, UserLogf: func(string, ...any) {}, Logf: func(string, ...any) {}}
+	diag, closeLog, err := helperDiagnostics(c.LogPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = closeLog() }()
+	// Whatever this process logs through the standard logger is bounded as well: a build that turns on tsnet's
+	// loggers writes there too, and that is the output that filled a disk (#777).
+	log.SetOutput(diag)
+	log.SetFlags(0)
+	srv := &tsnet.Server{Dir: c.Dir, Hostname: c.Hostname, ControlURL: c.ControlURL, Ephemeral: false, AuthKey: authKey, UserLogf: diag.Logf, Logf: diag.Logf}
 	if err := srv.Start(); err != nil {
 		return errors.New("embedded node could not start; inspect state permissions and configuration")
 	}
@@ -126,5 +148,60 @@ func Run(ctx context.Context, c Config, bootstrap bool, ready chan<- struct{}) e
 			return errors.New("tailnet bootstrap did not become ready before deadline; check key, approval and control plane")
 		}
 	}
-	return serveOwned(ctx, c, &realNode{srv, client}, ready)
+	node := &realNode{srv, client}
+	served, stopServe := context.WithCancel(ctx)
+	defer stopServe()
+	gaveUp := make(chan struct{})
+	watched := make(chan struct{})
+	go func() {
+		defer close(watched)
+		watchControl(served, node, controlPoll, controlGiveUp, diag.Logf, func() { close(gaveUp); stopServe() })
+	}()
+	err = serveOwned(served, c, node, ready)
+	stopServe()
+	<-watched
+	if err != nil {
+		return err
+	}
+	select {
+	case <-gaveUp:
+		return errNoControl
+	default:
+		return nil
+	}
+}
+
+// watchControl ends the helper when its node has had no control connection for giveUp (#777). A helper that
+// retries for hours is one nobody sees: it says so once, and the next session start or memcue connect up starts a
+// new one. A node that never gets its first connection counts as down from the start, so a hopeless key or an
+// unreachable control server ends the same way.
+func watchControl(ctx context.Context, n node, every, giveUp time.Duration, logf func(string, ...any), end func()) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	down := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		state, err := statusWithin(ctx, n, every)
+		if err == nil && state.Online {
+			down = time.Now()
+			continue
+		}
+		if wait := time.Since(down); wait >= giveUp {
+			logf("no control connection for %s: the helper exits; the next session start or memcue connect up starts a new one", wait.Round(time.Second))
+			end()
+			return
+		}
+	}
+}
+
+// statusWithin asks the node about itself no longer than wait: a status call that hangs must not keep a helper
+// that has lost its control connection alive.
+func statusWithin(ctx context.Context, n node, wait time.Duration) (State, error) {
+	ctx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+	return n.Status(ctx)
 }
