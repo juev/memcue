@@ -16,6 +16,8 @@ export interface HarnessOptions {
   version?: string;
   directory?: string;
   sessions?: Record<string, SessionFixture>;
+  /** Share one plugin storage between two harnesses, the way OpenCode shares it between plugin instances. */
+  storage?: Map<string, unknown>;
 }
 
 export interface Harness {
@@ -27,6 +29,20 @@ export interface Harness {
   hooks: Record<string, (event: any) => unknown>;
   notices: Array<{ sessionID: string; text: string; description?: string; resume?: boolean }>;
   prompts: Array<{ sessionID: string; text: string; delivery?: string }>;
+  /** The plugin RPC the server part registers; the TUI part reads the same handlers in a real session. */
+  rpc: RpcFixture;
+  storage: Map<string, unknown>;
+}
+
+export interface RpcFixture {
+  definition?: { id?: string };
+  handlers: Record<string, (input: unknown, context: unknown) => Promise<unknown>>;
+  emitted: Array<{ name: string; data: unknown }>;
+  disposed: boolean;
+  /** Answers `status` the way the TUI part calls it. */
+  status: (sessionID: string) => Promise<Record<string, unknown>>;
+  /** Answers `health` the way the TUI part calls it when no session exists. */
+  health: () => Promise<Record<string, unknown>>;
 }
 
 export function harness(options: HarnessOptions = {}): Harness {
@@ -37,6 +53,33 @@ export function harness(options: HarnessOptions = {}): Harness {
   const hooks: Harness['hooks'] = {};
   const notices: Harness['notices'] = [];
   const prompts: Harness['prompts'] = [];
+  const storage = options.storage ?? new Map<string, unknown>();
+  const rpc: RpcFixture = {
+    handlers: {},
+    emitted: [],
+    disposed: false,
+    status: async (sessionID: string) => {
+      const handler = rpc.handlers.status;
+      if (!handler) throw new Error('no status handler registered');
+      return await handler({ sessionID }, { signal: new AbortController().signal }) as Record<string, unknown>;
+    },
+    health: async () => {
+      const handler = rpc.handlers.health;
+      if (!handler) throw new Error('no health handler registered');
+      return await handler({}, { signal: new AbortController().signal }) as Record<string, unknown>;
+    },
+  };
+  const registerRpc = async (
+    definition: { id?: string },
+    handlers: Record<string, (input: unknown, context: unknown) => Promise<unknown>>,
+  ) => {
+    rpc.definition = definition;
+    rpc.handlers = handlers;
+    return {
+      events: { emit: async (name: string, data: unknown) => { rpc.emitted.push({ name, data }); } },
+      dispose: async () => { rpc.disposed = true; },
+    };
+  };
   const transform = async (register: (editor: unknown) => void) => {
     register({
       list: () => [...tools.values()],
@@ -77,8 +120,15 @@ export function harness(options: HarnessOptions = {}): Harness {
       synthetic: async (input: Harness['notices'][number]) => { notices.push(input); return {}; },
       prompt: async (input: Harness['prompts'][number]) => { prompts.push(input); return {}; },
     },
+    rpc: { register: registerRpc },
+    storage: {
+      get: async (key: string) => storage.get(key) as never,
+      set: async (key: string, value: unknown) => { storage.set(key, value); },
+      remove: async (key: string) => { storage.delete(key); },
+      scan: async () => ({ entries: [], more: false }),
+    },
   };
-  return { ctx, tools, commands, hooks, notices, prompts };
+  return { ctx, tools, commands, hooks, notices, prompts, rpc, storage };
 }
 
 /** A stand-in for the memcue CLI: it answers the reads the plugin makes and reports a receipt for writes. */
@@ -92,7 +142,10 @@ const calls = process.env.FAKE_MEMCUE_CALLS;
 if (calls) appendFileSync(calls, JSON.stringify({ args, cwd: process.cwd(), nonce: process.env.MEMCUE_OUTCOME_NONCE ?? null, stdin }) + '\\n');
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
-if (args[0] === 'version') process.exit(0);
+if (args[0] === 'version') {
+  if (process.env.FAKE_VERSION_FAIL === '1') { process.stderr.write('memcue 0.1.0: too old\\n'); process.exit(1); }
+  process.exit(0);
+}
 if (args[0] === 'session-card') {
   if (process.env.FAKE_SNAPSHOT_FAIL === '1') { process.stderr.write('no fact base\\n'); process.exit(1); }
   const facts = JSON.parse(process.env.FAKE_PITFALLS ?? '[]');

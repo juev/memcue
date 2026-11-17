@@ -76,8 +76,32 @@ Each write checks memcue's outcome receipt. A write whose outcome is unknown is 
 | `/memcue on` | Turn it back on, if the options allow it |
 | `/memcue dream` | Ask the current model to maintain the base |
 
-The command is registered by the plugin's server part; OpenCode lists it with the other commands, so no TUI part is
-needed. The status notice is a transcript message, not a model turn.
+The command is registered by the plugin's server part; OpenCode lists it with the other commands. The status notice
+is a transcript message, not a model turn.
+
+## TUI part
+
+The package carries a second entrypoint, `./tui`, that OpenCode loads into its terminal UI. It has two jobs:
+
+- A toast for what `/memcue status`, `on`, `off` and `dream` answer, and for a configuration error, an OpenCode older
+  than 2.0.0 or a failed binary probe — the things that otherwise only reach the log. A standing problem is toasted
+  once per session.
+- A compact memory indicator in the `prompt.footer.status` slot: `memcue on`, `memcue off`, `memcue off · subagent
+  worker`, `memcue off · configuration error: …`. It shows the same state as `/memcue status`, including the base.
+
+Every decision stays in the server part: the TUI part reads `status` over the plugin RPC and renders it, and never
+runs memcue itself. A TUI part that fails to load or an OpenCode without this part leaves the server part, its tools
+and the instruction untouched — memory keeps working, only the toast and the indicator are missing. The indicator
+does not report whether a dream is due: no cheap signal exists for that.
+
+The part needs the peers OpenCode itself provides, `@opentui/core`, `@opentui/solid`, `solid-js` and
+`@opencode/theme`, so it adds no runtime of its own. CI typechecks it (`tsconfig.tui.json`) but does not run a TUI,
+because that needs a real terminal session.
+
+Tested against OpenCode 2.3.0. There a plugin's toast renders on the home screen only: the same call made while a
+session is open returns without an error and draws nothing. So the toast is best-effort — a configuration error or
+an old OpenCode is announced when the TUI starts, before any session — and inside a session the transcript message
+and the indicator carry the same outcome. Toasts work as expected once OpenCode renders them per session.
 
 ## Subagents
 
