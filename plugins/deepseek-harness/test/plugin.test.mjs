@@ -40,7 +40,6 @@ case "$1" in
   search)
     case "$*" in
       *shelved*) printf '{"facts":[],"hints":["1 fact on the shelf matches: -in shelf:research"]}\\n' ;;
-      *versioned*) printf '{"facts":[{"id":"f1","version":2,"scope":"repo:example.com/test/harness","created":"2026-11-13T09:08:46Z","content":"${FACT}"},{"id":"f2","version":1,"scope":"global","content":"A second fact."}],"hints":["No facts of this repository, this host or global match; these come from other repositories: check that they apply."],"widened":true}\\n' ;;
       *) printf '[{"id":"f1","content":"${FACT}","origin":"test 2026-10-20"}]\\n' ;;
     esac
     ;;
@@ -445,28 +444,6 @@ test('memcue_search marks the kinds memcue_add never takes (#639)', () => {
 	assert.doesNotMatch(add, /\b(repo|other)\b/)
 	assert.doesNotMatch(search.split('.')[0], /\b(repo|other)\b/)
 	assert.match(search, /repo and other.*memcue_add never takes them/)
-})
-
-test('memcue_search renders one line per fact with its version, scope and a trailer (#756)', async () => {
-	const { tools } = mount()
-	const search = tools.get('memcue_search')
-	const result = await search.execute({ query: 'versioned words' }, {})
-	assert.equal(result.widened, true)
-	assert.deepEqual(result.facts[0],
-		{ id: 'f1', version: 2, content: FACT, origin: '', scope: 'repo:example.com/test/harness', created: '2026-11-13T09:08:46Z' })
-	const [part] = search.output.render({}, result)
-	assert.equal(part.text,
-		`f1@2 repo:example.com/test/harness 2026-11-13 ${FACT}\n`
-		+ 'f2@1 global A second fact.\n'
-		+ '2 facts | widened | No facts of this repository, this host or global match; these come from other repositories: check that they apply.')
-})
-
-test('an empty search renders the CLI wording with its hint (#756)', async () => {
-	const { tools } = mount()
-	const search = tools.get('memcue_search')
-	const result = await search.execute({ query: 'shelved words' }, {})
-	const [part] = search.output.render({}, result)
-	assert.equal(part.text, 'No stored facts match. | 1 fact on the shelf matches: -in shelf:research')
 })
 
 test('memcue_search hints on a Chinese query (#410)', async () => {

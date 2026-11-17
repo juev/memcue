@@ -38,16 +38,7 @@ test('search passes exact argv and preserves facts, hints and widening', async (
     query: '-query; $(no shell)', limit: 7, in: 'shelf:research', kind: 'rule,decision', since: '2026-11-01',
     minScore: 0, expired: true, allWords: true,
   }, signal, undefined, ctx);
-  assert.equal((result.content[0] as { text: string }).text,
-    'fact-1@3 global 2026-11-11 Привет\n1 fact | widened | Check the research shelf');
-});
-
-test('an empty search keeps the CLI wording and the hint in one line (#756)', async () => {
-  const result = await tool('memcue_search', async () => read(JSON.stringify({
-    facts: [], hints: ['2 facts on the shelf match: -in shelf:research'],
-  }))).execute('call', { query: 'nothing here' }, undefined, undefined, ctx);
-  assert.equal((result.content[0] as { text: string }).text,
-    'No stored facts match. | 2 facts on the shelf match: -in shelf:research');
+  assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), answer);
 });
 
 test('search defaults to five and rejects malformed native output', async () => {
@@ -72,18 +63,7 @@ test('add is a mutation, preserves literal text and native diagnostics', async (
   const result = await add.execute('call', { text: '--literal "text"', source: 'tool', kind: 'pitfall', scope: 'repo',
     origin: 'a named source', expires: '2026-12-01' }, undefined, undefined, ctx);
   assert.match((result.content[0] as { text: string }).text, /fact-2/);
-  // A native diagnostic is not the model's business on a successful write (#756): it goes to the details.
-  assert.doesNotMatch((result.content[0] as { text: string }).text, /native warning/);
-  assert.deepEqual(result.details, { outcome: 'committed', diagnostic: 'native warning' });
-});
-
-test('a native diagnostic of a successful search stays out of the model text (#756)', async () => {
-  const result = await tool('memcue_search', async () => ({
-    ...read(JSON.stringify({ facts: [{ id: 'fact-1', version: 2, scope: 'global', content: 'A fact.' }] })),
-    stderr: 'memcue: the base was rebuilt',
-  })).execute('call', { query: 'a fact' }, undefined, undefined, ctx);
-  assert.equal((result.content[0] as { text: string }).text, 'fact-1@2 global A fact.\n1 fact');
-  assert.deepEqual(result.details, { outcome: 'read', diagnostic: 'memcue: the base was rebuilt' });
+  assert.match((result.content[0] as { text: string }).text, /native warning/);
 });
 
 test('conflicting metadata and dream ranges fail without invoking the CLI', async () => {

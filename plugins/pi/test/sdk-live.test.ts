@@ -28,16 +28,6 @@ async function ok(pi: Pi, name: string, args: ToolCall['arguments']) {
   return result.text;
 }
 
-/** A literal for a regular expression, for the fact text a rendering must carry word for word. */
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/** The version the model reads in the one line of a fact (#756): `id@version scope day content`. */
-function versionIn(text: string, id: string): number {
-  const match = new RegExp(`${id}@(\\d+) `).exec(text);
-  assert.ok(match, `the rendered search carries the version of ${id}: ${text}`);
-  return Number(match[1]);
-}
-
 test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed versions', live, async t => {
   const fixture = await liveFixture(t);
   const first = await openPi(fixture);
@@ -46,11 +36,10 @@ test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed
   await first.dispose();
   const pi = await openPi(fixture);
   t.after(() => pi.dispose());
-  const found = await ok(pi, 'memcue_search', { query: 'concurrency examples', minScore: 0 });
-  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(content)}$`, 'm'),
-    `the written fact is rendered with its version: ${found}`);
+  const found = JSON.parse(await ok(pi, 'memcue_search', { query: 'concurrency examples', minScore: 0 }));
+  assert.equal(found.facts.find((fact: { id: string }) => fact.id === id)?.version, 1);
   const corrected = 'Prefer short concrete concurrency examples in design explanations.';
-  await ok(pi, 'memcue_correct', { id, text: corrected, expectedVersion: versionIn(found, id) });
+  await ok(pi, 'memcue_correct', { id, text: corrected, expectedVersion: 1 });
   const refused = await call(pi, 'memcue_correct', { id, text: 'A stale decision must not be saved.', expectedVersion: 1 });
   assert.equal(refused.isError, true);
   assert.match(refused.text, /refused|version|changed|expected/i);
@@ -78,9 +67,8 @@ test('SDK + CLI: inherited remote backends cannot redirect synthetic writes', li
   t.after(() => pi.dispose());
   const content = 'Synthetic facts must remain in the temporary local base.';
   const id = (await ok(pi, 'memcue_add', { text: content, source: 'user', kind: 'rule', scope: 'global' })).trim();
-  const found = await ok(pi, 'memcue_search', { query: 'temporary local base', minScore: 0 });
-  assert.match(found, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(content)}$`, 'm'),
-    `the written fact is rendered with its version: ${found}`);
+  const found = JSON.parse(await ok(pi, 'memcue_search', { query: 'temporary local base', minScore: 0 }));
+  assert.equal(found.facts.find((fact: { id: string }) => fact.id === id)?.content, content);
 });
 
 test('SDK + CLI: repo pitfalls refresh on the next prompt and do not leak into another repository', live, async t => {
@@ -138,19 +126,21 @@ test('SDK + CLI: a packed standalone package installs and loads via its manifest
   execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive, transportArchive],
     { cwd: destination, encoding: 'utf8', timeout: 60_000 });
   const installed = join(destination, 'node_modules', 'memcue-pi');
-  // npm may satisfy the plugin's `memcue-transport@^0.37.1` range from the registry even when this checkout's
-  // tarball is named on the command line (npm 11.6 on node 24 installs that copy nested), while this test exists to
-  // prove this checkout's packaging: the transport tarball built here has to carry every module the plugin imports,
-  // so it is unpacked where the plugin resolves the transport before the plugin is loaded.
+  // npm may satisfy the plugin's `memcue-transport` range from the registry even when this checkout's tarball is
+  // named on the command line (npm 11.6 on node 24 installs that copy nested), while this test exists to prove this
+  // checkout's packaging: the transport tarball built here has to carry every module the plugin imports, so it is
+  // unpacked where the plugin resolves the transport before the plugin is loaded.
   const transportNames = execFileSync('tar', ['-tzf', transportArchive], { encoding: 'utf8' }).trim().split('\n');
-  assert.ok(transportNames.includes('package/render.mjs'), `the transport package ships render.mjs: ${transportNames}`);
+  for (const module of ['index.mjs', 'transport.mjs', 'install.mjs']) {
+    assert.ok(transportNames.includes(`package/${module}`), `the transport package ships ${module}: ${transportNames}`);
+  }
   const transportDir = dirname(createRequire(join(installed, 'package.json')).resolve('memcue-transport'));
   execFileSync('tar', ['-xzf', transportArchive, '--strip-components=1', '-C', transportDir], { encoding: 'utf8' });
   const fact = 'Use a packed native extension to recall the release packaging decision.';
   const id = successful(await fixture.run(['add', '-source', 'user', '-kind', 'decision', '--', fact], true), true).trim();
   const pi = await openPi(fixture, { entry: installed });
   t.after(() => pi.dispose());
-  const result = await ok(pi, 'memcue_search', { query: 'release packaging decision', minScore: 0 });
-  assert.match(result, new RegExp(`^${id}@1 (?:\\S+ )?\\d{4}-\\d{2}-\\d{2} ${escape(fact)}$`, 'm'), result);
+  const result = JSON.parse(await ok(pi, 'memcue_search', { query: 'release packaging decision', minScore: 0 }));
+  assert.equal(result.facts.find((value: { id: string }) => value.id === id)?.content, fact);
   assert.deepEqual(pi.errors, []);
 });
