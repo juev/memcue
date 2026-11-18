@@ -100,6 +100,25 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
                 self.assertNotIn('-ack',text)
                 self.assertNotIn('-in project',text)
 
+    def test_delivered_policy_captures_repository_preferences_before_dependent_work(self):
+        hook = self.run_adapter('hook', data=self.payload())
+        self.assertEqual(hook.returncode, 0, hook.stderr)
+        note = json.loads(hook.stdout)['hookSpecificOutput']['additionalContext']
+        fallback = self.run_adapter('instructions')
+        self.assertEqual(fallback.returncode, 0, fallback.stderr)
+
+        required = (
+            'Before the first edit that depends on it or the final reply, search for a matching fact, add or correct it, and read it back',
+            '-kind rule -source user -scope repo',
+            'A request for one document or task stays in that task',
+            'retry with the name of the requested artifact by itself',
+        )
+        for result in (note, fallback.stdout):
+            normalized = ' '.join(result.split())
+            with self.subTest(result=normalized[:60]):
+                for phrase in required:
+                    self.assertIn(phrase, normalized)
+
     def test_later_shell_calls_use_same_config_without_hook_environment(self):
         r = self.run_adapter('hook',data=self.payload())
         self.assertEqual(r.returncode,0,r.stderr)

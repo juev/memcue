@@ -11,6 +11,8 @@ Hook child environment does not propagate to later shell calls. Run commands fro
 - Search when earlier knowledge of a user decision, host, service, repository or pitfall may affect the next step.
   Skip it when the user's message and the repository's files hold everything the task needs. Search in English first;
   retry with synonyms, exact identifiers and legacy-language words when needed. Keep replies in the user's requested language.
+  If a broad search for a standing rule returns no applicable fact, retry with the name of the requested artifact by itself.
+  For example, try `specifications` after an empty `documentation language` search.
 - Search returns an object with `facts` and optional `hints`, not a bare list. Read both. Facts include `id`, `content`,
   `origin` (optional), `scope` (optional), `created` and `expires` (optional).
   Do not invent source or kind fields in that response. Inspect the configured base history when persisted metadata is needed.
@@ -22,6 +24,9 @@ Hook child environment does not propagate to later shell calls. Run commands fro
   them from the transcript. Correct an existing fact rather than adding a duplicate. Preserve source, kind, scope and expiry.
   Store user rules and decisions the code does not show, durable pitfalls, and useful external context. Do not store task
   progress, what the repository shows, credentials, or procedures the user did not ask to remember.
+- When the user sets or corrects a standing preference, save it in the same turn. Before the first edit that depends on it
+  or the final reply, search for a matching fact, add or correct it, and read it back with `search -json`.
+  For a new repository-only rule, use `-kind rule -source user -scope repo`. A request for one document or task stays in that task.
 - Write new and corrected fact content in English. Preserve exact identifiers, commands, paths, versions, values and
   verbatim quotations. This is an instruction to the model, not automatic translation or a storage language restriction.
   Never correct a fact solely to change its language. Existing fact content remains as stored.
