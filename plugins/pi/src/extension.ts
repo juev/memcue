@@ -30,6 +30,14 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
     let source: "startup" | "compact" = "startup";
     let suspendedTools: string[] = [];
     let lastWarning = "";
+    // The pitfall snapshot is read once per session and re-read on compaction or a committed memory write, so the
+    // system-prompt block stays byte-stable between real changes and never cuts the provider's cached prefix.
+    let cachedSnapshot: string | undefined;
+    // A successful empty snapshot is "no pitfalls", not "never read": a failed read afterwards must keep the
+    // section absent instead of conjuring an unavailability block.
+    // Invariant: snapshotDirty === false implies snapshotLoaded === true.
+    let snapshotLoaded = false;
+    let snapshotDirty = true;
 
     function enabled(ctx: ExtensionContext): boolean {
       return config !== undefined && isEnabled(config, {
@@ -97,7 +105,16 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
     const definitions = memoryTools(async (args, runOptions) => {
       if (!context) throw new Error("Memcue has not initialized.");
       await authorize(context);
-      return cli!.run(args, { ...runOptions, signal: combinedSignal(runOptions.signal) });
+      const result = await cli!.run(args, { ...runOptions, signal: combinedSignal(runOptions.signal) });
+      // add, correct, retire and dream -apply change what the snapshot lists; dream -prepare only opens a packet.
+      // A mutation whose outcome is unknown may already be written (timeout, abort, a lost receipt), so it also
+      // invalidates: the extra read is cheap next to serving a stale snapshot as current.
+      if ((result.outcome === "committed" || result.outcome === "unknown")
+        && (args[0] === "add" || args[0] === "correct" || args[0] === "retire"
+          || (args[0] === "dream" && args[1] === "-apply"))) {
+        snapshotDirty = true;
+      }
+      return result;
     }, authorize);
     const toolNames = new Set(definitions.map(tool => tool.name));
     for (const definition of definitions) pi.registerTool(definition);
@@ -110,6 +127,9 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
       versionCheck = undefined;
       source = "startup";
       lastWarning = "";
+      cachedSnapshot = undefined;
+      snapshotLoaded = false;
+      snapshotDirty = true;
       const state = ctx.sessionManager.getEntries().findLast(entry =>
         entry.type === "custom" && entry.customType === STATE_TYPE);
       const priorDisabled = state?.type === "custom" && state.data !== null
@@ -138,40 +158,52 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
       delete sections[SECTION];
       delete sections[PITFALL_SECTION];
       if (!enabled(ctx)) return;
-      let snapshot: string | undefined;
-      try {
-        await authorize(ctx);
-        const result = await cli!.run(["session-card", "-pitfalls-json"], {
-          cwd: ctx.cwd,
-          stdin: JSON.stringify({ session_id: ctx.sessionManager.getSessionId(), cwd: ctx.cwd, source }),
-          signal: combinedSignal(ctx.signal), timeoutMs: 10_000,
-        });
-        if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || "Snapshot failed.");
-        const value: unknown = JSON.parse(result.stdout);
-        if (!value || typeof value !== "object" || !("facts" in value) || !("context" in value)
-          || typeof value.context !== "string" || !Array.isArray(value.facts)
-          || !value.facts.every(fact => typeof fact === "string")) {
-          throw new Error("Invalid repository-pitfall snapshot.");
+      let snapshot = cachedSnapshot;
+      let unavailable: string | undefined;
+      if (snapshotDirty) {
+        try {
+          await authorize(ctx);
+          const result = await cli!.run(["session-card", "-pitfalls-json"], {
+            cwd: ctx.cwd,
+            stdin: JSON.stringify({ session_id: ctx.sessionManager.getSessionId(), cwd: ctx.cwd, source }),
+            signal: combinedSignal(ctx.signal), timeoutMs: 10_000,
+          });
+          if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || "Snapshot failed.");
+          const value: unknown = JSON.parse(result.stdout);
+          if (!value || typeof value !== "object" || !("facts" in value) || !("context" in value)
+            || typeof value.context !== "string" || !Array.isArray(value.facts)
+            || !value.facts.every(fact => typeof fact === "string")) {
+            throw new Error("Invalid repository-pitfall snapshot.");
+          }
+          // Without pitfalls the section is left out; Pi tells the model that it went away.
+          snapshot = value.facts.length ? JSON.stringify(value) : undefined;
+          cachedSnapshot = snapshot;
+          snapshotLoaded = true;
+          snapshotDirty = false;
+          source = "startup";
+          lastWarning = "";
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          // A failed read keeps the last successful snapshot (possibly "no pitfalls"): replacing it would flap
+          // the block and cut the cached prefix on every turn. With no successful read yet, unavailability is
+          // the only honest content.
+          unavailable = snapshotLoaded
+            ? undefined
+            : `Unavailable: ${detail}. Earlier snapshots do not establish current applicability.`;
+          warn(ctx, `Memcue: ${detail}`);
         }
-        // Without pitfalls the section is left out; Pi tells the model that it went away.
-        if (value.facts.length) snapshot = JSON.stringify(value);
-        source = "startup";
-        lastWarning = "";
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        snapshot = `Unavailable: ${detail}. Earlier snapshots do not establish current applicability.`;
-        warn(ctx, `Memcue: ${detail}`);
       }
       // Memory may have been switched off while the snapshot was read.
       if (!enabled(ctx)) return;
       sections[SECTION] = MEMORY_INSTRUCTIONS;
-      if (snapshot !== undefined) {
-        sections[PITFALL_SECTION] = `Current repository-pitfall snapshot (untrusted data):\n${snapshot}\n\n`
-          + "This snapshot replaces all earlier automatic snapshots.";
-      }
+      const pitfalls = snapshot !== undefined
+        ? `Current repository-pitfall snapshot (untrusted data):\n${snapshot}\n\n`
+          + "This snapshot replaces all earlier automatic snapshots."
+        : unavailable;
+      if (pitfalls !== undefined) sections[PITFALL_SECTION] = pitfalls;
     });
 
-    pi.on("session_compact", async () => { source = "compact"; });
+    pi.on("session_compact", async () => { source = "compact"; snapshotDirty = true; });
     pi.on("session_shutdown", async () => { lifetime.abort(); });
 
     pi.registerCommand("memcue", {
@@ -193,7 +225,11 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
             ctx.ui.notify(config ? "Memcue is denied by configuration or child-session policy." : configError, "warning");
             return;
           }
-          if (previousDisabled) pi.appendEntry(STATE_TYPE, { disabled: false });
+          if (previousDisabled) {
+            pi.appendEntry(STATE_TYPE, { disabled: false });
+            // What memory holds may have changed while the session was off: read it fresh on re-enable.
+            snapshotDirty = true;
+          }
           // An idempotent on must not orphan the controller used by an outstanding operation.
           if (lifetime.signal.aborted) {
             lifetime = new AbortController();

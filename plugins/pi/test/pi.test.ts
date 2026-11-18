@@ -16,7 +16,7 @@ test('real Pi loader exposes Memcue tools and sends memory in system-prompt sect
     assert.ok(pi.requests.length >= 2, 'the tool call needs a second model request');
     const calls = await fixture.calls();
     assert.equal(calls.filter(call => call.args[0] === 'session-card').length, 1,
-      'the snapshot is read once per prompt, not before every model request of the tool loop');
+      'the snapshot is read once per agent start, not before every model request of the tool loop');
     assert.ok(calls.some(call => call.args[0] === 'version'));
     const snapshot = calls.find(call => call.args[0] === 'session-card');
     assert.ok(snapshot);
@@ -130,7 +130,10 @@ test('a later Pi request receives the current snapshot without retaining an earl
     await pi.prompt('First request.');
     assert.match(requestText(pi.requests[0]!), /PI-SDK-FACT/);
     await fixture.snapshot('CURRENT-SNAPSHOT-ONLY: the schema issue has been repaired.');
+    pi.enqueueTools([{ type: 'toolCall', id: 'add-refresh', name: 'memcue_add',
+      arguments: { text: 'A committed fact refreshes the snapshot.', source: 'tool' } }]);
     await pi.prompt('Second request.');
+    await pi.prompt('Third request.');
     const current = currentPrompt(pi.requests.at(-1)!);
     assert.match(current, /CURRENT-SNAPSHOT-ONLY/);
     assert.doesNotMatch(current, /PI-SDK-FACT/);
@@ -145,6 +148,7 @@ test('native memcue off and on commands remove and restore current memory access
     await pi.prompt();
     const callsBeforeOff = await fixture.calls();
     await pi.session.prompt('/memcue off');
+    await fixture.snapshot('RESTORED-AFTER-ON: memory changed while the session was off.');
     await pi.prompt('Run with memory switched off.');
     assert.equal(pi.session.getActiveToolNames().some(name => name.startsWith('memcue_')), false);
     assert.doesNotMatch(currentPrompt(pi.requests.at(-1)!), /PI-SDK-FACT|<memcue>/);
@@ -152,8 +156,11 @@ test('native memcue off and on commands remove and restore current memory access
     await pi.session.prompt('/memcue on');
     await pi.prompt('Run with memory switched on.');
     assert.ok(pi.session.getActiveToolNames().includes('memcue_search'));
-    assert.match(currentPrompt(pi.requests.at(-1)!), /PI-SDK-FACT/);
-    assert.ok((await fixture.calls()).length > callsBeforeOff.length);
+    assert.match(currentPrompt(pi.requests.at(-1)!), /RESTORED-AFTER-ON/);
+    assert.doesNotMatch(currentPrompt(pi.requests.at(-1)!), /PI-SDK-FACT/);
+    const readsAfterOn = (await fixture.calls()).filter(call => call.args[0] === 'session-card');
+    assert.ok(readsAfterOn.length > callsBeforeOff.filter(call => call.args[0] === 'session-card').length,
+      're-enable must re-read the snapshot, not serve the stale cache');
   } finally { await pi?.dispose(); await fixture.dispose(); }
 });
 
@@ -203,6 +210,24 @@ test('switching memory off during a snapshot prevents late memory injection', as
   } finally { await pi?.dispose(); await fixture.dispose(); }
 });
 
+test('an invalidating re-read of an identical snapshot adds no system-prompt patch', async () => {
+  const fixture = await piFixture();
+  let pi: Awaited<ReturnType<typeof openPi>> | undefined;
+  try {
+    pi = await openPi(fixture);
+    await pi.prompt('First request.');
+    pi.enqueueTools([{ type: 'toolCall', id: 'add-same', name: 'memcue_add',
+      arguments: { text: 'A committed fact that leaves the snapshot text identical.', source: 'tool' } }]);
+    await pi.prompt('Second request with the write.');
+    await pi.prompt('Third request re-reads the unchanged snapshot.');
+    const patches = (request: unknown) => (request as { messages: { role: string }[] }).messages
+      .slice(1).filter(message => message.role === 'system').length;
+    assert.equal(patches(pi.requests.at(-1)), 0, 'an identical snapshot after a re-read must keep the cached prompt');
+    const reads = (await fixture.calls()).filter(call => call.args[0] === 'session-card');
+    assert.equal(reads.length, 2, 'the committed write invalidated the cache exactly once');
+  } finally { await pi?.dispose(); await fixture.dispose(); }
+});
+
 test('an unchanged snapshot adds no system-prompt patch, and an empty one removes the pitfall section', async () => {
   const fixture = await piFixture();
   let pi: Awaited<ReturnType<typeof openPi>> | undefined;
@@ -214,7 +239,10 @@ test('an unchanged snapshot adds no system-prompt patch, and an empty one remove
       .slice(1).filter(message => message.role === 'system').length;
     assert.equal(patches(pi.requests.at(-1)), 0, 'an unchanged section must keep the cached prompt');
     await fixture.empty();
+    pi.enqueueTools([{ type: 'toolCall', id: 'add-empty', name: 'memcue_add',
+      arguments: { text: 'Trigger a snapshot re-read.', source: 'tool' } }]);
     await pi.prompt('Third request without pitfalls.');
+    await pi.prompt('Fourth request without pitfalls.');
     const current = currentPrompt(pi.requests.at(-1)!);
     assert.doesNotMatch(current, /memcue_pitfalls|PI-SDK-FACT/);
     assert.match(current, /<memcue>/);
