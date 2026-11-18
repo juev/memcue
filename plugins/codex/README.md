@@ -6,6 +6,11 @@ snapshot of the target cwd; a session receives it again only when it changes, or
 compaction. The hooks do not search facts by the task or inject a rules card. The working model
 chooses searches and writes; these instructions do not establish model compliance or recall quality.
 
+Both the hook and the `AGENTS.md` fallback ask the model to save a standing preference in the turn when the user
+sets or corrects it, then verify the fact before a dependent edit or the final reply. A preference limited to the
+current repository is saved with repository scope. If a broad lookup for a standing rule returns no applicable
+fact, search again using the name of the requested artifact by itself.
+
 This is a local CLI integration. It needs Python 3.9+, a memcue binary from 0.30.0 or newer, and Codex CLI 0.167.0.
 No MCP server, Claude installation, memory service, API key or second model is needed for memcue search/write or dream
 prepare/apply. Codex itself needs its normal authenticated model connection for an agent turn.
@@ -213,6 +218,11 @@ hooks in `/hooks`; observe delivered context on startup/resume/clear/compaction,
 answer a dream packet with the real working model. Confirm stored history/provenance independently. Repeat with
 untrusted and disabled hooks plus the fallback, and with denied directory writes. Do not count a successful agent turn
 as a passing test suite. Record exact versions, session IDs, events observed, checks run and any unverified events.
+
+To check preference capture, establish a lasting documentation convention in a synthetic repository. Verify that
+memcue holds a user rule with the repository scope before the first dependent edit. Start fresh sessions in that
+repository and a different one to check that the rule applies only in the intended repository. Repeat with a
+request confined to one document and confirm that the base stays empty.
 
 Contracts: [Codex hooks](https://developers.openai.com/codex/hooks),
 [skills](https://developers.openai.com/codex/skills), [AGENTS.md](https://developers.openai.com/codex/guides/agents-md),
