@@ -6,7 +6,7 @@
  */
 import { readFile } from 'node:fs/promises';
 
-export { install, installedPath, current } from 'memcue-transport';
+export { install, installedPath, current } from '../vendor/transport/index.mjs';
 
 /** The version of this plugin, which is the release of the binary it installs. */
 export async function pluginVersion(): Promise<string> {

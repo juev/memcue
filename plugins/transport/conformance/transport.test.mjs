@@ -1,8 +1,8 @@
 /**
  * The transport contract of #754, run against the canonical package and against the Pi and OpenCode adapters as
  * those plugins wire it. The DeepSeek Harness adapter has its own result shape and its own file; the shell and
- * Python contracts run beside this suite. A host that resolves a copy instead of the package fails the identity
- * check, and a wiring that drifts fails the cases.
+ * Python contracts run beside this suite. Each adapter must resolve its staged copy of the canonical files;
+ * mismatched bytes fail the source check, and a wiring that drifts fails the contract cases.
  */
 import assert from 'node:assert/strict';
 import { readFile, realpath } from 'node:fs/promises';
@@ -13,6 +13,7 @@ import { fixture, invalidReceipts, waitForFile } from './fixture.mjs';
 
 /** The adapters: the canonical package, and each Node plugin's transport as the plugin configures it. */
 async function adapters() {
+  const { files } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   const list = [{
     name: 'canonical',
     create: (binary, dir) => new MemcueCli({ binary, facts: join(dir, 'facts.db'), stateDir: join(dir, 'state'), host: 'laptop' }),
@@ -24,7 +25,13 @@ async function adapters() {
   ]) {
     try {
       const probe = await import(path);
-      assert.equal(probe.MemcueCli, MemcueCli, `${name} must import the shared transport, not a copy`);
+      const staged = new URL(`../../${name}/vendor/transport/`, import.meta.url);
+      for (const file of files) {
+        assert.deepEqual(await readFile(new URL(file, staged)), await readFile(new URL(`../${file}`, import.meta.url)),
+          `${name} must stage the checkout's exact ${file}`);
+      }
+      assert.equal(probe.MemcueCli, (await import(new URL('index.mjs', staged))).MemcueCli,
+        `${name} must import its staged transport`);
       list.push({
         name,
         create: (binary, dir) => new probe.MemcueCli(probe.transportConfig({ facts: join(dir, 'facts.db'), stateDir: join(dir, 'state'), host: 'laptop' }, binary)),

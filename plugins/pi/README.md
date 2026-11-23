@@ -107,10 +107,9 @@ or read the base itself.
 ## Development
 
 ```sh
-npm install --no-package-lock
-npx tsc --noEmit
-MEMCUE_BIN=/absolute/path/to/memcue npm test
+npm --prefix plugins/pi ci --ignore-scripts
+make test-pi
 ```
 
-The tests load the extension with the real Pi SDK and an offline model; with `MEMCUE_BIN` they also run the real
-binary on temporary bases. `make test-pi` in the repository root does the same with the built binary.
+Run from the repository root. The target stages the in-tree transport (`make prepare-transport`), then typechecks
+and tests the extension with the real Pi SDK, an offline model, and the built CLI on temporary bases.

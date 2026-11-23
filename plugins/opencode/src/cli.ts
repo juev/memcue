@@ -3,10 +3,10 @@
  * kill, the timeout, the 4 MiB output budget and the outcome receipt — lives in memcue-transport; this file names
  * the host and keeps the plugin's import path stable. The conformance suite runs the contract through this wiring.
  */
-import { MemcueCli, type CliConfig } from 'memcue-transport';
+import { MemcueCli, type CliConfig } from '../vendor/transport/index.mjs';
 
 export { MemcueCli };
-export type { CliConfig, CliResult, CliRunOptions } from 'memcue-transport';
+export type { CliConfig, CliResult, CliRunOptions } from '../vendor/transport/index.mjs';
 
 /** The transport configuration every OpenCode memcue call runs with: ambient settings reach the CLI, these win. */
 export function transportConfig(config: { facts?: string; stateDir?: string; host?: string }, binary: string): CliConfig {

@@ -96,6 +96,9 @@ jobs:
       - name: test plugins
         run: MEMCUE_BIN="$PWD/bin/memcue" node --experimental-test-module-mocks --test --test-concurrency=2 plugins/deepseek-harness/test/*.test.mjs plugins/claude-code/test/*.test.mjs
 
+      - name: pack and test npm tarballs
+        run: make test-npm-packages
+
       - name: test the shared transport contract on every host
         run: MEMCUE_CONFORMANCE_REQUIRE_ADAPTERS=1 make test-conformance
 

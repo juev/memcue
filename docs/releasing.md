@@ -1,53 +1,31 @@
 # Releasing
 
-One release covers the binary and the plugins (Claude Code, DSH, Hermes, Pi, OpenCode): they carry the same version.
+One stable tag releases the binary and the npm plugins. The Git-distributed plugins and the npm packages still carry the same checked-in release version: installers use it to select a binary release.
+
+## One-time npm setup
+
+Before the first release using this workflow, add `release.yml` as a [trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `memcue-dsh`, `memcue-pi` and `memcue-opencode` on npmjs.com. Use owner `juev`, repository `memcue`, no environment, and allow direct `npm publish`. Keep the old publishers until any release using the previous workflow has finished. No npm token is needed.
+
+The old `memcue-transport` versions stay on npm for old installations. New plugin tarballs carry the transport from the same checkout, so no new standalone transport release is needed.
 
 ## Order
 
-1. Open an issue for the release, then a PR for the version bump. A merged task does not ship until this PR does.
-2. In that PR, set the new version in:
-   - `package.json` (the repository root is the `memcue-dsh` plugin itself since #754);
-   - `plugins/transport/package.json` (the shared CLI transport, `memcue-transport`);
-   - `plugins/claude-code/.claude-plugin/plugin.json`;
-   - `plugins/hermes/memcue/plugin.yaml`;
-   - `plugins/hermes/memcue-context/plugin.yaml`;
-   - `plugins/pi/package.json`;
-   - `plugins/opencode/package.json`;
-   - `plugins/codex/.codex-plugin/plugin.json`;
-   - `plugins/claude-code/test/versions.test.mjs`, which checks the manifests above and the README.
-3. In `README.md`, update the release named in [Compatibility](../README.md#compatibility), add a row to its table, and
-   add a section under [Upgrade](../README.md#upgrade): what changed for a user, and whether the schema or a flag did.
-4. Publish the transport of this version ahead of the tag, then point Pi and OpenCode at it. Push the release branch,
-   run `publish-transport.yml` from it (`gh workflow run publish-transport.yml --ref <branch> -f dry_run=true`, then
-   `-f dry_run=false`), and once `npm pack memcue-transport@X.Y.Z` fetches it, run
-   `npm --prefix plugins/pi install memcue-transport@^X.Y.Z --save` and the same for `plugins/opencode`. Both plugins
-   declare `^X.Y.Z` and their locks resolve `X.Y.Z` from the registry; `versions.test.mjs` fails otherwise. On 0.x a
-   caret admits only its own minor, so a plugin left on the previous range installs the previous transport and fails
-   to load when it imports anything added since; `make link-transport` hides that from every local and CI run.
-5. Run `make test`. After CI passes, merge the PR with a rebase.
-6. Tag the merge commit twice and push both tags:
+1. Update the version in a normal PR:
+   - `package.json` (the repository root is `memcue-dsh`);
+   - `plugins/transport/package.json` (the shared, in-tree transport);
+   - `plugins/pi/package.json` and `plugins/opencode/package.json` with their matching lockfile metadata;
+   - `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json`;
+   - `plugins/hermes/memcue/plugin.yaml` and `plugins/hermes/memcue-context/plugin.yaml`.
+2. Update [Compatibility](../README.md#compatibility) and [Upgrade](../README.md#upgrade) with user-visible changes and any schema or flag changes. Merge the PR after normal CI passes. To rehearse npm packaging without publishing, use `make test-npm-packages`, the same command CI and the release job use.
+3. Tag the exact verified merge commit and push only that tag:
 
    ```bash
-   git tag vX.Y.Z
-   git tag dsh-vX.Y.Z
-   git tag pi-vX.Y.Z
-   git tag opencode-vX.Y.Z
-   git push origin vX.Y.Z dsh-vX.Y.Z pi-vX.Y.Z opencode-vX.Y.Z
+   git tag vX.Y.Z <merge-commit>
+   git push origin vX.Y.Z
    ```
 
-   `v*` runs `release.yml`: tests, then GoReleaser publishes the binaries and `checksums.txt`, and the `transport`
-   job publishes `memcue-transport` to npm. `dsh-v*` runs `publish-dsh.yml`, which publishes `memcue-dsh` from the
-   repository root and refuses a tag that differs from the package version; the package carries the transport files
-   inside itself, so it does not depend on the registry. Without the `dsh-v` tag npm keeps the previous plugin, and
-   that is how npm stayed at 0.5.3 through 0.11.1. `pi-v*` runs `publish-pi.yml` for `memcue-pi`, and `opencode-v*`
-   runs `publish-opencode.yml` for `memcue-opencode`; both refuse a tag that differs from their package version, and
-   both refuse to publish before `memcue-transport` of that version is on the registry, because they depend on it.
-   Tag `v*` first and wait for its transport job. The first publish of each package and its trusted publisher on
-   npmjs.com are manual steps; `publish-transport.yml` (workflow_dispatch) bootstraps or hotfixes the transport
-   outside a release.
-7. Check the results: `gh release view vX.Y.Z` lists the archives, and `npm view memcue-dsh version`,
-   `npm view memcue-transport version`, `npm view memcue-pi version` and `npm view memcue-opencode version` print
-   `X.Y.Z`.
+   `release.yml` checks the tag against the manifests, runs the tests, saves the tested npm tarballs, and publishes the binaries and `checksums.txt` with GoReleaser. Then it publishes those same tarballs to npm. Do not move the tag or create additional plugin tags.
+4. Check `gh release view vX.Y.Z` for the archives and `checksums.txt`. Verify each exact npm version (`npm view memcue-dsh@X.Y.Z version`, and likewise for `memcue-pi` and `memcue-opencode`) and verify `latest` points to `X.Y.Z` for a current stable release. If only npm jobs failed, re-run **failed jobs** on the original tag run. They accept an existing version only when its registry integrity matches the tested tarball.
 
 ## After the release
 

@@ -146,8 +146,8 @@ the bundle metadata and that the bundle patch points at the loadable ESM entry. 
 Go and Hermes suites when those packages are installed, and skips it with the install command otherwise.
 
 The CLI transport itself is the shared `memcue-transport` package (#754), imported as `memcue-dsh/transport`;
-`make test-conformance` runs its contract against this plugin's adapter and every other host, and the suite refuses
-a plugin that resolves a copy instead of the package.
+`make test-conformance` runs its contract against this plugin's adapter and every other host. The suites check
+that each Node adapter loads the shared source or a byte-identical staged copy.
 
 `sessions.test.mjs` drives the real binary named by `MEMCUE_BIN` over an invented journal under a `DSH_HOME` of its
 own, with every other host's history pointed at the same fixture: it checks that `memcue_sessions` returns the
@@ -159,23 +159,11 @@ encoding is not zstd; `internal/history`'s tests cover the compressed form.
 
 The package is published as `memcue-dsh` from the repository root. It carries the shared CLI transport
 (`plugins/transport`, #754) inside itself and exports it as `memcue-dsh/transport`, which the plugin imports by
-self-reference; the Pi and OpenCode plugins import the same files as the standalone `memcue-transport` package.
+self-reference. The Pi and OpenCode packages ship the same transport files inside their own tarballs.
 
-CI publishes on a `dsh-v*` tag or by manual dispatch through `.github/workflows/publish-dsh.yml`. It uses npm
-Trusted Publishing (OIDC): the workflow has `id-token: write`, no token, and no `NPM_TOKEN` secret. The trusted
-publisher is configured for the `juev/memcue` repository and the `publish-dsh.yml` workflow, with direct publish and
-stage-publish allowed. Manual dispatch has a `dry_run` input: it packs a throwaway prerelease with `--dry-run` and
-uploads nothing.
-
-A maintainer can still publish manually; npm asks for the 2FA code:
-
-```sh
-npm publish --access public   # from the repository root
-```
-
-A fork needs its own trusted publisher, or a granular `NPM_TOKEN` on a `NODE_AUTH_TOKEN` environment variable. A
-granular token without the 2FA bypass cannot run `npm publish`: use `npm stage publish` and approve the stage with
-`npm stage approve <id>`.
+The normal `vX.Y.Z` release publishes `memcue-dsh` via npm Trusted Publishing (OIDC) after the binary is available.
+See the [repository release procedure](../../docs/releasing.md). To test the tarball without publishing, run
+`make test-npm-packages` from the repository root.
 
 ## What differs from the Hermes plugin
 
