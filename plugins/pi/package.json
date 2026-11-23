@@ -25,12 +25,10 @@
     "index.ts",
     "src",
     "children",
+    "vendor/transport",
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {
-    "memcue-transport": "^0.40.2"
-  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"

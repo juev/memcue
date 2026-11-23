@@ -23,12 +23,12 @@
   },
   "files": [
     "src",
+    "vendor/transport",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
-    "@opencode/plugin": "^2.0.13",
-    "memcue-transport": "^0.40.2"
+    "@opencode/plugin": "^2.0.13"
   },
   "peerDependencies": {
     "@opencode/theme": ">=2.2.7",

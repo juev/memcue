@@ -1,13 +1,14 @@
 # memcue-transport
 
-The memcue CLI transport and binary install shared by the native harness plugins (#754). One implementation,
-imported by the Pi and OpenCode plugins from npm and by the DeepSeek Harness plugin through the `memcue-dsh/transport`
-subpath of the unified root package, so a fix reaches every host at once. The conformance suite in `conformance/`
-runs the same contract against every host adapter, the shell wrapper and the Python provider included.
+The memcue CLI transport and binary install shared by the native harness plugins (#754). Pi and OpenCode ship these
+files inside their packages, while DeepSeek Harness exposes them through `memcue-dsh/transport`. There is one source
+and no npm dependency on a separately published transport for new plugins. Historical versions remain on npm for
+older plugins. The conformance suite runs the same contract against every host adapter, including shell and Python.
 
 Plain ESM JavaScript with a hand-written declaration file: the DeepSeek Harness plugin loads from `node_modules`,
 where Node refuses to strip TypeScript types, and OpenCode runs plugins inside Bun. Node 24 and Bun are both
-supported. There is no build step.
+supported. There is no transpilation step; `make prepare-transport` copies the package files into the Pi and OpenCode
+package directories for development and packing.
 
 ## Transport contract
 

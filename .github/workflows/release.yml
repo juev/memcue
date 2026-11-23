@@ -11,12 +11,15 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    outputs:
+      npm-artifact-id: ${{ steps.npm-packages.outputs.artifact-id }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
@@ -46,13 +49,29 @@ jobs:
       - name: install the OpenCode plugin dependencies
         run: npm --prefix plugins/opencode ci --ignore-scripts --no-audit --no-fund
 
+      - name: Check the tag and manifest versions
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+          node --test plugins/claude-code/test/versions.test.mjs
+
       - name: release prerequisite regression
         run: node --test --test-concurrency=2 plugins/claude-code/test/release-prerequisites.test.mjs
 
       - name: test
         run: make test CLAUDE_BIN="$RUNNER_TEMP/claude-client/node_modules/.bin/claude"
 
-      # The plugin tags (dsh-v*, pi-v*) share the namespace; goreleaser OSS cannot filter them, so it gets both tags (#740).
+      - name: pack and test npm tarballs
+        run: make test-npm-packages NPM_PACK_DIR="$RUNNER_TEMP/npm-packages"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        id: npm-packages
+        with:
+          name: npm-packages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/npm-packages/*.tgz
+          if-no-files-found: error
+
+      # Historical plugin tags share the namespace; select the previous binary tag explicitly (#740).
       - name: previous release tag
         id: tags
         run: |
@@ -68,38 +87,40 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.tags.outputs.previous }}
 
-  # The shared transport is published with the memcue release (#754): the Pi and OpenCode plugins depend on it,
-  # and their publish workflows refuse to run before this version is on the registry. The DSH plugin carries the
-  # same files inside its own package and needs no registry dependency.
-  transport:
-    name: publish memcue-transport
+  # Plugins auto-install the binary of their release. Publish the binary before any npm package.
+  npm:
+    name: publish ${{ matrix.package }}
+    needs: goreleaser
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [memcue-dsh, memcue-pi, memcue-opencode]
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
-      - name: Check the tag names the package version
-        run: test "v$(node -p "require('./plugins/transport/package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Require the tested artifact ID
+        env:
+          NPM_ARTIFACT_ID: ${{ needs.goreleaser.outputs.npm-artifact-id }}
+        run: '[[ "$NPM_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
 
-      - name: Check the entry syntax
-        run: node --check plugins/transport/index.mjs
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          artifact-ids: ${{ needs.goreleaser.outputs.npm-artifact-id }}
+          path: ${{ runner.temp }}/npm-packages
 
-      # npm Trusted Publishing: the OIDC token comes from id-token: write, so there is no NPM_TOKEN.
-      # publish-transport.yml may have bootstrapped this version ahead of the tag, so an already-published
-      # version is a success, not a conflict.
+      # npm Trusted Publishing: authorize release.yml on each package; no npm write token.
       - name: Publish
-        working-directory: plugins/transport
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if npm view "memcue-transport@$version" version >/dev/null 2>&1; then
-            echo "memcue-transport@$version is already published; skipping"
-          else
-            npm publish --access public
-          fi
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: node scripts/publish-npm.mjs "$PACKAGE" "$GITHUB_REF_NAME" "$RUNNER_TEMP/npm-packages"

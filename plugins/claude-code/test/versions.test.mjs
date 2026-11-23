@@ -21,7 +21,7 @@ test('all plugin manifests carry the release version', async () => {
 	const hermesYaml = await readFile(new URL('plugins/hermes/memcue/plugin.yaml', root), 'utf8')
 	const hermes = hermesYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
 
-	assert.equal(rootPackage.version, '0.40.2')
+	assert.match(rootPackage.version, /^\d+\.\d+\.\d+$/)
 	assert.equal(transport.version, rootPackage.version)
 	assert.equal(pi.version, rootPackage.version)
 	assert.equal(opencode.version, rootPackage.version)
@@ -31,19 +31,14 @@ test('all plugin manifests carry the release version', async () => {
 	assert.equal(companion, rootPackage.version)
 })
 
-test('Pi and OpenCode depend on the transport of this release, and their locks resolve it', async () => {
-	// A plugin that imports a transport export the declared range cannot reach fails to load once published: on 0.x
-	// a caret admits only its own minor, and `make link-transport` hides the gap from every local and CI run (#770).
-	const transport = await json('plugins/transport/package.json')
+test('Pi and OpenCode locks carry the release version without a registry transport', async () => {
 	for (const plugin of ['pi', 'opencode']) {
 		const manifest = await json(`plugins/${plugin}/package.json`)
-		assert.equal(manifest.dependencies['memcue-transport'], `^${transport.version}`,
-			`plugins/${plugin} must declare the transport of this release`)
 		const lock = await json(`plugins/${plugin}/package-lock.json`)
-		assert.equal(lock.packages[''].dependencies['memcue-transport'], `^${transport.version}`,
-			`plugins/${plugin}/package-lock.json must be rebuilt after the range changes`)
-		assert.equal(lock.packages['node_modules/memcue-transport']?.version, transport.version,
-			`plugins/${plugin}/package-lock.json must resolve memcue-transport ${transport.version}`)
+		assert.equal(lock.version, manifest.version)
+		assert.equal(lock.packages[''].version, manifest.version)
+		assert.ok(!Object.keys(lock.packages).some(path => path.endsWith('/memcue-transport')),
+			`plugins/${plugin} must install without memcue-transport from npm`)
 	}
 })
 

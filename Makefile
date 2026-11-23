@@ -6,7 +6,9 @@ GOLANGCI_LINT ?= golangci-lint
 CLAUDE_BIN ?= claude
 HERMES_PYTHON ?= python3
 
-.PHONY: build test test-plugins test-opencode test-pi test-codex test-qwen test-claude-mods test-hermes-request test-conformance link-transport lint bench previous-release
+NPM_PACK_DIR ?= $(CURDIR)/dist/npm
+
+.PHONY: build test test-plugins test-opencode test-pi test-codex test-qwen test-claude-mods test-hermes-request test-conformance prepare-transport pack-npm test-npm-packages lint bench previous-release
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -43,19 +45,22 @@ test-plugins: build
 	$(MAKE) test-opencode
 	$(MAKE) test-conformance
 
-# The shared transport (#754) resolves from the working tree in every plugin: npm ci installs the published
-# package, and this link replaces it with the tree, so the tests always exercise the current implementation.
-link-transport:
-	@for plugin in pi opencode; do \
-		mkdir -p plugins/$$plugin/node_modules; \
-		rm -rf plugins/$$plugin/node_modules/memcue-transport; \
-		ln -s ../../transport plugins/$$plugin/node_modules/memcue-transport; \
-	done
+# Pi and OpenCode ship real files, not symlinks (npm pack excludes those).
+prepare-transport:
+	node scripts/prepare-transport.mjs
+
+pack-npm: prepare-transport
+	mkdir -p "$(NPM_PACK_DIR)"
+	npm pack --ignore-scripts --pack-destination "$(NPM_PACK_DIR)" . ./plugins/pi ./plugins/opencode
+
+test-npm-packages: pack-npm
+	node scripts/test-npm-packages.mjs "$(NPM_PACK_DIR)"
+	node --test scripts/publish-npm.test.mjs
 
 # One contract, every host: the Node adapters (canonical, Pi, OpenCode, DSH), the shell wrapper and the Python
 # provider. Adapters whose dependencies are not installed skip; MEMCUE_CONFORMANCE_REQUIRE_ADAPTERS=1, as in the
 # CI plugins job, refuses the skip. The Python contract needs the pinned Hermes interpreter (HERMES_PYTHON).
-test-conformance: build link-transport
+test-conformance: build prepare-transport
 	node --experimental-strip-types --test --test-concurrency=1 plugins/transport/conformance/*.test.mjs
 	$(HERMES_PYTHON) -I plugins/transport/conformance/hermes_contract.py
 
@@ -68,12 +73,12 @@ lint:
 	$(GOLANGCI_LINT) run --concurrency 2 ./...
 
 # Install the plugin's dependencies first: npm --prefix plugins/opencode ci
-test-opencode: build link-transport
+test-opencode: build prepare-transport
 	npm --prefix plugins/opencode run typecheck
 	MEMCUE_TEST_BINARY="$(CURDIR)/bin/memcue" npm --prefix plugins/opencode test
 
 # Install the pinned Pi test dependencies first: npm --prefix plugins/pi ci
-test-pi: build link-transport
+test-pi: build prepare-transport
 	npm --prefix plugins/pi run typecheck
 	MEMCUE_REQUIRE_LIVE=1 MEMCUE_TEST_BINARY="$(CURDIR)/bin/memcue" npm --prefix plugins/pi test
 

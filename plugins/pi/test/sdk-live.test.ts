@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import type { ToolCall } from '@earendil-works/pi-ai';
@@ -115,27 +114,12 @@ test('SDK + CLI: a packed standalone package installs and loads via its manifest
   const archive = join(destination, packed[0].filename);
   const names = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n');
   assert.ok(names.every(name => !name.startsWith('/') && !name.split('/').includes('..')));
-  // The shared transport is a published dependency since #754, and Pi's package manager installs dependencies
-  // (installNpm runs npm install). Pack the transport too and install both tarballs into a clean directory, so the
-  // test proves the released packaging without the developer's node_modules and without reaching the registry.
-  const transportRoot = fileURLToPath(new URL('../../transport/', import.meta.url));
-  const transportPacked = JSON.parse(execFileSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', destination], {
-    cwd: transportRoot, encoding: 'utf8', timeout: 30_000,
-  }));
-  const transportArchive = join(destination, transportPacked[0].filename);
-  execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive, transportArchive],
+  for (const module of ['index.mjs', 'transport.mjs', 'install.mjs']) {
+    assert.ok(names.includes(`package/vendor/transport/${module}`), `the Pi package ships ${module}`);
+  }
+  execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', archive],
     { cwd: destination, encoding: 'utf8', timeout: 60_000 });
   const installed = join(destination, 'node_modules', 'memcue-pi');
-  // npm may satisfy the plugin's `memcue-transport` range from the registry even when this checkout's tarball is
-  // named on the command line (npm 11.6 on node 24 installs that copy nested), while this test exists to prove this
-  // checkout's packaging: the transport tarball built here has to carry every module the plugin imports, so it is
-  // unpacked where the plugin resolves the transport before the plugin is loaded.
-  const transportNames = execFileSync('tar', ['-tzf', transportArchive], { encoding: 'utf8' }).trim().split('\n');
-  for (const module of ['index.mjs', 'transport.mjs', 'install.mjs']) {
-    assert.ok(transportNames.includes(`package/${module}`), `the transport package ships ${module}: ${transportNames}`);
-  }
-  const transportDir = dirname(createRequire(join(installed, 'package.json')).resolve('memcue-transport'));
-  execFileSync('tar', ['-xzf', transportArchive, '--strip-components=1', '-C', transportDir], { encoding: 'utf8' });
   const fact = 'Use a packed native extension to recall the release packaging decision.';
   const id = successful(await fixture.run(['add', '-source', 'user', '-kind', 'decision', '--', fact], true), true).trim();
   const pi = await openPi(fixture, { entry: installed });

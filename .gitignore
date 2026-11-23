@@ -2,3 +2,5 @@ bin/
 node_modules/
 __pycache__/
 dist/
+/plugins/pi/vendor/transport/
+/plugins/opencode/vendor/transport/
