@@ -3,18 +3,17 @@
 A memory provider for [Hermes Agent](https://github.com/NousResearch/hermes-agent) that keeps long-term memory in a
 memcue fact base:
 
-- **No facts come with a message** (#361). The system prompt block tells the model to search the base with
-  `memcue_search` before it answers a question that may depend on earlier sessions, first in English, then with synonyms
-  and Russian or another legacy language if English misses, and to go on to Hermes's own `session_search`
-  when memcue has nothing: a passage of an earlier session is history, not a fact (#621). It also lets the model search during work, when it
-  decides that may help: on starting with a specific host, service or repository, and before it diagnoses an
-  unexpected error, with a short query naming the system and the problem, checking the result against the current
-  state (#521). It is a hint, not a rule: no search runs on its own.
-- **No card of rules** (#656). The user's rules and decisions stay in the base: the system prompt block tells the
-  model to search them with `memcue_search` (`kind rule,decision`, the words of the task) at the start of a task and
-  when it turns to another system, and to skip memory when the message and the files hold everything. The same note
-  was measured on Claude Code in #647. The block also carries the hints of `memcue session-card` (an upgrade this
-  machine owes, a due dream), asked again at every rebuild after a compression or a reset; a cron run gets none. A
+- **Search when prior context matters.** The system prompt and `memcue_search` description tell the model to search
+  before answering or acting when earlier context could change the next step. For example, look up rules and decisions
+  (`kind rule,decision`) when resuming earlier work or switching to a system where prior decisions may apply. Skip
+  self-contained tasks and check current state directly. If past experience could help with an unexpected error,
+  search for the system and symptom and verify any result against live state (#521).
+  Search in English first, then try synonyms or the language of older facts if needed. After an empty lookup, use
+  Hermes's `session_search` only if the historical context is still needed; a transcript is not current evidence (#621).
+  This is guidance for the model, not a search that runs automatically. Automatic repository pitfall delivery is separate.
+- **No card of rules** (#656). User rules and decisions stay in the base. The system prompt also carries the hints of
+  `memcue session-card` (an upgrade this machine owes, a due dream), asked again at every rebuild after a compression
+  or a reset; a cron run gets none. A
   failed call leaves the block without the hints until the next rebuild and is reported to the log at most every ten
   minutes. The old settings `session_card` and `session_card_chars` are ignored.
 - **The project** of a session is the git repository its working directory lies in (Hermes passes the session's

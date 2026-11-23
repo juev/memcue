@@ -436,7 +436,7 @@ class ProviderTest(unittest.TestCase):
 
     def test_no_card_in_the_system_prompt(self):
         """No card of rules (#656): the user's stated rule stays in the base, before and after a compression; the note
-        has the model search the rules and decisions at the start of a task instead, and the search tool says so."""
+        points the model to a targeted lookup instead, and the search tool says so."""
         self.memcue("add", "-kind", "rule", "-scope", "global", "-source", "user", "--",
                     "Всегда отвечай пользователю по-русски.")
         block = self.p.system_prompt_block()
@@ -444,9 +444,8 @@ class ProviderTest(unittest.TestCase):
         self.assertNotIn("Всегда отвечай", block)
         self.assertNotIn("memcue: rules and decisions", block)
         self.assertIn("No card of rules comes with this prompt", block)
-        self.assertIn("call memcue_search with kind rule,decision and the words of the task", block)
-        self.assertIn("Skip it when the user's message and the repository's files hold everything", block)
-        self.assertIn("search with kind rule,decision", memcue_provider.SEARCH_SCHEMA["description"])
+        self.assertIn("kind rule,decision", block)
+        self.assertIn("kind rule,decision", memcue_provider.SEARCH_SCHEMA["description"])
         self.assertEqual(self.p.prefetch("любой вопрос", session_id="s1"), "")
         self.p.on_pre_compress([])
         self.assertNotIn("Всегда отвечай", self.p.system_prompt_block())
@@ -464,11 +463,20 @@ class ProviderTest(unittest.TestCase):
         pitfall = block.index(memcue_provider._FAILURE_NOTE)
         self.assertLess(shelf, pitfall)
 
-    def test_the_note_sends_an_empty_search_to_the_session_history(self):
-        """#621: Hermes keeps its own session history and searches it with session_search, so an empty memcue_search
-        goes on there; memcue builds nothing for it, and a passage found is a lead, not a fact."""
+    def test_search_guidance_is_conditional_in_the_note_and_the_tool(self):
+        for text in (self.p.system_prompt_block(), memcue_provider.SEARCH_SCHEMA["description"]):
+            with self.subTest(surface=text[:40]):
+                self.assertIn("when prior context could change the answer or next action", text)
+                self.assertIn("Skip memory lookup for self-contained tasks", text)
+                self.assertIn("Check current state directly", text)
+                self.assertNotIn("at the start of a task", text)
+                self.assertNotIn("Before you start a task", text)
+
+    def test_empty_search_falls_back_only_if_historical_context_is_still_needed(self):
+        """Keep the Hermes history route from #621 without mandating it after every miss."""
         text = self.p.system_prompt_block()
-        self.assertIn("When memcue_search finds nothing, search the history of earlier sessions with session_search", text)
+        self.assertIn("If memcue_search finds nothing and the historical context is still needed, use session_search", text)
+        self.assertNotIn("When memcue_search finds nothing, search", text)
         self.assertIn("history, not a fact", text)
         self.assertNotIn("memcue sessions", text)
 
@@ -483,16 +491,14 @@ class ProviderTest(unittest.TestCase):
                 self.assertIn("unexpected error", text)
                 self.assertIn("short query naming the system and the problem", text)
                 self.assertIn("against the current state", text)
-                self.assertIn("before answering" if text is search else "when the answer or the next step may depend",
-                              text)
-                self.assertIn("earlier sessions", text)
+                self.assertIn("if past experience could help diagnose", text)
+                self.assertIn("when resuming earlier work", text)
                 for word in ("must", "always", "every tool"):
                     self.assertNotIn(word, text.lower())
         block = self.p.system_prompt_block()
         self.assertIn("first search query in English", block)
         self.assertIn("retry with synonyms and Russian or another legacy language", block)
-        self.assertIn("when you decide it may help", block)
-        self.assertIn("when you decide it helps", search)
+
         # The note is deterministic: two builds give the same text. That alone does not show that Hermes reuses
         # its prompt cache.
         self.assertEqual(block, self.p.system_prompt_block())
