@@ -128,23 +128,27 @@ class PitfallLineTest(unittest.TestCase):
 
 class NoCardTest(unittest.TestCase):
     def test_every_host_searches_the_rules_instead_of_a_card(self):
-        """#656: no host gives a card; each note has the model search the user's rules and decisions at the start of a
-        task and says when to search at all, the lines measured in #647 (Claude Code word for word, the others with
-        their tool's name)."""
+        """#656: no host gives a card; every host tells the model to look up user rules and decisions.
+
+        Hermes makes the lookup conditional (#787); the other hosts retain the original #647 instructions.
+        """
         go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
         hermes = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
         hermes = re.sub(r'"\s*\n\s*"', "", hermes)  # the note is adjacent string literals; read it joined
         dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
         self.assertIn("-kind rule,decision \\\"<words of the task>\\\"", go)
-        for name, text in (("hermes", hermes), ("dsh", dsh)):
-            with self.subTest(host=name):
-                self.assertIn("with kind rule,decision and the words of the task", text)
+        self.assertIn("with kind rule,decision and the words of the task", dsh)
+        self.assertIn("search with kind rule,decision and terms specific to the task", hermes)
+        self.assertIn("when prior context could change the answer or next action", hermes)
+        self.assertIn("Skip memory lookup for self-contained tasks", hermes)
+        self.assertNotIn("Before you start a task", hermes)
         for name, text in (("claude-code", go), ("hermes", hermes), ("dsh", dsh)):
             with self.subTest(host=name):
                 self.assertIn("No card of rules", text)
-                self.assertIn("Before you start a task, and again when it turns to another system", text)
-                self.assertIn("Skip it when the user's message and the repository's files hold everything", text)
                 self.assertNotIn("session card", text)
+                if name != "hermes":
+                    self.assertIn("Before you start a task, and again when it turns to another system", text)
+                    self.assertIn("Skip it when the user's message and the repository's files hold everything", text)
 
 class PiNoteTest(unittest.TestCase):
     def test_pi_carries_the_dsh_note_word_for_word(self):
