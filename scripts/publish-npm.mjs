@@ -7,6 +7,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 const registry = 'https://registry.npmjs.org'
 const packages = new Set(['memcue-dsh', 'memcue-pi', 'memcue-opencode'])
 const releaseTag = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
+const propagationWaitMs = 5 * 60_000
+const pollIntervalMs = 5_000
 
 export async function publishPackage(name, tag, directory, {
   lookup = fetch,
@@ -36,9 +38,10 @@ export async function publishPackage(name, tag, directory, {
 
   if (await available()) return 'already published; integrity matches'
   publish(archive)
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  // A successful publish can take minutes to reach the public registry endpoint.
+  for (let waited = 0; waited <= propagationWaitMs; waited += pollIntervalMs) {
+    if (waited > 0) await wait(pollIntervalMs)
     if (await available()) return 'published and integrity verified'
-    await wait(5_000)
   }
   throw new Error(`npm publish succeeded but ${spec} is not yet visible in the registry; rerun the failed npm job`)
 }

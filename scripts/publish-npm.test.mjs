@@ -43,6 +43,34 @@ test('a retried job accepts identical existing bytes but refuses a conflicting v
     /different metadata or bytes/)
 })
 
+test('a version visible only on the last read of the five-minute window still succeeds', async t => {
+  const { directory, reply } = await fixture(t)
+  let waited = 0
+  let publishes = 0
+  assert.equal(await publishPackage(name, tag, directory, {
+    lookup: () => waited === 300_000 ? reply() : missing(),
+    publish: () => { publishes += 1 },
+    wait: ms => { assert.equal(ms, 5_000); waited += ms },
+  }), 'published and integrity verified')
+  assert.equal(publishes, 1)
+  assert.equal(waited, 300_000)
+})
+
+test('a permanently missing version stops after five minutes without publishing again', async t => {
+  const { directory } = await fixture(t)
+  let waited = 0
+  let lastLookup
+  let publishes = 0
+  await assert.rejects(publishPackage(name, tag, directory, {
+    lookup: () => { lastLookup = waited; return missing() },
+    publish: () => { publishes += 1 },
+    wait: ms => { assert.equal(ms, 5_000); waited += ms },
+  }), /not yet visible in the registry; rerun the failed npm job/)
+  assert.equal(publishes, 1)
+  assert.equal(waited, 300_000)
+  assert.equal(lastLookup, waited)
+})
+
 test('a registry error or a non-release tag does not permit publishing', async t => {
   const { directory } = await fixture(t)
   await assert.rejects(publishPackage(name, tag, directory, {
