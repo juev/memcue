@@ -1,6 +1,6 @@
 {
   "name": "memcue-pi",
-  "version": "0.40.1",
+  "version": "0.40.2",
   "description": "memcue long-term memory for the Pi coding agent: native tools, repository pitfalls and opt-in subagent memory",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "memcue-transport": "^0.40.1"
+    "memcue-transport": "^0.40.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
