@@ -29,7 +29,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "memcue-transport": "^0.40.1"
+    "memcue-transport": "^0.40.2"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

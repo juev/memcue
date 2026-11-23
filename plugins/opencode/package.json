@@ -28,7 +28,7 @@
   ],
   "dependencies": {
     "@opencode/plugin": "^2.0.13",
-    "memcue-transport": "^0.40.1"
+    "memcue-transport": "^0.40.2"
   },
   "peerDependencies": {
     "@opencode/theme": ">=2.2.7",
