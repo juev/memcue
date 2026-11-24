@@ -91,18 +91,13 @@ same-session/repository identities in two distinct profiles. No core monkeypatch
 The standalone `memcue-pi` package targets Pi **1.5.2**, Node.js **24+** and memcue **0.36.1 or later**. It can install
 the matching released binary when no compatible binary is configured. See [installation and role policy](../plugins/pi/README.md).
 
-A `before_agent_start` handler sets the memory section and serves the repository-pitfall snapshot from a per-session
-cache to avoid spawning the CLI on every prompt. Unchanged snapshots leave the section byte-stable and preserve the
-cached prompt; a re-read that returns changed facts can still patch the section and invalidate the provider prefix.
-The snapshot is read at session start and re-read on `session_compact`, on `/memcue on` after an off, and after every
-`add`/`correct`/`retire`/`dream -apply` whose outcome is committed or unknown (an unknown mutation may already be
-written). Each read calls `session-card -pitfalls-json` using the current `ctx.cwd`; a read-only `search` does not
-invalidate the cache.
-Facts expiring between invalidations apply on the next read, not on a timer. Writes made outside this session's
-Memcue tools, including writes from the shell or another session, likewise become visible only at the next invalidating
-read. A failed read keeps the last successful snapshot instead of flapping between a snapshot and an error text; only
-a failed first read shows an explicit unavailability diagnostic. Empty snapshots remove the pitfall section, and
-replacement sessions read current state again.
+Before each agent prompt, a `before_agent_start` handler sets the memory section and reads `session-card -pitfalls-json`
+using the current `ctx.cwd`. Writes made outside this session's Memcue tools, including writes from the shell or another
+session, and expiry rollover therefore apply on the next prompt. Unchanged snapshots leave the section byte-stable and
+preserve the cached prompt; changed facts can still patch the section and invalidate the provider prefix. A failed read
+keeps the last successful snapshot instead of flapping between a snapshot and an error text; only a failed first read
+shows an explicit unavailability diagnostic. Empty snapshots remove the pitfall section. Compaction and replacement
+sessions read current state again.
 
 The CLI transport has a combined 4 MiB stdout/stderr limit and a 10-second snapshot deadline. Overflow, failed reads
 and invalid snapshots produce an explicit diagnostic, not partial facts. This is an adapter ceiling, not a verified

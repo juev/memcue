@@ -57,12 +57,11 @@ optional:
 - Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire`, and `memcue_dream_prepare` /
   `memcue_dream_apply` for maintenance with the session's own model.
 - A `memcue` system-prompt section with the instruction every memcue host carries.
-- A `memcue_pitfalls` section with the current repository's pitfalls from `memcue session-card -pitfalls-json`.
-  It is read once per session and again after a compaction, a `/memcue on` after an off, or a committed or
-  possibly-committed memory write. This avoids a CLI spawn on every prompt. Unchanged snapshots preserve the cached
-  prompt; changed facts can still update the section and invalidate the provider prefix. External writes from the
-  shell or another session and expiry rollover become visible only after the next invalidating read. A failed read
-  keeps the last good snapshot. A section without pitfalls is left out. The scope follows Pi's working directory.
+- A `memcue_pitfalls` section with the current repository's pitfalls from `memcue session-card -pitfalls-json`, read
+  before every agent prompt. External writes from the shell or another session and expiry rollover apply on the next
+  prompt. Unchanged snapshots preserve the cached prompt; changed facts can still update the section and invalidate the
+  provider prefix. A failed read keeps the last good snapshot. A section without pitfalls is left out. The scope follows
+  Pi's working directory.
 
 Each write checks memcue's outcome receipt. A write whose outcome is unknown is reported as such and never retried.
 

@@ -70,14 +70,20 @@ test('SDK + CLI: inherited remote backends cannot redirect synthetic writes', li
   assert.equal(found.facts.find((fact: { id: string }) => fact.id === id)?.content, content);
 });
 
-test('SDK + CLI: repo pitfalls refresh on the next prompt and do not leak into another repository', live, async t => {
+test('SDK + CLI: external pitfall writes refresh on the next prompt and stay repository-scoped', live, async t => {
   const fixture = await liveFixture(t);
   const pi = await openPi(fixture);
+  await pi.prompt('Load the initial empty snapshot.');
   const marker = 'LIVE-REPOSITORY-PITFALL';
   const content = `${marker}: closing a channel before senders finish panics.\nWait for every sender before closing.`;
-  await ok(pi, 'memcue_add', { text: content, source: 'tool', kind: 'pitfall', scope: 'repo' });
-  await pi.prompt('Read the current repository snapshot again.');
+  const id = successful(await fixture.run([
+    'add', '-cwd', fixture.repo, '-source', 'tool', '-kind', 'pitfall', '-scope', 'repo', '--', content,
+  ], true), true).trim();
+  await pi.prompt('Read the externally added pitfall.');
   assert.match(currentPrompt(pi.requests.at(-1)!), /LIVE-REPOSITORY-PITFALL/);
+  successful(await fixture.run(['retire', '-expected-version', '1', '--', id], true), true);
+  await pi.prompt('Read the externally retired pitfall.');
+  assert.doesNotMatch(currentPrompt(pi.requests.at(-1)!), /LIVE-REPOSITORY-PITFALL/);
   await pi.dispose();
   const other = await openPi(fixture, { cwd: fixture.other });
   t.after(() => other.dispose());

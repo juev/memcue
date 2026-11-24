@@ -34,8 +34,7 @@ export async function piFixture(options: { versionDelayMs?: number; snapshotDela
   const mutationFile = join(root, 'committed-mutations.jsonl');
   const snapshotFile = join(root, 'snapshot.json');
   const behaviorFile = join(root, 'behavior.json');
-  const behavior: { version: unknown; snapshotExitCode: number; mutationExitCode: number; dropReceipt: boolean } =
-    { version: '0.36.1', snapshotExitCode: 0, mutationExitCode: 0, dropReceipt: false };
+  const behavior: { version: unknown; snapshotExitCode: number } = { version: '0.36.1', snapshotExitCode: 0 };
   await writeFile(behaviorFile, JSON.stringify(behavior));
   const binary = join(root, 'memcue-fixture.cjs');
   const facts = join(root, 'facts');
@@ -64,14 +63,13 @@ case 'correct':
 case 'retire':
   fs.appendFileSync(${JSON.stringify(mutationFile)}, JSON.stringify(args)+'\\n');
   output = '01M77C8CHDECN8VT3V85EQ9HGX\\n';
-  if (behavior.mutationExitCode) { status=behavior.mutationExitCode; error='synthetic mutation failed'; }
   break;
 case 'dream': output = 'dream handled\\n'; break;
 default: status=2; error='unexpected memcue command: '+args.join(' ');
 }
 process.stdout.write(output);
 process.stderr.write(error);
-if (!behavior.dropReceipt && process.env.MEMCUE_OUTCOME_NONCE) {
+if (process.env.MEMCUE_OUTCOME_NONCE) {
   const hash = text => createHash('sha256').update(text).digest('hex');
   process.stderr.write('\\nMEMCUE_OUTCOME_V1 '+JSON.stringify({version:1,nonce:process.env.MEMCUE_OUTCOME_NONCE,status:status===0?'success':'refused',bytes:Buffer.byteLength(output),sha256:hash(output),error_bytes:Buffer.byteLength(error),error_sha256:hash(error)})+'\\n');
 }
@@ -83,12 +81,9 @@ process.exit(status);
       try { return (await readFile(callsFile, 'utf8')).trim().split('\n').filter(Boolean).map(line => JSON.parse(line)); }
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
     },
-    async configure(value: { version?: unknown; snapshot?: unknown; snapshotRaw?: string; snapshotExitCode?: number;
-      mutationExitCode?: number; dropReceipt?: boolean }) {
+    async configure(value: { version?: unknown; snapshot?: unknown; snapshotRaw?: string; snapshotExitCode?: number }) {
       if (Object.hasOwn(value, 'version')) behavior.version = value.version;
       if (value.snapshotExitCode !== undefined) behavior.snapshotExitCode = value.snapshotExitCode;
-      if (value.mutationExitCode !== undefined) behavior.mutationExitCode = value.mutationExitCode;
-      if (value.dropReceipt !== undefined) behavior.dropReceipt = value.dropReceipt;
       if (value.snapshotRaw !== undefined) await writeFile(snapshotFile, value.snapshotRaw);
       else if (Object.hasOwn(value, 'snapshot')) await writeFile(snapshotFile, JSON.stringify(value.snapshot));
       await writeFile(behaviorFile, JSON.stringify(behavior));
