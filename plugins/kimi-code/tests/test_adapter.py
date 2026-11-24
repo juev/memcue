@@ -91,38 +91,30 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
                 self.assertIn('unsupported SessionStart source', json.loads(r.stdout)['systemMessage'])
                 self.assertIn('unsupported SessionStart source', r.stderr)
 
-    def test_pitfall_snapshot_uses_structured_additional_context(self):
-        r = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Task'))
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout), {
-            'hookSpecificOutput': {
-                'hookEventName': 'UserPromptSubmit',
-                'additionalContext': 'Repository pitfalls for synthetic/repo: snapshot.\n\nSynthetic pitfall.',
-            },
-        })
+    def test_prompt_and_tool_hooks_do_not_deliver_or_store_pitfalls(self):
+        payloads = (
+            self.payload(event='UserPromptSubmit', prompt='Task'),
+            self.payload(event='PreToolUse', tool_name='Bash', tool_input={'command': 'pwd'}),
+        )
+        for payload in payloads:
+            with self.subTest(payload=payload):
+                r = self.run_adapter('hook', data=payload)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(json.loads(r.stdout), {})
+        self.assertFalse((self.home/'state'/'kimi-pitfall-snapshots.json').exists())
+        self.assertFalse((self.home/'state'/'calls').exists())
 
-    def test_pitfall_snapshot_dedup_per_session_and_context(self):
-        first = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Task'))
-        self.assertIn('Synthetic pitfall.', self.context(first, 'UserPromptSubmit'))
-        again = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Next'))
-        self.assertEqual(self.context(again, 'UserPromptSubmit'), '')
-        shell = self.run_adapter('hook', data=self.payload(event='PreToolUse', tool_name='Bash',
-                                                           tool_input={'command': 'pwd'}))
-        self.assertEqual(self.context(shell, 'PreToolUse'), '')
-        other = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', session_id='another', prompt='Task'))
-        self.assertIn('Synthetic pitfall.', self.context(other, 'UserPromptSubmit'))
-        self.run_adapter('hook', data=self.payload(event='PostCompact', trigger='manual'))
-        after = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='After'))
-        self.assertIn('Synthetic pitfall.', self.context(after, 'UserPromptSubmit'))
-
-    def test_pre_tool_use_cwd_override(self):
-        other = self.home / 'other'
-        other.mkdir()
-        r = self.run_adapter('hook', data=self.payload(event='PreToolUse', tool_name='Bash',
-                                                       tool_input={'command': 'pwd', 'cwd': str(other)}))
+    def test_explicit_pitfalls_returns_the_current_snapshot(self):
+        r = self.run_adapter('pitfalls')
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(self.calls()[-1]['cwd'], str(other.resolve()))
-        self.assertNotIn('cwd', self.calls()[-1]['args'])
+        self.assertIn('Synthetic pitfall.', r.stdout)
+        self.assertEqual(self.calls()[-1]['args'], ['session-card', '-pitfalls-only'])
+        self.assertEqual(self.calls()[-1]['cwd'], str(self.cwd.resolve()))
+
+    def test_pitfalls_rejects_arguments(self):
+        r = self.run_adapter('pitfalls', 'unexpected')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('pitfalls accepts no arguments', r.stderr)
 
     def test_pre_tool_use_rejects_other_tools(self):
         r = self.run_adapter('hook', data=self.payload(event='PreToolUse', tool_name='Read', tool_input={}))
@@ -271,11 +263,10 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.assertEqual(manifest['systemPromptPath'], './SYSTEM.md')
         self.assertEqual(manifest['sessionStart'], {'skill': 'memcue'})
         hooks = manifest['hooks']
-        self.assertEqual({h['event'] for h in hooks}, {'SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostCompact'})
+        self.assertEqual({h['event'] for h in hooks}, {'SessionStart', 'PostCompact'})
         for handler in hooks:
             self.assertIn('./scripts/memcue.py', handler['command'])
             self.assertLessEqual(handler['timeout'], 30)
-        self.assertEqual(next(h for h in hooks if h['event'] == 'PreToolUse')['matcher'], 'Bash')
         self.assertEqual(next(h for h in hooks if h['event'] == 'PostCompact')['matcher'], 'manual|auto')
         for name in ('memcue', 'memcue-dream'):
             skill = (ROOT/'skills'/name/'SKILL.md').read_text()

@@ -9,9 +9,12 @@ Use the configured launcher from the plugin system prompt for **every** command 
 arguments shown to that launcher; do not call an unconfigured `memcue` binary. If the launcher is missing, read
 `plugins/kimi-code/README.md` in the integration checkout. A hook's environment does not carry into your shell.
 
-Run from the session's current working directory, including a nested or non-Git directory. Search first:
+Run from the session's current working directory, including a nested or non-Git directory. Before starting a task,
+retrieve the current repository's active pitfalls explicitly. Repeat after changing repository or compaction. Search
+first for every other fact kind and before every write:
 
 ```text
+pitfalls
 search -json -in all "<words of the fact>"
 add -kind rule -scope global -source user -- "<fact>"
 correct -expected-version VERSION ID "<corrected fact>"

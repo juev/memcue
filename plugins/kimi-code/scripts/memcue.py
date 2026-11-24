@@ -13,11 +13,6 @@ import sys
 import tempfile
 import time
 
-try:
-    import fcntl
-except ImportError:  # Windows is not a supported platform; snapshots are then compared without a lock.
-    fcntl = None
-
 
 class _ResponseTransportError(OSError):
     attempted = True
@@ -312,54 +307,6 @@ def hook_input():
     return data
 
 
-SNAPSHOTS = 'kimi-pitfall-snapshots.json'
-SNAPSHOT_SESSIONS = 128
-
-
-def default_state_dir():
-    """memcue's state directory of the default base, $XDG_STATE_HOME/memcue (stateRoot in cmd/memcue/facts.go)."""
-    return Path(os.environ.get('XDG_STATE_HOME') or Path.home() / '.local' / 'state') / 'memcue'
-
-
-def snapshot_changed(config, session, text):
-    """Say whether text differs from the last repository-pitfall snapshot this session received.
-
-    PreToolUse runs before every shell command, and an unchanged snapshot only repeats what the context holds.
-    text None forgets the session: after startup, resume, clear or compaction the context may not hold it any more.
-    A state that cannot be read or written delivers the snapshot rather than risk withholding a changed one.
-    """
-    state = Path(config['state_dir']) if 'state_dir' in config else default_state_dir()
-    key = hashlib.sha256(session.encode('utf-8')).hexdigest()
-    digest = None if text is None else hashlib.sha256(text.encode('utf-8')).hexdigest()
-    try:
-        state.mkdir(parents=True, exist_ok=True)
-        with open(state / (SNAPSHOTS + '.lock'), 'a', encoding='utf-8') as lock:
-            if fcntl:
-                fcntl.flock(lock, fcntl.LOCK_EX)
-            path = state / SNAPSHOTS
-            try:
-                seen = json.loads(path.read_text(encoding='utf-8'))
-            except (FileNotFoundError, ValueError):
-                seen = {}
-            if not isinstance(seen, dict):
-                seen = {}
-            entry = seen.pop(key, None)
-            if digest is not None and isinstance(entry, dict) and entry.get('sha256') == digest:
-                return False
-            if digest is not None:
-                seen[key] = {'sha256': digest, 'at': time.time()}
-            if len(seen) > SNAPSHOT_SESSIONS:
-                oldest = sorted(seen, key=lambda k: seen[k].get('at', 0) if isinstance(seen[k], dict) else 0)
-                for old in oldest[:len(seen) - SNAPSHOT_SESSIONS]:
-                    del seen[old]
-            tmp = path.with_name(path.name + '.' + secrets.token_hex(8))
-            tmp.write_text(json.dumps(seen), encoding='utf-8')
-            os.replace(tmp, path)
-    except OSError:
-        return True
-    return True
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     kimi_home = os.environ.get('KIMI_CODE_HOME') or str(Path.home() / '.kimi-code')
@@ -377,9 +324,8 @@ def main():
         if hook:
             data = hook_input()
             event = data['hook_event_name']
-            call(config, ['version', '-minimum', '0.30.1'], data['cwd'], timeout=5)
             if event in ('SessionStart', 'PostCompact'):
-                snapshot_changed(config, data['session_id'], None)
+                call(config, ['version', '-minimum', '0.30.1'], data['cwd'], timeout=5)
                 card = call(config, ['session-card', '-dream-tools', '-hints-only'],
                             data['cwd'], json.dumps(data), timeout=10)
                 text = ''
@@ -391,25 +337,27 @@ def main():
                         'call memcue_dream_prepare and answer its packet with memcue_dream_apply',
                         'run the memcue-dream skill with the configured launcher')
                 response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': text}
-            else:
-                card = call(config, ['session-card', '-pitfalls-only'], data['cwd'], json.dumps(data), timeout=10)
-                if card.strip():
-                    output = json.loads(card)['hookSpecificOutput']
-                    if not isinstance(output, dict) or output.get('hookEventName') != event or not isinstance(output.get('additionalContext'), str):
-                        raise AdapterError('invalid memcue SessionCard response')
-                    text = output['additionalContext']
-                else:
-                    text = ('Repository pitfalls: no git repository or no fact base. This supersedes earlier repository-pitfall snapshots.\n'
-                            'No active repository pitfalls.')
-                if not snapshot_changed(config, data['session_id'], text):
-                    text = ''
-                response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': text}
+        elif args.command == 'pitfalls':
+            if args.args:
+                raise AdapterError('pitfalls accepts no arguments')
+            cwd = os.getcwd()
+            call(config, ['version', '-minimum', '0.30.1'], cwd, timeout=5)
+            data = {'hook_event_name': 'UserPromptSubmit', 'session_id': 'explicit-pitfalls', 'cwd': cwd}
+            card = call(config, ['session-card', '-pitfalls-only'], cwd, json.dumps(data), timeout=10)
+            text = ''
+            if card.strip():
+                output = json.loads(card)['hookSpecificOutput']
+                if not isinstance(output, dict) or output.get('hookEventName') != 'UserPromptSubmit' or not isinstance(output.get('additionalContext'), str):
+                    raise AdapterError('invalid memcue SessionCard response')
+                text = output['additionalContext']
+            if text:
+                sys.stdout.write(text + '\n')
         elif args.command == 'instructions':
             managed = 'python3 -I "${KIMI_CODE_HOME:-$HOME/.kimi-code}/plugins/managed/memcue-kimi/scripts/memcue.py"'
             sys.stdout.write((ROOT / 'SYSTEM.md').read_text(encoding='utf-8').replace(managed, command))
         else:
             if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream'):
-                raise AdapterError('unsupported command; use search/add/correct/retire/reopen/facts/dump/version/dream')
+                raise AdapterError('unsupported command; use pitfalls/search/add/correct/retire/reopen/facts/dump/version/dream')
             if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-list']) or
                                                 len(args.args) == 3 and args.args[:2] == ['-prepare', '-since'] and
                                                 args.args[2] and not args.args[2].startswith('-') or
