@@ -369,6 +369,7 @@ def main():
     parser.add_argument('args', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     hook = args.command == 'hook'
+    response = {}
     try:
         config_path = Path(args.config)
         config = load_config(config_path)
@@ -381,6 +382,7 @@ def main():
                 snapshot_changed(config, data['session_id'], None)
                 card = call(config, ['session-card', '-dream-tools', '-hints-only'],
                             data['cwd'], json.dumps(data), timeout=10)
+                text = ''
                 if card.strip():
                     output = json.loads(card)['hookSpecificOutput']
                     if not isinstance(output, dict) or output.get('hookEventName') != 'SessionCard' or not isinstance(output.get('additionalContext'), str):
@@ -388,8 +390,7 @@ def main():
                     text = output['additionalContext'].replace(
                         'call memcue_dream_prepare and answer its packet with memcue_dream_apply',
                         'run the memcue-dream skill with the configured launcher')
-                    if text:
-                        sys.stdout.write(text + '\n')
+                response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': text}
             else:
                 card = call(config, ['session-card', '-pitfalls-only'], data['cwd'], json.dumps(data), timeout=10)
                 if card.strip():
@@ -400,8 +401,9 @@ def main():
                 else:
                     text = ('Repository pitfalls: no git repository or no fact base. This supersedes earlier repository-pitfall snapshots.\n'
                             'No active repository pitfalls.')
-                if snapshot_changed(config, data['session_id'], text) and text:
-                    sys.stdout.write(text + '\n')
+                if not snapshot_changed(config, data['session_id'], text):
+                    text = ''
+                response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': text}
         elif args.command == 'instructions':
             managed = 'python3 -I "${KIMI_CODE_HOME:-$HOME/.kimi-code}/plugins/managed/memcue-kimi/scripts/memcue.py"'
             sys.stdout.write((ROOT / 'SYSTEM.md').read_text(encoding='utf-8').replace(managed, command))
@@ -420,6 +422,9 @@ def main():
         print(message, file=sys.stderr)
         if not hook:
             return 1
+        response['systemMessage'] = message
+    if hook:
+        print(json.dumps(response))
     return 0
 
 

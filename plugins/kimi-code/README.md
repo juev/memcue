@@ -8,7 +8,10 @@ This is a native Kimi Code plugin (`kimi.plugin.json`), not an MCP server or a c
 
 ## Requirements
 
-- Kimi Code with plugins and classic hooks. The local acceptance target is 2.7.2.
+- Kimi Code with plugins, classic hooks and model-only `hookSpecificOutput.additionalContext` on `SessionStart`,
+  `UserPromptSubmit`, `PreToolUse` and `PostCompact`. Kimi Code 2.7.2 drops this field and is not compatible with this
+  version of the plugin. Upstream support is tracked in MoonshotAI/kimi-code#4255; the first suitable release has not
+  been published yet.
 - Python 3.9+ on `PATH` (`python3`).
 - A memcue binary. The adapter never downloads one: it uses `~/.local/bin/memcue` unless `binary` is configured.
   Install a release binary yourself (see the repository README).
@@ -71,10 +74,11 @@ For the author's server-mode setup, the configuration is:
   sent again only when it changes or after a lifecycle event. `PreToolUse` honours the Bash tool's `cwd` parameter.
   Snapshots are deduplicated per session in `kimi-pitfall-snapshots.json` in the shared state directory.
 
-Hook context is printed as plain stdout. Invalid input, missing binaries, malformed responses and command errors produce
-a bounded diagnostic on stderr and exit zero, without blocking Kimi Code. Ordinary launcher failures exit nonzero. A
-mutation whose response is lost is reported as UNKNOWN OUTCOME; inspect persisted state before retrying, never replay
-automatically.
+Hook context is returned as one JSON object with `hookSpecificOutput.additionalContext`, so Kimi can deliver it to the
+model without rendering the snapshot in the TUI. Invalid input, missing binaries, malformed responses and command errors
+produce a bounded diagnostic on stderr and `systemMessage`, and exit zero without blocking Kimi Code. Ordinary launcher
+failures exit nonzero. A mutation whose response is lost is reported as UNKNOWN OUTCOME; inspect persisted state before
+retrying, never replay automatically.
 
 ## Commands
 
@@ -114,7 +118,7 @@ pitfall snapshots.
 make test-kimi   # synthetic adapter + real-CLI suites; requires bin/memcue, never a live base
 ```
 
-The suites cover Kimi payloads, plain-text hook output, lifecycle and dedup, subprocess environment, fresh-process CRUD,
+The suites cover Kimi payloads, structured hook output, lifecycle and dedup, subprocess environment, fresh-process CRUD,
 history and provenance, repository scopes, dream prepare/apply, timeout and an installed copy without repository files.
 They do not measure model compliance or recall quality. Real Kimi runtime checks and their limits are recorded in the
 integration PR.

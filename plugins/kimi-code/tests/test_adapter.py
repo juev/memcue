@@ -66,13 +66,19 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
     def calls(self):
         return [json.loads(x) for x in (self.home/'state'/'calls').read_text().splitlines()]
 
-    def test_lifecycle_delivers_maintenance_as_plain_text(self):
+    def context(self, result, event):
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)['hookSpecificOutput']
+        self.assertEqual(output['hookEventName'], event)
+        self.assertIsInstance(output['additionalContext'], str)
+        return output['additionalContext']
+
+    def test_lifecycle_delivers_maintenance_as_structured_context(self):
         for event in ('SessionStart', 'PostCompact'):
             with self.subTest(event=event):
                 r = self.run_adapter('hook', data=self.payload(event=event))
-                self.assertEqual(r.returncode, 0, r.stderr)
-                self.assertNotIn('hookSpecificOutput', r.stdout)
-                self.assertIn('maintenance: run the memcue-dream skill with the configured launcher', r.stdout)
+                text = self.context(r, event)
+                self.assertIn('maintenance: run the memcue-dream skill with the configured launcher', text)
                 self.assertEqual(self.calls()[-1]['args'], ['session-card', '-dream-tools', '-hints-only'])
                 self.assertEqual(self.calls()[-1]['cwd'], str(self.cwd.resolve()))
                 self.assertNotIn('MEMCUE_AGENT', self.calls()[-1]['env'])
@@ -82,23 +88,32 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             with self.subTest(source=source):
                 r = self.run_adapter('hook', data=self.payload(source))
                 self.assertEqual(r.returncode, 0, r.stderr)
-                self.assertEqual(r.stdout, '')
+                self.assertIn('unsupported SessionStart source', json.loads(r.stdout)['systemMessage'])
                 self.assertIn('unsupported SessionStart source', r.stderr)
+
+    def test_pitfall_snapshot_uses_structured_additional_context(self):
+        r = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Task'))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), {
+            'hookSpecificOutput': {
+                'hookEventName': 'UserPromptSubmit',
+                'additionalContext': 'Repository pitfalls for synthetic/repo: snapshot.\n\nSynthetic pitfall.',
+            },
+        })
 
     def test_pitfall_snapshot_dedup_per_session_and_context(self):
         first = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Task'))
-        self.assertEqual(first.returncode, 0, first.stderr)
-        self.assertIn('Synthetic pitfall.', first.stdout)
+        self.assertIn('Synthetic pitfall.', self.context(first, 'UserPromptSubmit'))
         again = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='Next'))
-        self.assertEqual(again.stdout, '')
+        self.assertEqual(self.context(again, 'UserPromptSubmit'), '')
         shell = self.run_adapter('hook', data=self.payload(event='PreToolUse', tool_name='Bash',
                                                            tool_input={'command': 'pwd'}))
-        self.assertEqual(shell.stdout, '')
+        self.assertEqual(self.context(shell, 'PreToolUse'), '')
         other = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', session_id='another', prompt='Task'))
-        self.assertIn('Synthetic pitfall.', other.stdout)
+        self.assertIn('Synthetic pitfall.', self.context(other, 'UserPromptSubmit'))
         self.run_adapter('hook', data=self.payload(event='PostCompact', trigger='manual'))
         after = self.run_adapter('hook', data=self.payload(event='UserPromptSubmit', prompt='After'))
-        self.assertIn('Synthetic pitfall.', after.stdout)
+        self.assertIn('Synthetic pitfall.', self.context(after, 'UserPromptSubmit'))
 
     def test_pre_tool_use_cwd_override(self):
         other = self.home / 'other'
@@ -112,7 +127,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
     def test_pre_tool_use_rejects_other_tools(self):
         r = self.run_adapter('hook', data=self.payload(event='PreToolUse', tool_name='Read', tool_input={}))
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout, '')
+        self.assertIn('expected Bash tool input', json.loads(r.stdout)['systemMessage'])
         self.assertIn('expected Bash tool input', r.stderr)
 
     def test_later_shell_calls_use_same_config_without_hook_environment(self):
@@ -139,7 +154,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             with self.subTest(raw=raw[:60]):
                 r = self.run_adapter('hook', data=raw)
                 self.assertEqual(r.returncode, 0, r.stderr)
-                self.assertEqual(r.stdout, '')
+                self.assertIn('memcue (Kimi)', json.loads(r.stdout)['systemMessage'])
                 self.assertIn('memcue (Kimi)', r.stderr)
                 self.assertLess(len(r.stderr), 750)
                 self.assertIn('Other Kimi work can continue', r.stderr)
@@ -148,11 +163,12 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.binary.write_text('#!/usr/bin/env python3\nimport sys\nsys.stderr.write("synthetic denied "*1000)\nsys.exit(1)\n')
         r = self.run_adapter('hook', data=self.payload())
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout, '')
+        self.assertIn('memcue (Kimi)', json.loads(r.stdout)['systemMessage'])
         self.assertLess(len(r.stderr), 750)
         self.binary.unlink()
         r = self.run_adapter('hook', data=self.payload())
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('missing', json.loads(r.stdout)['systemMessage'])
         self.assertIn('missing', r.stderr)
         r = self.run_adapter('search', 'synthetic')
         self.assertNotEqual(r.returncode, 0)
@@ -200,11 +216,12 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             self.config.write_text(json.dumps(valid | change))
             r = self.run_adapter('hook', data=self.payload())
             self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertEqual(r.stdout, '')
+            self.assertIn('memcue (Kimi)', json.loads(r.stdout)['systemMessage'])
             self.assertIn('memcue (Kimi)', r.stderr)
         self.config.unlink()
         r = self.run_adapter('hook', data=self.payload())
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('memcue (Kimi)', json.loads(r.stdout)['systemMessage'])
         self.assertIn('memcue (Kimi)', r.stderr)
 
     def test_unsupported_runner_commands_cannot_start(self):

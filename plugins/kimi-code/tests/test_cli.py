@@ -66,13 +66,20 @@ class RealCLI(unittest.TestCase):
         payload = dict(hook_event_name=event, session_id=session, cwd=str(cwd or self.nested), **fields)
         if event == 'SessionStart':
             payload.setdefault('source', 'startup')
-        return self.cli('hook', data=json.dumps(payload)).stdout
+        response = json.loads(self.cli('hook', data=json.dumps(payload)).stdout)
+        return response['hookSpecificOutput']['additionalContext']
 
     def test_repository_pitfalls_on_task_and_target_switch(self):
         text = "Kimi fixture failed because its schema was stale; regenerate its whole schema."
         self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
+        rule = "Synthetic orchard reviews require the amber label."
+        self.add(rule, '-kind', 'rule', '-scope', 'repo', '-source', 'user')
+        global_pitfall = "A global synthetic failure must remain outside repository context."
+        self.add(global_pitfall, '-kind', 'pitfall', '-scope', 'global', '-source', 'tool')
         task = self.hook('UserPromptSubmit', 'pitfalls-task', prompt='Unrelated task')
         self.assertIn(text, task)
+        self.assertNotIn(rule, task)
+        self.assertNotIn(global_pitfall, task)
         other = self.home/'other'
         subprocess.run(['git', 'init', '-q', str(other)], env=self.env, check=True)
         subprocess.run(['git', '-C', str(other), 'remote', 'add', 'origin',
