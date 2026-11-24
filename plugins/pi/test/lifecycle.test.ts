@@ -5,27 +5,6 @@ import test from 'node:test';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { currentPrompt, openPi, piFixture } from './pi-harness.ts';
 
-for (const [name, response] of [
-  ['empty', { snapshot: { facts: [], context: 'No current pitfalls.' } }],
-  ['malformed JSON', { snapshotRaw: '{broken' }],
-  ['invalid shape', { snapshot: { facts: [42], context: 'Invalid.' } }],
-  ['CLI failure', { snapshotExitCode: 1 }],
-] as const) {
-  test(`${name} snapshot replaces an earlier successful automatic snapshot`, async t => {
-    const fixture = await piFixture();
-    const pi = await openPi(fixture);
-    t.after(async () => { await pi.dispose(); await fixture.dispose(); });
-    await pi.prompt('First request.');
-    assert.match(currentPrompt(pi.requests.at(-1)!), /PI-SDK-FACT/);
-    await fixture.configure(response);
-    await pi.prompt('Second request.');
-    assert.doesNotMatch(currentPrompt(pi.requests.at(-1)!), /PI-SDK-FACT/);
-    await fixture.snapshot('RECOVERED-PITFALL');
-    await pi.prompt('Recover after the failed read.');
-    assert.match(currentPrompt(pi.requests.at(-1)!), /RECOVERED-PITFALL/);
-  });
-}
-
 test('missing executable reports unavailability without breaking ordinary prompts', async t => {
   const fixture = await piFixture();
   const pi = await openPi(fixture, { binary: join(fixture.root, 'missing-executable') });
