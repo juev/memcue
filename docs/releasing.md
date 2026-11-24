@@ -15,7 +15,8 @@ The old `memcue-transport` versions stay on npm for old installations. New plugi
    - `plugins/transport/package.json` (the shared, in-tree transport);
    - `plugins/pi/package.json` and `plugins/opencode/package.json` with their matching lockfile metadata;
    - `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json`;
-   - `plugins/hermes/memcue/plugin.yaml` and `plugins/hermes/memcue-context/plugin.yaml`.
+   - `plugins/hermes/memcue/plugin.yaml` and `plugins/hermes/memcue-context/plugin.yaml`;
+   - `plugins/kimi-code/kimi.plugin.json`.
 2. Update [Compatibility](../README.md#compatibility) and [Upgrade](../README.md#upgrade) with user-visible changes and any schema or flag changes. Merge the PR after normal CI passes. To rehearse npm packaging without publishing, use `make test-npm-packages`, the same command CI and the release job use.
 3. Tag the exact verified merge commit and push only that tag:
 

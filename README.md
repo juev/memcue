@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.3`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.4`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.4 | 9 | 0.40.4 | 0.40.4 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.4 (`hermes-agent` >=0.17.0) |
 | 0.40.3 | 9 | 0.40.3 | 0.40.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.3 (`hermes-agent` >=0.17.0) |
 | 0.40.2 | 9 | 0.40.2 | 0.40.2 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.2 (`hermes-agent` >=0.17.0) |
 | 0.40.1 | 9 | 0.40.1 | 0.40.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.1 (`hermes-agent` >=0.17.0) |
@@ -330,6 +331,17 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.4: Kimi Code support and fresh Pi snapshots (#795, #798)
+
+- The new native Kimi Code plugin shares the memcue base and provides model-driven search, writes and dream commands.
+  On Kimi 2.7.2 the agent calls `pitfalls` explicitly: the complete current-repository snapshot no longer appears as a
+  large `UserPromptSubmit hook` block in the TUI. Reinstall the plugin after upgrading. The README records the
+  requirements for restoring automatic delivery after a released Kimi client supports model-only `additionalContext`.
+- Pi reads the current repository-pitfall snapshot on every prompt and reuses an unchanged snapshot to preserve the
+  provider prefix. Changes and compaction no longer leave stale facts in the request context.
+- npm publication allows more time for registry propagation; the binary, plugin versions and fact-base schema (9) are
+  otherwise unchanged. No migration is needed from 0.40.3.
 
 ### 0.40.3: self-contained npm plugins and one release tag (#790)
 

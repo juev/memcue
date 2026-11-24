@@ -14,6 +14,7 @@ test('all plugin manifests carry the release version', async () => {
 	const transport = await json('plugins/transport/package.json')
 	const pi = await json('plugins/pi/package.json')
 	const opencode = await json('plugins/opencode/package.json')
+	const kimi = await json('plugins/kimi-code/kimi.plugin.json')
 	const codex = await json('plugins/codex/.codex-plugin/plugin.json')
 	const companionYaml = await readFile(new URL('plugins/hermes/memcue-context/plugin.yaml', root), 'utf8')
 	const companion = companionYaml.match(/^version:\s*(\S+)\s*$/m)?.[1]
@@ -25,6 +26,7 @@ test('all plugin manifests carry the release version', async () => {
 	assert.equal(transport.version, rootPackage.version)
 	assert.equal(pi.version, rootPackage.version)
 	assert.equal(opencode.version, rootPackage.version)
+	assert.equal(kimi.version, rootPackage.version)
 	assert.equal(claude.version, rootPackage.version)
 	assert.equal(hermes, rootPackage.version)
 	assert.equal(codex.version, rootPackage.version)
