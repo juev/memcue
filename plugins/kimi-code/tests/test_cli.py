@@ -67,55 +67,32 @@ class RealCLI(unittest.TestCase):
         if event == 'SessionStart':
             payload.setdefault('source', 'startup')
         response = json.loads(self.cli('hook', data=json.dumps(payload)).stdout)
-        return response['hookSpecificOutput']['additionalContext']
+        return response.get('hookSpecificOutput', {}).get('additionalContext', '')
 
-    def test_repository_pitfalls_on_task_and_target_switch(self):
+    def test_explicit_repository_pitfalls_and_silent_prompt_hooks(self):
         text = "Kimi fixture failed because its schema was stale; regenerate its whole schema."
         self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
         rule = "Synthetic orchard reviews require the amber label."
         self.add(rule, '-kind', 'rule', '-scope', 'repo', '-source', 'user')
         global_pitfall = "A global synthetic failure must remain outside repository context."
         self.add(global_pitfall, '-kind', 'pitfall', '-scope', 'global', '-source', 'tool')
-        task = self.hook('UserPromptSubmit', 'pitfalls-task', prompt='Unrelated task')
-        self.assertIn(text, task)
-        self.assertNotIn(rule, task)
-        self.assertNotIn(global_pitfall, task)
+        for _ in range(2):
+            task = self.cli('pitfalls').stdout
+            self.assertIn(text, task)
+            self.assertNotIn(rule, task)
+            self.assertNotIn(global_pitfall, task)
         other = self.home/'other'
         subprocess.run(['git', 'init', '-q', str(other)], env=self.env, check=True)
         subprocess.run(['git', '-C', str(other), 'remote', 'add', 'origin',
                         'https://example.invalid/team/other.git'], env=self.env, check=True)
-        switched = self.hook('PreToolUse', 'pitfalls-task', tool_name='Bash',
-                             tool_input={'command': 'pwd', 'cwd': str(other)})
+        switched = self.cli('pitfalls', cwd=other).stdout
         self.assertNotIn(text, switched)
         self.assertIn('No active repository pitfalls', switched)
         self.assertIn('supersedes', switched)
-
-    def test_unchanged_pitfall_snapshot_is_sent_once_per_context(self):
-        text = "Kimi fixture failed because its cache was stale; clear the whole cache."
-        self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
-        other = self.home/'other'
-        subprocess.run(['git', 'init', '-q', str(other)], env=self.env, check=True)
-        subprocess.run(['git', '-C', str(other), 'remote', 'add', 'origin',
-                        'https://example.invalid/team/other.git'], env=self.env, check=True)
-        shell = lambda target: dict(tool_name='Bash', tool_input={'command': 'pwd', 'cwd': str(target)})
-        self.hook('SessionStart', 'dedupe')
-        self.assertIn(text, self.hook('UserPromptSubmit', 'dedupe', prompt='Task'))
-        self.assertEqual(self.hook('PreToolUse', 'dedupe', **shell(self.nested)), '')
-        self.assertEqual(self.hook('UserPromptSubmit', 'dedupe', prompt='Next'), '')
-        switched = self.hook('PreToolUse', 'dedupe', **shell(other))
-        self.assertIn('No active repository pitfalls', switched)
-        self.assertNotIn(text, switched)
-        self.assertIn(text, self.hook('PreToolUse', 'dedupe', **shell(self.nested)))
-        self.assertIn(text, self.hook('PreToolUse', 'another', **shell(self.nested)))
-        self.hook('PostCompact', 'dedupe', trigger='manual')
-        self.assertIn(text, self.hook('UserPromptSubmit', 'dedupe', prompt='After'))
-
-    def test_unreadable_snapshot_state_still_delivers(self):
-        text = "Kimi fixture failed because its index was stale; rebuild the whole index."
-        self.add(text, '-kind', 'pitfall', '-scope', 'repo', '-source', 'tool')
-        (self.home/'state'/'kimi-pitfall-snapshots.json').mkdir(parents=True)
-        for turn in ('one', 'two'):
-            self.assertIn(text, self.hook('UserPromptSubmit', 'broken-state', prompt=turn))
+        self.assertEqual(self.hook('UserPromptSubmit', 'silent-hooks', prompt='Unrelated task'), '')
+        self.assertEqual(self.hook('PreToolUse', 'silent-hooks', tool_name='Bash',
+                                   tool_input={'command': 'pwd'}), '')
+        self.assertFalse((self.home/'state'/'kimi-pitfall-snapshots.json').exists())
 
     def test_lifecycle_delivers_dream_hint_without_memory_note_or_fact_card(self):
         fact = self.add('Synthetic orchard reviews require the amber label.', '-kind', 'rule', '-source', 'user', '-scope', 'repo')

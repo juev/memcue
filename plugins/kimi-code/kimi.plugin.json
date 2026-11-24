@@ -15,17 +15,6 @@
       "timeout": 30
     },
     {
-      "event": "UserPromptSubmit",
-      "command": "python3 -I ./scripts/memcue.py hook",
-      "timeout": 30
-    },
-    {
-      "event": "PreToolUse",
-      "matcher": "Bash",
-      "command": "python3 -I ./scripts/memcue.py hook",
-      "timeout": 30
-    },
-    {
       "event": "PostCompact",
       "matcher": "manual|auto",
       "command": "python3 -I ./scripts/memcue.py hook",
