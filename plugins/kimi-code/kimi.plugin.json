@@ -1,0 +1,35 @@
+{
+  "name": "memcue-kimi",
+  "version": "0.40.3",
+  "description": "Pull-mode long-term memory over the memcue CLI for Kimi Code",
+  "skills": "./skills/",
+  "systemPromptPath": "./SYSTEM.md",
+  "sessionStart": {
+    "skill": "memcue"
+  },
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "matcher": "startup|resume",
+      "command": "python3 -I ./scripts/memcue.py hook",
+      "timeout": 30
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "python3 -I ./scripts/memcue.py hook",
+      "timeout": 30
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "command": "python3 -I ./scripts/memcue.py hook",
+      "timeout": 30
+    },
+    {
+      "event": "PostCompact",
+      "matcher": "manual|auto",
+      "command": "python3 -I ./scripts/memcue.py hook",
+      "timeout": 30
+    }
+  ]
+}
