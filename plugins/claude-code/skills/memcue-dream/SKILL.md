@@ -6,7 +6,7 @@ description: Tidy long-term memory (memcue dream). Use when the session start sa
 # memcue: the dream
 
 A dream splits compound facts, retires or corrects
-duplicates and outdated facts, and moves a global fact that holds in one project to that project. You do it; memcue prepares the work and checks your answer.
+duplicates, outdated facts and explicitly resolved pitfalls, and moves a global fact that holds in one project to that project. You do it; memcue prepares the work and checks your answer.
 
 Dreams do not translate facts or schedule work for missing translations. Auxiliary fields are removed during upgrade. Old auxiliary answers are refused; prepare a new packet. Write necessary new and corrected content in English, preserving literals;
 never correct a fact solely to change its language.

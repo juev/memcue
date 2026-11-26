@@ -164,4 +164,5 @@ test('schemas carry the native constraints the model must respect', () => {
   };
   assert.deepEqual(answer.required, ['packet', 'splits', 'actions', 'scopes']);
   assert.deepEqual(answer.properties.actions.items?.properties.op.enum, ['retire', 'correct']);
+  assert.deepEqual(answer.properties.actions.items?.properties.kind.enum, ['duplicate', 'outdated', 'resolved']);
 });

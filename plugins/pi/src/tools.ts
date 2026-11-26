@@ -56,7 +56,7 @@ const answerSchema = Type.Object({
   actions: Type.Array(Type.Object({
     op: Type.Union([Type.Literal('retire'), Type.Literal('correct')]),
     id: text(), content: optionalText(), by: optionalText(),
-    kind: Type.Optional(Type.Union([Type.Literal('duplicate'), Type.Literal('outdated')])),
+    kind: Type.Optional(Type.Union([Type.Literal('duplicate'), Type.Literal('outdated'), Type.Literal('resolved')])),
     reason: text(),
   }, { additionalProperties: false })),
   scopes: Type.Array(Type.Object({ id: text(), scope: text(), reason: text() }, { additionalProperties: false })),
@@ -127,7 +127,9 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
       args.push('--', params.query);
       return searchOutput(await run(args, { cwd: ctx.cwd, signal }));
     }),
-    define('memcue_add', 'Store one durable fact, decision or verified pitfall. Search first and correct a matching fact '
+    define('memcue_add', 'Store one durable fact, decision or verified pitfall. '
+      + 'For pitfalls, require a verified cause and fix plus fresh-checkout reuse; exclude one-off and already resolved incidents. '
+      + 'Search first and correct a matching fact '
       + 'instead of duplicating it. Preserve the distinction between user instructions, observations and agent conclusions.',
     addSchema, true, async (params, ctx, signal) => {
       if (params.scope !== undefined && params.shelf !== undefined) throw new Error('scope and shelf are mutually exclusive.');

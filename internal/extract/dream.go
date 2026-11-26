@@ -10,8 +10,8 @@ type Action struct {
 	Op      string `json:"op"` // "retire" or "correct"
 	ID      string `json:"id"`
 	Content string `json:"content,omitempty"`
-	By      string `json:"by,omitempty"`   // retire: the fact of the group that covers or outdates this one
-	Kind    string `json:"kind,omitempty"` // retire: "duplicate" or "outdated"
+	By      string `json:"by,omitempty"`   // retire: optional evidence for resolved, required for duplicate and outdated
+	Kind    string `json:"kind,omitempty"` // retire: "duplicate", "outdated" or "resolved"
 	Reason  string `json:"reason"`
 }
 
@@ -34,7 +34,7 @@ type Rescope struct {
 // answerShape is the one answer a packet takes, with the packet id the model must echo.
 const answerShape = "## Answer format\n\nОтвет — один JSON-объект. `packet` — ровно `%s`.\n" +
 	`{"packet": "%s","splits":[{"id":"…","parts":["…","…"],"reason":"…"}],` +
-	`"actions":[{"op":"retire|correct","id":"…","content":"…","by":"…","kind":"duplicate|outdated","reason":"…"}],` +
+	`"actions":[{"op":"retire|correct","id":"…","content":"…","by":"…","kind":"duplicate|outdated|resolved","reason":"…"}],` +
 	`"scopes":[{"id":"…","scope":"…","reason":"…"}]}` + "\nOnly answer the supplied split, group and scope tasks. Empty lists are valid.\n"
 
 // DreamInstructions is the text a dream packet starts with: what to do, the three tasks with their rules, and the

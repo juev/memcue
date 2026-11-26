@@ -179,6 +179,7 @@ _FAILURE_NOTE = (
     'When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you '
     'finish if a later session in a fresh checkout would hit it again — even when the cause is in the '
     "repository's own files; what the repository shows is its documents, not a failure you found by running it.")
+_PITFALL_FILTER_NOTE = "A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf."
 
 _FACT_LANGUAGE_NOTE = "Write new and corrected facts in English regardless of the chat language. Preserve identifiers, commands, paths, versions, exact values and verbatim quotes. Keep the user's reply language unchanged."
 _QUERY_LANGUAGE_NOTE = 'Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.'
@@ -467,7 +468,8 @@ SEARCH_SCHEMA = _schema(
 ADD_SCHEMA = _schema(
     "memcue_add", "Store one fact in long-term memory, at once, when you learn it: nothing is extracted from the "
     "session later. Store the user's rules and corrections (with the reason), the user's decisions the code does not "
-    "show, pitfalls found by an error or a check, and hosts, services and pointers outside the repository. Not the "
+    "show, pitfalls found by an error or a check, and hosts, services and pointers outside the repository. "
+    "For pitfalls, require a verified cause and fix plus fresh-checkout reuse; exclude one-off and already resolved incidents. Not the "
     "progress of the task, what the repository or a command shows, installation state or multi-step procedures, "
     "unless the user asks "
     "to remember one (kind procedure). One self-contained "
@@ -774,7 +776,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 "newer fact that says otherwise is not that evidence on its own. When nothing in the session settles "
                 "it, answer from the facts and their days, name the conflict, and ask before you correct or retire "
                 "one."
-                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + ("\n\n" + hints if hints else ""))
+                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + "\n\n" + _PITFALL_FILTER_NOTE + ("\n\n" + hints if hints else ""))
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the note: MEMORY.md and USER.md of this

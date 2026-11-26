@@ -1163,14 +1163,16 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 			refused = append(refused, "correct "+a.ID+": no content")
 		case a.Op == "retire" && left[g] == 1:
 			refused = append(refused, "retire "+a.ID+": last active fact of its group")
-		case a.Op == "retire" && (!byKnown || byGroup != g || a.By == a.ID):
+		case a.Op == "retire" && a.By == "" && a.Kind != "resolved":
+			refused = append(refused, "retire "+a.ID+": by "+a.By+" is not another fact of its group")
+		case a.Op == "retire" && a.By != "" && (!byKnown || byGroup != g || a.By == a.ID):
 			refused = append(refused, "retire "+a.ID+": by "+a.By+" is not another fact of its group")
 		case a.Op == "retire" && retired[a.By]:
 			refused = append(refused, "retire "+a.ID+": by "+a.By+" is retired too")
 		case a.Op == "retire" && covers[a.ID]:
 			refused = append(refused, "retire "+a.ID+": it covers another retired fact")
-		case a.Op == "retire" && a.Kind != "duplicate" && a.Kind != "outdated":
-			refused = append(refused, "retire "+a.ID+": kind "+a.Kind+" is neither duplicate nor outdated")
+		case a.Op == "retire" && a.Kind != "duplicate" && a.Kind != "outdated" && a.Kind != "resolved":
+			refused = append(refused, "retire "+a.ID+": kind "+a.Kind+" is not duplicate, outdated or resolved")
 		case a.Op == "retire" && a.Kind == "duplicate" && a.ID < a.By:
 			// every machine keeps the smaller ID of a duplicate pair, so two dreams over one base cannot retire both
 			refused = append(refused, "retire "+a.ID+": a duplicate keeps the smaller id, retire "+a.By+" instead")
@@ -1180,7 +1182,10 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 			done[a.ID] = true
 			if a.Op == "retire" {
 				left[g]--
-				retired[a.ID], covers[a.By] = true, true
+				retired[a.ID] = true
+				if a.By != "" {
+					covers[a.By] = true
+				}
 			}
 			ok = append(ok, a)
 		}

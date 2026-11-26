@@ -126,6 +126,43 @@ class PitfallLineTest(unittest.TestCase):
 
 
 
+class CaptureReuseTest(unittest.TestCase):
+    FILTER = (
+        "A pitfall requires reproducible environmental, platform, tool, or repository behavior, "
+        "a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. "
+        "Do not store typos or invocations resolved by the tool's own help; transient "
+        "network/authentication or CI-runner state; a defect the current task just fixed; finished "
+        "experiments, rejected candidates, release notes, or one-off observations; obsolete "
+        "migration/install state; or unverified and context-free fragments. Design decisions, durable "
+        "host configuration, and external research limitations remain capturable under their appropriate "
+        "kind, scope, or shelf."
+    )
+
+    def test_every_capture_surface_requires_fresh_checkout_reuse(self):
+        for path in (PLUGINS.parent / 'cmd' / 'memcue' / 'session.go',
+                     PLUGINS / 'claude-code' / 'skills' / 'memcue' / 'SKILL.md',
+                     PLUGINS / 'hermes' / 'memcue' / '__init__.py',
+                     PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs'):
+            with self.subTest(host=path.name):
+                flat = ' '.join(path.read_text(encoding='utf-8').split())
+                self.assertIn(' '.join(self.FILTER.split()), flat)
+        hermes = (PLUGINS / 'hermes' / 'memcue' / '__init__.py').read_text(encoding='utf-8')
+        self.assertGreaterEqual(hermes.count('_PITFALL_FILTER_NOTE'), 2)
+
+    def test_native_add_descriptions_reject_one_off_pitfalls(self):
+        constraint = (
+            'For pitfalls, require a verified cause and fix plus fresh-checkout reuse; '
+            'exclude one-off and already resolved incidents.'
+        )
+        for path in (PLUGINS / 'hermes' / 'memcue' / '__init__.py',
+                     PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs',
+                     PLUGINS / 'pi' / 'src' / 'tools.ts',
+                     PLUGINS / 'opencode' / 'src' / 'tools.ts'):
+            with self.subTest(host=path.name):
+                flat = ' '.join(path.read_text(encoding='utf-8').split())
+                self.assertIn(constraint, flat)
+
+
 class NoCardTest(unittest.TestCase):
     def test_every_host_searches_the_rules_instead_of_a_card(self):
         """#656: no host gives a card; every host tells the model to look up user rules and decisions.

@@ -161,4 +161,7 @@ test('schemas reject unsafe shapes and require observed versions', () => {
   assert.equal(Check(tool('memcue_dream_apply', noop).parameters, {
     answer: { packet: 'p', splits: [], actions: [{ op: 'retire', id: 'id', kind: 'duplicate', by: 'another', reason: 'same fact' }], scopes: [] },
   }), true);
+  assert.equal(Check(tool('memcue_dream_apply', noop).parameters, {
+    answer: { packet: 'p', splits: [], actions: [{ op: 'retire', id: 'id', kind: 'resolved', reason: 'the fact records its fix' }], scopes: [] },
+  }), true);
 });
