@@ -129,8 +129,8 @@ const answerSchema = {
           op: { type: 'string', enum: ['retire', 'correct'] },
           id: text('Fact id the action applies to.'),
           content: optionalText('Replacement text for a correction.'),
-          by: optionalText('Fact id this fact is duplicated into, when one exists.'),
-          kind: { type: 'string', enum: ['duplicate', 'outdated'] },
+          by: optionalText('Grouped fact supplying duplicate, outdated, or resolved evidence, when one is needed.'),
+          kind: { type: 'string', enum: ['duplicate', 'outdated', 'resolved'] },
           reason: text('Why the action applies.'),
         },
         required: ['op', 'id', 'reason'],
@@ -228,7 +228,9 @@ export function memoryTools(
       args.push('--', String(params.query));
       return searchOutput(await run(args, { cwd, signal }));
     }),
-    define('memcue_add', 'Store one durable fact, decision or verified pitfall. Search first and correct a matching fact '
+    define('memcue_add', 'Store one durable fact, decision or verified pitfall. '
+      + 'For pitfalls, require a verified cause and fix plus fresh-checkout reuse; exclude one-off and already resolved incidents. '
+      + 'Search first and correct a matching fact '
       + 'instead of duplicating it. Preserve the distinction between user instructions, observations and agent conclusions.',
     addSchema, async (params, { cwd, signal }) => {
       if (params.scope !== undefined && params.shelf !== undefined) throw new Error('scope and shelf are mutually exclusive.');

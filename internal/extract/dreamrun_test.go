@@ -64,6 +64,34 @@ func TestDreamSchemaIsTheAnswer(t *testing.T) {
 	}
 }
 
+func TestDreamResolvedRetirementContract(t *testing.T) {
+	for name, text := range map[string]string{
+		"endpoint schema": dreamSchema,
+		"packet answer":   DreamInstructions("p-802"),
+	} {
+		if !strings.Contains(text, "resolved") {
+			t.Errorf("%s does not admit resolved retirement", name)
+		}
+	}
+	text := strings.Join(strings.Fields(DreamInstructions("p-802")), " ")
+	for _, phrase := range []string{
+		`kind: "resolved"`,
+		"его собственный текст прямо сообщает",
+		"без `by`",
+		"другой факт группы",
+		"не снимай факт только потому, что он старый",
+		"нет поисковых обращений",
+		"«вероятно, исправлен»",
+		"один номер PR",
+		"завершённый эксперимент без явного разрешения",
+		"не догадывайся о состоянии репозитория",
+	} {
+		if !strings.Contains(text, phrase) {
+			t.Errorf("resolved-retirement instructions lack %q", phrase)
+		}
+	}
+}
+
 func TestDreamInstructionsEnglishContentWithoutLanguageOnlyRewrites(t *testing.T) {
 	text := DreamInstructions("policy-packet")
 	for _, phrase := range []string{"new and corrected facts in English", "identifiers, commands, paths, versions, exact values and verbatim quotes", "Never correct a fact solely to change its language"} {

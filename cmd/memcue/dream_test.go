@@ -196,6 +196,58 @@ func TestDreamPrepareChangesNothing(t *testing.T) {
 	}
 }
 
+func TestDreamApplyResolvedWithoutByPreservesHistory(t *testing.T) {
+	env(t)
+	s, err := store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolvedFact, err := s.AddWith("Workflow nightly-sync.yml needed a manual subscription workaround; PR #123 fixed that bug and the workaround is no longer needed.", "x 2026-10-19", "", store.Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved := resolvedFact.ID
+	keptFact, err := s.AddWith("Workflow nightly-sync.yml now manages the subscription without the manual workaround from PR #123.", "x 2026-10-19", "", store.Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept := keptFact.ID
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	calls := fakeDream(t, func(string) []extract.Action {
+		return []extract.Action{{Op: "retire", ID: resolved, Kind: "resolved",
+			Reason: "its own text says the bug was fixed and the workaround is no longer needed"}}
+	})
+	if err := dreamModel([]string{"-all"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*calls) != 1 || !strings.Contains((*calls)[0], resolved) || !strings.Contains((*calls)[0], kept) {
+		t.Fatalf("resolved fact was not reviewed with its grouped evidence: %+v", *calls)
+	}
+	if got := storedFact(t, resolved); got.Status != store.Retired || got.Version != 2 {
+		t.Fatalf("self-contained resolved fact was not retired with a version bump: %+v", got)
+	}
+	if got := storedFact(t, kept); got.Status != store.Active || got.Version != 1 {
+		t.Fatalf("unrelated group member changed: %+v", got)
+	}
+	if err := runReopen([]string{resolved}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedFact(t, resolved); got.Status != store.Active || got.Version != 3 {
+		t.Fatalf("reopen after resolved retirement: %+v", got)
+	}
+	s, err = store.Open(factsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	history, err := s.History(resolved)
+	if err != nil || len(history) != 3 {
+		t.Fatalf("resolved retirement or reopen lost immutable history: %+v, %v", history, err)
+	}
+}
+
 func TestDreamCorrectsMergedFact(t *testing.T) {
 	env(t)
 	_, a, b, _ := dreamBase(t)
@@ -236,6 +288,34 @@ func TestDreamRefusesUnsafeActions(t *testing.T) {
 	}
 	if len(refused) != 12 {
 		t.Errorf("refused %d: %q", len(refused), refused)
+	}
+}
+
+func TestDreamResolvedRetirementValidation(t *testing.T) {
+	groups := func() [][]store.Fact {
+		return [][]store.Fact{{{ID: "A"}, {ID: "B"}, {ID: "C"}}, {{ID: "D"}, {ID: "E"}}}
+	}
+	for _, tc := range []struct {
+		name   string
+		groups [][]store.Fact
+		action extract.Action
+		want   bool
+	}{
+		{name: "self-contained", groups: groups(), action: extract.Action{Op: "retire", ID: "A", Kind: "resolved", Reason: "fixed in its own text"}, want: true},
+		{name: "grouped evidence", groups: groups(), action: extract.Action{Op: "retire", ID: "A", By: "B", Kind: "resolved", Reason: "fixed by B"}, want: true},
+		{name: "self citation", groups: groups(), action: extract.Action{Op: "retire", ID: "A", By: "A", Kind: "resolved", Reason: "invalid"}},
+		{name: "other group citation", groups: groups(), action: extract.Action{Op: "retire", ID: "A", By: "D", Kind: "resolved", Reason: "invalid"}},
+		{name: "unknown fact", groups: groups(), action: extract.Action{Op: "retire", ID: "Z", Kind: "resolved", Reason: "invalid"}},
+		{name: "last group fact", groups: [][]store.Fact{{{ID: "A"}}}, action: extract.Action{Op: "retire", ID: "A", Kind: "resolved", Reason: "invalid"}},
+		{name: "duplicate still needs by", groups: groups(), action: extract.Action{Op: "retire", ID: "B", Kind: "duplicate", Reason: "unchanged"}},
+		{name: "outdated still needs by", groups: groups(), action: extract.Action{Op: "retire", ID: "B", Kind: "outdated", Reason: "unchanged"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ok, refused := checkActions(tc.groups, []extract.Action{tc.action})
+			if (len(ok) == 1) != tc.want || (len(refused) == 1) == tc.want {
+				t.Fatalf("ok=%+v refused=%q, want accepted=%v", ok, refused, tc.want)
+			}
+		})
 	}
 }
 

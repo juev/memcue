@@ -457,11 +457,14 @@ class ProviderTest(unittest.TestCase):
         self.assertLess(note, shelf)
 
     def test_the_pitfall_line_follows_the_shelf_text(self):
-        """#566: the pitfall line follows the shelf text, where the measured run had it; no card follows it (#656)."""
+        """#566 stays verbatim; #802 adds the reuse filter and narrows the add-tool description."""
         block = self.p.system_prompt_block()
         shelf = block.index(memcue_provider._SHELF_NOTE)
         pitfall = block.index(memcue_provider._FAILURE_NOTE)
+        pitfall_filter = block.index(memcue_provider._PITFALL_FILTER_NOTE)
         self.assertLess(shelf, pitfall)
+        self.assertLess(pitfall, pitfall_filter)
+        self.assertIn("fresh-checkout reuse", memcue_provider.ADD_SCHEMA["description"])
 
     def test_search_guidance_is_conditional_in_the_note_and_the_tool(self):
         for text in (self.p.system_prompt_block(), memcue_provider.SEARCH_SCHEMA["description"]):

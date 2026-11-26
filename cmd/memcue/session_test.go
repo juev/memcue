@@ -248,6 +248,12 @@ func TestSessionNotePreservesOtherMeasured647Instructions(t *testing.T) {
 	// #771, not measured: a fact is corrected or retired on the session's evidence, never on a newer fact alone.
 	const retire = "use the memcue skill (memcue add / correct / retire)."
 	old = strings.ReplaceAll(old, retire, retire+" Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name the conflict, and ask before you correct or retire one.")
+	// #802, not measured: the fresh-checkout filter narrows capture without dropping the proven #566 line.
+	const pitfallFilter = "- A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.\n"
+	if strings.Count(sessionNote, pitfallFilter) != 1 {
+		t.Fatal("session note does not carry the #802 fresh-checkout pitfall filter exactly once")
+	}
+	old = strings.Replace(old, "- When the user asks you to remember", pitfallFilter+"- When the user asks you to remember", 1)
 	oldLines := strings.Split(old, "\n")
 	newLines := strings.Split(sessionNote, "\n")
 	// The introductory line stays; the new English fact rule and changed search-language line come next.

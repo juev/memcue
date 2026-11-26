@@ -1425,10 +1425,11 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
-- **Retire** a fact of a group as a duplicate or as contradicted, naming the fact that covers it (`by`) and its kind,
-  `duplicate` or `outdated`. Of two duplicates the one with the smaller id stays, whatever the model prefers, so
-  machines dreaming over one shared base keep the same copy and never retire both. Every group keeps at least one
-  fact; a retired fact stays in the history.
+- **Retire** a fact of a group as a duplicate, as contradicted, or as explicitly resolved. For `duplicate` and
+  `outdated`, name the fact that covers it (`by`). A `resolved` retirement needs no `by` when the fact's own text
+  records the fix; otherwise `by` names the grouped fact supplying that evidence. Of two duplicates the one with the
+  smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same copy and never
+  retire both. Every group keeps at least one fact; a retired fact stays in the history.
 - **Correct** a fact of a group with text built only from the facts of the group. Only the replacement content is written; it triggers no expansion or translation call.
 
 A duplicate learnt in another project than the fact that stays is kept (#607): a fact that holds in two repositories

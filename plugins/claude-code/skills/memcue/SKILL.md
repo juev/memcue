@@ -42,6 +42,8 @@ When a command fails and you fix or work around it, store the cause and the fix 
 
 Store it with `memcue add -kind pitfall -source tool -- "<cause and fix>"`.
 
+A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
+
 ## Remember
 
 Search first: if a stored fact says the same or an older version of it, correct that fact instead of adding a second
