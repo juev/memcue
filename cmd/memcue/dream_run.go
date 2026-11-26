@@ -45,7 +45,7 @@ const dreamAllStalls = 3
 // runs out of groups, so it does not keep the loop going. It runs on the endpoint when MEMCUE_API_URL is set and on
 // claude -p otherwise, and stops on the first failed pass, after dreamAllStalls passes that change nothing, or after
 // dreamAllPasses.
-func (inv *invocation) runDreamOnce(out io.Writer, all, background bool, packets int) error {
+func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bool, packets int) error {
 	out = inv.writer(out)
 	if !all && !background && extract.API.URL == "" {
 		return fmt.Errorf("dream -run: %w", extract.ErrNoEndpoint)
@@ -73,7 +73,7 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background bool, packets
 	}
 	defer unlock()
 	if !all {
-		_, _, err := inv.dreamPass(dir, packets, out)
+		_, _, err := inv.dreamPass(dir, packets, noiseOnly, out)
 		return err
 	}
 	stalls := 0
@@ -81,7 +81,7 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background bool, packets
 		if _, err := fmt.Fprintf(out, "dream -all: pass %d\n", pass); err != nil {
 			return err
 		}
-		rec, work, err := inv.dreamPass(dir, packets, out)
+		rec, work, err := inv.dreamPass(dir, packets, noiseOnly, out)
 		if err != nil {
 			return fmt.Errorf("dream -all: pass %d: %w", pass, err)
 		}
@@ -116,7 +116,7 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background bool, packets
 // groups and each packet's global facts to check the scope of. Most of a call's time is the model
 // writing its answer, so three calls of a third of it each take about a third of the time. Their answers are joined
 // and applied as one.
-func (inv *invocation) dreamPass(dir string, packets int, out io.Writer) (dreamRecord, int, error) {
+func (inv *invocation) dreamPass(dir string, packets int, noiseOnly bool, out io.Writer) (dreamRecord, int, error) {
 	out = inv.writer(out)
 	var from time.Time
 	var seen map[string]int
@@ -129,7 +129,7 @@ func (inv *invocation) dreamPass(dir string, packets int, out io.Writer) (dreamR
 	}
 	var packet bytes.Buffer
 	start := time.Now()
-	rec, w, err := inv.prepare(dir, from, seen, false, packets, &packet)
+	rec, w, err := inv.prepare(dir, from, seen, false, packets, noiseOnly, &packet)
 	timing := dreamTiming{Prepare: ms(time.Since(start))}
 	if err != nil || rec.Packet == "" {
 		rec.Timing = &timing
@@ -196,6 +196,7 @@ type dreamWork struct {
 	split    []store.Fact
 	groups   [][]store.Fact
 	fresh    map[string]bool // the facts of the groups the dream reviews as new
+	noise    map[string]int  // facts eligible for noise retirement in this packet
 	scope    []store.Fact    // the global facts to check the scope of (#607)
 	projects []string        // the projects they may move to
 }
@@ -211,9 +212,16 @@ func (w dreamWork) calls() ([]dreamCall, error) {
 		if len(scope) == 0 {
 			projects = nil
 		}
-		text, err := renderPacket(w.id, split, scope, projects, groups, w.fresh)
+		text, err := renderPacket(w.id, split, scope, projects, groups, w.fresh, w.noise)
 		c := dreamCall{text: text, rec: dreamCallRecord{Task: task, Split: len(split), Groups: len(groups),
 			Facts: len(scope)}}
+		for _, g := range groups {
+			for _, f := range g {
+				if _, ok := w.noise[f.ID]; ok {
+					c.rec.Noise++
+				}
+			}
+		}
 		for _, g := range groups {
 			if !slices.ContainsFunc(g, func(f store.Fact) bool { return w.fresh[f.ID] }) {
 				c.rec.Swept++
@@ -259,6 +267,7 @@ type dreamCallRecord struct {
 	Split    int            `json:"split,omitempty"`  // fresh facts given to split
 	Groups   int            `json:"groups,omitempty"` // groups given to merge
 	Swept    int            `json:"swept,omitempty"`  // of them, the merge sweep's: groups with no fresh fact
+	Noise    int            `json:"noise,omitempty"`  // facts eligible for noise retirement
 	Facts    int            `json:"facts,omitempty"`  // facts given to check the scope of
 	Proposed int            `json:"proposed"`         // splits, actions or scopes the model returned
 	Tokens   extract.Tokens `json:"tokens"`

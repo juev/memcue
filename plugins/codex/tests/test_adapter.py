@@ -209,7 +209,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             self.assertFalse((self.home/'state').exists())
 
     def test_dream_allowlist_passes_only_documented_packet_commands(self):
-        for args in (('-prepare',),('-prepare','-all'),('-prepare','-since','2000-01-01'),
+        for args in (('-prepare',),('-prepare','-all'),('-prepare','-all','-noise'),('-list','-all','-noise'),('-prepare','-since','2000-01-01'),
                      ('-prepare','-since','2000-01-01T00:00:00Z'),('-list',),('-apply','/synthetic/answer.json'),
                      ('--','-prepare','-all')):
             with self.subTest(args=args):

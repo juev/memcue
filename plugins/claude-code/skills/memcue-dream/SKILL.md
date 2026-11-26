@@ -6,7 +6,7 @@ description: Tidy long-term memory (memcue dream). Use when the session start sa
 # memcue: the dream
 
 A dream splits compound facts, retires or corrects
-duplicates, outdated facts and explicitly resolved pitfalls, and moves a global fact that holds in one project to that project. You do it; memcue prepares the work and checks your answer.
+duplicates, outdated facts, explicitly resolved pitfalls and eligible one-off noise, and moves a global fact that holds in one project to that project. You do it; memcue prepares the work and checks your answer.
 
 Dreams do not translate facts or schedule work for missing translations. Auxiliary fields are removed during upgrade. Old auxiliary answers are refused; prepare a new packet. Write necessary new and corrected content in English, preserving literals;
 never correct a fact solely to change its language.
@@ -26,7 +26,8 @@ the background and says nothing (#569). The session start names the dream only w
    ```
 
    It prints the instructions, the three tasks with their rules and the data. "nothing for the dream" means you are
-   done.
+   done. For a bounded cleanup of only explicit one-off records, add `-noise` (with `-all` to consider every active
+   fact); this skips split, duplicate and scope work.
 2. Follow the instructions: write one JSON answer to a temporary file (`mktemp`), with `packet` exactly as printed.
 3. Apply it:
 

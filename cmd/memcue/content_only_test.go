@@ -87,7 +87,7 @@ func TestContentOnlyDreamFailedCallAppliesNothing(t *testing.T) {
 	fakeDreamRun(t, nil)
 	good := dreamRunFn
 	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
-		if hasFacts(packetBlock(packet, "## Данные: область")) {
+		if hasFacts(packetBlock(packet, "## Data: scope")) {
 			return extract.DreamReply{}, errModel
 		}
 		return good(ctx, packet)

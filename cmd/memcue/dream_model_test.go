@@ -81,22 +81,22 @@ func answerPacket(text string) (dreamAnswer, error) {
 		return a, err
 	}
 	a.Packet = p.ID
-	if in := packetBlock(text, "## Данные: разделение"); hasFacts(in) {
+	if in := packetBlock(text, "## Data: splitting"); hasFacts(in) {
 		r, err := splitFn(in)
 		if err != nil {
 			return a, err
 		}
 		a.Splits = r.Splits
 	}
-	if in := packetBlock(text, "## Данные: область"); hasFacts(in) {
+	if in := packetBlock(text, "## Data: scope"); hasFacts(in) {
 		r, err := scopeFn(in)
 		if err != nil {
 			return a, err
 		}
 		a.Scopes = r
 	}
-	if i := strings.Index(text, "## Данные: группы\n\n"); i >= 0 {
-		groups := text[i+len("## Данные: группы\n\n"):]
+	if i := strings.Index(text, "## Data: groups and noise candidates\n\n"); i >= 0 {
+		groups := text[i+len("## Data: groups and noise candidates\n\n"):]
 		if !strings.HasPrefix(groups, "Групп нет.") {
 			r, err := dreamFn(groups)
 			if err != nil {

@@ -11,7 +11,7 @@ type Action struct {
 	ID      string `json:"id"`
 	Content string `json:"content,omitempty"`
 	By      string `json:"by,omitempty"`   // retire: optional evidence for resolved, required for duplicate and outdated
-	Kind    string `json:"kind,omitempty"` // retire: "duplicate", "outdated" or "resolved"
+	Kind    string `json:"kind,omitempty"` // retire: "duplicate", "outdated", "resolved" or "noise"
 	Reason  string `json:"reason"`
 }
 
@@ -32,9 +32,9 @@ type Rescope struct {
 }
 
 // answerShape is the one answer a packet takes, with the packet id the model must echo.
-const answerShape = "## Answer format\n\nОтвет — один JSON-объект. `packet` — ровно `%s`.\n" +
+const answerShape = "## Answer format\n\nReturn one JSON object. `packet` must be exactly `%s`.\n" +
 	`{"packet": "%s","splits":[{"id":"…","parts":["…","…"],"reason":"…"}],` +
-	`"actions":[{"op":"retire|correct","id":"…","content":"…","by":"…","kind":"duplicate|outdated|resolved","reason":"…"}],` +
+	`"actions":[{"op":"retire|correct","id":"…","content":"…","by":"…","kind":"duplicate|outdated|resolved|noise","reason":"…"}],` +
 	`"scopes":[{"id":"…","scope":"…","reason":"…"}]}` + "\nOnly answer the supplied split, group and scope tasks. Empty lists are valid.\n"
 
 // DreamInstructions is the text a dream packet starts with: what to do, the three tasks with their rules, and the
@@ -42,9 +42,9 @@ const answerShape = "## Answer format\n\nОтвет — один JSON-объек
 func DreamInstructions(id string) string {
 	var b strings.Builder
 	b.WriteString(packetPrompt)
-	b.WriteString("\n## Задача 1. Разделение составных фактов\n\n" + splitPrompt)
-	b.WriteString("\n## Задача 2. Группы похожих фактов\n\n" + dreamPrompt)
-	b.WriteString("\n## Задача 3. Где верен факт\n\n" + scopePrompt)
+	b.WriteString("\n## Task 1. Split compound facts\n\n" + splitPrompt)
+	b.WriteString("\n## Task 2. Similar groups and noise candidates\n\n" + dreamPrompt)
+	b.WriteString("\n## Task 3. Where a fact applies\n\n" + scopePrompt)
 	b.WriteString("\n" + strings.ReplaceAll(answerShape, "%s", id))
 	return b.String()
 }

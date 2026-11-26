@@ -95,7 +95,7 @@ commands:
   session-card    session-start without the note: repository pitfalls and maintenance hints: memcue session-card [-dream-tools] [-pitfalls-only | -pitfalls-json | -hints-only]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   sessions  passages of earlier Claude Code, Qwen Code, OpenCode and DSH sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
-  add       store a fact, indexed at once: memcue add [-cwd DIR] [-origin O] [-expires YYYY-MM-DD] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
+  add       store a fact, indexed at once: memcue add [-cwd DIR] [-origin O] [-expires YYYY-MM-DD|-no-expires] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   # add -batch FILE [-force] atomically adds a content-only JSON FactInput array
   correct   new version of a fact: memcue correct [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT
   retire    take a fact out of recall: memcue retire ID
@@ -104,7 +104,7 @@ commands:
   history   immutable fact versions: memcue history [-json] ID
   facts     list the active facts
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
-  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] | -list | -apply FILE | -run [-all|-background] [-j N]
+  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] [-noise] | -list | -apply FILE | -run [-all|-background] [-noise] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text; copy the whole history into an empty PostgreSQL base: memcue migrate -postgres [-apply]; load the base into an empty memcue server: memcue migrate -server [-apply]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...

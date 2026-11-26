@@ -40,7 +40,7 @@ LETTERS = {"A": "duplicate", "B": "outdated", "C": "none"}
 
 def parse_groups(text):
     groups = []
-    for block in re.split(r"^## Группа \d+\n", text, flags=re.M)[1:]:
+    for block in re.split(r"^## (?:Группа|Group|Noise candidate) \d+\n", text, flags=re.M)[1:]:
         facts, cur = [], None
         for line in block.splitlines():
             m = re.match(r"- id (\S+) \(", line)

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -76,18 +77,40 @@ func TestDreamResolvedRetirementContract(t *testing.T) {
 	text := strings.Join(strings.Fields(DreamInstructions("p-802")), " ")
 	for _, phrase := range []string{
 		`kind: "resolved"`,
-		"его собственный текст прямо сообщает",
-		"без `by`",
-		"другой факт группы",
-		"не снимай факт только потому, что он старый",
-		"нет поисковых обращений",
-		"«вероятно, исправлен»",
-		"один номер PR",
-		"завершённый эксперимент без явного разрешения",
-		"не догадывайся о состоянии репозитория",
+		"the fact's own text carries the evidence",
+		"`by` is optional",
+		"another fact in the group",
+		"merely because it is old",
+		"unused in search",
+		"Probably fixed",
+		"a PR number alone",
+		"a finished experiment without an explicit resolution",
+		"Never guess repository state outside the packet",
 	} {
 		if !strings.Contains(text, phrase) {
 			t.Errorf("resolved-retirement instructions lack %q", phrase)
+		}
+	}
+}
+
+func TestDreamNoiseRetirementContract(t *testing.T) {
+	for name, text := range map[string]string{"endpoint schema": dreamSchema, "packet answer": DreamInstructions("p-805")} {
+		for _, phrase := range []string{"noise", "by"} {
+			if !strings.Contains(text, phrase) {
+				t.Errorf("%s lacks %q for noise retirement", name, phrase)
+			}
+		}
+	}
+	text := strings.Join(strings.Fields(DreamInstructions("p-805")), " ")
+	for _, phrase := range []string{
+		"only facts marked as noise candidates are eligible",
+		"task progress or a one-off observation",
+		"transient authentication/CI/process state",
+		"reusable research limitations",
+		"the only group that may become empty",
+	} {
+		if !strings.Contains(text, phrase) {
+			t.Errorf("noise-retirement instructions lack %q", phrase)
 		}
 	}
 }
@@ -101,5 +124,23 @@ func TestDreamInstructionsEnglishContentWithoutLanguageOnlyRewrites(t *testing.T
 	}
 	if strings.Contains(text, `"translations"`) || strings.Contains(dreamSchema, `"translations"`) {
 		t.Error("dream still requests translation answers")
+	}
+}
+
+func TestModelPromptsUseEnglish(t *testing.T) {
+	cyrillic := regexp.MustCompile(`[А-Яа-яЁё]`)
+	for name, text := range map[string]string{
+		"dream packet": packetPrompt,
+		"split":        splitPrompt,
+		"review":       dreamPrompt,
+		"scope":        scopePrompt,
+		"note":         notePrompt,
+		"system":       dreamRunSystem,
+		"answer":       answerShape,
+		"api answer":   jsonAnswer,
+	} {
+		if cyrillic.MatchString(text) {
+			t.Errorf("%s still contains Russian instructions", name)
+		}
 	}
 }

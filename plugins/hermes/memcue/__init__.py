@@ -180,6 +180,7 @@ _FAILURE_NOTE = (
     'finish if a later session in a fresh checkout would hit it again — even when the cause is in the '
     "repository's own files; what the repository shows is its documents, not a failure you found by running it.")
 _PITFALL_FILTER_NOTE = "A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf."
+_REVIEW_EXPIRY_NOTE = "Agent/tool pitfall and environment facts expire after 30 days by default. Use expires for a different review date, or no_expires only for deliberately durable knowledge such as repeatable platform behavior."
 
 _FACT_LANGUAGE_NOTE = "Write new and corrected facts in English regardless of the chat language. Preserve identifiers, commands, paths, versions, exact values and verbatim quotes. Keep the user's reply language unchanged."
 _QUERY_LANGUAGE_NOTE = 'Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.'
@@ -476,8 +477,8 @@ ADD_SCHEMA = _schema(
     "statement in one to three sentences, naming the system or project, with exact values; only what the user said "
     "or a tool confirmed. Search first and correct a stored fact instead of adding a second copy.",
     {"content": _FACT_LANGUAGE_NOTE,
-     "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD (e.g. a one-off reminder); "
-                "omit for a fact that stays true.",
+     "expires": "Optional last day the fact is worth recalling, YYYY-MM-DD. Agent/tool pitfall and environment facts "
+                "default to 30 days; other kinds and durable facts with no_expires have no default expiry.",
      "kind": "Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event "
              "(what happened that the next days need; expires after a week unless expires is given).",
      "source": "Optional who said it: user (the user's words; the default for rule and decision), "
@@ -486,6 +487,7 @@ ADD_SCHEMA = _schema(
      "shelf": "Optional shelf name, e.g. research: the fact is kept out of ordinary search and found with "
               "in shelf:<name>. For what was read from outside sources; omit scope when you pass it."},
     ["content"])
+ADD_SCHEMA["parameters"]["properties"]["no_expires"] = {"type": "boolean", "description": "Store deliberately durable knowledge without expiry; mutually exclusive with expires."}
 CORRECT_SCHEMA = _schema(
     "memcue_correct", "Replace a stored fact with a corrected version (the history keeps the old one).",
     {"id": "Fact ID from memcue_search.", "content": _FACT_LANGUAGE_NOTE,
@@ -502,6 +504,7 @@ DREAM_PREPARE_SCHEMA = _schema(
     "Answer it with memcue_dream_apply. 'nothing for the dream' means there is nothing to do.",
     {"since": "Optional: 'all' reviews every fact, a date (YYYY-MM-DD) the facts written since; the default is "
               "the facts new since the last dream. The first dream on a base needs one of them."}, [])
+DREAM_PREPARE_SCHEMA["parameters"]["properties"]["noise"] = {"type": "boolean", "description": "Prepare only explicit one-off noise candidates, without split, duplicate or scope work."}
 DREAM_APPLY_SCHEMA = _schema(
     "memcue_dream_apply", "Apply the answer to the packet memcue_dream_prepare returned: memcue checks it and "
     "reports what it changed and what it refused.",
@@ -776,7 +779,7 @@ class MemcueMemoryProvider(MemoryProvider):
                 "newer fact that says otherwise is not that evidence on its own. When nothing in the session settles "
                 "it, answer from the facts and their days, name the conflict, and ask before you correct or retire "
                 "one."
-                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + "\n\n" + _PITFALL_FILTER_NOTE + ("\n\n" + hints if hints else ""))
+                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + "\n\n" + _PITFALL_FILTER_NOTE + "\n\n" + _REVIEW_EXPIRY_NOTE + ("\n\n" + hints if hints else ""))
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the note: MEMORY.md and USER.md of this
@@ -1256,6 +1259,8 @@ class MemcueMemoryProvider(MemoryProvider):
             return tool_error("the dream is off in this context")
         if tool_name == "memcue_dream_prepare":
             cmd = ["dream", "-prepare"]
+            if arg("noise"):
+                cmd.append("-noise")
             if arg("since") == "all":
                 cmd.append("-all")
             elif arg("since"):
@@ -1284,9 +1289,13 @@ class MemcueMemoryProvider(MemoryProvider):
             source = arg("source") or ("user" if arg("kind") in ("rule", "decision") else "agent")
             if source not in _ADD_SOURCES:
                 return tool_error("source must be one of: " + ", ".join(_ADD_SOURCES))
+            if arg("expires") and arg("no_expires"):
+                return tool_error("expires and no_expires are mutually exclusive")
             cmd = ["add", "-source", source, "-cwd", self._workspace]
             if arg("expires"):
                 cmd += ["-expires", arg("expires")]
+            if arg("no_expires"):
+                cmd += ["-no-expires"]
             if arg("kind"):
                 cmd += ["-kind", arg("kind")]
             if arg("scope"):

@@ -36,7 +36,8 @@ func (inv *invocation) runAddBatch(path string, force bool, out io.Writer) error
 	if inputs == nil {
 		return errors.New("batch input must be a non-null JSON array")
 	}
-	for _, in := range inputs {
+	for i := range inputs {
+		in := &inputs[i]
 		if strings.TrimSpace(in.Content) == "" {
 			return errors.New("empty fact in batch")
 		}
@@ -50,9 +51,15 @@ func (inv *invocation) runAddBatch(path string, force bool, out io.Writer) error
 		if !force && hasSecret(in.Content) {
 			return errors.New("batch contains a possible secret; use a password manager or explicit -force")
 		}
-		if (source == "agent" || source == "tool") && !recall.IsShelf(in.Scope) && vet.State(store.Fact{Content: in.Content, Meta: in.Meta}) != "" {
-			return errors.New("batch contains installation state; " + strings.TrimRight(stateWaysOut, ".\n"))
+		if (source == "agent" || source == "tool") && !recall.IsShelf(in.Scope) {
+			if vet.State(store.Fact{Content: in.Content, Meta: in.Meta}) != "" {
+				return errors.New("batch contains installation state; " + strings.TrimRight(stateWaysOut, ".\n"))
+			}
+			if part := vet.CaptureNoise(store.Fact{Content: in.Content, Meta: in.Meta}); part != "" {
+				return fmt.Errorf("batch contains %s, not reusable knowledge; use kind=event with an expiry or shelf:research as appropriate", part)
+			}
 		}
+		in.Expires = captureExpires(in.Kind, source, in.Scope, in.Expires, false)
 	}
 	if len(inputs) == 0 {
 		return nil
