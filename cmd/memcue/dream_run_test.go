@@ -114,7 +114,7 @@ func TestDreamRunLogsTheFailedCall(t *testing.T) {
 	fakeDreamRun(t, nil)
 	good := dreamRunFn
 	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
-		if strings.Contains(packet, "## Группа 1") {
+		if strings.Contains(packet, "## Group 1") {
 			return extract.DreamReply{Tokens: extract.Tokens{Input: 7}}, errModel
 		}
 		return good(ctx, packet)
@@ -185,7 +185,7 @@ func TestDreamRunAllStopsOnAFailedPass(t *testing.T) {
 	first := ""
 	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
 		// The packet of the second pass fails.
-		id := regexp.MustCompile("`packet` — ровно `([^`]+)`").FindStringSubmatch(packet)[1]
+		id := regexp.MustCompile("`packet` must be exactly `([^`]+)`").FindStringSubmatch(packet)[1]
 		mu.Lock()
 		if first == "" {
 			first = id

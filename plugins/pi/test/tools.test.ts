@@ -70,6 +70,7 @@ test('conflicting metadata and dream ranges fail without invoking the CLI', asyn
   const never: RunMemcue = async () => { assert.fail('CLI must not run'); };
   for (const [name, args] of [
     ['memcue_add', { text: 'fact', source: 'agent', scope: 'repo', shelf: 'research' }],
+    ['memcue_add', { text: 'fact', source: 'agent', expires: '2027-01-01', noExpires: true }],
     ['memcue_correct', { id: 'id', text: 'fact', expectedVersion: 2, expires: '2027-01-01', noExpires: true }],
     ['memcue_dream_prepare', { all: true, since: '2026-01-01' }],
   ] as const) {

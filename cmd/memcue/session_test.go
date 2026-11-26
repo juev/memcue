@@ -254,6 +254,12 @@ func TestSessionNotePreservesOtherMeasured647Instructions(t *testing.T) {
 		t.Fatal("session note does not carry the #802 fresh-checkout pitfall filter exactly once")
 	}
 	old = strings.Replace(old, "- When the user asks you to remember", pitfallFilter+"- When the user asks you to remember", 1)
+	// #805, not measured: agent/tool review facts get a bounded expiry unless durable knowledge is explicit.
+	const reviewExpiry = "- Agent/tool pitfall and environment facts expire after 30 days by default. Use -expires YYYY-MM-DD for a different review date, or -no-expires only for deliberately durable knowledge such as repeatable platform behavior.\n"
+	if strings.Count(sessionNote, reviewExpiry) != 1 {
+		t.Fatal("session note does not carry the #805 review-expiry rule exactly once")
+	}
+	old = strings.Replace(old, "- When the user asks you to remember", reviewExpiry+"- When the user asks you to remember", 1)
 	oldLines := strings.Split(old, "\n")
 	newLines := strings.Split(sessionNote, "\n")
 	// The introductory line stays; the new English fact rule and changed search-language line come next.

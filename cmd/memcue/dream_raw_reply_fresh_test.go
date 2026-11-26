@@ -52,7 +52,7 @@ func TestAutomaticDreamRejectsRawObsoleteReplyAtomically(t *testing.T) {
 				}
 				action := ""
 				top := ""
-				if hasFacts(packetBlock(packet, "## Данные: область")) {
+				if hasFacts(packetBlock(packet, "## Data: scope")) {
 					if kind == "translations" {
 						top = fmt.Sprintf(`,"translations":[{"id":%q,"translation":"obsolete translation"}]`, a)
 					}

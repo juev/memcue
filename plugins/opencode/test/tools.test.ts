@@ -65,6 +65,7 @@ test('conflicting metadata and dream ranges fail without invoking the CLI', asyn
   const never: RunMemcue = async () => { assert.fail('CLI must not run'); };
   for (const [name, args] of [
     ['memcue_add', { text: 'fact', source: 'agent', scope: 'repo', shelf: 'research' }],
+    ['memcue_add', { text: 'fact', source: 'agent', expires: '2027-01-01', noExpires: true }],
     ['memcue_correct', { id: 'id', text: 'fact', expectedVersion: 2, expires: '2027-01-01', noExpires: true }],
     ['memcue_dream_prepare', { all: true, since: '2026-01-01' }],
   ] as const) {
@@ -164,5 +165,5 @@ test('schemas carry the native constraints the model must respect', () => {
   };
   assert.deepEqual(answer.required, ['packet', 'splits', 'actions', 'scopes']);
   assert.deepEqual(answer.properties.actions.items?.properties.op.enum, ['retire', 'correct']);
-  assert.deepEqual(answer.properties.actions.items?.properties.kind.enum, ['duplicate', 'outdated', 'resolved']);
+  assert.deepEqual(answer.properties.actions.items?.properties.kind.enum, ['duplicate', 'outdated', 'resolved', 'noise']);
 });

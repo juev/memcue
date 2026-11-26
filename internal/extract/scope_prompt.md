@@ -1,20 +1,20 @@
-На входе — факты с областью `global` и список проектов базы (`projects`). Global-факт memcue подаёт в поиск из любого
-репозитория, а global-правило — ещё и в карточку каждой сессии. Global верен только тогда, когда факт верен в каждом
-репозитории и на каждом хосте: правило работы агента, общее для любой задачи, грабли инструмента, на которые можно
-наступить где угодно, сведения о пользователе.
+The input contains facts with the `global` scope and the base's project list (`projects`). A global memcue fact is
+available from every repository, and a global rule also reaches every session's rule search. Use global only for a fact
+that holds in every repository and on every host: an agent-wide rule, a tool pitfall that can recur anywhere, or
+information about the user.
 
-Для каждого факта реши, верен ли он везде. Если факт про один проект — называет его репозиторий, его файлы, CI,
-релизы, решения по нему или систему, которая живёт в одном репозитории из `projects`, — верни
-`{"id": "…", "scope": "…", "reason": "…"}`, где `scope` — одна строка из `projects`.
+For each fact, decide whether it really applies everywhere. If it concerns one project — its repository, files, CI,
+releases, decisions, or a system belonging to one project in `projects` — return
+`{"id": "…", "scope": "…", "reason": "…"}`, where `scope` is exactly one entry from `projects`.
 
-Правила:
+Rules:
 
-1. `scope` — только из `projects`, байт в байт. Проекта факта в списке нет — ничего не возвращай.
-2. Факт о двух и более проектах, о хосте или сервисе без своего репозитория в `projects`, о пользователе и его
-   привычках остаётся global: ничего не возвращай.
-3. `origin` говорит, где факт узнали, а не где он верен: правило, сказанное в одном репозитории, бывает общим.
-   Решай по тексту.
-4. Сомневаешься — оставь global.
-5. `reason` — одна фраза: какой проект факт называет.
+1. `scope` must be copied byte for byte from `projects`. If the fact's project is absent, return nothing for it.
+2. A fact about multiple projects, a host or service without its repository in `projects`, or the user and their habits
+   stays global: return nothing for it.
+3. `origin` records where a fact was learnt, not where it applies: a rule learnt in one repository can be general.
+   Decide from the text.
+4. When in doubt, keep the fact global.
+5. `reason` is one phrase naming the project the fact concerns.
 
-Большая часть фактов верна везде; пустой список — нормальный ответ.
+Most facts remain global; an empty list is a normal answer.

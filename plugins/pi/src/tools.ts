@@ -36,7 +36,8 @@ const addSchema = Type.Object({
   scope: optionalText('global, repo, host:NAME, repo:KEY, service:NAME or dir:/PATH. Mutually exclusive with shelf.'),
   shelf: optionalText('For example research. Ordinary search excludes shelves.'),
   origin: optionalText('Explicit source attribution when the current repository/date is insufficient.'),
-  expires: optionalText('Expiry date YYYY-MM-DD. Events default to seven days.'),
+  expires: optionalText('Expiry date YYYY-MM-DD. Events default to seven days; agent/tool pitfall and environment facts to 30 days.'),
+  noExpires: Type.Optional(Type.Boolean({ description: 'Store deliberately durable knowledge without expiry; mutually exclusive with expires.' })),
 }, { additionalProperties: false });
 const correctSchema = Type.Object({
   id: text(), text: text(), expectedVersion: version,
@@ -47,6 +48,7 @@ const retireSchema = Type.Object({ id: text(), expectedVersion: version }, { add
 const prepareSchema = Type.Object({
   all: Type.Optional(Type.Boolean({ description: 'Prepare all active facts; useful when no dream schedule exists.' })),
   since: optionalText('Start at YYYY-MM-DD or RFC3339. Mutually exclusive with all.'),
+  noise: Type.Optional(Type.Boolean({ description: 'Prepare only explicit one-off noise candidates, without split, duplicate or scope work.' })),
 }, { additionalProperties: false });
 const answerSchema = Type.Object({
   packet: text('Exact packet identifier from memcue_dream_prepare.'),
@@ -56,7 +58,7 @@ const answerSchema = Type.Object({
   actions: Type.Array(Type.Object({
     op: Type.Union([Type.Literal('retire'), Type.Literal('correct')]),
     id: text(), content: optionalText(), by: optionalText(),
-    kind: Type.Optional(Type.Union([Type.Literal('duplicate'), Type.Literal('outdated'), Type.Literal('resolved')])),
+    kind: Type.Optional(Type.Union([Type.Literal('duplicate'), Type.Literal('outdated'), Type.Literal('resolved'), Type.Literal('noise')])),
     reason: text(),
   }, { additionalProperties: false })),
   scopes: Type.Array(Type.Object({ id: text(), scope: text(), reason: text() }, { additionalProperties: false })),
@@ -133,12 +135,14 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
       + 'instead of duplicating it. Preserve the distinction between user instructions, observations and agent conclusions.',
     addSchema, true, async (params, ctx, signal) => {
       if (params.scope !== undefined && params.shelf !== undefined) throw new Error('scope and shelf are mutually exclusive.');
+      if (params.expires !== undefined && params.noExpires) throw new Error('expires and noExpires are mutually exclusive.');
       const args = ['add', '-cwd', ctx.cwd, '-source', params.source];
       addOption(args, '-kind', params.kind);
       addOption(args, '-scope', params.scope);
       addOption(args, '-shelf', params.shelf);
       addOption(args, '-origin', params.origin);
       addOption(args, '-expires', params.expires);
+      if (params.noExpires) args.push('-no-expires');
       args.push('--', params.text);
       return output(await run(args, { cwd: ctx.cwd, mutation: true, signal }));
     }),
@@ -164,6 +168,7 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
       if (params.all && params.since !== undefined) throw new Error('all and since are mutually exclusive.');
       const args = ['dream', '-prepare'];
       if (params.all) args.push('-all');
+      if (params.noise) args.push('-noise');
       addOption(args, '-since', params.since);
       return output(await run(args, { cwd: ctx.cwd, mutation: true, signal, timeoutMs: 60_000 }));
     }),

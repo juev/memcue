@@ -162,7 +162,8 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 	batch := fs.String("batch", "", "atomically add a JSON array of FactInput objects from a regular file")
 	origin := fs.String("origin", "", "where it was learnt: repository and date (default: those of -cwd or the working directory, empty outside a repository)")
 	cwd := fs.String("cwd", "", "working directory for the default origin (default: the process working directory; an empty value is no project)")
-	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: never)")
+	expires := fs.String("expires", "", "last day the fact is worth recalling, YYYY-MM-DD (default: 30 days for agent/tool pitfall or environment, never otherwise)")
+	noExpires := fs.Bool("no-expires", false, "store deliberately durable knowledge without an expiry")
 	// The default is the agent's: a fact stored without -source is most often an agent's own finding, and the user's
 	// words, the only source whose global decisions reach the session card, are named (#574).
 	source := fs.String("source", "agent", "who said it: user (the user's words), user_confirmed, tool (what a command showed), agent, note, memory")
@@ -185,6 +186,9 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 		}
 		return inv.runAddBatch(*batch, *force, out)
 	}
+	if *noExpires && *expires != "" {
+		return errors.New("add: -expires and -no-expires cannot be combined")
+	}
 	if !sources[*source] {
 		return fmt.Errorf("add: unknown -source %q", *source)
 	}
@@ -201,12 +205,15 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 		return err
 	}
 	content := strings.Join(fs.Args(), " ")
-	// The agent writes its own facts (#494): what it saw (tool) or concluded (agent) is live at once and meets no other
-	// check, so the state rule runs here (#475). A fact in the user's words keeps them, and a shelf fact says what an
-	// outside source states about another system, not the state of the user's machines (#565).
+	// The agent writes its own facts (#494): what it saw (tool) or concluded (agent) is live at once, subject to the
+	// installation-state and one-off capture checks (#475, #805). A fact in the user's words keeps them, and a shelf
+	// fact says what an outside source states about another system, not the state of the user's machines (#565).
 	if (*source == "agent" || *source == "tool") && !recall.IsShelf(*scope) {
 		if part := vet.State(store.Fact{Kind: *kind, Source: *source, Content: content}); part != "" {
 			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; %s", part, stateWaysOut)
+		}
+		if part := vet.CaptureNoise(store.Fact{Content: content, Meta: store.Meta{Kind: *kind, Scope: *scope, Source: *source}}); part != "" {
+			return fmt.Errorf("add: the fact records %s, not reusable knowledge; use -kind event with -expires for a temporary event, -shelf research for an external finding, or leave task progress in the session history", part)
 		}
 	}
 	if !*force && hasSecret(content) {
@@ -222,7 +229,7 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 	}
 	m := store.Meta{Kind: *kind, Scope: defaultScope(*scope, *origin), Source: *source}
 	return inv.withStore(func(s *store.Store) error {
-		f, err := s.AddWith(content, *origin, eventExpires(*kind, *expires), m)
+		f, err := s.AddWith(content, *origin, captureExpires(*kind, *source, *scope, *expires, *noExpires), m)
 		if err != nil {
 			return err
 		}
@@ -334,7 +341,7 @@ func originKey(origin string) string {
 const defaultEventTTL = 7
 
 // eventExpires gives an event fact a short life unless the caller set one, and MEMCUE_EVENT_TTL_DAYS says how long;
-// 0 keeps event facts without an expiry. A rule, a decision or a pitfall has no default expiry: it is knowledge.
+// 0 keeps event facts without an expiry. Rules and decisions have no default expiry; agent/tool pitfall and environment facts get a review expiry.
 func eventExpires(kind, expires string) string {
 	if expires != "" || kind != "event" {
 		return expires
@@ -349,6 +356,21 @@ func eventExpires(kind, expires string) string {
 		return ""
 	}
 	return time.Now().AddDate(0, 0, days).Format(time.DateOnly)
+}
+
+const defaultReviewTTL = 30
+
+func captureExpires(kind, source, scope, expires string, noExpires bool) string {
+	if expires != "" || noExpires {
+		return expires
+	}
+	if kind == "event" {
+		return eventExpires(kind, expires)
+	}
+	if (kind == "pitfall" || kind == "environment") && (source == "agent" || source == "tool") && !recall.IsShelf(scope) {
+		return time.Now().AddDate(0, 0, defaultReviewTTL).Format(time.DateOnly)
+	}
+	return ""
 }
 
 func (inv *invocation) runCorrect(args []string, out io.Writer) error {

@@ -11,7 +11,7 @@ MODEL, DATES = sys.argv[5], sys.argv[6] == "dates"
 key = key_path.read_text().strip()
 
 groups = []
-for block in re.split(r"^## Группа \d+\n", groups_path.read_text(), flags=re.M)[1:]:
+for block in re.split(r"^## (?:Группа|Group|Noise candidate) \d+\n", groups_path.read_text(), flags=re.M)[1:]:
     facts, cur = [], None
     for line in block.splitlines():
         m = re.match(r"- id (\S+) \(origin: (.*?); записан (\S+?)(?:, новый)?; ", line)

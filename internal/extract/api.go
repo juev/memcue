@@ -20,7 +20,7 @@ var API struct {
 
 // jsonAnswer replaces the structured output that `claude -p` enforces with a schema: chat completions only promise
 // some JSON object, so the prompt names the shape.
-const jsonAnswer = "\n\nОтвет — только JSON-объект, без пояснений и без markdown: " +
+const jsonAnswer = "\n\nReturn only a JSON object, with no explanation or markdown: " +
 	`{"facts": [{"content": "…"}], "dropped": "…", "outdated": []}` + "\n"
 
 // Tokens is the usage a call reports: an endpoint has no price, so its cost is counted from tokens; `claude -p` reports

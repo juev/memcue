@@ -1,6 +1,6 @@
 ---
 name: memcue
-description: Write to long-term memory (memcue). Use as soon as the user states a rule or a correction ("не так, делай так", "always", "never"), makes a decision the code does not show, or you find a pitfall, a host, a service or a pointer outside the repository that a later session will need; also when the user asks to remember or forget something ("запомни", "remember this"), or a stored fact turns out wrong or outdated.
+description: Write to long-term memory (memcue). Use as soon as the user states a rule or a correction ("не так, делай так", "always", "never"), makes a decision the code does not show, or you find a verified, unresolved pitfall with fresh-checkout reuse, a host, a service or a pointer outside the repository that a later session will need; also when the user asks to remember or forget something ("запомни", "remember this"), or a stored fact turns out wrong or outdated.
 ---
 
 # memcue: writing to memory
@@ -43,6 +43,8 @@ When a command fails and you fix or work around it, store the cause and the fix 
 Store it with `memcue add -kind pitfall -source tool -- "<cause and fix>"`.
 
 A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
+
+Agent/tool pitfall and environment facts expire after 30 days by default. Use `-expires YYYY-MM-DD` for a different review date, or `-no-expires` only for deliberately durable knowledge such as repeatable platform behavior.
 
 ## Remember
 

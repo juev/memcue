@@ -19,6 +19,7 @@ import (
 	"github.com/juev/memcue/internal/extract"
 	"github.com/juev/memcue/internal/recall"
 	"github.com/juev/memcue/internal/store"
+	"github.com/juev/memcue/internal/vet"
 )
 
 // A dream is a pass over the facts written since the last one: each new fact is grouped with the stored facts close
@@ -98,6 +99,7 @@ type dreamRecord struct {
 	Translated int `json:"translated,omitempty"`
 	// Swept counts the facts seen before that the merge sweep grouped with their neighbours.
 	Swept int `json:"swept,omitempty"`
+	Noise int `json:"noise,omitempty"` // facts the packet marked as eligible for noise review
 	// Grouped is what the dream grouped and what came of each group, by id only: it answers whether two facts were
 	// grouped in a run without the model.
 	Grouped []dreamGroupRecord `json:"grouped,omitempty"`
@@ -186,6 +188,7 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 	fs := flag.NewFlagSet("dream", flag.ContinueOnError)
 	since := fs.String("since", "", "review facts written since this date or RFC 3339 time (default: since the last dream)")
 	all := fs.Bool("all", false, "review every active fact")
+	noiseOnly := fs.Bool("noise", false, "review only explicit one-off noise candidates, without split, duplicate or scope work")
 	prep := fs.Bool("prepare", false, "print split, duplicate and scope work for the session's model; keep it for -apply")
 	list := fs.Bool("list", false, "print the groups and stop")
 	applyFile := fs.String("apply", "", "check and carry out the model's answer to the packet -prepare printed")
@@ -201,12 +204,12 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 	fs.Visit(func(f *flag.Flag) { jSet = jSet || f.Name == "j" })
 	if *run {
 		if *applyFile != "" || *since != "" || *prep || *list || *background && *all {
-			return errors.New("-run takes no other flag than -all or -background, and -j")
+			return errors.New("-run takes no other flag than -all, -noise or -background, and -j")
 		}
 		if *jobs < 1 {
 			return fmt.Errorf("-j %d: at least one packet", *jobs)
 		}
-		return inv.runDreamOnce(out, *all, *background, *jobs)
+		return inv.runDreamOnce(out, *all, *background, *noiseOnly, *jobs)
 	}
 	if jSet || *background {
 		return errors.New("-j and -background go with -run")
@@ -250,7 +253,7 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 			return err
 		}
 	}
-	rec, _, err := inv.prepare(dir, from, seen, *list, 1, out)
+	rec, _, err := inv.prepare(dir, from, seen, *list, 1, *noiseOnly, out)
 	switch {
 	case *list:
 		return err
@@ -349,6 +352,7 @@ type dreamPacket struct {
 	ScopeFrom   string           `json:"scope_from,omitempty"`   // the scope cursor the packet started from
 	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
 	Groups      []map[string]int `json:"groups"`
+	Noise       map[string]int   `json:"noise,omitempty"` // facts eligible for singleton or grouped noise retirement
 	// Deferred are the groups the packet bounds left out, kept for the record only.
 	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
 	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
@@ -398,7 +402,7 @@ const packetFile = "dream.packet.json"
 //
 // packets (#471) scales every bound: dream -run sends the work of that many packets at once, cut back into packets of
 // the usual bounds, so a pass of a base far behind does the work of several. The session's model gets one.
-func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, out io.Writer) (dreamRecord, dreamWork, error) {
+func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, noiseOnly bool, out io.Writer) (dreamRecord, dreamWork, error) {
 	out = inv.writer(out)
 	var work dreamWork
 	maxFresh, maxGroups := packets*packetFresh, packets*packetGroups
@@ -422,6 +426,9 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	if err != nil {
 		return rec, work, err
 	}
+	if noiseOnly {
+		fresh = slices.DeleteFunc(slices.Clone(fresh), func(f store.Fact) bool { return vet.CaptureNoise(f) == "" })
+	}
 	rec.Fresh = len(fresh)
 	batch := fresh
 	if len(batch) > maxFresh {
@@ -441,6 +448,7 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		return rec, work, err
 	}
 	swept := 0
+	var sweptFacts []store.Fact
 	isBatch := freshSet(batch)
 	for _, f := range sweepFacts(active, isFresh, cursor) {
 		if swept == packets*mergeSweep || gr.groupsWithout(isBatch) >= room {
@@ -451,6 +459,7 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		}
 		cursor = f.ID
 		swept++
+		sweptFacts = append(sweptFacts, f)
 	}
 	rec.Swept = swept
 	// Groups with a fresh fact come first, so the packet bound below leaves out sweep groups before them.
@@ -482,9 +491,35 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		batch = slices.DeleteFunc(slices.Clone(batch), func(f store.Fact) bool { return left[f.ID] })
 		isBatch = freshSet(batch)
 	}
-	rec.Groups = len(groups)
+	noise := map[string]int{}
+	grouped := map[string]bool{}
+	for _, g := range groups {
+		for _, f := range g {
+			grouped[f.ID] = true
+			if vet.CaptureNoise(f) != "" {
+				noise[f.ID] = f.Version
+			}
+		}
+	}
+	for _, f := range append(slices.Clone(batch), sweptFacts...) {
+		if len(groups) >= maxGroups {
+			break
+		}
+		if !grouped[f.ID] && vet.CaptureNoise(f) != "" {
+			groups = append(groups, []store.Fact{f})
+			noise[f.ID] = f.Version
+		}
+	}
+	if noiseOnly {
+		groups, noise = nil, map[string]int{}
+		for _, f := range batch {
+			groups = append(groups, []store.Fact{f})
+			noise[f.ID] = f.Version
+		}
+	}
+	rec.Groups, rec.Noise = len(groups), len(noise)
 	if list {
-		_, err := io.WriteString(out, renderGroups(groups, isBatch))
+		_, err := io.WriteString(out, renderGroups(groups, isBatch, noise))
 		return rec, work, err
 	}
 	// Global facts get their scope checked a packet at a time, in the order of their ids, after a cursor (#607); a fact
@@ -495,12 +530,14 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		return rec, work, err
 	}
 	var scoped []store.Fact
-	for _, f := range active {
-		if len(scoped) == packets*packetScope {
-			break
-		}
-		if f.ID > scopeFrom && strings.EqualFold(f.Scope, "global") {
-			scoped = append(scoped, f)
+	if !noiseOnly {
+		for _, f := range active {
+			if len(scoped) == packets*packetScope {
+				break
+			}
+			if f.ID > scopeFrom && strings.EqualFold(f.Scope, "global") {
+				scoped = append(scoped, f)
+			}
 		}
 	}
 	var projects []string
@@ -510,10 +547,10 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		scopeCursor = scoped[len(scoped)-1].ID
 	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
-		Split: versions(batch), Deferred: deferred, Merge: cursor,
+		Split: versions(batch), Deferred: deferred, Merge: cursor, Noise: noise,
 		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor}
-	for _, f := range fresh {
-		if !isBatch[f.ID] {
+	for _, f := range active {
+		if noiseOnly || !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
 				p.Seen[f.ID] = v
 			} else {
@@ -533,9 +570,13 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		return rec, work, err
 	}
 	rec.Packet = p.ID
-	work = dreamWork{id: p.ID, split: batch, groups: groups, fresh: isBatch,
+	splitForModel := batch
+	if noiseOnly {
+		splitForModel = nil
+	}
+	work = dreamWork{id: p.ID, split: splitForModel, groups: groups, fresh: isBatch, noise: noise,
 		scope: scoped, projects: projects}
-	text, err := renderPacket(p.ID, batch, scoped, projects, groups, isBatch)
+	text, err := renderPacket(p.ID, splitForModel, scoped, projects, groups, isBatch, noise)
 	if err != nil {
 		return rec, work, err
 	}
@@ -546,7 +587,11 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 // renderPacket is the text the model reads: the instructions, the groups, the facts to split,
 // and the global facts to check the scope of with the projects they may move to.
 func renderPacket(id string, split, scope []store.Fact, projects []string, groups [][]store.Fact,
-	fresh map[string]bool) (string, error) {
+	fresh map[string]bool, noiseSets ...map[string]int) (string, error) {
+	var noise map[string]int
+	if len(noiseSets) > 0 {
+		noise = noiseSets[0]
+	}
 	splitIn, err := renderSplitInput(split)
 	if err != nil {
 		return "", err
@@ -557,13 +602,13 @@ func renderPacket(id string, split, scope []store.Fact, projects []string, group
 	}
 	var b strings.Builder
 	b.WriteString(extract.DreamInstructions(id))
-	b.WriteString("\n## Данные: разделение\n\n```json\n" + splitIn + "\n```\n")
-	b.WriteString("\n## Данные: область\n\n```json\n" + scopeIn + "\n```\n")
-	b.WriteString("\n## Данные: группы\n\n")
+	b.WriteString("\n## Data: splitting\n\n```json\n" + splitIn + "\n```\n")
+	b.WriteString("\n## Data: scope\n\n```json\n" + scopeIn + "\n```\n")
+	b.WriteString("\n## Data: groups and noise candidates\n\n")
 	if len(groups) == 0 {
-		b.WriteString("Групп нет.\n")
+		b.WriteString("No groups.\n")
 	}
-	b.WriteString(renderGroups(groups, fresh))
+	b.WriteString(renderGroups(groups, fresh, noise))
 	return b.String(), nil
 }
 
@@ -653,7 +698,7 @@ func (inv *invocation) applyAnswer(dir, path string, out io.Writer) (dreamRecord
 		// store will.
 		a.Actions[i].Content = strings.TrimSpace(a.Actions[i].Content)
 	}
-	ok, refused := checkActions(groups, a.Actions)
+	ok, refused := checkActionsWithNoise(groups, a.Actions, p.Noise)
 	rec.Refused = append(rec.Refused, refused...)
 	plan.Groups = planGroups(groups, ok)
 	rec.Fresh = len(p.Split)
@@ -1114,20 +1159,30 @@ func writeMergeCursor(dir, id string) error {
 	return os.WriteFile(filepath.Join(dir, "dream.merge"), []byte(id+"\n"), 0o600)
 }
 
-func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {
+func renderGroups(groups [][]store.Fact, fresh map[string]bool, noiseSets ...map[string]int) string {
+	var noise map[string]int
+	if len(noiseSets) > 0 {
+		noise = noiseSets[0]
+	}
 	var b strings.Builder
 	for i, g := range groups {
-		fmt.Fprintf(&b, "## Группа %d\n\n", i+1)
+		heading := "Group"
+		if len(g) == 1 {
+			if _, ok := noise[g[0].ID]; ok {
+				heading = "Noise candidate"
+			}
+		}
+		fmt.Fprintf(&b, "## %s %d\n\n", heading, i+1)
 		for _, f := range g {
 			mark := ""
 			if fresh[f.ID] {
-				mark = ", новый"
+				mark = ", new"
 			}
 			where := ""
 			if f.Scope != "" {
 				where = "; scope: " + f.Scope
 			}
-			fmt.Fprintf(&b, "- id %s (origin: %s%s; записан %s%s)\n  %s\n", f.ID, f.Origin, where,
+			fmt.Fprintf(&b, "- id %s (origin: %s%s; recorded %s%s)\n  %s\n", f.ID, f.Origin, where,
 				f.Created.Format(time.DateOnly), mark,
 				strings.Join(strings.Fields(f.Content), " "))
 		}
@@ -1136,10 +1191,14 @@ func renderGroups(groups [][]store.Fact, fresh map[string]bool) string {
 	return b.String()
 }
 
-// checkActions keeps the actions that name a fact of the groups sent, at most one per fact, a correction with text,
-// a retirement by another fact of its group that stays, a duplicate retired in favour of the smaller id, and leave
-// every group at least one active fact; the rest come back with why they were refused.
+// checkActions keeps actions on facts of the packet, at most one per fact. Duplicate and outdated retirement needs
+// covering evidence in the group; resolved and noise may use the fact itself, but noise also needs packet eligibility.
+// Only an eligible singleton noise candidate may leave a group empty; every other group keeps one active fact.
 func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract.Action, refused []string) {
+	return checkActionsWithNoise(groups, actions, nil)
+}
+
+func checkActionsWithNoise(groups [][]store.Fact, actions []extract.Action, noise map[string]int) (ok []extract.Action, refused []string) {
 	groupOf := map[string]int{}
 	left := make([]int, len(groups))
 	for i, g := range groups {
@@ -1154,6 +1213,8 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 	for _, a := range actions {
 		g, known := groupOf[a.ID]
 		byGroup, byKnown := groupOf[a.By]
+		_, noiseEligible := noise[a.ID]
+		noiseRetire := a.Op == "retire" && a.Kind == "noise"
 		switch {
 		case !known:
 			refused = append(refused, a.Op+" "+a.ID+": not a fact of the groups")
@@ -1161,9 +1222,13 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 			refused = append(refused, a.Op+" "+a.ID+": second action on the fact")
 		case a.Op == "correct" && a.Content == "":
 			refused = append(refused, "correct "+a.ID+": no content")
-		case a.Op == "retire" && left[g] == 1:
+		case noiseRetire && !noiseEligible:
+			refused = append(refused, "retire "+a.ID+": fact is not eligible for noise review in this packet")
+		case noiseRetire && strings.TrimSpace(a.Reason) == "":
+			refused = append(refused, "retire "+a.ID+": noise retirement needs a reason")
+		case a.Op == "retire" && left[g] == 1 && (!noiseRetire || len(groups[g]) != 1):
 			refused = append(refused, "retire "+a.ID+": last active fact of its group")
-		case a.Op == "retire" && a.By == "" && a.Kind != "resolved":
+		case a.Op == "retire" && a.By == "" && a.Kind != "resolved" && !noiseRetire:
 			refused = append(refused, "retire "+a.ID+": by "+a.By+" is not another fact of its group")
 		case a.Op == "retire" && a.By != "" && (!byKnown || byGroup != g || a.By == a.ID):
 			refused = append(refused, "retire "+a.ID+": by "+a.By+" is not another fact of its group")
@@ -1171,8 +1236,8 @@ func checkActions(groups [][]store.Fact, actions []extract.Action) (ok []extract
 			refused = append(refused, "retire "+a.ID+": by "+a.By+" is retired too")
 		case a.Op == "retire" && covers[a.ID]:
 			refused = append(refused, "retire "+a.ID+": it covers another retired fact")
-		case a.Op == "retire" && a.Kind != "duplicate" && a.Kind != "outdated" && a.Kind != "resolved":
-			refused = append(refused, "retire "+a.ID+": kind "+a.Kind+" is not duplicate, outdated or resolved")
+		case a.Op == "retire" && a.Kind != "duplicate" && a.Kind != "outdated" && a.Kind != "resolved" && !noiseRetire:
+			refused = append(refused, "retire "+a.ID+": kind "+a.Kind+" is not duplicate, outdated, resolved or noise")
 		case a.Op == "retire" && a.Kind == "duplicate" && a.ID < a.By:
 			// every machine keeps the smaller ID of a duplicate pair, so two dreams over one base cannot retire both
 			refused = append(refused, "retire "+a.ID+": a duplicate keeps the smaller id, retire "+a.By+" instead")

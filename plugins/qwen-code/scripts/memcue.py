@@ -406,11 +406,11 @@ def main():
         else:
             if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream', 'sessions'):
                 raise AdapterError('unsupported command; use search/add/correct/retire/reopen/facts/dump/version/dream/sessions')
-            if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-list']) or
+            if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-prepare', '-noise'], ['-prepare', '-all', '-noise'], ['-list'], ['-list', '-all', '-noise']) or
                                                 len(args.args) == 3 and args.args[:2] == ['-prepare', '-since'] and
                                                 args.args[2] and not args.args[2].startswith('-') or
                                                 len(args.args) == 2 and args.args[0] == '-apply'):
-                raise AdapterError('dream accepts only -prepare [-all | -since DATE], -list or -apply FILE; no background runner')
+                raise AdapterError('dream accepts only -prepare [-all] [-noise] [-since DATE], -list or -apply FILE; no background runner')
             call(config, ['version', '-minimum', '0.30.0'], os.getcwd())
             sys.stdout.write(call(config, [args.command, *args.args], os.getcwd(), timeout=60 if args.command == 'dream' else TIMEOUT))
     except (AdapterError, OSError, ValueError, KeyError, TypeError) as exc:

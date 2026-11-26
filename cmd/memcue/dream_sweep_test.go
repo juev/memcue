@@ -51,7 +51,7 @@ func TestDreamSweepRetiresAnOldDuplicate(t *testing.T) {
 	if err := dreamModel(nothingFresh(), &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) != 1 || strings.Contains((*calls)[0], ", новый") {
+	if len(*calls) != 1 || strings.Contains((*calls)[0], ", new") {
 		t.Fatalf("calls %q", *calls)
 	}
 	if f := storedFact(t, a); f.Status != store.Retired {
@@ -128,7 +128,7 @@ func TestDreamSweepIsBounded(t *testing.T) {
 		if err := dreamModel(nothingFresh(), &bytes.Buffer{}); err != nil {
 			t.Fatal(err)
 		}
-		if len(*calls) != 1 || strings.Contains((*calls)[0], "## Группа 2") ||
+		if len(*calls) != 1 || strings.Contains((*calls)[0], "## Group 2") ||
 			!strings.Contains((*calls)[0], pair[0]) || !strings.Contains((*calls)[0], pair[1]) {
 			t.Fatalf("want the one group %v, sent %q", pair, *calls)
 		}
@@ -219,7 +219,7 @@ func TestDreamSweepGroupDryRunAndChangedGroup(t *testing.T) {
 	if err := runDream(append([]string{"-list"}, nothingFresh()...), &list); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(list.String(), a) || !strings.Contains(list.String(), b) || strings.Contains(list.String(), ", новый") {
+	if !strings.Contains(list.String(), a) || !strings.Contains(list.String(), b) || strings.Contains(list.String(), ", new") {
 		t.Fatalf("list %q", list.String())
 	}
 	fakeDream(t, func(groups string) []extract.Action {

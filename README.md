@@ -1275,7 +1275,7 @@ by a search that names it; an expired fact only with `-expired`; and at most `-n
 your rules and decisions (`-kind rule,decision`) at the start of a task. `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
-says otherwise: what happened in one run is not the knowledge a later session needs. `add` without `-source` stores
+says otherwise: what happened in one run is not the knowledge a later session needs. An agent/tool `pitfall` or `environment` fact gets a 30-day review expiry; `-expires` chooses another date and `-no-expires` deliberately keeps durable knowledge without one. Expiry hides a fact from ordinary search and automatic repository pitfalls without deleting its history; a later verified use can renew it with `correct -no-expires`. Explicit one-off outcomes, resolved current-task defects and transient state are refused at capture rather than stored as durable knowledge. `add` without `-source` stores
 the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
 showed takes `-source tool`. Facts that carry a `channel` from the dream of 0.28.0 (#625) keep it; nothing reads or
 writes it since the card went:
@@ -1302,7 +1302,8 @@ memcue notes                         # which entries of the built-in memory note
 memcue reindex -dry-run              # index rows against the live facts, and how many lack their number term
 memcue reindex                       # rebuild the index from the live facts (-json for one JSON object)
 memcue dream -since 2026-10-19 -list # groups of similar facts a dream would review
-memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base)
+memcue dream -all -noise -list      # only explicit one-off noise candidates, without split, duplicate or scope work
+memcue dream -prepare                # the work of a dream, for the session's model (-all: the whole base; -noise: candidates only)
 memcue dream -apply answer.json      # check and carry out the model's answer to it
 ```
 
@@ -1436,11 +1437,15 @@ What the answer may do:
   refused, and the cursor stops before it, so a later packet gives it again. On a copy of the author's base it moved none
   of 25 facts that hold everywhere and 10 of 31 facts of one project, each to its own; 19 of the rest had no project
   to go to ([docs/research/global-scope-607-2026-11.md](docs/research/global-scope-607-2026-11.md)). The check only moves facts: a global fact made stale by a newer one is retired by a group, as any other.
-- **Retire** a fact of a group as a duplicate, as contradicted, or as explicitly resolved. For `duplicate` and
+- **Retire** a fact of a group as a duplicate, as contradicted, as explicitly resolved, or as one-off noise. For `duplicate` and
   `outdated`, name the fact that covers it (`by`). A `resolved` retirement needs no `by` when the fact's own text
-  records the fix; otherwise `by` names the grouped fact supplying that evidence. Of two duplicates the one with the
-  smaller id stays, whatever the model prefers, so machines dreaming over one shared base keep the same copy and never
-  retire both. Every group keeps at least one fact; a retired fact stays in the history.
+  records the fix; otherwise `by` names the grouped fact supplying that evidence. `noise` is limited to packet-marked
+  candidates whose own text explicitly records task progress, a finished experiment, a rejected candidate, a one-off
+  release or transient state, obsolete installation state, or a context-free fragment. Age, length, missing search
+  usage and a PR number alone are not evidence. Of two duplicates the one with the smaller id stays, whatever the model
+  prefers, so machines dreaming over one shared base keep the same copy and never retire both. Every ordinary group
+  keeps at least one fact; only an eligible singleton noise candidate may leave its group empty. A retired fact stays
+  in the history.
 - **Correct** a fact of a group with text built only from the facts of the group. Only the replacement content is written; it triggers no expansion or translation call.
 
 A duplicate learnt in another project than the fact that stays is kept (#607): a fact that holds in two repositories

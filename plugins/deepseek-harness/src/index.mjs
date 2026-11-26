@@ -44,6 +44,7 @@ const NOTE = `Long-term memory is memcue, a base of short facts learnt in earlie
 - Findings from outside sources go on the research shelf. When you read a web page, another project's documentation, a changelog, a paper or a benchmark that is not part of the repository, and find something a later investigation of the same subject would need (a limit, a behaviour, a trade-off or a limitation of a named system), store it at once with memcue_add and shelf research, naming the source (document, version or date) in the fact. Store what your conclusion rests on and its limits, not every detail of the page; store what the source states, not your conclusion for the task; say so when it is only a vendor's or an anonymous claim, and leave out what nothing supports. A document in the repository is what the repository shows: do not store it. A pitfall, a host or a fact of this repository goes where it goes today, not on the shelf. Search the shelf first (memcue_search with in shelf:research) and correct a fact that says the same or an older version. Ordinary search leaves the shelf out, and an answer with facts does not say that the shelf has more: when a task returns to a system, library or question that may have been researched before, also search with in shelf:research. A shelf fact is a lead from an earlier reading: before relying on it, compare its version or date with what the workspace uses, and correct or retire it when it no longer holds. An answer built on a shelf fact says no more than the fact and its source state, and marks an inference as one.
 - When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you finish if a later session in a fresh checkout would hit it again — even when the cause is in the repository's own files; what the repository shows is its documents, not a failure you found by running it.
 - A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
+- Agent/tool pitfall and environment facts expire after 30 days by default. Use -expires YYYY-MM-DD for a different review date, or -no-expires only for deliberately durable knowledge such as repeatable platform behavior.
 - Use memcue_search to find a fact and its id; memcue_correct or memcue_retire to fix or forget an existing fact. Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name the conflict, and ask before you correct or retire one.`
 
 /**
@@ -548,7 +549,8 @@ export function apply(ctx, config) {
 		parameters: {
 			text: { type: 'string', required: true, description: 'Write new and corrected facts in English regardless of the chat language. Preserve identifiers, commands, paths, versions, exact values and verbatim quotes. Keep the user\'s reply language unchanged.' },
 			origin: { type: 'string', description: 'Where the fact was learnt. Defaults to the repository of the session workspace and today.' },
-			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD (for a one-off reminder).' },
+			expires: { type: 'string', description: 'Optional last day the fact is worth recalling, YYYY-MM-DD. Agent/tool pitfall and environment facts default to 30 days.' },
+			no_expires: { type: 'boolean', description: 'Store deliberately durable knowledge without expiry; mutually exclusive with expires.' },
 			kind: { type: 'string', description: 'Optional: rule, decision, pitfall, environment, procedure (steps the user asked to remember) or event (what happened that the next days need; expires after a week unless expires is given).' },
 			source: { type: 'string', description: 'Optional who said it: user (the user\'s words; the default for rule and decision), user_confirmed, tool (seen in a tool\'s output) or agent (the default otherwise).' },
 			scope: { type: 'string', description: 'Optional: global, repo (this project only; memcue names it), host:<name> or service:<name>. Use global for a rule or decision of every project; a decision about one project or task is repo.' },
@@ -565,9 +567,11 @@ export function apply(ctx, config) {
 			const kind = String(args.kind ?? '').trim()
 			const source = String(args.source ?? '').trim() || (kind === 'rule' || kind === 'decision' ? 'user' : 'agent')
 			if (!ADD_SOURCES.includes(source)) return { stored: false, message: `memcue: source must be one of: ${ADD_SOURCES.join(', ')}` }
+			if (args.expires && args.no_expires) return { stored: false, message: 'memcue: expires and no_expires are mutually exclusive' }
 			const flags = ['add', '-source', source, '-cwd', sessionCwd(exec)]
 			if (args.origin) flags.push('-origin', String(args.origin))
 			if (args.expires) flags.push('-expires', String(args.expires))
+			if (args.no_expires) flags.push('-no-expires')
 			if (args.kind) flags.push('-kind', String(args.kind))
 			if (args.scope) flags.push('-scope', String(args.scope))
 			if (args.shelf) flags.push('-shelf', String(args.shelf))

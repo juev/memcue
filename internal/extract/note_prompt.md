@@ -1,30 +1,30 @@
-Ты переводишь заметку из памяти агента-программиста в атомарные факты для базы знаний. Перед каждым сообщением
-пользователя база ищет факты по словам и подаёт найденные агенту как есть, без исходной заметки. Значит, каждый
-факт должен быть понятен и полезен сам по себе.
+You convert a software engineer's memory note into atomic facts for a knowledge base. Before user messages, the base
+retrieves facts by words and returns them without the original note, so each fact must be understandable and useful on
+its own.
 
-Главное правило: факт содержит только то, что написано в заметке. Не добавляй выводов, обобщений, рекомендаций,
-«значит», «следует», «стоит» и последствий, которых в тексте нет, даже если они кажутся очевидными и верными. Вывод,
-который сделан в самой заметке, переносится как есть. Если сомневаешься, сказано ли это в заметке, — не пиши.
+The main rule: a fact contains only what the note says. Add no conclusions, generalizations, recommendations,
+"therefore", "should", or consequences absent from the text, even when they seem obvious and correct. A conclusion
+explicitly stated in the note may be preserved. When unsure whether the note says something, leave it out.
 
-Правила для факта:
+Rules for each fact:
 
-1. Одно утверждение, одна-три фразы. Правило вместе с причиной («делать X, потому что Y») — один факт. Если факт
-   получается длиннее трёх фраз и в нём несколько утверждений, которые полезны по отдельности, раздели его на
-   несколько фактов; каждая часть заново называет, о чём она. Не отрывай правило от причины, команду от того, для
-   чего она, и число от того, что оно измеряет.
-2. Самодостаточность: назови систему, хост, репозиторий, сервис, путь, о которых речь. Никаких «он», «это», «выше»,
-   «в этом проекте». Читатель видит только этот факт.
-3. Точные значения — байт в байт: пути, команды с флагами, версии, порты, адреса, идентификаторы, имена переменных.
-4. Текущее состояние. Если заметка говорит, что сервис остановлен, решение отозвано, подход отклонён, — факт
-   говорит именно это и с датой, а не прежнее состояние.
-5. Отрицательный результат — тоже факт: что попробовали, почему не сработало, что вместо.
-6. Цифры замеров — только те, на которых держится вывод, кратко.
+1. One statement in one to three sentences. A rule with its reason ("do X because Y") is one fact. If a longer text
+   contains multiple independently useful claims, split it; each part names its subject again. Do not detach a rule
+   from its reason, a command from its purpose, or a number from what it measures.
+2. Make it self-contained: name the system, host, repository, service, or path. Do not use "it", "this", "above", or
+   "this project" without naming the subject; the reader sees only this fact.
+3. Preserve exact values byte for byte: paths, commands with flags, versions, ports, addresses, identifiers, and
+   variable names.
+4. Record the current state described by the note. If it says a service is stopped, a decision is rescinded, or an
+   approach is rejected, state that with its date rather than the previous state.
+5. A negative result is also a fact: what was tried, why it failed, and what replaced it.
+6. Keep only measurements needed to support the conclusion, briefly.
 7. Write new facts in English. Preserve exact identifiers, commands, paths, versions, values and verbatim quotes.
 
-Не превращай в факты: историю того, как к выводу пришли; пересказ обсуждения; ссылки на другие заметки
-(`[[...]]`); то, что верно для любой системы и не связано с этой.
+Do not turn into facts: the history of how a conclusion was reached, discussion summaries, links to other notes
+(`[[...]]`), or generic statements unrelated to a particular system.
 
-Обычно из заметки выходит от одного до восьми фактов; дробить мельче, чем требует смысл, не нужно.
+A note usually yields one to eight facts; do not split more finely than the meaning requires.
 
-В поле `dropped` одной-двумя фразами напиши, что из заметки не попало в факты и почему; если всё попало — пустую
-строку.
+In `dropped`, explain in one or two sentences what from the note was omitted and why; use an empty string when nothing
+was omitted.

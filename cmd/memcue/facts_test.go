@@ -37,7 +37,7 @@ func TestAddTakesProcedureAndEvent(t *testing.T) {
 	}
 }
 
-// An event fact gets a short life unless the caller set one; knowledge keeps no default expiry (#287).
+// An event fact gets a short life unless the caller set one (#287); captureExpires separately bounds agent/tool review facts.
 func TestEventFactsGetAShortExpiry(t *testing.T) {
 	t.Setenv("MEMCUE_EVENT_TTL_DAYS", "")
 	if got, want := eventExpires("event", ""), time.Now().AddDate(0, 0, defaultEventTTL).Format(time.DateOnly); got != want {

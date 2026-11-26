@@ -142,12 +142,41 @@ class CaptureReuseTest(unittest.TestCase):
         for path in (PLUGINS.parent / 'cmd' / 'memcue' / 'session.go',
                      PLUGINS / 'claude-code' / 'skills' / 'memcue' / 'SKILL.md',
                      PLUGINS / 'hermes' / 'memcue' / '__init__.py',
-                     PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs'):
+                     PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs',
+                     PLUGINS / 'pi' / 'src' / 'instructions.ts',
+                     PLUGINS / 'opencode' / 'src' / 'instructions.ts',
+                     PLUGINS / 'kimi-code' / 'skills' / 'memcue' / 'SKILL.md',
+                     PLUGINS / 'kimi-code' / 'SYSTEM.md',
+                     PLUGINS / 'codex' / 'skills' / 'memcue' / 'SKILL.md',
+                     PLUGINS / 'codex' / 'policy.md',
+                     PLUGINS / 'qwen-code' / 'skills' / 'memcue' / 'SKILL.md'):
             with self.subTest(host=path.name):
                 flat = ' '.join(path.read_text(encoding='utf-8').split())
                 self.assertIn(' '.join(self.FILTER.split()), flat)
         hermes = (PLUGINS / 'hermes' / 'memcue' / '__init__.py').read_text(encoding='utf-8')
         self.assertGreaterEqual(hermes.count('_PITFALL_FILTER_NOTE'), 2)
+
+    def test_every_capture_surface_names_the_review_expiry(self):
+        paths = (PLUGINS.parent / 'cmd' / 'memcue' / 'session.go',
+                 PLUGINS / 'claude-code' / 'skills' / 'memcue' / 'SKILL.md',
+                 PLUGINS / 'hermes' / 'memcue' / '__init__.py',
+                 PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs',
+                 PLUGINS / 'pi' / 'src' / 'instructions.ts',
+                 PLUGINS / 'opencode' / 'src' / 'instructions.ts',
+                 PLUGINS / 'kimi-code' / 'skills' / 'memcue' / 'SKILL.md',
+                 PLUGINS / 'kimi-code' / 'SYSTEM.md',
+                 PLUGINS / 'codex' / 'skills' / 'memcue' / 'SKILL.md',
+                 PLUGINS / 'codex' / 'policy.md',
+                 PLUGINS / 'qwen-code' / 'skills' / 'memcue' / 'SKILL.md')
+        for path in paths:
+            with self.subTest(host=path.name):
+                text = path.read_text(encoding='utf-8')
+                self.assertIn('expire after 30 days', text)
+                self.assertIn('deliberately durable knowledge', text)
+        for path in (PLUGINS / 'pi' / 'src' / 'tools.ts', PLUGINS / 'opencode' / 'src' / 'tools.ts'):
+            self.assertIn('noExpires', path.read_text(encoding='utf-8'))
+        for path in (PLUGINS / 'hermes' / 'memcue' / '__init__.py', PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs'):
+            self.assertIn('no_expires', path.read_text(encoding='utf-8'))
 
     def test_native_add_descriptions_reject_one_off_pitfalls(self):
         constraint = (

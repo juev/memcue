@@ -24,6 +24,8 @@ Hook child environment does not propagate to later shell calls. Run commands fro
   them from the transcript. Correct an existing fact rather than adding a duplicate. Preserve source, kind, scope and expiry.
   Store user rules and decisions the code does not show, durable pitfalls, and useful external context. Do not store task
   progress, what the repository shows, credentials, or procedures the user did not ask to remember.
+- A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
+- Agent/tool pitfall and environment facts expire after 30 days by default. Use `-expires YYYY-MM-DD` for a different review date, or `-no-expires` only for deliberately durable knowledge such as repeatable platform behavior.
 - When the user sets or corrects a standing preference, save it in the same turn. Before the first edit that depends on it
   or the final reply, search for a matching fact, add or correct it, and read it back with `search -json`.
   For a new repository-only rule, use `-kind rule -source user -scope repo`. A request for one document or task stays in that task.

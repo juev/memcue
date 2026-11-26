@@ -175,8 +175,8 @@ func TestDreamPrepareChangesNothing(t *testing.T) {
 	if err := runDream([]string{"-prepare", "-all"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"memcue dream -apply", "## Задача 1.", "## Задача 2.", "## Задача 3.",
-		"## Данные: группы", a, b} {
+	for _, want := range []string{"memcue dream -apply", "## Task 1.", "## Task 2.", "## Task 3.",
+		"## Data: groups and noise candidates", a, b} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("packet lacks %q", want)
 		}
@@ -459,8 +459,8 @@ func TestDreamReviewsFactPulledAfterLastDream(t *testing.T) {
 	if len(*calls) != 1 || !strings.Contains((*calls)[0], pulled) || !strings.Contains((*calls)[0], a) {
 		t.Fatalf("pulled fact not reviewed with its neighbour: %q", *calls)
 	}
-	if !strings.Contains((*calls)[0], pulled+" (origin: y 2026-10-20; записан 2026-") ||
-		!strings.Contains((*calls)[0], ", новый)") {
+	if !strings.Contains((*calls)[0], pulled+" (origin: y 2026-10-20; recorded 2026-") ||
+		!strings.Contains((*calls)[0], ", new)") {
 		t.Errorf("pulled fact not marked new: %q", (*calls)[0])
 	}
 }
@@ -507,7 +507,7 @@ func TestDreamSkipsSeenReviewsNewVersion(t *testing.T) {
 	if err := dreamModel(nil, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if len(*calls) != 1 || !strings.Contains((*calls)[0], other) || !strings.Contains((*calls)[0], b+" (origin: x 2026-10-19; записан 2026-") {
+	if len(*calls) != 1 || !strings.Contains((*calls)[0], other) || !strings.Contains((*calls)[0], b+" (origin: x 2026-10-19; recorded 2026-") {
 		t.Fatalf("new fact and new version not reviewed: %q", *calls)
 	}
 }

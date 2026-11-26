@@ -1050,6 +1050,15 @@ class ProviderTest(unittest.TestCase):
         self.assertIn(f"expires={until}", line)
         self.assertIn("пересоздания контейнера, теперь с новым ключом.", line)
 
+    def test_add_with_no_expiry_marks_deliberately_durable_knowledge(self):
+        json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "On host x, use the Unix socket at /srv/memcue/socket for local requests.",
+            "kind": "environment", "source": "tool", "no_expires": True}))
+        self.assertNotIn("expires=", self.facts()[0])
+        refused = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Another durable fact.", "expires": "2027-01-01", "no_expires": True}))
+        self.assertIn("mutually exclusive", refused["error"])
+
     def test_add_with_expiry_keeps_the_expiry(self):
         json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Напоминание: 21 октября проверить dream в memcue.",

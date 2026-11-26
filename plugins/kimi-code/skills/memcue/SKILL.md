@@ -1,6 +1,6 @@
 ---
 name: memcue
-description: Search and write long-term memory when the user states a durable rule, decision or correction, asks to remember or forget something, or a verified pitfall or external finding will help a later session.
+description: Search and write long-term memory when the user states a durable rule, decision or correction, asks to remember or forget something, or a verified, unresolved pitfall with fresh-checkout reuse or an external finding will help a later session.
 ---
 
 # Write memory with the existing CLI
@@ -45,6 +45,10 @@ Choose metadata deliberately on add:
 - Procedures: `-kind procedure` only when the user asks to remember them.
 - Temporary events: `-kind event`, with `-expires YYYY-MM-DD` when the default seven days is unsuitable.
 - Agent conclusions: `-source agent`, clearly distinguished from observed evidence and user instructions.
+
+A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
+
+Agent/tool pitfall and environment facts expire after 30 days by default. Use `-expires YYYY-MM-DD` for a different review date, or `-no-expires` only for deliberately durable knowledge such as repeatable platform behavior.
 
 Keep each fact self-contained and atomic. Name the system and useful search words. Do not store credentials, task
 progress, what the repository shows, installation state or unrequested procedures. Default origin comes from the
