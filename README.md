@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.5`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.6`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.6 | 9 | 0.40.6 | 0.40.6 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.6 (`hermes-agent` >=0.17.0) |
 | 0.40.5 | 9 | 0.40.5 | 0.40.5 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.5 (`hermes-agent` >=0.17.0) |
 | 0.40.4 | 9 | 0.40.4 | 0.40.4 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.4 (`hermes-agent` >=0.17.0) |
 | 0.40.3 | 9 | 0.40.3 | 0.40.3 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.3 (`hermes-agent` >=0.17.0) |
@@ -332,6 +333,19 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.6: bounded memory capture and noise cleanup (#805)
+
+- Agent/tool `pitfall` and `environment` facts now expire after 30 days by default. Use `-expires` for another review
+  date or `-no-expires` for deliberately durable knowledge. Existing facts keep their expiry; rules, decisions and
+  research shelves are unchanged. Explicit one-off outcomes and resolved current-task incidents are refused at capture.
+- Dream accepts `retire kind="noise"` only for packet-eligible one-off records. `dream -noise` reviews just those
+  candidates without split, duplicate or scope work. Singleton noise retirement is allowed, ordinary groups still keep
+  one fact, and noise-only review does not mark unreviewed durable facts as seen.
+- Model-facing prompts are English. Stored facts and user-facing diagnostics are not translated. `NotePromptVersion`
+  is 2; rerunning note migration remains an explicit action.
+- Update the binary and installed plugins together. The fact-base schema stays at 9; no migration is needed from
+  0.40.5.
 
 ### 0.40.5: retire explicitly resolved pitfalls (#802, #803)
 
