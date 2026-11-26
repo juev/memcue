@@ -1,6 +1,6 @@
 {
   "name": "memcue-transport",
-  "version": "0.40.5",
+  "version": "0.40.6",
   "description": "The memcue CLI transport and binary install shared by the native harness plugins",
   "type": "module",
   "license": "MIT",
