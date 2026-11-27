@@ -1,3 +1,3 @@
 name: memcue
-version: 0.40.7
+version: 0.40.8
 description: "memcue — long-term memory as a base of atomic facts: the model uses memcue_search when prior context matters, built-in memory writes are mirrored into it, and facts can expire. Runs the memcue binary."

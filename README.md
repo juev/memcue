@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.7`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.8`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.8 | 9 | 0.40.8 | 0.40.8 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.8 (`hermes-agent` >=0.17.0) |
 | 0.40.7 | 9 | 0.40.7 | 0.40.7 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.7 (`hermes-agent` >=0.17.0) |
 | 0.40.6 | 9 | 0.40.6 | 0.40.6 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.6 (`hermes-agent` >=0.17.0) |
 | 0.40.5 | 9 | 0.40.5 | 0.40.5 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.5 (`hermes-agent` >=0.17.0) |
@@ -334,6 +335,14 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.8: batched Flash dream review (#810)
+
+- Dream runs configured with `deepseek-flash` screen noise and compare groups without thinking. Direct pair
+  retirements require a separate confirmation and the existing version checks.
+- The server screens fresh records for noise and revisits older pairs on the weekly sweep. Scope, splits,
+  and unresolved groups use reasoning.
+- Upgrades from 0.40.7 use fact-base schema 9 and the existing CLI flags.
 
 ### 0.40.7: bounded dream sweep and restart handling (#808)
 
