@@ -33,7 +33,11 @@ func (f *flashPass) judge(rec dreamCallRecord, system, input string, cap int, ke
 	rec.Tokens, rec.Model = r.Tokens, ms(time.Since(start))
 	var labels map[string]string
 	if err == nil {
-		labels, err = parseFlashLabels(r.Answer, keys, allowed...)
+		parse := parseFlashLabels
+		if rec.Task == "flash-noise" {
+			parse = parseFlashNoiseLabels
+		}
+		labels, err = parse(r.Answer, keys, allowed...)
 	}
 	if err != nil {
 		err = fmt.Errorf("%s: %w", rec.Task, err)
