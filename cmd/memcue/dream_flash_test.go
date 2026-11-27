@@ -198,22 +198,25 @@ func TestFlashJudgeRetriesInvalidIDsThenSkipsMalformedPairOrConfirmation(t *test
 					defer mu.Unlock()
 					requests++
 					if recoverOnRetry && requests == 2 {
-						writeFlashResponse(w, map[string]string{"want": "yes"})
+						writeFlashResponse(w, map[string]string{"f01.covered": "yes"})
 						return
 					}
-					writeFlashResponse(w, map[string]string{"extra": "yes", "unknown": "yes"})
+					writeFlashResponse(w, map[string]string{"f99.covered": "yes", "text that should not enter the diagnostic": "yes"})
 				}))
 				defer endpoint.Close()
 				withFlashEndpoint(t, endpoint)
 				pass := flashPass{ctx: t.Context()}
-				labels, err := pass.judge(dreamCallRecord{Task: task}, "system", "input", 64, []string{"want"}, "yes")
-				if err != nil || (labels["want"] == "yes") != recoverOnRetry || len(pass.calls) != 2 {
+				labels, err := pass.judge(dreamCallRecord{Task: task}, "system", "input", 64, []string{"f01.covered"}, "yes")
+				if err != nil || (labels["f01.covered"] == "yes") != recoverOnRetry || len(pass.calls) != 2 {
 					t.Fatalf("labels=%v, err=%v, calls=%+v", labels, err, pass.calls)
 				}
-				for _, id := range []string{"want", "extra", "unknown"} {
+				for _, id := range []string{"f01.covered", "f99.covered", "<invalid ID>"} {
 					if !strings.Contains(pass.calls[0].Error, id) {
 						t.Errorf("first attempt omitted label ID %q: %s", id, pass.calls[0].Error)
 					}
+				}
+				if strings.Contains(pass.calls[0].Error, "should not enter") {
+					t.Error("diagnostic echoed non-ID text")
 				}
 				if (pass.calls[1].Error == "") != recoverOnRetry {
 					t.Errorf("second attempt error: %q", pass.calls[1].Error)

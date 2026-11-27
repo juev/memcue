@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"regexp"
 	"slices"
 
 	"github.com/juev/memcue/internal/extract"
@@ -266,6 +267,8 @@ func flashConfirmationPrompt(action extract.Action, facts map[string]store.Fact)
 	return system, string(input), nil
 }
 
+var flashLabelID = regexp.MustCompile(`^(verdict|f[0-9]{2,8}(\.(covered|replaced|resolved|conflict|complement))?)$`)
+
 func parseFlashLabels(raw []byte, keys []string, allowed ...string) (map[string]string, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	if opening, err := decoder.Token(); err != nil || opening != json.Delim('{') {
@@ -296,6 +299,11 @@ func parseFlashLabels(raw []byte, keys []string, allowed ...string) (map[string]
 	}
 	received := slices.Sorted(maps.Keys(labels))
 	if !slices.Equal(received, slices.Sorted(slices.Values(keys))) {
+		for i, id := range received {
+			if !flashLabelID.MatchString(id) {
+				received[i] = "<invalid ID>"
+			}
+		}
 		return nil, fmt.Errorf("flash response: missing or unexpected label IDs (expected %q, received %q)", keys, received)
 	}
 	valid := make(map[string]bool, len(allowed))
