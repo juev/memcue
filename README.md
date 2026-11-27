@@ -1461,19 +1461,24 @@ Who runs it:
   prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
   `memcue_dream_apply` (#494). Hermes builds the system prompt once and again after a compression or a reset, so the
   line is as fresh as the last rebuild ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
-- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left. It uses
-  the endpoint when `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks)
-  otherwise. The merge sweep alone does not keep an ordinary `-all` run going. The command stops on the first failed
-  pass or after 200 passes. An ordinary run also stops after three passes that change nothing. A second run resumes.
+- **The whole base.** `memcue dream -run -all` alternates pending fresh/scope work with a bounded old-fact sweep.
+  It reports swept and remaining counts, saves the old-fact cursor in `dream.all.json`, and resumes after a failed
+  pass or the 200-pass limit. A completed sweep does not start again for seven days; fresh work can still run.
+  It uses the endpoint when `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools,
+  no hooks) otherwise.
   With an endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405).
-  `-noise` saves a separate checkpoint for each reviewed text. An explicit `actions: []` marks the unchanged
-  candidates reviewed. Edited text is eligible again. This applies to `-run -all -noise` and the manual
-  `-prepare -noise` / `-apply` flow. Review the first answers against a live base manually before applying them.
+  `memcue dream -run -all -noise` screens every active fact for one-off noise, including facts the local filter
+  would not have selected. It does no split, duplicate, or scope work. Only facts that also pass the existing
+  local noise filter can be retired; other noise proposals are reported and kept. It saves a separate checkpoint
+  in `dream.noise.all.json`: unchanged text is not sent again, and new or edited text is eligible on the next run.
+  The manual `-prepare -noise` / `-apply` flow still sends only locally selected candidates and has its own checkpoint.
   Without `-all` or `-noise`, `-run` uses the same schedule as session start. A direct `-run` without `-all` requires
   `MEMCUE_API_URL`. The local `-background` run can use `claude -p`.
 - **DeepSeek Flash review.** With `MEMCUE_API_URL` and `MEMCUE_MODEL=deepseek-flash`, regular dream runs
   classify noise and compare up to six same-project groups per request without thinking. Each proposed pair
-  retirement gets a separate confirmation. Reasoning handles splits, scope checks, and unresolved groups.
+  retirement gets a separate confirmation. An invalid label reply is retried; mixed pair batches are split to
+  isolate a persistent failure, and unconfirmed actions are not applied. Reasoning handles splits, scope checks,
+  and unresolved groups.
   The endpoint must support DeepSeek's thinking switch. The same route runs in the background and on the server.
   Server noise screening covers fresh facts, and the weekly sweep revisits older groups. See
   [the synthetic comparison](docs/research/dream-noise-2026-11.md#running-the-full-cli).

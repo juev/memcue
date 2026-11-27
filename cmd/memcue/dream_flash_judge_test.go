@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+func TestParseFlashLabelsRejectsConflictingDuplicateVerdicts(t *testing.T) {
+	if labels, err := parseFlashLabels([]byte(`{"verdict":"reject","verdict":"confirm"}`), []string{"verdict"}, "reject", "confirm"); err == nil {
+		t.Fatalf("ambiguous reply was accepted: %v", labels)
+	}
+}
+
 func TestParseFlashNoiseLabels(t *testing.T) {
 	tests := []struct {
 		name    string

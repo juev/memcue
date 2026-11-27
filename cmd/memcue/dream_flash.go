@@ -27,24 +27,35 @@ type flashPass struct {
 func (f *flashPass) judge(rec dreamCallRecord, system, input string, cap int, keys []string, allowed ...string) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(f.ctx, dreamRunTimeout)
 	defer cancel()
-	start := time.Now()
-	r, err := extract.DreamFlashJudgment(ctx, system, input, cap)
-	f.reply.Tokens.Add(r.Tokens)
-	rec.Tokens, rec.Model = r.Tokens, ms(time.Since(start))
-	var labels map[string]string
-	if err == nil {
-		parse := parseFlashLabels
-		if rec.Task == "flash-noise" {
-			parse = parseFlashNoiseLabels
+	parse := parseFlashLabels
+	if rec.Task == "flash-noise" {
+		parse = parseFlashNoiseLabels
+	}
+	var err error
+	for range 2 {
+		start := time.Now()
+		r, requestErr := extract.DreamFlashJudgment(ctx, system, input, cap)
+		f.reply.Tokens.Add(r.Tokens)
+		rec.Tokens, rec.Model, rec.Error = r.Tokens, ms(time.Since(start)), ""
+		var labels map[string]string
+		err = requestErr
+		if err == nil {
+			labels, err = parse(r.Answer, keys, allowed...)
 		}
-		labels, err = parse(r.Answer, keys, allowed...)
+		if err != nil {
+			err = fmt.Errorf("%s: %w", rec.Task, err)
+			rec.Error = err.Error()
+		}
+		f.calls = append(f.calls, rec)
+		if requestErr != nil || err == nil {
+			return labels, err
+		}
 	}
-	if err != nil {
-		err = fmt.Errorf("%s: %w", rec.Task, err)
-		rec.Error = err.Error()
+	if rec.Task == "flash-noise" {
+		return nil, err
 	}
-	f.calls = append(f.calls, rec)
-	return labels, err
+	// A malformed pair or confirmation cannot authorize a retirement.
+	return nil, nil
 }
 
 func runFlashDream(ctx context.Context, w dreamWork, packet *dreamPacket) (extract.DreamReply, []dreamCallRecord, error) {
@@ -82,7 +93,7 @@ func (f *flashPass) run(w dreamWork, packet *dreamPacket) error {
 		return out
 	}
 	noise := make(map[string]int)
-	var actions []extract.Action
+	actions := []extract.Action{}
 	for chunk := range slices.Chunk(slices.Sorted(maps.Keys(candidates)), flashNoiseBatch) {
 		batch := make([]store.Fact, 0, len(chunk))
 		keys := make([]string, 0, len(chunk))
@@ -131,7 +142,8 @@ func (f *flashPass) run(w dreamWork, packet *dreamPacket) error {
 		}
 		comparable = append(comparable, group)
 	}
-	for groups := range slices.Chunk(comparable, flashGroupBatch) {
+	var judgePairs func([][]store.Fact) error
+	judgePairs = func(groups [][]store.Fact) error {
 		promptGroups := make([][]store.Fact, 0, len(groups))
 		for _, group := range groups {
 			promptGroups = append(promptGroups, aliased(group))
@@ -146,6 +158,13 @@ func (f *flashPass) run(w dreamWork, packet *dreamPacket) error {
 			system, input, max(1200, 32*len(keys)), keys, "yes", "no", "uncertain")
 		if err != nil {
 			return err
+		}
+		if labels == nil && len(groups) > 1 {
+			mid := len(groups) / 2
+			if err := judgePairs(groups[:mid]); err != nil {
+				return err
+			}
+			return judgePairs(groups[mid:])
 		}
 		for _, group := range groups {
 			proposed, escalate := flashPairCandidates(group, aliases, labels)
@@ -167,6 +186,12 @@ func (f *flashPass) run(w dreamWork, packet *dreamPacket) error {
 				}
 			}
 		}
+		return nil
+	}
+	for groups := range slices.Chunk(comparable, flashGroupBatch) {
+		if err := judgePairs(groups); err != nil {
+			return err
+		}
 	}
 
 	w.groups, w.noise = fallback, nil
@@ -178,6 +203,9 @@ func (f *flashPass) run(w dreamWork, packet *dreamPacket) error {
 	}
 	answer.Actions = append(actions, answer.Actions...)
 	f.reply.Answer, err = json.Marshal(answer)
+	if w.noiseOnly {
+		return err
+	}
 	if err != nil {
 		return err
 	}
