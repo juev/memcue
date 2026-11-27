@@ -3,6 +3,7 @@ package extract
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -41,6 +42,16 @@ func DreamAnswer(ctx context.Context, packet string) (DreamReply, error) {
 	}
 	r.Answer = rp.payload
 	return r, nil
+}
+
+// DreamFlashJudgment requests bounded JSON from the configured DeepSeek-compatible endpoint without thinking.
+func DreamFlashJudgment(ctx context.Context, system, input string, maxTokens int) (DreamReply, error) {
+	ep := Endpoint{URL: API.URL, Model: Model, Key: API.Key, disableThinking: true, maxTokens: maxTokens}
+	rp, err := runAPI(ctx, ep, system, input)
+	if err == nil && rp.finish != "stop" {
+		err = fmt.Errorf("incomplete Flash judgment: finish reason %q", rp.finish)
+	}
+	return DreamReply{Answer: rp.payload, Tokens: rp.tokens}, err
 }
 
 // DreamReply is the answer to a dream packet and what the call took. API and TTFT are what `claude -p` reports of

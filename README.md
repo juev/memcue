@@ -1430,6 +1430,12 @@ Who runs it:
   `-prepare -noise` / `-apply` flow. Review the first answers against a live base manually before applying them.
   Without `-all` or `-noise`, `-run` uses the same schedule as session start. A direct `-run` without `-all` requires
   `MEMCUE_API_URL`. The local `-background` run can use `claude -p`.
+- **DeepSeek Flash review.** With `MEMCUE_API_URL` and `MEMCUE_MODEL=deepseek-flash`, regular dream runs
+  classify noise and compare up to six same-project groups per request without thinking. Each proposed pair
+  retirement gets a separate confirmation. Reasoning handles splits, scope checks, and unresolved groups.
+  The endpoint must support DeepSeek's thinking switch. The same route runs in the background and on the server.
+  Server noise screening covers fresh facts, and the weekly sweep revisits older groups. See
+  [the synthetic comparison](docs/research/dream-noise-2026-11.md#running-the-full-cli).
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups and the global facts to check the
   scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call
@@ -1438,7 +1444,7 @@ Who runs it:
   calls, the time of the packet, the calls and the apply, and the tokens of each pass (#471,
   [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)). Under `calls` it keeps a line per
   call (#643): its task (`review` for the fresh facts and the groups, the merge sweep's counted under `swept`,
-  `scope`), the work it was given, how many changes the model proposed, its tokens, its time
+  `scope`, plus `flash-noise`, `flash-pairs`, and `flash-confirm` on Flash), the work it was given, how many changes the model proposed, its tokens, its time
   and, on `claude -p`, its cost. An endpoint reports tokens only, so a call there has no `cost_usd`.
 
 - **The server.** In server mode only `memcue server` runs dream. It checks the queue every ten minutes.

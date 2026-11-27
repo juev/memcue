@@ -70,6 +70,7 @@ func run(ctx context.Context, system, input string) (Result, error) {
 // reply is one answer of the model: the JSON object it gave and what the call cost.
 type reply struct {
 	payload []byte
+	finish  string  // chat completions finish_reason
 	cost    float64 // as `claude -p` reports it
 	tokens  Tokens
 	// api and ttft are the time `claude -p` says the API took and took to its first token; an endpoint has neither.
