@@ -8,9 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -59,18 +57,15 @@ func runServer(args []string) error {
 	logger.Printf("serving %s as tailnet node %s, port %s", path, cfg.Hostname, serverPort)
 	dreams := make(chan struct{})
 	if dreamBackground() {
-		inv := newInvocation()
-		defer inv.close()
 		dir, err := stateDir()
 		if err != nil {
 			return err
 		}
 		go func() {
 			defer close(dreams)
-			runDreams(ctx, logger, func() (int, error) {
-				n, _, err := inv.dreamDue(dir, dreamEveryFromEnv(dreamEvery))
-				return n, err
-			}, func(ctx context.Context) error { return dreamProcess(ctx, dir) })
+			runDreams(ctx, logger, func(ctx context.Context) (bool, error) {
+				return runServerDreamBatches(ctx, dir, dreamEveryFromEnv(dreamEvery))
+			})
 		}()
 	} else {
 		close(dreams)
@@ -87,16 +82,16 @@ var dreamCheck = 10 * time.Minute
 
 // runDreams runs a dream of the server's base whenever one is due, until ctx ends (R11). The server is the only
 // machine that dreams in server mode; the dream's writes reach the replicas like any other change.
-func runDreams(ctx context.Context, logger *log.Logger, due func() (int, error), dream func(context.Context) error) {
-	for {
-		switch n, err := due(); {
-		case err != nil:
+func runDreams(ctx context.Context, logger *log.Logger, dream func(context.Context) (bool, error)) {
+	for ctx.Err() == nil {
+		more, err := dream(ctx)
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
 			logger.Printf("dream: %v", err)
-		case n > 0:
-			logger.Printf("dream: %d facts wait, dreaming", n)
-			if err := dream(ctx); err != nil && ctx.Err() == nil {
-				logger.Printf("dream: %v", err)
-			}
+		} else if more {
+			continue
 		}
 		t := time.NewTimer(dreamCheck)
 		select {
@@ -106,23 +101,6 @@ func runDreams(ctx context.Context, logger *log.Logger, due func() (int, error),
 		case <-t.C:
 		}
 	}
-}
-
-// dreamProcess runs one dream of the base as its own process, as a session start does on a local base, and waits for
-// it; dream.out in the state directory keeps what it said.
-func dreamProcess(ctx context.Context, dir string) error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	out, err := os.OpenFile(filepath.Join(dir, "dream.out"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = out.Close() }()
-	cmd := exec.CommandContext(ctx, exe, "dream", "-run", "-background")
-	cmd.Stdout, cmd.Stderr = out, out
-	return cmd.Run()
 }
 
 // serveBase serves st on ln until ctx ends. A long poll in progress ends with ctx and answers nothing.

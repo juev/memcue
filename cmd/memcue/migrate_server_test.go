@@ -144,20 +144,26 @@ func TestServerDreamsWhenADreamIsDue(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		runDreams(ctx, log.New(io.Discard, "", 0), func() (int, error) {
-			if checks.Add(1) < 3 {
-				return 0, nil
+		runDreams(ctx, log.New(io.Discard, "", 0), func(context.Context) (bool, error) {
+			if checks.Add(1) == 1 {
+				return false, nil
 			}
-			return 2, nil
-		}, func(context.Context) error { dreams.Add(1); cancel(); return nil })
+			dreams.Add(1)
+			// A continuation must run even though the next idle tick would be an hour away.
+			dreamCheck = time.Hour
+			if checks.Load() == 3 {
+				cancel()
+			}
+			return true, nil
+		})
 	}()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("runDreams did not stop")
 	}
-	if checks.Load() != 3 || dreams.Load() != 1 {
-		t.Fatalf("%d checks, %d dreams; want a dream at the third check", checks.Load(), dreams.Load())
+	if checks.Load() != 3 || dreams.Load() != 2 {
+		t.Fatalf("%d checks, %d dreams; want two dreams after one idle tick", checks.Load(), dreams.Load())
 	}
 }
 

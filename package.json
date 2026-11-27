@@ -1,6 +1,6 @@
 {
   "name": "memcue-dsh",
-  "version": "0.40.6",
+  "version": "0.40.7",
   "description": "memcue long-term memory for DeepSeek Harness (dsh): the model searches and writes its facts itself",
   "type": "module",
   "license": "MIT",

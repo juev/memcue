@@ -378,6 +378,16 @@ func applyRescopes(s *store.Store, rescopes []dreamPlanRescope, saw map[string]i
 	return changedFirst, nil
 }
 
+func dreamScopeFacts(active []store.Fact, cursor string) []store.Fact {
+	var scoped []store.Fact
+	for _, f := range active {
+		if f.ID > cursor && strings.EqualFold(f.Scope, "global") {
+			scoped = append(scoped, f)
+		}
+	}
+	return scoped
+}
+
 // readScopeCursor reads the id of the last global fact a dream gave to check the scope of; no file is the start.
 func readScopeCursor(dir string) (string, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "dream.scope"))

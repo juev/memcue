@@ -98,8 +98,13 @@ type dreamRecord struct {
 	// Translated reads historical dream.log records; new dreams never translate facts.
 	Translated int `json:"translated,omitempty"`
 	// Swept counts the facts seen before that the merge sweep grouped with their neighbours.
-	Swept int `json:"swept,omitempty"`
-	Noise int `json:"noise,omitempty"` // facts the packet marked as eligible for noise review
+	Swept          int  `json:"swept,omitempty"`
+	Noise          int  `json:"noise,omitempty"` // facts the packet marked as eligible for noise review
+	NoiseChecked   int  `json:"noise_checked,omitempty"`
+	NoiseRemaining *int `json:"noise_remaining,omitempty"`
+
+	sweepCursor   string
+	scopeAdvanced bool
 	// Grouped is what the dream grouped and what came of each group, by id only: it answers whether two facts were
 	// grouped in a run without the model.
 	Grouped []dreamGroupRecord `json:"grouped,omitempty"`
@@ -137,6 +142,7 @@ type dreamPlan struct {
 	Translations []dreamPlanTranslation `json:"translations,omitempty"`
 	Groups       []dreamPlanGroup       `json:"groups"`
 	Merge        string                 `json:"merge,omitempty"` // the sweep cursor to keep once the plan is carried out
+	OldSweep     bool                   `json:"old_sweep,omitempty"`
 	// Rescopes are the global facts to move to one project, with the version the model read (#607).
 	Rescopes []dreamPlanRescope `json:"rescopes,omitempty"`
 	// ScopeCursor is the last global fact the packet gave to check, kept once the plan is carried out; ScopeFrom the
@@ -244,6 +250,7 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 		if from, err = parseSince(*since); err != nil {
 			return err
 		}
+	case *noiseOnly:
 	default:
 		var ok bool
 		if from, ok = lastDream(dir); !ok {
@@ -253,7 +260,7 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 			return err
 		}
 	}
-	rec, _, err := inv.prepare(dir, from, seen, *list, 1, *noiseOnly, out)
+	rec, _, err := inv.prepare(dir, from, seen, *list, 1, dreamOptions{noiseOnly: *noiseOnly}, out)
 	switch {
 	case *list:
 		return err
@@ -353,6 +360,9 @@ type dreamPacket struct {
 	ScopeCursor string           `json:"scope_cursor,omitempty"` // the scope cursor once the answer is applied
 	Groups      []map[string]int `json:"groups"`
 	Noise       map[string]int   `json:"noise,omitempty"` // facts eligible for singleton or grouped noise retirement
+	NoiseOnly   bool             `json:"noise_only,omitempty"`
+	NoiseSince  *time.Time       `json:"noise_since,omitempty"`
+	OldSweep    bool             `json:"old_sweep,omitempty"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
 	Deferred []dreamGroupRecord `json:"deferred,omitempty"`
 	Merge    string             `json:"merge,omitempty"` // the sweep cursor once the answer is applied
@@ -402,8 +412,11 @@ const packetFile = "dream.packet.json"
 //
 // packets (#471) scales every bound: dream -run sends the work of that many packets at once, cut back into packets of
 // the usual bounds, so a pass of a base far behind does the work of several. The session's model gets one.
-func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, noiseOnly bool, out io.Writer) (dreamRecord, dreamWork, error) {
+func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, options dreamOptions, out io.Writer) (dreamRecord, dreamWork, error) {
 	out = inv.writer(out)
+	if options.noiseOnly {
+		return inv.prepareNoise(dir, from, list, packets, out)
+	}
 	var work dreamWork
 	maxFresh, maxGroups := packets*packetFresh, packets*packetGroups
 	start := time.Now()
@@ -422,12 +435,17 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	if err != nil {
 		return rec, work, err
 	}
+	if options.server && seen == nil {
+		seen = map[string]int{}
+		for _, f := range active {
+			if f.Created.Before(from) {
+				seen[f.ID] = f.Version
+			}
+		}
+	}
 	fresh, err := freshFacts(s, active, from, seen)
 	if err != nil {
 		return rec, work, err
-	}
-	if noiseOnly {
-		fresh = slices.DeleteFunc(slices.Clone(fresh), func(f store.Fact) bool { return vet.CaptureNoise(f) == "" })
 	}
 	rec.Fresh = len(fresh)
 	batch := fresh
@@ -435,7 +453,13 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		batch = batch[:maxFresh]
 	}
 	isFresh := freshSet(fresh)
-	gr := newGrouper(active)
+	pool := active
+	if options.sweep != nil {
+		rec.Fresh = 0
+		batch = nil
+		pool = oldDreamFacts(active, "", options.sweep.through, isFresh)
+	}
+	gr := newGrouper(pool)
 	for _, f := range batch {
 		if err := gr.add(s, f); err != nil {
 			return rec, work, err
@@ -443,14 +467,29 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	}
 	// The sweep takes the room the fresh groups leave in the packet, so it never pushes a fresh fact to the next one.
 	room := min(packets*mergeGroups, maxGroups-len(gr.groups()))
-	cursor, err := readMergeCursor(dir)
-	if err != nil {
-		return rec, work, err
+	var cursor string
+	var anchors []store.Fact
+	switch {
+	case options.sweep != nil:
+		cursor = options.sweep.after
+		start, found := slices.BinarySearchFunc(pool, cursor, func(f store.Fact, id string) int {
+			return strings.Compare(f.ID, id)
+		})
+		if found {
+			start++
+		}
+		anchors = pool[start:]
+	case !options.server:
+		cursor, err = readMergeCursor(dir)
+		if err != nil {
+			return rec, work, err
+		}
+		anchors = sweepFacts(active, isFresh, cursor)
 	}
 	swept := 0
 	var sweptFacts []store.Fact
 	isBatch := freshSet(batch)
-	for _, f := range sweepFacts(active, isFresh, cursor) {
+	for _, f := range anchors {
 		if swept == packets*mergeSweep || gr.groupsWithout(isBatch) >= room {
 			break
 		}
@@ -462,6 +501,9 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		sweptFacts = append(sweptFacts, f)
 	}
 	rec.Swept = swept
+	if options.sweep != nil {
+		rec.sweepCursor, cursor = cursor, ""
+	}
 	// Groups with a fresh fact come first, so the packet bound below leaves out sweep groups before them.
 	var groups, sweepGroups [][]store.Fact
 	for _, g := range gr.groups() {
@@ -496,7 +538,7 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	for _, g := range groups {
 		for _, f := range g {
 			grouped[f.ID] = true
-			if vet.CaptureNoise(f) != "" {
+			if (!options.server || isBatch[f.ID]) && vet.CaptureNoise(f) != "" {
 				noise[f.ID] = f.Version
 			}
 		}
@@ -505,14 +547,7 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		if len(groups) >= maxGroups {
 			break
 		}
-		if !grouped[f.ID] && vet.CaptureNoise(f) != "" {
-			groups = append(groups, []store.Fact{f})
-			noise[f.ID] = f.Version
-		}
-	}
-	if noiseOnly {
-		groups, noise = nil, map[string]int{}
-		for _, f := range batch {
+		if (!options.server || isBatch[f.ID]) && !grouped[f.ID] && vet.CaptureNoise(f) != "" {
 			groups = append(groups, []store.Fact{f})
 			noise[f.ID] = f.Version
 		}
@@ -530,15 +565,9 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 		return rec, work, err
 	}
 	var scoped []store.Fact
-	if !noiseOnly {
-		for _, f := range active {
-			if len(scoped) == packets*packetScope {
-				break
-			}
-			if f.ID > scopeFrom && strings.EqualFold(f.Scope, "global") {
-				scoped = append(scoped, f)
-			}
-		}
+	if options.sweep == nil {
+		scoped = dreamScopeFacts(active, scopeFrom)
+		scoped = scoped[:min(len(scoped), packets*packetScope)]
 	}
 	var projects []string
 	scopeCursor := scopeFrom
@@ -548,9 +577,10 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	}
 	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, Seen: versions(active),
 		Split: versions(batch), Deferred: deferred, Merge: cursor, Noise: noise,
-		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor}
+		Swept: swept, Scope: versions(scoped), Projects: projects, ScopeFrom: scopeFrom, ScopeCursor: scopeCursor,
+		OldSweep: options.sweep != nil}
 	for _, f := range active {
-		if noiseOnly || !isBatch[f.ID] {
+		if !isBatch[f.ID] {
 			if v, ok := seen[f.ID]; ok {
 				p.Seen[f.ID] = v
 			} else {
@@ -564,19 +594,18 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	if len(batch) == 0 && len(groups) == 0 && len(scoped) == 0 {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
+		if options.sweep != nil {
+			return rec, work, err
+		}
 		return rec, work, errors.Join(err, writeDreamSeen(dir, p.Seen), writeMergeCursor(dir, cursor), markDream(dir, start))
 	}
 	if err := writeJSONFile(filepath.Join(dir, packetFile), p); err != nil {
 		return rec, work, err
 	}
 	rec.Packet = p.ID
-	splitForModel := batch
-	if noiseOnly {
-		splitForModel = nil
-	}
-	work = dreamWork{id: p.ID, split: splitForModel, groups: groups, fresh: isBatch, noise: noise,
+	work = dreamWork{id: p.ID, split: batch, groups: groups, fresh: isBatch, noise: noise,
 		scope: scoped, projects: projects}
-	text, err := renderPacket(p.ID, splitForModel, scoped, projects, groups, isBatch, noise)
+	text, err := renderPacket(p.ID, batch, scoped, projects, groups, isBatch, noise)
 	if err != nil {
 		return rec, work, err
 	}
@@ -641,8 +670,15 @@ func (inv *invocation) applyAnswer(dir, path string, out io.Writer) (dreamRecord
 	if a.Packet != p.ID {
 		return rec, fmt.Errorf("answer %s is for packet %q, the current one is %q: run -prepare again", path, a.Packet, p.ID)
 	}
-	plan := dreamPlan{Start: p.Start, Seen: p.Seen, Merge: p.Merge}
-	rec.Swept = p.Swept
+	if p.NoiseOnly {
+		rec, err = inv.applyNoise(dir, p, a, rec, out)
+		if err == nil {
+			err = os.Remove(filepath.Join(dir, packetFile))
+		}
+		return rec, err
+	}
+	plan := dreamPlan{Start: p.Start, Seen: p.Seen, Merge: p.Merge, OldSweep: p.OldSweep}
+	rec.Swept, rec.Noise = p.Swept, len(p.Noise)
 	done := map[string]bool{}
 	for _, sp := range a.Splits {
 		var parts []string
@@ -860,7 +896,7 @@ func (inv *invocation) applyPlan(dir string, plan dreamPlan, rec dreamRecord, ou
 				continue
 			}
 			inv.effect = true
-			f, err := apply(s, a)
+			f, err := apply(s, a, g.Facts[a.ID])
 			if err != nil {
 				return rec, err
 			}
@@ -890,6 +926,10 @@ func (inv *invocation) applyPlan(dir string, plan dreamPlan, rec dreamRecord, ou
 			return rec, err
 		}
 	}
+	if plan.OldSweep {
+		return rec, writeDreamSeen(dir, saw)
+	}
+	rec.scopeAdvanced = scopeCursor > plan.ScopeFrom
 	return rec, errors.Join(writeDreamSeen(dir, saw), writeMergeCursor(dir, plan.Merge),
 		writeScopeCursor(dir, scopeCursor), markDream(dir, plan.Start))
 }
@@ -1259,11 +1299,11 @@ func checkActionsWithNoise(groups [][]store.Fact, actions []extract.Action, nois
 }
 
 // apply makes one checked retirement or content correction without an inference call.
-func apply(s *store.Store, a extract.Action) (store.Fact, error) {
+func apply(s *store.Store, a extract.Action, expected int) (store.Fact, error) {
 	if a.Op == "retire" {
-		return s.Retire(a.ID)
+		return s.Retire(a.ID, expected)
 	}
-	return s.Correct(a.ID, a.Content)
+	return s.Correct(a.ID, a.Content, expected)
 }
 
 func parseSince(v string) (time.Time, error) {

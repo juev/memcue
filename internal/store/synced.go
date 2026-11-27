@@ -286,8 +286,9 @@ func nextSeq(tx *sql.Tx) (int64, error) {
 
 // syncWrite stores facts as this copy's own writes: each register that differs from the stored fact becomes a change
 // stamped by the shared clock. The server numbers the change; a replica puts it into its outbox. A fact the base
-// does not hold is created with every register. It returns the facts as stored.
-func (s *Store) syncWrite(facts []Fact) ([]Fact, error) {
+// does not hold is created with every register. When provided, expected is the version of the first fact before
+// this write (the fact being edited or split).
+func (s *Store) syncWrite(facts []Fact, expected ...int) ([]Fact, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, err
@@ -298,10 +299,13 @@ func (s *Store) syncWrite(facts []Fact) ([]Fact, error) {
 		return nil, err
 	}
 	out := make([]Fact, 0, len(facts))
-	for _, f := range facts {
+	for i, f := range facts {
 		row, exists, err := loadRow(tx, f.ID)
 		if err != nil {
 			return nil, err
+		}
+		if i == 0 && len(expected) != 0 && (!exists || row.Version != expected[0]) {
+			return nil, ErrChanged
 		}
 		ch := Change{OpID: newOpID(s.now()), ID: f.ID}
 		if exists {
