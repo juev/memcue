@@ -194,7 +194,7 @@ func (inv *invocation) runDream(args []string, out io.Writer) (err error) {
 	fs := flag.NewFlagSet("dream", flag.ContinueOnError)
 	since := fs.String("since", "", "review facts written since this date or RFC 3339 time (default: since the last dream)")
 	all := fs.Bool("all", false, "review every active fact")
-	noiseOnly := fs.Bool("noise", false, "review only explicit one-off noise candidates, without split, duplicate or scope work")
+	noiseOnly := fs.Bool("noise", false, "review only one-off noise, without split, duplicate or scope work; -run -all -noise screens every active fact")
 	prep := fs.Bool("prepare", false, "print split, duplicate and scope work for the session's model; keep it for -apply")
 	list := fs.Bool("list", false, "print the groups and stop")
 	applyFile := fs.String("apply", "", "check and carry out the model's answer to the packet -prepare printed")
@@ -361,6 +361,7 @@ type dreamPacket struct {
 	Groups      []map[string]int `json:"groups"`
 	Noise       map[string]int   `json:"noise,omitempty"` // facts eligible for singleton or grouped noise retirement
 	NoiseOnly   bool             `json:"noise_only,omitempty"`
+	NoiseAll    bool             `json:"noise_all,omitempty"`
 	NoiseSince  *time.Time       `json:"noise_since,omitempty"`
 	OldSweep    bool             `json:"old_sweep,omitempty"`
 	// Deferred are the groups the packet bounds left out, kept for the record only.
@@ -415,7 +416,7 @@ const packetFile = "dream.packet.json"
 func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, list bool, packets int, options dreamOptions, out io.Writer) (dreamRecord, dreamWork, error) {
 	out = inv.writer(out)
 	if options.noiseOnly {
-		return inv.prepareNoise(dir, from, list, packets, out)
+		return inv.prepareNoise(dir, from, list, packets, options.noiseAll, out)
 	}
 	var work dreamWork
 	maxFresh, maxGroups := packets*packetFresh, packets*packetGroups
@@ -479,7 +480,7 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 			start++
 		}
 		anchors = pool[start:]
-	case !options.server:
+	case !options.server && !options.all:
 		cursor, err = readMergeCursor(dir)
 		if err != nil {
 			return rec, work, err

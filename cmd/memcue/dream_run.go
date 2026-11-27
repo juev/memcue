@@ -37,6 +37,8 @@ const dreamAllStalls = 3
 type dreamOptions struct {
 	flash     bool
 	noiseOnly bool
+	noiseAll  bool
+	all       bool
 	server    bool
 	sweep     *dreamSweepRange
 }
@@ -47,11 +49,7 @@ type dreamOptions struct {
 // The background run a session start starts (#569) is that plain run, on claude -p without MEMCUE_API_URL: the
 // session start checked that one of them is there. It leaves quietly when another dream holds the lock.
 //
-// With all (#405) it finishes the base: no interval, packets one after another while a packet has facts to split,
-// or check the scope of. The merge sweep walks the base in a circle and never
-// runs out of groups, so it does not keep the loop going. It runs on the endpoint when MEMCUE_API_URL is set and on
-// claude -p otherwise, and stops on the first failed pass, after dreamAllStalls passes that change nothing, or after
-// dreamAllPasses.
+// With all (#405) it drains fresh and scope work alongside a finite old-fact sweep, or drains only the noise queue.
 func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bool, packets int) error {
 	out = inv.writer(out)
 	if !all && !background && extract.API.URL == "" {
@@ -83,43 +81,23 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bo
 		_, _, err := inv.dreamPass(dir, packets, dreamOptions{noiseOnly: noiseOnly}, out)
 		return err
 	}
-	stalls := 0
+	if !noiseOnly {
+		return inv.runDreamAll(dir, packets, out)
+	}
 	for pass := 1; pass <= dreamAllPasses; pass++ {
 		if _, err := fmt.Fprintf(out, "dream -all: pass %d\n", pass); err != nil {
 			return err
 		}
-		rec, work, err := inv.dreamPass(dir, packets, dreamOptions{noiseOnly: noiseOnly}, out)
+		rec, _, err := inv.dreamPass(dir, packets, dreamOptions{noiseOnly: true, noiseAll: true}, out)
 		if err != nil {
 			return fmt.Errorf("dream -all: pass %d: %w", pass, err)
 		}
-		if rec.Packet == "" { // nothing for the dream
+		if rec.Packet == "" || *rec.NoiseRemaining == 0 {
 			_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
 			return err
 		}
-		if noiseOnly {
-			if *rec.NoiseRemaining == 0 {
-				_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
-				return err
-			}
-			if rec.NoiseChecked == 0 {
-				_, err := fmt.Fprintf(out, "dream -all: stopped without progress; %d noise candidates remain\n", *rec.NoiseRemaining)
-				return err
-			}
-			continue
-		}
-		// A pass that checked the scope of global facts moved its cursor, even when it moved no fact (#607).
-		if len(rec.Splits)+len(rec.Actions)+rec.ScopeChecked == 0 {
-			stalls++
-		} else {
-			stalls = 0
-		}
-		switch {
-		case work == 0:
-			_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
-			return err
-		case stalls >= dreamAllStalls:
-			_, err := fmt.Fprintf(out, "dream -all: stopped after %d passes that changed nothing; maintenance work remains\n", stalls)
-			return err
+		if rec.NoiseChecked == 0 {
+			return fmt.Errorf("dream -all: stopped without progress; %d noise candidates remain", *rec.NoiseRemaining)
 		}
 	}
 	return fmt.Errorf("dream -all: stopped after %d passes with work left; run it again", dreamAllPasses)
@@ -145,7 +123,7 @@ func (inv *invocation) dreamPass(dir string, packets int, options dreamOptions, 
 			return dreamRecord{}, 0, err
 		}
 	}
-	options.flash = !options.noiseOnly && extract.API.URL != "" && extract.Model == "deepseek-flash"
+	options.flash = (!options.noiseOnly || options.noiseAll) && extract.API.URL != "" && extract.Model == "deepseek-flash"
 	var packet bytes.Buffer
 	start := time.Now()
 	rec, w, err := inv.prepare(dir, from, seen, false, packets, options, &packet)

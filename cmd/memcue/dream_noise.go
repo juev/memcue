@@ -21,6 +21,13 @@ import (
 
 const noiseReviewFile = "dream.noise.json"
 
+func noiseReviewPath(dir string, all bool) string {
+	if all {
+		return filepath.Join(dir, "dream.noise.all.json")
+	}
+	return filepath.Join(dir, noiseReviewFile)
+}
+
 const noiseInstructions = "This packet is for noise review only. Propose only retire actions with kind noise and an evidence-based reason. " +
 	"For candidates you keep, omit the action. Return an explicit empty actions array if you keep all candidates.\n\n"
 
@@ -46,22 +53,22 @@ func noiseHash(content string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func noisePending(active []store.Fact, reviewed map[string]string, from time.Time) []store.Fact {
+func noisePending(active []store.Fact, reviewed map[string]string, from time.Time, all bool) []store.Fact {
 	var pending []store.Fact
 	for _, f := range active {
-		if !f.Created.Before(from) && vet.CaptureNoise(f) != "" && reviewed[f.ID] != noiseHash(f.Content) {
+		if !f.Created.Before(from) && (all || vet.CaptureNoise(f) != "") && reviewed[f.ID] != noiseHash(f.Content) {
 			pending = append(pending, f)
 		}
 	}
 	return pending
 }
 
-func (inv *invocation) prepareNoise(dir string, from time.Time, list bool, packets int, out io.Writer) (dreamRecord, dreamWork, error) {
+func (inv *invocation) prepareNoise(dir string, from time.Time, list bool, packets int, all bool, out io.Writer) (dreamRecord, dreamWork, error) {
 	start := time.Now()
 	rec := dreamRecord{Time: start.UTC().Format(time.RFC3339), Since: from.UTC().Format(time.RFC3339)}
 	var work dreamWork
 	reviewed := map[string]string{}
-	if err := readDreamState(filepath.Join(dir, noiseReviewFile), &reviewed); err != nil {
+	if err := readDreamState(noiseReviewPath(dir, all), &reviewed); err != nil {
 		return rec, work, err
 	}
 	s, err := inv.openBase()
@@ -73,11 +80,16 @@ func (inv *invocation) prepareNoise(dir string, from time.Time, list bool, packe
 	if err != nil {
 		return rec, work, err
 	}
-	pending := noisePending(active, reviewed, from)
+	pending := noisePending(active, reviewed, from, all)
 	remaining := len(pending)
 	rec.NoiseRemaining = &remaining
+	if all && remaining == 0 {
+		if _, err := fmt.Fprintf(out, "dream -noise: %d of %d active facts checked, %d remaining\n", len(active)-remaining, len(active), remaining); err != nil {
+			return rec, work, err
+		}
+	}
 	batch := pending[:min(remaining, packets*min(packetFresh, packetGroups))]
-	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, NoiseOnly: true, Noise: versions(batch)}
+	p := dreamPacket{ID: start.UTC().Format(time.RFC3339Nano), Start: start, NoiseOnly: true, NoiseAll: all, Noise: versions(batch)}
 	if !from.IsZero() {
 		p.NoiseSince = &from
 	}
@@ -104,6 +116,9 @@ func (inv *invocation) prepareNoise(dir string, from time.Time, list bool, packe
 	}
 	rec.Packet = p.ID
 	work = dreamWork{id: p.ID, noiseOnly: true, groups: groups, fresh: freshSet(batch), noise: p.Noise}
+	if all {
+		work.flashScreen = batch
+	}
 	_, err = io.WriteString(out, noiseInstructions+text)
 	return rec, work, err
 }
@@ -119,7 +134,7 @@ func (inv *invocation) applyNoise(dir string, p dreamPacket, answer dreamAnswer,
 	if err := validateNoiseAnswer(answer); err != nil {
 		return rec, err
 	}
-	path := filepath.Join(dir, noiseReviewFile)
+	path := noiseReviewPath(dir, p.NoiseAll)
 	reviewed := map[string]string{}
 	if err := readDreamState(path, &reviewed); err != nil {
 		return rec, err
@@ -176,11 +191,17 @@ func (inv *invocation) applyNoise(dir string, p dreamPacket, answer dreamAnswer,
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return rec, err
 		}
-		if err != nil || f.Version != p.Noise[id] || f.Status != store.Active || vet.CaptureNoise(f) == "" {
+		if err != nil || f.Version != p.Noise[id] || f.Status != store.Active || !p.NoiseAll && vet.CaptureNoise(f) == "" {
 			rec.Refused = append(rec.Refused, id+": candidate changed since the packet")
 			continue
 		}
 		if a, ok := retire[id]; ok {
+			if vet.CaptureNoise(f) == "" {
+				rec.Refused = append(rec.Refused, id+": noise proposal does not meet the retirement gate")
+				reviewed[id] = noiseHash(f.Content)
+				rec.NoiseChecked++
+				continue
+			}
 			inv.effect = true
 			if _, err := s.Retire(id, f.Version); err != nil {
 				if errors.Is(err, store.ErrChanged) || errors.Is(err, store.ErrRetired) || errors.Is(err, store.ErrNotFound) {
@@ -212,7 +233,7 @@ func (inv *invocation) applyNoise(dir string, p dreamPacket, answer dreamAnswer,
 	if p.NoiseSince != nil {
 		from = *p.NoiseSince
 	}
-	remaining := len(noisePending(active, reviewed, from))
+	remaining := len(noisePending(active, reviewed, from, p.NoiseAll))
 	rec.NoiseRemaining = &remaining
 	rec.Grouped = groupRecords(p, answer.Actions, rec.Actions)
 	if err := writeJSONFile(path, reviewed); err != nil {
@@ -225,6 +246,11 @@ func (inv *invocation) applyNoise(dir string, p dreamPacket, answer dreamAnswer,
 	}
 	for _, refusal := range rec.Refused {
 		if _, err := fmt.Fprintf(out, "refused %s\n", refusal); err != nil {
+			return rec, err
+		}
+	}
+	if p.NoiseAll {
+		if _, err := fmt.Fprintf(out, "dream -noise: %d of %d active facts checked, %d remaining\n", len(active)-remaining, len(active), remaining); err != nil {
 			return rec, err
 		}
 	}

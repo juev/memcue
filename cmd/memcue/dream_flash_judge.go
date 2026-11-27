@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 
 	"github.com/juev/memcue/internal/extract"
@@ -266,21 +267,36 @@ func flashConfirmationPrompt(action extract.Action, facts map[string]store.Fact)
 }
 
 func parseFlashLabels(raw []byte, keys []string, allowed ...string) (map[string]string, error) {
-	var labels map[string]string
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&labels); err != nil {
-		return nil, fmt.Errorf("flash response: %w", err)
-	}
-	if labels == nil {
+	if opening, err := decoder.Token(); err != nil || opening != json.Delim('{') {
 		return nil, errors.New("flash response: expected JSON object")
+	}
+	labels := make(map[string]string, len(keys))
+	for decoder.More() {
+		token, err := decoder.Token()
+		key, ok := token.(string)
+		if err != nil || !ok {
+			return nil, errors.New("flash response: invalid label ID")
+		}
+		if _, exists := labels[key]; exists {
+			return nil, fmt.Errorf("flash response: repeated label ID (expected %q)", keys)
+		}
+		var label string
+		if err := decoder.Decode(&label); err != nil {
+			return nil, errors.New("flash response: expected a string label")
+		}
+		labels[key] = label
+	}
+	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
+		return nil, errors.New("flash response: malformed labels")
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return nil, errors.New("flash response: multiple JSON values")
 	}
-	if len(labels) != len(keys) {
-		return nil, errors.New("flash response: missing or unexpected label IDs")
+	received := slices.Sorted(maps.Keys(labels))
+	if !slices.Equal(received, slices.Sorted(slices.Values(keys))) {
+		return nil, fmt.Errorf("flash response: missing or unexpected label IDs (expected %q, received %q)", keys, received)
 	}
 	valid := make(map[string]bool, len(allowed))
 	for _, label := range allowed {
@@ -290,11 +306,6 @@ func parseFlashLabels(raw []byte, keys []string, allowed ...string) (map[string]
 		label, ok := labels[key]
 		if !ok || !valid[label] {
 			return nil, fmt.Errorf("flash response: missing or invalid label for %q", key)
-		}
-	}
-	for key := range labels {
-		if !slices.Contains(keys, key) {
-			return nil, fmt.Errorf("flash response: unexpected label ID %q", key)
 		}
 	}
 	return labels, nil

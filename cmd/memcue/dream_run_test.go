@@ -227,8 +227,66 @@ func TestDreamRunAllStopsAtTheBound(t *testing.T) {
 	}
 }
 
-// The merge sweep may keep returning the same group, but it cannot keep -all running
-// after split, expansion and scope work is complete.
+func TestDreamRunAllDrainsFiniteOldSweepWithoutRestartingIt(t *testing.T) {
+	dir, st := newServerDreamFixture(t)
+	for i := range 101 {
+		serverDreamFact(t, st, "Synthetic old rule "+strings.Repeat("x", i+1), "repo:example/audit")
+	}
+	if err := markBase(dir); err != nil {
+		t.Fatal(err)
+	}
+	fakeDream(t, func(string) []extract.Action { return nil })
+	fakeDreamRun(t, nil)
+	var out bytes.Buffer
+	args := []string{"-run", "-all", "-j", "1"}
+	if err := runDream(args, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"swept 50 of 101, remaining 51", "swept 100 of 101, remaining 1", "swept 101 of 101, remaining 0"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("missing %q in %s", want, out.String())
+		}
+	}
+	out.Reset()
+	if err := runDream(args, &out); err != nil || strings.Contains(out.String(), "swept") {
+		t.Fatalf("repeat: %s, %v", out.String(), err)
+	}
+}
+
+func TestDreamRunAllResumesOldSweepAlongsideFreshCaptures(t *testing.T) {
+	dir, st := newServerDreamFixture(t)
+	for i := range 101 {
+		serverDreamFact(t, st, "Synthetic review rule "+strings.Repeat("y", i+1), "repo:example/audit")
+	}
+	if err := markBase(dir); err != nil {
+		t.Fatal(err)
+	}
+	fewPerPacket(t)
+	serverDreamFact(t, st, "Synthetic fresh rule with new instructions.", "repo:example/fresh")
+	fakeDream(t, func(packet string) []extract.Action {
+		if strings.Contains(packetBlock(packet, "## Data: splitting"), "Synthetic fresh rule") {
+			serverDreamFact(t, st, "Synthetic fresh rule captured while reviewing another record.", "repo:example/fresh")
+		}
+		return nil
+	})
+	fakeDreamRun(t, nil)
+	args := []string{"-run", "-all", "-j", "1"}
+	var out bytes.Buffer
+	old := dreamAllPasses
+	t.Cleanup(func() { dreamAllPasses = old })
+	dreamAllPasses = 2
+	if err := runDream(args, &out); err == nil || !strings.Contains(out.String(), "swept 50 of 101, remaining 51") {
+		t.Fatalf("old work did not advance under a fresh backlog: %s, %v", out.String(), err)
+	}
+	dreamAllPasses = 5
+	out.Reset()
+	_ = runDream(args, &out) // The continuous fresh stream is deliberately still pending at the bound.
+	if strings.Contains(out.String(), "swept 50 of") || !strings.Contains(out.String(), "swept 101 of 101, remaining 0") {
+		t.Fatalf("old work was repeated or skipped after restart: %s", out.String())
+	}
+}
+
+// A finite sweep must not keep returning the same group once its anchors are done.
 func TestDreamRunAllFinishesDespiteRepeatingSweep(t *testing.T) {
 	dir := env(t)
 	dreamBase(t)
