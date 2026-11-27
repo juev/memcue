@@ -4,6 +4,8 @@ Start with the question and the conditions of a study. These reports record hist
 failed, negative, inconclusive and superseded findings. A result on one person's base, model or synthetic grid is
 not a current reliability guarantee. Current usage belongs in the [project README](../../README.md).
 
+Record the results of every experiment in the repository documentation, including negative and inconclusive results.
+
 The [issue coverage map](issue-coverage-2026-11.md) accounts for **all 323 issues**, open and closed, and links
 **175 measurement-bearing source issues**, **2 reviews**, **46 planned/context-only issues** and **100 implementation
 or tracking issues**. These are source counts, not independent experiment counts. Existing complete reports are
@@ -148,6 +150,7 @@ a source link is not a downloadable copy of the private evidence.
 | [The dream without one task, against real searches, November 2026 (#661)](dream-ablations-661-2026-11.md) |
 | [What the dream costs, by task, November 2026 (#643)](dream-cost-643-2026-11.md) |
 | [The merge sweep: duplicates older than the last dream, October 2026](dream-merge-2026-10.md) |
+| [Dream noise classification on 60 synthetic facts, November 2026](dream-noise-2026-11.md) |
 | [The dream through the extraction endpoint, October 2026](dream-run-2026-10.md) |
 | [Where the time of `dream -run -all` goes, October 2026](dream-time-2026-10.md) |
 | [Dream triage research, October 2026](dream-triage-2026-10.md) |

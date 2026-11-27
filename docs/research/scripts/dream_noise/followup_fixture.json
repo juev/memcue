@@ -1,0 +1,122 @@
+[
+  {
+    "id": "h01",
+    "label": "noise",
+    "content": "The preview deployment completed, and the temporary namespace was deleted."
+  },
+  {
+    "id": "h02",
+    "label": "useful",
+    "content": "The scheduler hashes partition keys case-sensitively. Normalize tenant aliases before hashing or two spellings of the same name get separate workers."
+  },
+  {
+    "id": "h03",
+    "label": "uncertain",
+    "content": "The nightly job exited with code 1 after a storage alert. The alert details and the final job log were not retained."
+  },
+  {
+    "id": "h04",
+    "label": "noise",
+    "content": "The one-time demo used release candidate 7 and ended with no follow-up work."
+  },
+  {
+    "id": "h05",
+    "label": "useful",
+    "content": "JavaScript Map compares array keys by identity. Serialize the key parts before memoizing calls that reconstruct an equivalent array."
+  },
+  {
+    "id": "h06",
+    "label": "noise",
+    "content": "Вчера прогнали проверку синхронизации на тестовом проекте. Все шаги завершились."
+  },
+  {
+    "id": "h07",
+    "label": "useful",
+    "content": "The rollback exercise exposed that old readers reject the new job state. Roll out readers that accept it before enabling writers to emit it."
+  },
+  {
+    "id": "h08",
+    "label": "uncertain",
+    "content": "One worker reported a stale configuration during a test run, but neither the configuration version nor the worker log is available."
+  },
+  {
+    "id": "h09",
+    "label": "noise",
+    "content": "A temporary test account was created for the walkthrough and removed after the meeting."
+  },
+  {
+    "id": "h10",
+    "label": "useful",
+    "content": "При пагинации по смещению добавляй уникальный ID последним полем сортировки. Без него записи с одинаковой датой перескакивают между страницами."
+  },
+  {
+    "id": "h11",
+    "label": "noise",
+    "content": "The staging smoke test passed on its second run; no failure details or changes were recorded."
+  },
+  {
+    "id": "h12",
+    "label": "uncertain",
+    "content": "Отчёт показывает расхождение в числе обработанных строк, но исходный файл и контрольная сумма выгрузки отсутствуют."
+  },
+  {
+    "id": "h13",
+    "label": "useful",
+    "content": "A completed load test showed that memory use grows with the number of unclosed response bodies; close every response before continuing the loop."
+  },
+  {
+    "id": "h14",
+    "label": "noise",
+    "content": "The sample database for the workshop was restored from backup and removed after the exercise."
+  },
+  {
+    "id": "h15",
+    "label": "uncertain",
+    "content": "Локальная сборка однажды использовала неожиданный сертификат. Команда сборки и источник сертификата не записаны."
+  },
+  {
+    "id": "h16",
+    "label": "noise",
+    "content": "Finished a one-off check of the new dashboard; the page opened and no issue was filed."
+  },
+  {
+    "id": "h17",
+    "label": "useful",
+    "content": "This snapshot store releases shared blocks only after deleting the last snapshot that references them. Inspect snapshot retention before diagnosing low free space."
+  },
+  {
+    "id": "h18",
+    "label": "noise",
+    "content": "На демонстрационном стенде включили синюю тему для записи ролика. После записи вернули прежнюю тему."
+  },
+  {
+    "id": "h19",
+    "label": "uncertain",
+    "content": "A generated chart shows a negative queue depth on one shard. The raw metric and the aggregator configuration are missing."
+  },
+  {
+    "id": "h20",
+    "label": "noise",
+    "content": "The package mirror was unavailable during a single setup attempt. The retry succeeded without configuration changes."
+  },
+  {
+    "id": "h21",
+    "label": "useful",
+    "content": "Сборка завершилась успешно после обновления зависимости, а регрессия проявляется только при включённом режиме совместимости с протоколом v1."
+  },
+  {
+    "id": "h22",
+    "label": "noise",
+    "content": "The disposable preview certificate expired after the presentation and was not needed afterward."
+  },
+  {
+    "id": "h23",
+    "label": "uncertain",
+    "content": "A scheduled job ran an hour early on one host after a clock change. The scheduler's effective time zone and trigger history are unavailable."
+  },
+  {
+    "id": "h24",
+    "label": "useful",
+    "content": "When the object store returns 503 during multipart upload, preserve the upload ID and retry only failed parts; restarting the whole upload creates duplicate objects."
+  }
+]

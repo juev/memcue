@@ -50,6 +50,9 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   already-reviewed fact at cycle start and a durable cursor. Fresh batches and the weekly scan alternate when both
   have work. Restart resumes the cursor. An existing server starts the first scan at its first check after upgrade.
   A newly initialized server starts its first scan after seven days. Old noise candidates require manual review.
+  With `MEMCUE_MODEL=deepseek-flash` and `MEMCUE_API_URL`, the server screens the bounded fresh batch for noise,
+  including singletons. It compares same-project groups during fresh review and the weekly sweep, and confirms
+  each proposed direct pair retirement. The same version-checked apply path commits the result.
 - R12: `memcue migrate -server` reads the local base of `MEMCUE_FACTS`, reports what it would send, and with `-apply`
   sends the latest version of every fact to the empty server of `MEMCUE_SERVER` through the helper. Stamps come from
   `created`, with the server's device id. A server that holds any fact refuses and stores nothing.

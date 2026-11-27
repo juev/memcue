@@ -49,7 +49,9 @@ type Endpoint struct {
 	// Quick asks for an answer without reasoning where the endpoint is known to take that request: DeepSeek reasons by
 	// default, and on a split call 97–99 % of the output tokens were reasoning (#232). Other endpoints get the plain
 	// request, since an unknown field may be refused.
-	Quick bool
+	Quick           bool
+	disableThinking bool
+	maxTokens       int
 }
 
 func runAPI(ctx context.Context, ep Endpoint, system, input string) (reply, error) {
@@ -65,9 +67,12 @@ func runAPI(ctx context.Context, ep Endpoint, system, input string) (reply, erro
 		// The review and the suspect calls judge an answer that is already written, so they must give the same verdict
 		// on the same input: without a temperature the endpoint samples, and a wrong retire sticks (#296).
 		request["temperature"] = 0
-		if deepSeek(ep.URL) {
-			request["thinking"] = map[string]string{"type": "disabled"}
-		}
+	}
+	if ep.disableThinking || ep.Quick && deepSeek(ep.URL) {
+		request["thinking"] = map[string]string{"type": "disabled"}
+	}
+	if ep.maxTokens > 0 {
+		request["max_tokens"] = ep.maxTokens
 	}
 	body, err := json.Marshal(request)
 	if err != nil {
@@ -121,12 +126,13 @@ func parseAPI(raw []byte) (reply, error) {
 	if len(env.Choices) == 0 {
 		return reply{}, fmt.Errorf("endpoint returned no choices")
 	}
-	if fr := env.Choices[0].FinishReason; fr == "length" {
-		return reply{}, fmt.Errorf("answer cut at the token limit")
-	}
-	return reply{payload: []byte(stripFence(env.Choices[0].Message.Content)),
+	answer := reply{payload: []byte(stripFence(env.Choices[0].Message.Content)), finish: env.Choices[0].FinishReason,
 		tokens: Tokens{Input: env.Usage.PromptTokens, Cached: max(env.Usage.CacheHit, env.Usage.Details.Cached),
-			Output: env.Usage.CompletionTokens}}, nil
+			Output: env.Usage.CompletionTokens}}
+	if answer.finish == "length" {
+		return answer, fmt.Errorf("answer cut at the token limit")
+	}
+	return answer, nil
 }
 
 // stripFence removes a ```json fence some models put around the object despite the instruction.

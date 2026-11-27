@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.7`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.8`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.8 | 9 | 0.40.8 | 0.40.8 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.8 (`hermes-agent` >=0.17.0) |
 | 0.40.7 | 9 | 0.40.7 | 0.40.7 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.7 (`hermes-agent` >=0.17.0) |
 | 0.40.6 | 9 | 0.40.6 | 0.40.6 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.6 (`hermes-agent` >=0.17.0) |
 | 0.40.5 | 9 | 0.40.5 | 0.40.5 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.5 (`hermes-agent` >=0.17.0) |
@@ -334,6 +335,14 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.8: batched Flash dream review (#810)
+
+- Dream runs configured with `deepseek-flash` screen noise and compare groups without thinking. Direct pair
+  retirements require a separate confirmation and the existing version checks.
+- The server screens fresh records for noise and revisits older pairs on the weekly sweep. Scope, splits,
+  and unresolved groups use reasoning.
+- Upgrades from 0.40.7 use fact-base schema 9 and the existing CLI flags.
 
 ### 0.40.7: bounded dream sweep and restart handling (#808)
 
@@ -1430,6 +1439,12 @@ Who runs it:
   `-prepare -noise` / `-apply` flow. Review the first answers against a live base manually before applying them.
   Without `-all` or `-noise`, `-run` uses the same schedule as session start. A direct `-run` without `-all` requires
   `MEMCUE_API_URL`. The local `-background` run can use `claude -p`.
+- **DeepSeek Flash review.** With `MEMCUE_API_URL` and `MEMCUE_MODEL=deepseek-flash`, regular dream runs
+  classify noise and compare up to six same-project groups per request without thinking. Each proposed pair
+  retirement gets a separate confirmation. Reasoning handles splits, scope checks, and unresolved groups.
+  The endpoint must support DeepSeek's thinking switch. The same route runs in the background and on the server.
+  Server noise screening covers fresh facts, and the weekly sweep revisits older groups. See
+  [the synthetic comparison](docs/research/dream-noise-2026-11.md#running-the-full-cli).
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups and the global facts to check the
   scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call
@@ -1438,7 +1453,7 @@ Who runs it:
   calls, the time of the packet, the calls and the apply, and the tokens of each pass (#471,
   [docs/research/dream-time-2026-10.md](docs/research/dream-time-2026-10.md)). Under `calls` it keeps a line per
   call (#643): its task (`review` for the fresh facts and the groups, the merge sweep's counted under `swept`,
-  `scope`), the work it was given, how many changes the model proposed, its tokens, its time
+  `scope`, plus `flash-noise`, `flash-pairs`, and `flash-confirm` on Flash), the work it was given, how many changes the model proposed, its tokens, its time
   and, on `claude -p`, its cost. An endpoint reports tokens only, so a call there has no `cost_usd`.
 
 - **The server.** In server mode only `memcue server` runs dream. It checks the queue every ten minutes.

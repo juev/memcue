@@ -591,7 +591,8 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	for _, g := range groups {
 		p.Groups = append(p.Groups, versions(g))
 	}
-	if len(batch) == 0 && len(groups) == 0 && len(scoped) == 0 {
+	flashSweepWork := options.flash && !options.server && len(sweptFacts) > 0
+	if len(batch) == 0 && len(groups) == 0 && len(scoped) == 0 && !flashSweepWork {
 		// Nothing to ask: the dream is done as of now.
 		_, err := fmt.Fprintln(out, "memcue: nothing for the dream")
 		if options.sweep != nil {
@@ -605,6 +606,15 @@ func (inv *invocation) prepare(dir string, from time.Time, seen map[string]int, 
 	rec.Packet = p.ID
 	work = dreamWork{id: p.ID, split: batch, groups: groups, fresh: isBatch, noise: noise,
 		scope: scoped, projects: projects}
+	if options.flash {
+		work.flashScreen = batch
+		if !options.server {
+			work.flashScreen = append(slices.Clone(batch), sweptFacts...)
+			for _, group := range groups {
+				work.flashScreen = append(work.flashScreen, group...)
+			}
+		}
+	}
 	text, err := renderPacket(p.ID, batch, scoped, projects, groups, isBatch, noise)
 	if err != nil {
 		return rec, work, err

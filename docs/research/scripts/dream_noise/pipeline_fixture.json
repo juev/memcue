@@ -1,0 +1,102 @@
+[
+  {
+    "id": "full-duplicates",
+    "facts": [
+      {"id": "f01", "content": "In repo:example/cache, configure the quartz cache with a 90-second TTL to expire stale entries.", "scope": "repo:example/cache", "source": "agent", "kind": "rule"},
+      {"id": "f02", "content": "Configure the quartz cache in repo:example/cache to expire stale entries by setting its TTL to 90 seconds.", "scope": "repo:example/cache", "source": "tool", "kind": "rule"},
+      {"id": "f03", "content": "In repo:example/cache, set the quartz cache TTL to 90 seconds to expire stale entries.", "scope": "repo:example/cache", "source": "agent", "kind": "rule"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "f02", "kind": "duplicate", "by": "f01"},
+      {"op": "retire", "id": "f03", "kind": "duplicate", "by": "f01"}
+    ]
+  },
+  {
+    "id": "explicitly-outdated",
+    "facts": [
+      {"id": "f04", "content": "In repo:example/ledger, the copper ledger exporter writes TSV files with a tab delimiter.", "scope": "repo:example/ledger", "source": "agent", "kind": "procedure"},
+      {"id": "f05", "content": "On 2026-10-03, repo:example/ledger replaced the copper ledger exporter; it now writes CSV files with a comma delimiter instead of TSV with tabs.", "scope": "repo:example/ledger", "source": "tool", "kind": "procedure"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "f04", "kind": "outdated", "by": "f05"}
+    ]
+  },
+  {
+    "id": "resolved-workaround",
+    "facts": [
+      {"id": "f06", "content": "In repo:example/search, when the indigo indexer reports a stale shard, restart the indigo indexer to restore shard reads.", "scope": "repo:example/search", "source": "agent", "kind": "procedure"},
+      {"id": "f07", "content": "In repo:example/search, the deployed fix 8ac41f eliminated the indigo indexer's stale-shard bug; restarting the indigo indexer is no longer needed to restore shard reads.", "scope": "repo:example/search", "source": "tool", "kind": "event"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "f06", "kind": "resolved", "by": "f07"}
+    ]
+  },
+  {
+    "id": "complementary-duplicate-details",
+    "facts": [
+      {"id": "f08", "content": "In repo:example/backup, rotate the cobalt backup key every 30 days using the vaultctl command.", "scope": "repo:example/backup", "source": "agent", "kind": "procedure"},
+      {"id": "f09", "content": "In repo:example/backup, rotate the cobalt backup key every 30 days with vaultctl rotate --key cobalt, then verify the fingerprint with vaultctl show --fingerprint.", "scope": "repo:example/backup", "source": "tool", "kind": "procedure"}
+    ],
+    "expected": [
+      {"op": "correct", "id": "f08", "terms": ["30 days", "vaultctl rotate --key cobalt", "vaultctl show --fingerprint"]},
+      {"op": "retire", "id": "f09", "kind": "duplicate", "by": "f08"}
+    ]
+  },
+  {
+    "id": "same-words-different-hosts",
+    "facts": [
+      {"id": "f10", "content": "On host:cedar, the amber relay listens on port 7441 and sends amber relay heartbeats every 20 seconds.", "scope": "repo:example/relay", "source": "agent", "kind": "rule"},
+      {"id": "f11", "content": "On host:maple, the amber relay listens on port 7441 and sends amber relay heartbeats every 20 seconds.", "scope": "repo:example/relay", "source": "tool", "kind": "rule"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "undecidable-contradiction",
+    "facts": [
+      {"id": "f12", "content": "In repo:example/queue, the saffron queue worker uses a batch size of 40 messages.", "scope": "repo:example/queue", "source": "agent", "kind": "rule"},
+      {"id": "f13", "content": "In repo:example/queue, the saffron queue worker uses a batch size of 60 messages.", "scope": "repo:example/queue", "source": "tool", "kind": "rule"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "cross-project-similarity",
+    "facts": [
+      {"id": "f14", "content": "In repo:example/web, the jade renderer caches compiled jade templates for 15 minutes.", "scope": "repo:example/web", "source": "agent", "kind": "rule"},
+      {"id": "f15", "content": "In repo:example/worker, the jade renderer caches compiled jade templates for 15 minutes.", "scope": "repo:example/worker", "source": "tool", "kind": "rule"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "regex-noise-singleton",
+    "facts": [
+      {"id": "f16", "content": "The completed experiment selected the plum menu for a one-off preview; it recorded no reusable result.", "scope": "repo:example/ui", "source": "agent", "kind": "other"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "f16", "kind": "noise"}
+    ]
+  },
+  {
+    "id": "unmatched-one-off-near-useful-fact",
+    "facts": [
+      {"id": "f17", "content": "During the violet banner contrast check in the dashboard preview I nudged the heading two pixels left. The test overlay was discarded when the preview closed.", "scope": "repo:example/ui", "source": "agent", "kind": "other"},
+      {"id": "f20", "content": "The violet banner contrast check in the dashboard preview requires loading the high-contrast palette before opening the heading overlay.", "scope": "repo:example/ui", "source": "tool", "kind": "procedure"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "f17", "kind": "noise"}
+    ]
+  },
+  {
+    "id": "unclear-singleton",
+    "facts": [
+      {"id": "f18", "content": "The fuchsia parser behaved strangely around the sample input; the cause and any lasting implication are unknown.", "scope": "repo:example/parser", "source": "agent", "kind": "pitfall"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "useful-singleton",
+    "facts": [
+      {"id": "f19", "content": "In repo:example/metrics, set the umber sampler interval to 5 seconds to preserve short-lived spike measurements.", "scope": "repo:example/metrics", "source": "agent", "kind": "rule"}
+    ],
+    "expected": []
+  }
+]

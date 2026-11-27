@@ -35,6 +35,7 @@ var dreamRunFn = func(parent context.Context, packet string) (extract.DreamReply
 const dreamAllStalls = 3
 
 type dreamOptions struct {
+	flash     bool
 	noiseOnly bool
 	server    bool
 	sweep     *dreamSweepRange
@@ -144,6 +145,7 @@ func (inv *invocation) dreamPass(dir string, packets int, options dreamOptions, 
 			return dreamRecord{}, 0, err
 		}
 	}
+	options.flash = !options.noiseOnly && extract.API.URL != "" && extract.Model == "deepseek-flash"
 	var packet bytes.Buffer
 	start := time.Now()
 	rec, w, err := inv.prepare(dir, from, seen, false, packets, options, &packet)
@@ -166,17 +168,29 @@ func (inv *invocation) dreamPass(dir string, packets int, options dreamOptions, 
 		return rec, 0, fmt.Errorf("%s: %w", packetFile, err)
 	}
 	work := len(p.Split) + len(p.Scope)
-	calls, err := w.calls()
-	if err != nil {
-		return rec, work, err
-	}
 	start = time.Now()
-	r, byCall, err := askAll(inv.ctx, calls)
-	timing.Model, timing.API, timing.TTFT, timing.Calls = ms(time.Since(start)), ms(r.API), ms(r.TTFT), len(calls)
+	var r extract.DreamReply
+	var byCall []dreamCallRecord
+	if options.flash {
+		r, byCall, err = runFlashDream(inv.ctx, w, &p)
+	} else {
+		var calls []dreamCall
+		calls, err = w.calls()
+		if err != nil {
+			return rec, work, err
+		}
+		r, byCall, err = askAll(inv.ctx, calls)
+	}
+	timing.Model, timing.API, timing.TTFT, timing.Calls = ms(time.Since(start)), ms(r.API), ms(r.TTFT), len(byCall)
 	if err != nil {
 		rec.Tokens, rec.CostUSD, rec.Timing, rec.Error = &r.Tokens, r.CostUSD, &timing, "model: "+err.Error()
 		rec.Calls = byCall
 		return rec, work, errors.Join(err, appendJSON(filepath.Join(dir, "dream.log"), rec))
+	}
+	if options.flash {
+		if err := writeJSONFile(filepath.Join(dir, packetFile), p); err != nil {
+			return rec, work, err
+		}
 	}
 	// The answer stays next to its packet: what the model said is the record a refused action is checked by.
 	path := filepath.Join(dir, "dream.answer.json")
@@ -187,6 +201,9 @@ func (inv *invocation) dreamPass(dir string, packets int, options dreamOptions, 
 	sweepCursor := rec.sweepCursor
 	rec, err = inv.applyAnswer(dir, path, out)
 	rec.sweepCursor = sweepCursor
+	if options.flash {
+		rec.Noise = len(p.Noise)
+	}
 	timing.Apply = ms(time.Since(start))
 	rec.Tokens, rec.CostUSD, rec.Timing, rec.Calls = &r.Tokens, r.CostUSD, &timing, byCall
 	if err != nil {
@@ -211,14 +228,15 @@ func ms(d time.Duration) int64 { return d.Milliseconds() }
 
 // dreamWork is the work prepare gathered for the model, kept apart so dream -run can cut it into calls.
 type dreamWork struct {
-	id        string
-	noiseOnly bool
-	split     []store.Fact
-	groups    [][]store.Fact
-	fresh     map[string]bool // the facts of the groups the dream reviews as new
-	noise     map[string]int  // facts eligible for noise retirement in this packet
-	scope     []store.Fact    // the global facts to check the scope of (#607)
-	projects  []string        // the projects they may move to
+	id          string
+	noiseOnly   bool
+	split       []store.Fact
+	flashScreen []store.Fact // facts this pass can classify as noise
+	groups      [][]store.Fact
+	fresh       map[string]bool // the facts of the groups the dream reviews as new
+	noise       map[string]int  // facts eligible for noise retirement in this packet
+	scope       []store.Fact    // the global facts to check the scope of (#607)
+	projects    []string        // the projects they may move to
 }
 
 // calls cuts the work into packets of the usual bounds, one task kind a call: fresh facts with groups, which need the

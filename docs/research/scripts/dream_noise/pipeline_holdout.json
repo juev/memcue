@@ -1,0 +1,91 @@
+[
+  {
+    "id": "caliper-equivalent",
+    "facts": [
+      {"id": "h01", "content": "In repo:sample/caliper, reject any calibration sample whose cobalt gauge reading exceeds 18 microns.", "scope": "repo:sample/caliper", "source": "agent", "kind": "rule"},
+      {"id": "h02", "content": "For repo:sample/caliper, a cobalt gauge sample above 18 microns fails calibration and must be rejected.", "scope": "repo:sample/caliper", "source": "tool", "kind": "rule"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "h02", "kind": "duplicate", "by": "h01"}
+    ]
+  },
+  {
+    "id": "mosaic-export-replaced",
+    "facts": [
+      {"id": "h03", "content": "In repo:sample/mosaic, the mosaic index export stores tile coordinates as signed 16-bit integers.", "scope": "repo:sample/mosaic", "source": "agent", "kind": "rule"},
+      {"id": "h04", "content": "In repo:sample/mosaic, commit 71bd2c replaced the mosaic index encoding with signed 32-bit tile coordinates. The 16-bit encoding is no longer written.", "scope": "repo:sample/mosaic", "source": "tool", "kind": "event"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "h03", "kind": "outdated", "by": "h04"}
+    ]
+  },
+  {
+    "id": "thimble-workaround-resolved",
+    "facts": [
+      {"id": "h05", "content": "In repo:sample/thimble, after rotating the thimble signing key, restart the relay so its cached key is reloaded.", "scope": "repo:sample/thimble", "source": "agent", "kind": "procedure"},
+      {"id": "h06", "content": "In repo:sample/thimble, deployed commit 9c20aa refreshes the relay's signing-key cache after rotation. Operators no longer need to restart the relay.", "scope": "repo:sample/thimble", "source": "tool", "kind": "event"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "h05", "kind": "resolved", "by": "h06"}
+    ]
+  },
+  {
+    "id": "staged-rollout",
+    "facts": [
+      {"id": "h07", "content": "In repo:sample/palimpsest, restart the palimpsest worker after renewing its certificate because it keeps the previous certificate in memory.", "scope": "repo:sample/palimpsest", "source": "agent", "kind": "procedure"},
+      {"id": "h08", "content": "In repo:sample/palimpsest, commit e2017b refreshes the palimpsest worker certificate cache without a restart. The change is enabled only in staging; production still requires a restart after certificate renewal.", "scope": "repo:sample/palimpsest", "source": "tool", "kind": "event"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "complementary-operation",
+    "facts": [
+      {"id": "h09", "content": "In repo:sample/obsidian, after rotating an obsidian service token, record the renewal time in the credential journal.", "scope": "repo:sample/obsidian", "source": "agent", "kind": "procedure"},
+      {"id": "h10", "content": "In repo:sample/obsidian, after rotating an obsidian service token, record the renewal time and the renewed key identifier in the credential journal.", "scope": "repo:sample/obsidian", "source": "tool", "kind": "procedure"}
+    ],
+    "expected": [
+      {"op": "correct", "id": "h09", "terms": ["renewed key identifier"]},
+      {"op": "retire", "id": "h10", "kind": "duplicate", "by": "h09"}
+    ]
+  },
+  {
+    "id": "retain-specific-procedure",
+    "facts": [
+      {"id": "h11", "content": "In repo:sample/velum, run velumctl snapshot --segment east, then verify its digest with velumctl checksum --segment east before upload.", "scope": "repo:sample/velum", "source": "agent", "kind": "procedure"},
+      {"id": "h12", "content": "In repo:sample/velum, take a snapshot of the east segment before upload.", "scope": "repo:sample/velum", "source": "tool", "kind": "procedure"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "h12", "kind": "duplicate", "by": "h11"}
+    ]
+  },
+  {
+    "id": "one-off-noise",
+    "facts": [
+      {"id": "h13", "content": "The finished preview used the saffron menu once; the mock was discarded and no lasting choice or result was recorded.", "scope": "repo:sample/interface", "source": "agent", "kind": "other"}
+    ],
+    "expected": [
+      {"op": "retire", "id": "h13", "kind": "noise"}
+    ]
+  },
+  {
+    "id": "episode-with-reusable-fact",
+    "facts": [
+      {"id": "h14", "content": "During the run on repo:sample/lantern, I found that lanternctl --repair preserves the current cursor when --dry-run is set; I used that option to inspect the failed import.", "scope": "repo:sample/lantern", "source": "agent", "kind": "pitfall"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "useful-control",
+    "facts": [
+      {"id": "h15", "content": "In repo:sample/rookery, keep the rookery journal in append-only mode so recovery can replay every acknowledged event.", "scope": "repo:sample/rookery", "source": "agent", "kind": "rule"}
+    ],
+    "expected": []
+  },
+  {
+    "id": "uncertain-control",
+    "facts": [
+      {"id": "h16", "content": "The lilac decoder behaved inconsistently for one sample, and no cause or persistent effect has been established.", "scope": "repo:sample/decoder", "source": "tool", "kind": "pitfall"}
+    ],
+    "expected": []
+  }
+]
