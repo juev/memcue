@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.9`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.10`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.10 | 9 | 0.40.10 | 0.40.10 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.10 (`hermes-agent` >=0.17.0) |
 | 0.40.9 | 9 | 0.40.9 | 0.40.9 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.9 (`hermes-agent` >=0.17.0) |
 | 0.40.8 | 9 | 0.40.8 | 0.40.8 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.8 (`hermes-agent` >=0.17.0) |
 | 0.40.7 | 9 | 0.40.7 | 0.40.7 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.7 (`hermes-agent` >=0.17.0) |
@@ -336,6 +337,15 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.10: filter one-off facts at capture (#813)
+
+- `add`, `add -batch`, and text changes with `correct` now reject recognizable one-off reports, bare paths,
+  store announcements, and installation-state facts before writing. A rejected batch writes nothing, and a rejected
+  correction leaves the previous fact intact. Checks run locally without a model call; no schema migration is needed.
+- An omitted `-source` defaults to `agent` for every fact kind. Use `user` only for an explicit lasting user
+  preference or remember request; tool evidence and agent conclusions retain their actual provenance.
+- Upgrades from 0.40.9 use fact-base schema 9 and existing CLI flags.
 
 ### 0.40.9: grouped Flash noise labels
 

@@ -1,6 +1,6 @@
 {
   "name": "memcue-opencode",
-  "version": "0.40.9",
+  "version": "0.40.10",
   "description": "memcue long-term memory for OpenCode: native tools, repository pitfalls and opt-in subagent memory",
   "type": "module",
   "license": "MIT",
