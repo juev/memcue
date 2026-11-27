@@ -143,7 +143,7 @@ func TestDreamApplyRefusesAChangedSplit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := runCorrect([]string{compound, "На loffe стоит memcue 0.4.1; бинарь memcue лежит в /opt/data/bin."},
+	if err := runCorrect([]string{compound, "На тестовом хосте перед запуском сверяй права на Unix-сокет."},
 		&bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}

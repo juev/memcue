@@ -332,7 +332,7 @@ class CodexDeliveryTest(unittest.TestCase):
             self.assertEqual(delivered["hookSpecificOutput"]["hookEventName"],"SessionStart")
             text = delivered["hookSpecificOutput"]["additionalContext"]
             for term in ("No card of rules", "Before you start a task", "another system", "-kind rule,decision",
-                         "-in global", "-in shelf:research", "what the repository shows", "Search first", "English",
+                         "-in global", "-in shelf:research", "paths or procedures already documented in the repository", "Search first", "English",
                          "legacy-language", "corrected fact content", "verbatim quotations", "user's requested language"):
                 self.assertIn(term,text)
             for forbidden in ("memcue sessions", "session_search", "built-in memory", "claude -p"):

@@ -3,14 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/juev/memcue/internal/jsonctx"
-	"github.com/juev/memcue/internal/recall"
-	"github.com/juev/memcue/internal/store"
-	"github.com/juev/memcue/internal/vet"
 	"io"
 	"os"
 	"strings"
 	"syscall"
+
+	"github.com/juev/memcue/internal/jsonctx"
+	"github.com/juev/memcue/internal/store"
 )
 
 func (inv *invocation) runAddBatch(path string, force bool, out io.Writer) error {
@@ -41,25 +40,19 @@ func (inv *invocation) runAddBatch(path string, force bool, out io.Writer) error
 		if strings.TrimSpace(in.Content) == "" {
 			return errors.New("empty fact in batch")
 		}
-		source := in.Source
-		if source == "" {
-			source = "agent"
+		if in.Source == "" {
+			in.Source = "agent"
 		}
-		if !sources[source] || validKindScope(in.Kind, in.Scope) != nil || store.ValidExpiry(in.Expires) != nil {
+		if !sources[in.Source] || validKindScope(in.Kind, in.Scope) != nil || store.ValidExpiry(in.Expires) != nil {
 			return errors.New("batch contains invalid source, kind, scope or expiry")
 		}
 		if !force && hasSecret(in.Content) {
 			return errors.New("batch contains a possible secret; use a password manager or explicit -force")
 		}
-		if (source == "agent" || source == "tool") && !recall.IsShelf(in.Scope) {
-			if vet.State(store.Fact{Content: in.Content, Meta: in.Meta}) != "" {
-				return errors.New("batch contains installation state; " + strings.TrimRight(stateWaysOut, ".\n"))
-			}
-			if part := vet.CaptureNoise(store.Fact{Content: in.Content, Meta: in.Meta}); part != "" {
-				return fmt.Errorf("batch contains %s, not reusable knowledge; use kind=event with an expiry or shelf:research as appropriate", part)
-			}
+		if err := validateCapture("add -batch", in.Content, in.Meta); err != nil {
+			return err
 		}
-		in.Expires = captureExpires(in.Kind, source, in.Scope, in.Expires, false)
+		in.Expires = captureExpires(in.Kind, in.Source, in.Scope, in.Expires, false)
 	}
 	if len(inputs) == 0 {
 		return nil

@@ -1,6 +1,6 @@
 ---
 name: memcue
-description: Search and write long-term memory when the user states a durable rule, decision or correction, asks to remember or forget something, or a verified, unresolved pitfall with fresh-checkout reuse or an external finding will help a later session.
+description: Search and write long-term memory when the user explicitly states a lasting preference or asks to remember or forget something, or when a verified finding would change what a later session does and is not already kept in the session or repository docs.
 ---
 
 # Write memory with the existing CLI
@@ -38,8 +38,8 @@ the facts and their days, name the conflict, and ask before you correct or retir
 
 Choose metadata deliberately on add:
 
-- User rules: `-kind rule -source user -scope global`, or `-scope repo` when limited to this project.
-- Decisions the code does not show: `-kind decision -source user -scope repo` when they concern this repository.
+- User-stated lasting rules: `-kind rule -source user -scope global`, or `-scope repo` when limited to this project.
+- User decisions: `-kind decision -source user -scope repo` only when explicitly stated by the user or they ask you to remember it.
 - Verified pitfalls: `-kind pitfall -source tool`; keep cause and workaround if a later session would hit the failure again.
 - External environment: `-kind environment -source tool -scope host:NAME` or `-scope service:NAME` as appropriate.
 - Procedures: `-kind procedure` only when the user asks to remember them.

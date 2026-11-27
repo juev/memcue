@@ -1,6 +1,6 @@
 ---
 name: memcue
-description: Write to long-term memory (memcue). Use as soon as the user states a rule or a correction ("не так, делай так", "always", "never"), makes a decision the code does not show, or you find a verified, unresolved pitfall with fresh-checkout reuse, a host, a service or a pointer outside the repository that a later session will need; also when the user asks to remember or forget something ("запомни", "remember this"), or a stored fact turns out wrong or outdated.
+description: Write to long-term memory (memcue) when the user explicitly states a lasting preference or asks to remember or forget something, or when a verified finding would change what a later session does and is not already kept in the session or repository docs; also when a stored fact turns out wrong or outdated.
 ---
 
 # memcue: writing to memory
@@ -11,11 +11,13 @@ when you learn it, not at the end of the session.
 
 Write new and corrected facts in English regardless of the chat language. Preserve identifiers, commands, paths, versions, exact values and verbatim quotes. Keep the user's reply language unchanged.
 
+Before storing, ask what a later session would do differently because it knows this fact. Keep task progress, completed outcomes, and paths or procedures already documented in the repository in the session or repository docs. Store a reusable pitfall only when its cause and fix are verified and a later fresh checkout would hit it again.
+
 Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.
 
 ## What to store
 
-- **Rules and corrections of the user**, with the reason when the user gave one: `-kind rule`, `-scope global` unless
+- **Standing rules and corrections explicitly stated by the user**, with the reason when the user gave one: `-kind rule`, `-scope global` unless
   the user ties it to one repository (`-scope repo`).
 - **Decisions of the user** on goals, scope and approach that the code and the git history do not show:
   `-kind decision -scope repo`. `-scope global` only for a decision that holds in every repository and on every host:
@@ -29,10 +31,7 @@ Write the first search query in English regardless of the chat language; if Engl
 - **Events the next days need**: a release rolled out, an outage, a host taken down: `-kind event`. An event expires
   after a week (`MEMCUE_EVENT_TTL_DAYS`) unless `-expires` gives a date.
 
-Rules and decisions take `-source user`: they are the user's words. No card brings them to a session: the next one
-finds them by searching `-kind rule,decision` at the start of a task, so write them with the words such a task would
-use. Name the source every time: a fact without `-source` is stored as yours (`agent`), and what a command or a file showed is
-`-source tool`.
+Use `-source user` only for a standing rule or decision the user explicitly states as a lasting preference, or asks you to remember. Choosing `-kind rule` or `decision` does not make an inference the user's words. Use `-source tool` for facts directly shown by a command or file, and `-source agent` for your conclusions. Name the source every time.
 
 Do not store: the progress of the task, what the repository, its git history or a command shows, installation state
 (versions, paths of binaries, defaults of a config), multi-step procedures the user did not ask to remember (they belong in a skill or the docs), and

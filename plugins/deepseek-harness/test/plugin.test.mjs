@@ -512,7 +512,7 @@ exit 0
 	assert.equal((await readFile(oldLog, 'utf8')).trim(), 'search -json -n 5 -- harness base')
 })
 
-test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
+test('memcue_add defaults provenance to agent for rules and other kinds', async () => {
 	await resetLog()
 	const { tools } = mount()
 	const exec = { agent: { session: { header: { cwd: '/repo/demo' } } } }
@@ -525,7 +525,10 @@ test('memcue_add sends provenance, expiry, cwd and a separator', async () => {
 	assert.equal(result.stored, true)
 	const text = await waitForLog('arg: add ')
 	// A rule is the user's words by default (#494).
-	assert.match(text, /arg: add -source user -cwd \/repo\/demo -expires 2026-10-21 -kind rule -scope global -- A new fact\./)
+	assert.match(text, /arg: add -source agent -cwd \/repo\/demo -expires 2026-10-21 -kind rule -scope global -- A new fact\./)
+	await resetLog()
+	await tools.get('memcue_add').execute({ text: 'The user asked to remember this rule.', kind: 'rule', source: 'user' }, exec)
+	assert.match(await waitForLog('arg: add '), /arg: add -source user /)
 })
 
 test('memcue_add passes the source it is given and refuses an unknown one (#494)', async () => {
@@ -686,7 +689,8 @@ test('English-first instructions reach the system prompt and registered tool sch
 	const { sections, tools } = mount()
 	for (const phrase of ['new and corrected facts in English', 'regardless of the chat language',
 		'first search query in English', 'Russian or another legacy language',
-		'identifiers, commands, paths, versions, exact values and verbatim quotes', "user's reply language"]) {
+		'identifiers, commands, paths, versions, exact values and verbatim quotes', "user's reply language",
+		'what a later session would do differently', 'completed outcomes', 'source user only when the user explicitly states it']) {
 		assert.ok(sections[0].text.includes(phrase), phrase)
 	}
 	for (const name of ['memcue_add', 'memcue_correct']) {
