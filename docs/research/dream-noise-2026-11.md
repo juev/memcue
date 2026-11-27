@@ -209,6 +209,14 @@ background path, HTTP failure and retry, stale decisions, fresh singleton noise 
 pair sweep without old singleton screening. The full Go suite with the race detector, lint, and all 24 offline
 research tests passed. These checks used zero paid requests.
 
+## Response format during rollout
+
+Two bounded runs on v0.40.8 stopped before apply. DeepSeek returned a JSON array under the `useful` label
+instead of a label string under each requested fact ID. Both runs left the dream checkpoint and the fact counts
+as they were. In v0.40.9 the noise prompt shows the preferred per-ID format, and the parser also accepts the
+grouped format when the arrays assign one allowed label to every requested ID. Unknown, repeated, and missing
+IDs fail the pass. Pair judgments and confirmations keep their existing response format.
+
 ## Reproduce
 
 Run from the repository root with Python 3, Go, a local memcue binary, and API credentials supplied in the environment. The output directory must be new. The runner reserves peak cost before each call, caps completion tokens and records usage or failure in `requests.json`. `report.json` contains the two layouts, fact IDs, labels, scores, and replay results. The native replay imports the fixture into temporary SQLite files and runs with an isolated environment.
