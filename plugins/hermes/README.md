@@ -22,12 +22,14 @@ memcue fact base:
   cron run) takes the directory Hermes itself falls back to: `resolve_agent_cwd()`, that is `TERMINAL_CWD` or the
   process directory (#354). A session whose directory is one of Hermes's own outside git (`/opt/data`,
   `/opt/hermes`) has no project: its facts keep an empty origin and a `repo` scope is dropped (#347).
-- **The model keeps its memory itself** (#494). The system prompt block and `memcue_add` tell it to store a rule or a
-  correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it learns
-  it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the session
-  afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default; `tool` is what a
-  tool's output showed, `agent` anything else, and memcue refuses
-  installation state from either (#475).
+- **The model keeps its memory itself** (#494). Before writing, it asks what a later session would do differently
+  because it knows the fact. Task progress, completed outcomes, and paths or procedures already documented in the
+  repository stay in session history or repository docs. Search first and correct an existing fact instead of adding
+  a copy. Nothing is extracted from the session afterwards. `memcue_add` defaults `source` to `agent` for every kind.
+  Use `user` only for the user's explicit lasting preference or request to remember, `tool` for facts directly shown
+  by a tool, and `user_confirmed` for a conclusion the user confirmed. Choosing `rule` or `decision` alone does not
+  establish user provenance. The model requires a verified cause and fix before storing a pitfall, and memcue refuses
+  installation state from agent or tool sources (#475).
 - **Session rotation** through `/new`, `/reset`, `/branch` or `/resume` rebinds the provider to the new session id
   after Hermes has ended the old one; a reset forgets what the old session's searches returned.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes an approved

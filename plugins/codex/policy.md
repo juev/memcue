@@ -22,8 +22,12 @@ Hook child environment does not propagate to later shell calls. Run commands fro
   Use `-expired` only when investigating expired facts, and `-n` or `-min-score 0` to widen a search.
 - Search first before every write. Use the memcue skill to add, correct or retire facts while working; nothing extracts
   them from the transcript. Correct an existing fact rather than adding a duplicate. Preserve source, kind, scope and expiry.
-  Store user rules and decisions the code does not show, durable pitfalls, and useful external context. Do not store task
-  progress, what the repository shows, credentials, or procedures the user did not ask to remember.
+  Before storing, ask what a later session would do differently because it knows the fact. Keep task progress, completed
+  outcomes, and paths or procedures already documented in the repository in the session or repository docs. Store a
+  reusable pitfall only when its cause and fix are verified and a later fresh checkout would hit it again. Store a
+  standing rule or decision as source user only when the user explicitly states it as a lasting preference or asks you
+  to remember it; selecting kind rule or decision does not make an agent's inference the user's words. Other findings
+  use source agent or source tool according to their actual origin.
 - A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
 - Agent/tool pitfall and environment facts expire after 30 days by default. Use `-expires YYYY-MM-DD` for a different review date, or `-no-expires` only for deliberately durable knowledge such as repeatable platform behavior.
 - When the user sets or corrects a standing preference, save it in the same turn. Before the first edit that depends on it

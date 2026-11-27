@@ -30,6 +30,20 @@ const stateWaysOut = "store what does not change with the next release or restar
 	"-shelf research (the shelf parameter of memcue_add). If the version, path or time is only incidental, drop it " +
 	"from the text and store the rest. The state of a machine here is not stored."
 
+func validateCapture(command, content string, m store.Meta) error {
+	if (m.Source != "" && m.Source != "agent" && m.Source != "tool") || recall.IsShelf(m.Scope) {
+		return nil
+	}
+	f := store.Fact{Content: content, Meta: m}
+	if part := vet.State(f); part != "" {
+		return fmt.Errorf("%s: the fact records installation state (%s), which a command reads; %s", command, part, stateWaysOut)
+	}
+	if part := vet.CaptureWriteNoise(f); part != "" {
+		return fmt.Errorf("%s: the fact records %s, not reusable knowledge; leave task progress in session history, document paths in their project, or use kind=event with an expiry for temporary events", command, part)
+	}
+	return nil
+}
+
 // factsPath is the fact base of this process: MEMCUE_FACTS, else the base every agent of the machine shares (#718).
 // A base that still lives at the default of 0.35 and earlier, in the Claude config directory, stays in use until it is
 // moved, so an upgrade does not start an empty base next to it.
@@ -205,16 +219,9 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 		return err
 	}
 	content := strings.Join(fs.Args(), " ")
-	// The agent writes its own facts (#494): what it saw (tool) or concluded (agent) is live at once, subject to the
-	// installation-state and one-off capture checks (#475, #805). A fact in the user's words keeps them, and a shelf
-	// fact says what an outside source states about another system, not the state of the user's machines (#565).
-	if (*source == "agent" || *source == "tool") && !recall.IsShelf(*scope) {
-		if part := vet.State(store.Fact{Kind: *kind, Source: *source, Content: content}); part != "" {
-			return fmt.Errorf("add: the fact records installation state (%s), which a command reads; %s", part, stateWaysOut)
-		}
-		if part := vet.CaptureNoise(store.Fact{Content: content, Meta: store.Meta{Kind: *kind, Scope: *scope, Source: *source}}); part != "" {
-			return fmt.Errorf("add: the fact records %s, not reusable knowledge; use -kind event with -expires for a temporary event, -shelf research for an external finding, or leave task progress in the session history", part)
-		}
+	m := store.Meta{Kind: *kind, Scope: *scope, Source: *source}
+	if err := validateCapture("add", content, m); err != nil {
+		return err
 	}
 	if !*force && hasSecret(content) {
 		return errors.New("add: the fact looks like a secret; use a password manager, or pass -force to store it anyway")
@@ -227,7 +234,7 @@ func (inv *invocation) runAdd(args []string, out io.Writer) error {
 			return errors.New("add: -scope repo needs a project: run it in one, or pass -cwd or -origin")
 		}
 	}
-	m := store.Meta{Kind: *kind, Scope: defaultScope(*scope, *origin), Source: *source}
+	m.Scope = defaultScope(*scope, *origin)
 	return inv.withStore(func(s *store.Store) error {
 		f, err := s.AddWith(content, *origin, captureExpires(*kind, *source, *scope, *expires, *noExpires), m)
 		if err != nil {
@@ -414,7 +421,20 @@ func (inv *invocation) runCorrect(args []string, out io.Writer) error {
 			empty := ""
 			exp = &empty
 		}
-		f, err := correctObserved(s, fs.Arg(0), content, exp, *expected)
+		cur, err := s.Get(rest[0])
+		if err != nil {
+			return err
+		}
+		if *expected != 0 && *expected != cur.Version {
+			return store.ErrChanged
+		}
+		if cur.Status != store.Retired && strings.TrimSpace(content) != cur.Content {
+			if err := validateCapture("correct", content, cur.Meta); err != nil {
+				return err
+			}
+		}
+		// Write against the version whose metadata governed capture.
+		f, err := s.CorrectExpiring(cur.ID, content, exp, cur.Version)
 		if err != nil {
 			return err
 		}
@@ -1096,12 +1116,6 @@ func refuseAuxiliaryFlags(args []string) error {
 	return nil
 }
 
-func correctObserved(s *store.Store, id, content string, expires *string, version int) (store.Fact, error) {
-	if version == 0 {
-		return s.CorrectExpiring(id, content, expires)
-	}
-	return s.CorrectExpiring(id, content, expires, version)
-}
 func retireObserved(s *store.Store, id string, version int) (store.Fact, error) {
 	if version == 0 {
 		return s.Retire(id)

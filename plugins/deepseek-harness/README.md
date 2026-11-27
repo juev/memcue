@@ -12,11 +12,14 @@ fact base:
   measured on Claude Code in #647. At the first prompt and after every compaction `memcue session-card` supplies only
   its hints (an upgrade this machine owes, a due dream), often none, as a user-role notice. A failed call is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
-- **The model keeps its memory itself** (#494). The system-prompt section and `memcue_add` tell it to store a rule or
-  a correction of the user, a decision the code does not show, a pitfall, a host, a service or a pointer when it
-  learns it, to search first and correct a stored fact instead of adding a copy. Nothing is extracted from the
-  session afterwards. `memcue_add` takes a `source`: a `rule` or `decision` is the user's words by default; `tool` is
-  what a tool's output showed, `agent` anything else, and memcue refuses installation state from either (#475).
+- **The model keeps its memory itself** (#494). Before writing, it asks what a later session would do differently
+  because it knows the fact. Task progress, completed outcomes, and paths already documented in the repository stay
+  in session history or repository docs. Search first and correct an existing fact instead of adding a copy. Nothing
+  is extracted from the session afterwards. `memcue_add` defaults `source` to `agent` for every kind. Use `user` only
+  for the user's explicit lasting preference or request to remember, `tool` for facts directly shown by a tool, and
+  `user_confirmed` for a conclusion the user confirmed. Choosing `rule` or `decision` alone does not establish that
+  the user said it. The model requires a verified cause and fix before storing a pitfall, and memcue refuses
+  installation state from agent or tool sources (#475).
 - **An empty search falls back to the history** (#630). A line of this plugin's own, beside the note every native
   host shares, tells the model to call `memcue_sessions` with the same words when `memcue_search` finds nothing. The
   command reads this harness's journal under `$DSH_HOME/sessions` (else `~/.dsh/sessions`) beside the other hosts'

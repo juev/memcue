@@ -671,15 +671,24 @@ class ProviderTest(unittest.TestCase):
             "content": finding, "source": "tool", "shelf": "research"}))
         self.assertNotIn("error", stored)
 
-    def test_a_rule_is_the_users_words_by_default(self):
-        """A rule or decision is the user's words by default (#494), found by search and not put in the prompt (#656);
-        another source is passed as given, and an unknown one is refused."""
+    def test_a_rule_defaults_to_agent_and_user_source_is_explicit(self):
+        """Kind does not prove provenance (#813); explicit source is kept, and an unknown one is refused."""
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Всегда пиши коммиты по-английски.", "kind": "rule", "scope": "global"}))
         fact_id = added["result"].split()[0]
         line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
+        self.assertIn("source=agent", line)
+        prompt = self.p.system_prompt_block()
+        self.assertNotIn("Всегда пиши коммиты", prompt)
+        self.assertIn("what a later session would do differently", prompt)
+        self.assertIn("completed outcomes", prompt)
+        self.assertIn("fresh checkout would hit it again", prompt)
+        self.assertIn("does not make an inference the user's words", prompt)
+        added = json.loads(self.p.handle_tool_call("memcue_add", {
+            "content": "Пользователь попросил запомнить это правило.", "kind": "rule", "source": "user"}))
+        fact_id = added["result"].split()[0]
+        line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
         self.assertIn("source=user", line)
-        self.assertNotIn("Всегда пиши коммиты", self.p.system_prompt_block())
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Контейнер demo пишет логи в /var/log/demo.", "kind": "environment", "source": "tool"}))
         fact_id = added["result"].split()[0]

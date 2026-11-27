@@ -19,6 +19,30 @@ var captureNoisePatterns = []struct {
 	{"one-off observation", regexp.MustCompile(`\bone-off\b|разов(?:ая|ой) программ|в прогоне .* сняли|перенесены [0-9]+ [a-z-]*факт|\b(?:[0-9]+ facts (?:were )?retired|retired [0-9]+ facts)\b`)},
 }
 
+var (
+	runReport         = regexp.MustCompile(`^(?:in (?:this|the last) (?:run|session|test)|(?:в этом|в последнем) (?:прогоне|сеансе|тесте))[,: ]+\S`)
+	barePath          = regexp.MustCompile(`^/[a-z0-9._-]+(?:/[a-z0-9._-]+)+/?$`)
+	storeAnnouncement = regexp.MustCompile(`^[\pL\pN][\pL\pN_. -]{0,100} (?:(?:was )?published (?:on|to)|опубликован(?:а|о)? (?:в|на)) (?:google play|(?:the )?app store)[.!]?$`)
+)
+
+// CaptureWriteNoise also checks report and path forms that can be recognized regardless of the agent's chosen kind.
+// Dream's candidate selector retains its own scope.
+func CaptureWriteNoise(f store.Fact) string {
+	if strings.EqualFold(strings.TrimSpace(f.Kind), "event") {
+		return ""
+	}
+	content := strings.ToLower(strings.TrimSpace(f.Content))
+	switch {
+	case runReport.MatchString(content):
+		return "a single run's outcome"
+	case barePath.MatchString(content):
+		return "a bare path"
+	case storeAnnouncement.MatchString(content):
+		return "a release announcement"
+	}
+	return CaptureNoise(f)
+}
+
 // CaptureNoise names content that explicitly records a one-off outcome rather than reusable knowledge. A source that
 // predates source labels is checked too. The check is deliberately narrow: a doubtful pitfall or environment fact
 // goes through with a bounded expiry and can later be reviewed by dream, while a wrong refusal would lose knowledge.

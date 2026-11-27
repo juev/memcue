@@ -1314,9 +1314,24 @@ by a search that names it; an expired fact only with `-expired`; and at most `-n
 your rules and decisions (`-kind rule,decision`) at the start of a task. `memcue correct` writes a new version and `memcue retire` takes a fact out. By hand (`add` without `-origin` names the project of the working directory and
 today; in a temporary directory the origin stays empty, because a scratch directory says nothing about where the fact
 came from). See [Projects](#projects) for how a project is named. A fact of `kind: event` gets an expiry of `MEMCUE_EVENT_TTL_DAYS` days (7 by default) unless `-expires`
-says otherwise: what happened in one run is not the knowledge a later session needs. An agent/tool `pitfall` or `environment` fact gets a 30-day review expiry; `-expires` chooses another date and `-no-expires` deliberately keeps durable knowledge without one. Expiry hides a fact from ordinary search and automatic repository pitfalls without deleting its history; a later verified use can renew it with `correct -no-expires`. Explicit one-off outcomes, resolved current-task defects and transient state are refused at capture rather than stored as durable knowledge. `add` without `-source` stores
-the fact as the agent's (`agent`, #574), so a fact in the user's own words takes `-source user`, and what a command
-showed takes `-source tool`. Facts that carry a `channel` from the dream of 0.28.0 (#625) keep it; nothing reads or
+says otherwise: what happened in one run is not the knowledge a later session needs. An agent/tool `pitfall` or
+`environment` fact gets a 30-day review expiry. Use `-expires` to choose another date or `-no-expires` to keep durable
+knowledge without one. Expiry hides a fact from ordinary search and repository pitfalls without deleting its history.
+A later verified use can renew it with `correct -no-expires`.
+
+Before writing a fact, identify what a later session would do differently because of it. Leave progress and release
+outcomes in session history. Read paths and procedures from the repository's instructions or configuration when they
+are already documented there. A useful pitfall gives the condition, symptom, and verified cause or workaround.
+
+`add`, `add -batch`, and changes to a fact's text with `correct` share the capture checks. They can refuse explicit
+run reports, bare paths, standalone store announcements, and other recognizable one-off or installation-state
+records. A refused batch writes nothing. A refused correction keeps the previous version and expiry. Corrections
+use the fact's stored provenance and scope. An expiry-only correction can renew existing text.
+
+An omitted source defaults to `agent` for every kind. Use `-source user` for a standing user instruction or a fact
+the user explicitly asked to remember. Use `-source tool` for what a command or a file showed. Explicit user
+memories, time-limited events, and research shelves have their own purposes. The capture checks run locally without
+calling a model. Facts that carry a `channel` from the dream of 0.28.0 (#625) keep it; nothing reads or
 writes it since the card went:
 
 ```bash

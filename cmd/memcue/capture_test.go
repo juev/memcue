@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,82 @@ import (
 
 	"github.com/juev/memcue/internal/store"
 )
+
+func TestCaptureAdmissionMatchedRecords(t *testing.T) {
+	env(t)
+	for _, tc := range []struct {
+		name, kind, scope, source, content, refused string
+	}{
+		{"English run report", "rule", "repo:x", "", "In this run, the updater did not push to main.", "single run"},
+		{"standing rule", "rule", "repo:x", "agent", "Send updater changes through a pull request before pushing to main.", ""},
+		{"Russian run report", "decision", "repo:x", "tool", "В этом прогоне предупреждение npm не остановило сборку.", "single run"},
+		{"reproducible pitfall", "pitfall", "repo:x", "tool", "Если npm ci выдаёт ELOCKVERIFY, сначала обнови lockfile той же версией npm, что в CI.", ""},
+		{"bare path", "environment", "host:x", "tool", "/srv/example/compose.yaml", "bare path"},
+		{"operational path", "procedure", "host:x", "tool", "After editing /srv/example/compose.yaml, validate it before restarting the worker.", ""},
+		{"release announcement", "decision", "repo:x", "agent", "Sample App was published on Google Play.", "release announcement"},
+		{"release requirement", "procedure", "repo:x", "agent", "Before publishing to Google Play, increment versionCode in gradle.properties.", ""},
+		{"explicit memory", "rule", "repo:x", "user", "In this run, the user asked to keep this wording verbatim.", ""},
+		{"research source", "decision", "shelf:research", "tool", "In this run, the vendor measured an error on the default deployment.", ""},
+		{"temporary event", "event", "repo:x", "agent", "В этом прогоне выпустили тестовую версию.", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{"-kind", tc.kind, "-scope", tc.scope}
+			if tc.source != "" {
+				args = append(args, "-source", tc.source)
+			}
+			var out bytes.Buffer
+			err := runAdd(append(args, "--", tc.content), &out)
+			if tc.refused != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.refused) || out.Len() != 0 {
+					t.Fatalf("add result %q, error %v", out.String(), err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := storedFact(t, strings.TrimSpace(out.String())); got.Content != tc.content || got.Source != tc.source {
+				t.Errorf("stored content/source = %q/%q, want %q/%q", got.Content, got.Source, tc.content, tc.source)
+			}
+		})
+	}
+	if err := withStore(func(s *store.Store) error {
+		facts, err := s.Active()
+		if err == nil && len(facts) != 7 {
+			t.Errorf("active count = %d, want 7 admitted facts", len(facts))
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCorrectChecksNewCaptureAndKeepsVersionOnRefusal(t *testing.T) {
+	env(t)
+	var out bytes.Buffer
+	original := "Use a pull request for each update."
+	if err := runAdd([]string{"-kind", "rule", original}, &out); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out.String())
+	out.Reset()
+	noisy := "In this run, we used a pull request."
+	if err := runCorrect([]string{id, noisy}, &out); err == nil || !strings.Contains(err.Error(), "single run") || out.Len() != 0 {
+		t.Fatalf("correct result %q, error %v", out.String(), err)
+	}
+	if got := storedFact(t, id); got.Content != original || got.Version != 1 {
+		t.Fatalf("refusal changed fact to %q v%d", got.Content, got.Version)
+	}
+	if err := runCorrect([]string{id, "Use a signed pull request for each update."}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := runCorrect([]string{"-expected-version", "1", id, noisy}, &out); !errors.Is(err, store.ErrChanged) {
+		t.Fatalf("stale correction: %v", err)
+	}
+	if got := storedFact(t, id); got.Version != 2 || got.Source != "agent" {
+		t.Errorf("latest corrected version/source = %d/%s", got.Version, got.Source)
+	}
+}
 
 func TestCaptureExpires(t *testing.T) {
 	want := time.Now().AddDate(0, 0, defaultReviewTTL).Format(time.DateOnly)
@@ -96,6 +173,13 @@ func TestBatchCaptureNoiseAndExpiry(t *testing.T) {
 	if err := runAdd([]string{"-batch", path}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "completed work") {
 		t.Fatalf("batch accepted one-off work: %v", err)
 	}
+	write(t, []store.FactInput{
+		{Content: "Validate the backup against the recovery manifest before replacing it."},
+		{Content: "In this run, the backup passed validation.", Meta: store.Meta{Kind: "decision"}},
+	})
+	if err := runAdd([]string{"-batch", path}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "single run") {
+		t.Fatalf("batch accepted a run report labeled as a decision: %v", err)
+	}
 	write(t, []store.FactInput{{Content: "For host x, bind the test socket inside the short task scratch directory.", Meta: store.Meta{Kind: "environment", Source: "tool", Scope: "host:x"}}})
 	var out bytes.Buffer
 	if err := runAdd([]string{"-batch", path}, &out); err != nil {
@@ -103,5 +187,22 @@ func TestBatchCaptureNoiseAndExpiry(t *testing.T) {
 	}
 	if got, want := storedFact(t, strings.TrimSpace(out.String())).Expires, time.Now().AddDate(0, 0, defaultReviewTTL).Format(time.DateOnly); got != want {
 		t.Errorf("batch expiry = %q, want %q", got, want)
+	}
+	write(t, []store.FactInput{{Content: "Review the pinned dependencies before upgrading.", Meta: store.Meta{Kind: "decision"}}})
+	out.Reset()
+	if err := runAdd([]string{"-batch", path}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := storedFact(t, strings.TrimSpace(out.String())); got.Source != "agent" {
+		t.Errorf("batch omitted source = %q", got.Source)
+	}
+	if err := withStore(func(s *store.Store) error {
+		facts, err := s.Active()
+		if err == nil && len(facts) != 2 {
+			t.Errorf("active count = %d, a refused batch changed the base", len(facts))
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

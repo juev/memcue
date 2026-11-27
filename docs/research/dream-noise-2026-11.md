@@ -217,6 +217,27 @@ as they were. In v0.40.9 the noise prompt shows the preferred per-ID format, and
 grouped format when the arrays assign one allowed label to every requested ID. Unknown, repeated, and missing
 IDs fail the pass. Pair judgments and confirmations keep their existing response format.
 
+## Capture checks before dream
+
+[#813](https://github.com/juev/memcue/issues/813) moves the first decision to the writing session. A model can use
+the current task to distinguish completed work from reusable knowledge. The CLI checks explicit forms locally.
+
+An isolated SQLite fixture tested 11 synthetic records in English and Russian. The CLI refused four records:
+two reports tied to a particular run, a bare path, and a store announcement. It kept the seven controls:
+a standing rule, a reproducible pitfall, a procedure that needs the path, a publishing prerequisite, an explicit
+user memory, an external research finding, and a temporary event. A separate fixture rejected a mixed batch
+without writing its valid prefix and refused a noisy correction without changing its target's version. The valid
+correction advanced the version, and a stale correction still returned the version conflict.
+A built CLI repeated the add, batch, and correction refusals on a fresh SQLite base. Search returned only the
+admitted rule.
+
+The fixtures made no model requests. These results verify the capture checks on the specified forms.
+They do not measure how often a model follows the new instructions or how much noise will remain in a live base.
+
+```sh
+go test ./cmd/memcue -run 'Test(CaptureAdmissionMatchedRecords|CorrectChecksNewCaptureAndKeepsVersionOnRefusal|BatchCaptureNoiseAndExpiry)$'
+```
+
 ## Reproduce
 
 Run from the repository root with Python 3, Go, a local memcue binary, and API credentials supplied in the environment. The output directory must be new. The runner reserves peak cost before each call, caps completion tokens and records usage or failure in `requests.json`. `report.json` contains the two layouts, fact IDs, labels, scores, and replay results. The native replay imports the fixture into temporary SQLite files and runs with an isolated environment.
