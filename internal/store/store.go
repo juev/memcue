@@ -811,7 +811,7 @@ func (s *Store) CorrectExpiring(id, content string, expires *string, expected ..
 		}
 		f.Expires = *expires
 	}
-	return s.write(f)
+	return s.write(f, expected...)
 }
 
 // ValidExpiry accepts "" (never expires) or a "YYYY-MM-DD" date.
@@ -913,7 +913,7 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	}
 	f := cur
 	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
-	return s.write(f)
+	return s.write(f, version)
 }
 
 // Retag adds a version of a fact with a new origin and scope; the content and everything else stay, the creation time
@@ -936,7 +936,7 @@ func (s *Store) Retag(id string, version int, origin, scope string) (Fact, error
 	}
 	f := cur
 	f.Version, f.Author, f.Origin, f.Scope = cur.Version+1, s.author, origin, scope
-	return s.write(f)
+	return s.write(f, version)
 }
 
 // Current returns the latest version of every fact that is not retired, whatever its review state.
@@ -1017,7 +1017,7 @@ func (s *Store) Retire(id string, expected ...int) (Fact, error) {
 
 	f := cur
 	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
-	return s.write(f)
+	return s.write(f, expected...)
 }
 
 // SplitFact replaces a fact in recall with its parts: they take its place with its origin, expiry and meta, stored
@@ -1062,7 +1062,7 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 	}
 	written := append([]Fact{retired}, out...)
 	if s.sync != nil {
-		stored, err := s.syncWrite(written)
+		stored, err := s.syncWrite(written, cur.Version)
 		if err != nil {
 			return nil, err
 		}
@@ -1089,10 +1089,10 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 }
 
 // write stores a new version of a fact as this memcue writes it, and returns the version as stored.
-func (s *Store) write(f Fact) (Fact, error) {
+func (s *Store) write(f Fact, expected ...int) (Fact, error) {
 	f.Meta = approved(f.Meta)
 	if s.sync != nil {
-		stored, err := s.syncWrite([]Fact{f})
+		stored, err := s.syncWrite([]Fact{f}, expected...)
 		if err != nil {
 			return Fact{}, err
 		}

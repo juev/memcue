@@ -1396,13 +1396,12 @@ In server mode only the server dreams, on a schedule; a client refuses `dream` a
 
 Who runs it:
 
-- **The session start, in the background** (#569). A dream is due once `MEMCUE_DREAM_EVERY` (default `24h`, #665) has
-  passed since the last one and some fact is fresh or lacks ordinary search queries. The first check on a machine
-  only marks the start, so the facts it already had are not swept by surprise; `memcue dream -prepare -all` reviews them. When a
-  dream is due, `session-start` (Claude Code) and `session-card` (Hermes, DSH) start `memcue dream -run -background`
-  in its own session and return at once: one pass, on the endpoint when `MEMCUE_API_URL` is set and on `claude -p`
-  otherwise. The start is stamped in `dream.started`, so a dream that fails is tried again an interval later, not at
-  every session start; what the dream prints goes to `dream.out`, its record to `dream.log`. A held `dream.lock`
+- **The session start, in the background** (#569). A local dream is due once `MEMCUE_DREAM_EVERY` (default `24h`,
+  #665) has passed since the last one and a fact is fresh. The first check marks the existing facts as seen.
+  `memcue dream -prepare -all` can review them. When due, `session-start` (Claude Code) and `session-card` (Hermes, DSH)
+  start `memcue dream -run -background` in its own session and return at once. The command runs one pass on the
+  endpoint when `MEMCUE_API_URL` is set and on `claude -p` otherwise. It stamps the start in `dream.started` and retries
+  failures after the interval. Output goes to `dream.out` and records go to `dream.log`. A held `dream.lock`
   makes the background run leave quietly, so sessions started together run one dream. `claude -p` runs with the
   environment of the session that started it, so on a machine whose Claude Code login expires the dream fails;
   `MEMCUE_CLAUDE_TOKEN_FILE` names a token from `claude setup-token` for it (#591).
@@ -1412,14 +1411,16 @@ Who runs it:
   prompt says so (`session-card -dream-tools`), and the model runs `memcue_dream_prepare` and
   `memcue_dream_apply` (#494). Hermes builds the system prompt once and again after a compression or a reset, so the
   line is as fresh as the last rebuild ([plugins/hermes/README.md](plugins/hermes/README.md#dream)).
-- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left: no
-  interval, and the merge sweep, which never runs out of groups, does not keep it going. It uses the endpoint when
-  `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks) otherwise. It stops on
-  the first failed pass, after three passes that change nothing, or after 200 passes; a second run continues. With an
-  endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405). Without
-  `-all`, `-run` checks the interval and the facts the session start checks and makes no call when nothing is due
-  (#401); started by hand without `MEMCUE_API_URL` it refuses, so a long run never starts on `claude -p` by
-  surprise. `-background` is the run a session start starts: one pass, on `claude -p` without an endpoint.
+- **The whole base.** `memcue dream -run -all` answers packet after packet until the base has no work left. It uses
+  the endpoint when `MEMCUE_API_URL` is set and `claude -p` on `MEMCUE_MODEL` (default Opus, no tools, no hooks)
+  otherwise. The merge sweep alone does not keep an ordinary `-all` run going. The command stops on the first failed
+  pass or after 200 passes. An ordinary run also stops after three passes that change nothing. A second run resumes.
+  With an endpoint set, `env -u MEMCUE_API_URL -u MEMCUE_MODEL memcue dream -run -all` runs it on Opus (#405).
+  `-noise` saves a separate checkpoint for each reviewed text. An explicit `actions: []` marks the unchanged
+  candidates reviewed. Edited text is eligible again. This applies to `-run -all -noise` and the manual
+  `-prepare -noise` / `-apply` flow. Review the first answers against a live base manually before applying them.
+  Without `-all` or `-noise`, `-run` uses the same schedule as session start. A direct `-run` without `-all` requires
+  `MEMCUE_API_URL`. The local `-background` run can use `claude -p`.
 - **Calls at once.** A pass of `dream -run` takes the work of up to `-j` packets (default 4) and sends it as calls at
   once: the fresh facts with the groups and the global facts to check the
   scope of each go in their own calls of one packet's bounds. Their answers are applied as one, and one failed call
@@ -1430,6 +1431,15 @@ Who runs it:
   call (#643): its task (`review` for the fresh facts and the groups, the merge sweep's counted under `swept`,
   `scope`), the work it was given, how many changes the model proposed, its tokens, its time
   and, on `claude -p`, its cost. An endpoint reports tokens only, so a call there has no `cost_usd`.
+
+- **The server.** In server mode only `memcue server` runs dream. It checks the queue every ten minutes.
+  `MEMCUE_DREAM_EVERY` (default `24h`) controls when routine maintenance starts. A run handles bounded batches
+  immediately, up to four passes before checking the queue again. The server continues while work remains and retries
+  after ten minutes when a model call fails or a pass makes no progress. Separately, a weekly scan revisits older
+  groups even when no fresh facts exist. It records a high-ID boundary and cursor, alternates with fresh work, and
+  resumes after restart. On upgrade, an initialized server starts the first scan at its next check. A new server
+  starts one after seven days. `dream.out` and `dream.log` report completed and remaining work and why the run stopped.
+  Retirement still requires evidence.
 
 A packet holds up to 40 fresh facts, 30 groups and 30 global facts to check the
 scope of. The fresh facts it leaves out are not counted

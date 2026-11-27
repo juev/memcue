@@ -515,3 +515,31 @@ func TestNotFoundIsAnsweredAgainOnceTheCreateArrives(t *testing.T) {
 		t.Fatalf("edit not applied: %+v", got)
 	}
 }
+
+func TestServerRetireRejectsAChangeBetweenReadAndWrite(t *testing.T) {
+	s, path := openRole(t, OpenServer, syncT0)
+	writer, err := OpenServer(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = writer.Close() }()
+	f, err := s.AddWith("Original old text", "example 2026-11-10", "", Meta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Retire asks for the time after loading and checking the old version.
+	s.now = func() time.Time {
+		s.now = func() time.Time { return syncT0 }
+		if _, err := writer.Correct(f.ID, "Correction from another writer", f.Version); err != nil {
+			t.Fatal(err)
+		}
+		return syncT0
+	}
+	if _, err := s.Retire(f.ID, f.Version); !errors.Is(err, ErrChanged) {
+		t.Errorf("stale retirement should fail with ErrChanged, got %v", err)
+	}
+	got, err := s.Get(f.ID)
+	if err != nil || got.Status != Active || got.Content != "Correction from another writer" {
+		t.Fatalf("stale retirement overwrote a correction: %+v, %v", got, err)
+	}
+}

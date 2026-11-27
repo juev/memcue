@@ -41,9 +41,15 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   the helper rebuilds the replica from the server and keeps the outbox.
 - R10: If session-start or session-card finds no helper socket, it starts the helper detached and answers without
   waiting for it. If it finds a helper of another binary version, it asks that helper to exit and starts a new one.
-- R11: In server mode a client rejects `dream`, starts no background dream and shows no dream hint. The server runs
-  dream on a schedule. A fact is fresh for dream when its `content` stamp changed since the previous pass; a change of
-  labels alone does not make it fresh.
+- R11: In server mode a client rejects `dream`, starts no background dream and shows no dream hint. The server checks
+  every ten minutes. `MEMCUE_DREAM_EVERY` (24 hours by default) governs when fresh content may start routine
+  maintenance. A fact is fresh when its `content` stamp changed since the previous pass. A due run processes
+  successive bounded batches in bursts of at most four passes. The server checks for more work immediately after
+  each burst. It retries after ten minutes following an error or a pass that made no progress.
+  A separate weekly cycle revisits older fact groups even when no fresh content is due. It records the highest ID of an
+  already-reviewed fact at cycle start and a durable cursor. Fresh batches and the weekly scan alternate when both
+  have work. Restart resumes the cursor. An existing server starts the first scan at its first check after upgrade.
+  A newly initialized server starts its first scan after seven days. Old noise candidates require manual review.
 - R12: `memcue migrate -server` reads the local base of `MEMCUE_FACTS`, reports what it would send, and with `-apply`
   sends the latest version of every fact to the empty server of `MEMCUE_SERVER` through the helper. Stamps come from
   `created`, with the server's device id. A server that holds any fact refuses and stores nothing.
@@ -91,7 +97,7 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   A custom binary protocol was rejected: payloads are megabytes at most and HTTP is easier to inspect. A push started
   by the server was rejected: a client would have to listen on the tailnet, for no gain in latency over the long poll.
 - **Change number.** `seq` is a signed 64-bit integer the server raises on every write, `max(seq)+1` inside the write
-  transaction. Dream runs as a separate process on the server's base; the long poll notices its commits through
+  transaction. Dream writes through a separate database connection. The long poll notices its commits through
   `PRAGMA data_version`.
 - **Client.** The CLI opens the replica at `$XDG_STATE_HOME/memcue/server-<server name>/replica.db`, derived from
   `MEMCUE_SERVER` alone (R16). Only the helper uses the network: it long-polls, applies rows, and sends the outbox.
@@ -121,11 +127,16 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
 - **Migration.** From one base: loffe and Hermes are merged into the Mac base once by the existing git sync, then
   `migrate -server` loads that base. Each fact goes with the text and labels of its latest version and the creation
   time of its first. Implemented in `cmd/memcue/migrate_server.go`.
-- **Dream on the server.** `memcue server` looks every ten minutes whether a dream is due (`MEMCUE_DREAM_EVERY`,
-  the model of `MEMCUE_API_URL` or `claude -p`, off with `MEMCUE_DREAM_BACKGROUND=0`) and runs `memcue dream -run
-  -background` as a process of its own on the server base. A server row keeps `content_version`, the version at which
-  its text last changed, so new labels alone leave a fact as the last dream saw it. `memcue server` refuses to run
-  with `MEMCUE_SERVER` or `MEMCUE_POSTGRES_DSN`, which would send its dream to a client backend. Implemented.
+- **Dream on the server.** `memcue server` runs dream in a goroutine tied to server shutdown, using the model of
+  `MEMCUE_API_URL` or `claude -p`. `MEMCUE_DREAM_BACKGROUND=0` disables it. The scheduler checks
+  every ten minutes. `MEMCUE_DREAM_EVERY` (24 hours by default) governs routine fresh-content runs. Each run processes
+  bounded batches immediately, up to four passes before checking the queue again. After an error or a pass with no
+  progress it retries at the next ten-minute check. A weekly scan reviews older groups from a fixed high-ID boundary,
+  alternates with fresh work, and resumes from its durable cursor after restart. On upgrade, an initialized server
+  begins that scan at its first check. A new server waits seven days. Progress reports processed and remaining work
+  and why the scheduler stopped. A server row keeps `content_version`, the version at which its text last changed, so
+  new labels alone leave a fact as the last dream saw it. The server refuses to run with `MEMCUE_SERVER` or
+  `MEMCUE_POSTGRES_DSN`, which would send its dream to a client backend.
 
 ## Verification scenarios
 
@@ -147,9 +158,11 @@ Tests are named as the steps land.
   `TestResetReplicaKeepsTheOutbox`); the helper's loop with a fake server follows.
 - R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`
   (`TestSessionStartStartsAndReplacesTheRealHelper`, `TestSessionStartReplacesAHelperOfAnotherVersion`).
-- R11: command tests and a freshness unit test (client side: `TestServerModeRefusesLocalCommands`,
+- R11: command tests and freshness/scheduling tests (client side: `TestServerModeRefusesLocalCommands`,
   `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`; server side:
-  `TestDreamOnTheServerSeesANewTextAndNotNewLabels`, `TestServerDreamsWhenADreamIsDue`).
+  `TestDreamOnTheServerSeesANewTextAndNotNewLabels`, `TestServerDreamsWhenADreamIsDue`,
+  `TestServerDreamResumesFreshBacklogAfterFailedBatchAndRestart`, `TestServerDreamCompletesWeeklySweepWithoutFreshFacts`,
+  `TestServerDreamAlternatesAndLogsRemainingWorkAtBudget`, `TestServerDreamCancellationKeepsPacketPending`).
 - R12: `TestImportLoadsAnEmptyBaseOnly`, `TestMigrateServerReportsAndLoadsAnEmptyServerOnly`.
 - R14: `make test-plugins`.
 - R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`); the helper's status of a new

@@ -34,6 +34,12 @@ var dreamRunFn = func(parent context.Context, packet string) (extract.DreamReply
 // dreamAllStalls bounds repeated unanswered split or scope work in dream -run -all.
 const dreamAllStalls = 3
 
+type dreamOptions struct {
+	noiseOnly bool
+	server    bool
+	sweep     *dreamSweepRange
+}
+
 // runDreamOnce is memcue dream -run. A plain run (#401) is the dream started by hand or by a job, without a session
 // model to hand the packet to: it asks what the session start of Claude
 // Code asks before it says a dream is due, whether MEMCUE_DREAM_EVERY has passed and some fact is fresh, and with nothing due makes no call. It needs MEMCUE_API_URL, so a long run never starts by surprise.
@@ -54,7 +60,7 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bo
 	if err != nil {
 		return err
 	}
-	if !all {
+	if !all && !noiseOnly {
 		fresh, _, err := inv.dreamDue(dir, dreamEveryFromEnv(dreamEvery))
 		if err != nil {
 			return err
@@ -73,7 +79,7 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bo
 	}
 	defer unlock()
 	if !all {
-		_, _, err := inv.dreamPass(dir, packets, noiseOnly, out)
+		_, _, err := inv.dreamPass(dir, packets, dreamOptions{noiseOnly: noiseOnly}, out)
 		return err
 	}
 	stalls := 0
@@ -81,13 +87,24 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bo
 		if _, err := fmt.Fprintf(out, "dream -all: pass %d\n", pass); err != nil {
 			return err
 		}
-		rec, work, err := inv.dreamPass(dir, packets, noiseOnly, out)
+		rec, work, err := inv.dreamPass(dir, packets, dreamOptions{noiseOnly: noiseOnly}, out)
 		if err != nil {
 			return fmt.Errorf("dream -all: pass %d: %w", pass, err)
 		}
 		if rec.Packet == "" { // nothing for the dream
 			_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
 			return err
+		}
+		if noiseOnly {
+			if *rec.NoiseRemaining == 0 {
+				_, err := fmt.Fprintf(out, "dream -all: done after %d passes\n", pass)
+				return err
+			}
+			if rec.NoiseChecked == 0 {
+				_, err := fmt.Fprintf(out, "dream -all: stopped without progress; %d noise candidates remain\n", *rec.NoiseRemaining)
+				return err
+			}
+			continue
 		}
 		// A pass that checked the scope of global facts moved its cursor, even when it moved no fact (#607).
 		if len(rec.Splits)+len(rec.Actions)+rec.ScopeChecked == 0 {
@@ -116,11 +133,11 @@ func (inv *invocation) runDreamOnce(out io.Writer, all, background, noiseOnly bo
 // groups and each packet's global facts to check the scope of. Most of a call's time is the model
 // writing its answer, so three calls of a third of it each take about a third of the time. Their answers are joined
 // and applied as one.
-func (inv *invocation) dreamPass(dir string, packets int, noiseOnly bool, out io.Writer) (dreamRecord, int, error) {
+func (inv *invocation) dreamPass(dir string, packets int, options dreamOptions, out io.Writer) (dreamRecord, int, error) {
 	out = inv.writer(out)
 	var from time.Time
 	var seen map[string]int
-	if last, ok := lastDream(dir); ok {
+	if last, ok := lastDream(dir); ok && !options.noiseOnly {
 		from = last
 		var err error
 		if seen, err = readDreamSeen(dir); err != nil {
@@ -129,7 +146,7 @@ func (inv *invocation) dreamPass(dir string, packets int, noiseOnly bool, out io
 	}
 	var packet bytes.Buffer
 	start := time.Now()
-	rec, w, err := inv.prepare(dir, from, seen, false, packets, noiseOnly, &packet)
+	rec, w, err := inv.prepare(dir, from, seen, false, packets, options, &packet)
 	timing := dreamTiming{Prepare: ms(time.Since(start))}
 	if err != nil || rec.Packet == "" {
 		rec.Timing = &timing
@@ -167,7 +184,9 @@ func (inv *invocation) dreamPass(dir string, packets int, noiseOnly bool, out io
 		return rec, work, err
 	}
 	start = time.Now()
+	sweepCursor := rec.sweepCursor
 	rec, err = inv.applyAnswer(dir, path, out)
+	rec.sweepCursor = sweepCursor
 	timing.Apply = ms(time.Since(start))
 	rec.Tokens, rec.CostUSD, rec.Timing, rec.Calls = &r.Tokens, r.CostUSD, &timing, byCall
 	if err != nil {
@@ -192,13 +211,14 @@ func ms(d time.Duration) int64 { return d.Milliseconds() }
 
 // dreamWork is the work prepare gathered for the model, kept apart so dream -run can cut it into calls.
 type dreamWork struct {
-	id       string
-	split    []store.Fact
-	groups   [][]store.Fact
-	fresh    map[string]bool // the facts of the groups the dream reviews as new
-	noise    map[string]int  // facts eligible for noise retirement in this packet
-	scope    []store.Fact    // the global facts to check the scope of (#607)
-	projects []string        // the projects they may move to
+	id        string
+	noiseOnly bool
+	split     []store.Fact
+	groups    [][]store.Fact
+	fresh     map[string]bool // the facts of the groups the dream reviews as new
+	noise     map[string]int  // facts eligible for noise retirement in this packet
+	scope     []store.Fact    // the global facts to check the scope of (#607)
+	projects  []string        // the projects they may move to
 }
 
 // calls cuts the work into packets of the usual bounds, one task kind a call: fresh facts with groups, which need the
@@ -213,7 +233,10 @@ func (w dreamWork) calls() ([]dreamCall, error) {
 			projects = nil
 		}
 		text, err := renderPacket(w.id, split, scope, projects, groups, w.fresh, w.noise)
-		c := dreamCall{text: text, rec: dreamCallRecord{Task: task, Split: len(split), Groups: len(groups),
+		if w.noiseOnly {
+			text = noiseInstructions + text
+		}
+		c := dreamCall{text: text, noiseOnly: w.noiseOnly, rec: dreamCallRecord{Task: task, Split: len(split), Groups: len(groups),
 			Facts: len(scope)}}
 		for _, g := range groups {
 			for _, f := range g {
@@ -254,8 +277,9 @@ const (
 
 // dreamCall is one model call of a pass: the packet text it sends and its line in the pass's record.
 type dreamCall struct {
-	text string
-	rec  dreamCallRecord
+	noiseOnly bool
+	text      string
+	rec       dreamCallRecord
 }
 
 // dreamCallRecord is one model call of a dream -run pass in dream.log (#643): its task, the work it was given, how
@@ -311,6 +335,15 @@ func askAll(ctx context.Context, calls []dreamCall) (extract.DreamReply, []dream
 			errs[i] = fmt.Errorf("answer: %w", err)
 			recs[i].Error = errs[i].Error()
 			continue
+		}
+		if calls[i].noiseOnly {
+			if err := validateNoiseAnswer(a); err != nil {
+				errs[i], recs[i].Error = err, err.Error()
+				continue
+			}
+			if joined.Actions == nil {
+				joined.Actions = []extract.Action{}
+			}
 		}
 		recs[i].Proposed = len(a.Splits) + len(a.Expansions) + len(a.Actions) + len(a.Scopes)
 		// The first answer that came back sets the packet; a failed call before it is no packet to compare with.

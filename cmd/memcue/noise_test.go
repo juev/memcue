@@ -139,11 +139,9 @@ func TestDreamNoiseOnlySkipsDurableWork(t *testing.T) {
 	if got := storedFact(t, kept.ID); got.Status != store.Active {
 		t.Fatalf("durable fact changed during noise-only review: %+v", got)
 	}
-	seen, err := os.ReadFile(filepath.Join(dir, "state", "memcue", "dream.seen"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(seen), kept.ID) {
-		t.Fatal("noise-only review marked the unreviewed durable fact as seen")
+	for _, file := range []string{"dream.seen", "dream.at", "dream.merge", "dream.scope", unpromotedFile} {
+		if _, err := os.Stat(filepath.Join(dir, "state", "memcue", file)); !os.IsNotExist(err) {
+			t.Errorf("noise-only review created ordinary dream state %s: %v", file, err)
+		}
 	}
 }
