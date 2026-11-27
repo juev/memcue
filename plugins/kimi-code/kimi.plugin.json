@@ -1,6 +1,6 @@
 {
   "name": "memcue-kimi",
-  "version": "0.40.6",
+  "version": "0.40.7",
   "description": "Pull-mode long-term memory over the memcue CLI for Kimi Code",
   "skills": "./skills/",
   "systemPromptPath": "./SYSTEM.md",
