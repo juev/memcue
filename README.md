@@ -60,7 +60,7 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.40.10`; the fact-base schema is **9**. Content-only storage is an incompatible
+This release candidate is `0.40.11`; the fact-base schema is **9**. Content-only storage is an incompatible
 upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
 backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
 See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
@@ -68,6 +68,7 @@ the same release version. Publication and live deployment are separate steps; ne
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.40.11 | 9 | 0.40.11 | 0.40.11 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.11 (`hermes-agent` >=0.17.0) |
 | 0.40.10 | 9 | 0.40.10 | 0.40.10 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.10 (`hermes-agent` >=0.17.0) |
 | 0.40.9 | 9 | 0.40.9 | 0.40.9 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.9 (`hermes-agent` >=0.17.0) |
 | 0.40.8 | 9 | 0.40.8 | 0.40.8 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.8 (`hermes-agent` >=0.17.0) |
@@ -337,6 +338,16 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.40.11: resumable full-base dreams (#815, #816)
+
+- `dream -run -all` drains a finite old-fact sweep alongside fresh and scope work. It reports remaining work and
+  resumes from the last successful packet. A second immediate run does not restart a completed old-fact sweep.
+- `dream -run -all -noise` screens every active fact, not just local candidates. It can retire only one-off noise
+  flagged by the model that also passes the existing local filter; it does not split, merge or rescope facts.
+- Flash retries malformed pair and confirmation replies, isolates malformed pair groups, and skips unvalidated
+  actions. Label diagnostics show expected and received IDs without echoing other reply text.
+- Upgrades from 0.40.10 keep fact-base schema 9; no migration is needed.
 
 ### 0.40.10: filter one-off facts at capture (#813)
 
