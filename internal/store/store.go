@@ -787,7 +787,7 @@ func checkRetiredMatch(ctx context.Context, tx *sql.Tx, f Fact) error {
 	err := tx.QueryRowContext(ctx, `SELECT id, retirement_reason FROM facts f WHERE status = 'retired'
   AND (retirement_key = ? OR (retirement_key = '' AND scope = ? AND content = ?))
   AND version = (SELECT max(version) FROM facts WHERE id = f.id)
-  ORDER BY (trim(retirement_reason) = 'User requested forgetting.') DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
+  ORDER BY (trim(retirement_reason) IN ('User requested forgetting.', 'The built-in memory tool removed the mirrored note.')) DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -803,7 +803,8 @@ func retirementKey(f Fact) string {
 }
 
 func retiredMatch(id, scope, reason string) error {
-	if strings.TrimSpace(reason) == "User requested forgetting." {
+	switch strings.TrimSpace(reason) {
+	case "User requested forgetting.", "The built-in memory tool removed the mirrored note.":
 		return errors.New("this claim matches a forgotten fact in this scope; do not store it without explicit user authorization")
 	}
 	if !validRetirementReason(reason) {

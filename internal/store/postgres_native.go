@@ -31,7 +31,7 @@ func (p *postgresTransaction) checkRetiredMatch(f Fact) error {
 	err := p.tx.QueryRow(p.ctx, `SELECT id, coalesce(payload->>'retirement_reason', '') FROM memcue.facts
   WHERE NOT active AND (payload->>'retirement_key' = $1 OR (coalesce(payload->>'retirement_key', '') = ''
   AND scope = $2 AND payload->>'Content' = $3))
-  ORDER BY (trim(coalesce(payload->>'retirement_reason', '')) = 'User requested forgetting.') DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
+  ORDER BY (trim(coalesce(payload->>'retirement_reason', '')) IN ('User requested forgetting.', 'The built-in memory tool removed the mirrored note.')) DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

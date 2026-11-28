@@ -1118,7 +1118,7 @@ class MemcueMemoryProvider(MemoryProvider):
                     if ok:
                         written[self._key(target, content)] = remembered(out.split()[0], 1)
             elif action == "remove" and fact_id:
-                ok, out = self._run(["retire", "-reason", "User requested forgetting."] + version_args + ["--", fact_id])
+                ok, out = self._run(["retire", "-reason", "The built-in memory tool removed the mirrored note."] + version_args + ["--", fact_id])
                 if ok:  # a failed retire keeps the mapping, so the next remove can try again
                     written.pop(previous_key, None)
             else:

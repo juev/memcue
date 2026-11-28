@@ -34,7 +34,8 @@ memcue fact base:
   after Hermes has ended the old one; a reset forgets what the old session's searches returned.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes an approved
   global fact (source `memory`, origin `hermes-memory`; #440). When the agent edits that entry the fact gets a new
-  version, when it removes it the fact is retired. Which fact an entry became is kept in
+  version. On removal, the mirror records that the built-in tool removed the note; that legacy hook does not pass a
+  reason from the model, so it does not claim a user requested forgetting. Which fact an entry became is kept in
   `$HERMES_HOME/memcue/written.json`. The built-in memory is a second memory next to memcue: turn it off once the
   model writes to memcue, with `hermes config set memory.memory_enabled false` and
   `hermes config set memory.user_profile_enabled false`. memcue does not change Hermes's settings. While Hermes still

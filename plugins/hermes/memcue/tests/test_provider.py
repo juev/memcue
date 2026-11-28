@@ -336,6 +336,8 @@ class ProviderTest(unittest.TestCase):
         self.assertIn(f"{fact_id} v2 active", "\n".join(self.memcue("dump", self.p._facts)))
         self.p.on_memory_write("remove", "memory", "", {"previous_content": new})
         self.assertEqual(self.facts(), [])
+        history = json.loads("\n".join(self.memcue("history", "-json", fact_id)))
+        self.assertEqual(history[-1]["retirement_reason"], "The built-in memory tool removed the mirrored note.")
 
     def test_replace_of_a_retired_mirror_adds_a_new_fact(self):
         old = "Проект demo: база PostgreSQL 18 слушает порт 55432."
