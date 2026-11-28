@@ -6,15 +6,57 @@ recall and proactive capture instructions to the system prompt through scoped
 `promptGuidance`, only while the corresponding tools are callable. This does
 not query the database at prompt assembly or replace built-in memory.
 
-Pack this directory with `npm pack` and install the tarball on an isolated test
-Gateway with `openclaw plugins install npm-pack:/absolute/path/to/package.tgz`.
-Set `plugins.entries.memcue-tools.config` to an object containing absolute
-`binary` and `dataDir` paths. Use the Memcue binary from the tested revision
-and an existing empty private directory (mode 0700), dedicated to that Gateway
-and owner. Do not point it at production data. The tool process receives explicit
-local storage paths and does not inherit remote sync configuration.
+## Agent-assisted installation from a commit
 
-Run `node --test test.mjs` for the lightweight adapter contract. For the Gateway
-smoke test, save a synthetic rule in one owner session, recall it from another,
-correct it, and retire it. Verify a group session cannot call any of the tools.
-A timed-out mutation may already have landed; search before retrying.
+Only proceed when the operator has authorized the target. For a first install,
+use an isolated OpenClaw profile with a synthetic database. Do not use the
+production Gateway, select a different memory provider, or connect a sync backend.
+
+1. From a checkout of Memcue, use the full commit SHA approved by the operator.
+   Pack its tracked files rather than your current working tree:
+
+   ```sh
+   checkout=$(mktemp -d)
+   git archive "$COMMIT" plugins/openclaw | tar -xf - -C "$checkout"
+   (cd "$checkout/plugins/openclaw" && npm pack --ignore-scripts --pack-destination "$checkout")
+   ```
+
+2. Use OpenClaw 2026.11.10 and Memcue 0.41.0 for the tested combination (not a
+   minimum-version claim). Download the Memcue release for the Gateway's OS and
+   architecture from [GitHub Releases](https://github.com/juev/memcue/releases/tag/v0.41.0).
+   Verify its SHA-256 against GitHub release asset metadata or the release checksum
+   file, extract it, and use an absolute path to the binary on the Gateway host.
+   Create a separate, empty directory with mode 0700 for the database.
+3. With the CLI explicitly targeting the approved test profile, install the
+   reviewed archive. Follow the installer prompts; a noninteractive run may need
+   `--force --accept-capabilities` after explicit approval of that archive and
+   its capabilities. Do not use these flags for unreviewed sources.
+
+   ```sh
+   openclaw plugins install "npm-pack:$checkout/juev-memcue-openclaw-0.1.0.tgz"
+   ```
+
+4. Merge the following settings under `plugins.entries.memcue-tools.config`
+   in that profile. Do not replace the rest of the config.
+
+   ```json
+   {
+     "binary": "/absolute/path/to/memcue",
+     "dataDir": "/absolute/path/to/private-test-data"
+   }
+   ```
+
+   The plugin uses `facts.db` and `state/` under this directory. It does not
+   inherit remote sync configuration.
+5. Run `openclaw config validate` and
+   `openclaw plugins inspect memcue-tools --runtime --json`. Confirm
+   `status: loaded` and all four tools: `memcue_search`, `memcue_add`,
+   `memcue_correct`, and `memcue_retire`. Registration is not proof of
+   session access. On the test Gateway, save a synthetic rule in one owner
+   session; find it in another, correct it, retire it, then verify it no longer
+   appears in ordinary search. Confirm all four tools are unavailable in a
+   group session. Report any skipped phase separately.
+
+From the package source directory, `MEMCUE_BIN=/absolute/path/to/memcue node
+--test --test-concurrency=1 test.mjs` checks the adapter without chat or model
+calls. A timed-out mutation may already have landed; search before retrying.
