@@ -101,7 +101,8 @@ class ProviderTest(unittest.TestCase):
         # would turn the usage log on behind the tests that assert it is off, and a recall setting changes what is served.
         for key in _shell_memcue_vars():
             del os.environ[key]
-        os.environ["MEMCUE_DREAM_BACKGROUND"] = "0"
+        # Hermes's config loader resolves its home independently of initialize(hermes_home=...).
+        os.environ["HERMES_HOME"] = self.home
         _pin_builtin_memory(self)
         self.p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         self.p.initialize("s1", hermes_home=self.home, agent_context="primary")

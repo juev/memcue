@@ -277,8 +277,7 @@ class RequestContext(unittest.TestCase):
       unchanged_but(out,parts,'messages',1)
       self.assertEqual(out['messages'][1]['content'][0],parts['messages'][1]['content'][0])
       self.assertEqual({k:v for k,v in out['messages'][1]['content'][1].items() if k!='text'},{'type':'text'},'a fresh part must not inherit the old cache breakpoint')
-      # Codex Responses: `instructions` and every non-user item stay; the card passes the released
-      # preflight, while a developer message item still raises there before the call leaves.
+      # Codex Responses: `instructions` and every non-user item stay; the card passes the released preflight.
       import inspect
       from agent.transports.codex import ResponsesApiTransport
       transport=ResponsesApiTransport()
@@ -292,8 +291,10 @@ class RequestContext(unittest.TestCase):
       checked=preflight(out)
       self.assertEqual(checked['instructions'],'Base instructions.')
       self.assertIn('Failure-0 cause;',json.dumps(checked['input']),'the released preflight dropped the card')
-      with self.assertRaises(ValueError):
-       preflight({**codex,'input':[*codex['input'],{'type':'message','role':'developer','content':[{'type':'input_text','text':'card'}]}]})
+      # Hermes versions differ on accepting developer input. The middleware must never put the card there.
+      developer={'type':'message','role':'developer','content':[{'type':'input_text','text':'Base developer input.'}]}
+      with_developer={**codex,'input':[*codex['input'],developer]}
+      unchanged_but(send(copy.deepcopy(with_developer),mode),with_developer,'input',0)
       typed={**codex,'input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'ok'}]}]}
       out=send(copy.deepcopy(typed),mode)
       unchanged_but(out,typed,'input',0)
@@ -303,7 +304,8 @@ class RequestContext(unittest.TestCase):
       # user text, never into the tool_result carrier that follows the tool call.
       from agent.anthropic_adapter import build_anthropic_kwargs
       def anthropic_kwargs(messages):
-       wanted={'model':'claude-opus-4.8','messages':messages,'tools':None,'max_tokens':None,'reasoning_config':None}
+       tools=[{'type':'function','function':{'name':'terminal','description':'Synthetic fixture tool','parameters':{'type':'object','properties':{}}}}]
+       wanted={'model':'claude-opus-4.8','messages':messages,'tools':tools,'max_tokens':None,'reasoning_config':None}
        params=inspect.signature(build_anthropic_kwargs).parameters
        return build_anthropic_kwargs(**{k:v for k,v in wanted.items() if k in params})
       mode='anthropic_messages'
