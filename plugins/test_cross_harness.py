@@ -18,22 +18,9 @@ from pathlib import Path
 PLUGINS = Path(__file__).resolve().parent
 
 
-class RecallDuringWorkTest(unittest.TestCase):
-    def test_only_hermes_guides_recall_during_work(self):
-        """#521 is the Hermes provider's instruction only: the DSH and Claude Code plugins do not carry it."""
-        self.assertIn("During work", (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8"))
-        for path in (PLUGINS / "deepseek-harness" / "src" / "index.mjs",
-                     PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md"):
-            with self.subTest(path=path.name):
-                text = path.read_text(encoding="utf-8")
-                self.assertIn("memcue", text)
-                self.assertNotIn("During work", text)
-                self.assertNotIn("unexpected error", text)
-
-
 class HistoryFallbackTest(unittest.TestCase):
     def test_each_host_sends_an_empty_search_to_its_own_history(self):
-        """#621: after an empty search, Claude Code runs memcue sessions over its transcripts, in the note and in the
+        """#621: when history still matters after an empty search, Claude Code can run memcue sessions, in the note and in the
         skill; Hermes has its own session_search; DSH reads its own journal through memcue_sessions (#630), in a line
         of its own beside the note every native host shares word for word."""
         go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
@@ -41,11 +28,13 @@ class HistoryFallbackTest(unittest.TestCase):
         for text in (go, skill):
             self.assertIn("memcue sessions", text)
             self.assertIn("history, not a fact", text)
+            self.assertIn("the history still matters", text)
         hermes = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
         self.assertIn("session_search", hermes)
         self.assertNotIn("memcue sessions", hermes)
         dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
         self.assertIn("memcue_sessions", dsh)
+        self.assertIn("finds nothing useful and the history still matters", dsh)
         self.assertNotIn("session_search", dsh)
         shared = re.search(r"const NOTE = `([^`]*)`", dsh)
         self.assertIsNotNone(shared)
@@ -192,17 +181,30 @@ class CaptureReuseTest(unittest.TestCase):
 
 
 class NoCardTest(unittest.TestCase):
-    def test_every_host_searches_the_rules_instead_of_a_card(self):
-        """#656: no host gives a card; every host tells the model to look up user rules and decisions.
+    def test_conditional_lookup_does_not_require_a_start_of_task_search(self):
+        """Check the delivered policy inputs, including the optional CLI fallbacks."""
+        paths = [PLUGINS.parent / 'cmd/memcue/session.go'] + [PLUGINS / name for name in (
+            'codex/policy.md', 'codex/AGENTS.md.snippet', 'qwen-code/QWEN.md.snippet',
+            'kimi-code/SYSTEM.md', 'deepseek-harness/src/index.mjs', 'opencode/src/instructions.ts',
+            'pi/src/instructions.ts', 'hermes/memcue/__init__.py',
+        )]
+        for path in paths:
+            with self.subTest(policy=str(path.relative_to(PLUGINS.parent))):
+                text = ' '.join(path.read_text(encoding='utf-8').split())
+                self.assertIn('when prior context could change the answer or next action', text)
+                self.assertIn('Skip memory lookup for self-contained tasks', text)
+                self.assertIn('rule,decision', text)
+                self.assertIn('unexpected error', text)
+                self.assertNotRegex(text, r'(?:Before (?:you start|starting) a task|at the start of a task),? (?:and again|and when|search)')
 
-        Hermes makes the lookup conditional (#787); the other hosts retain the original #647 instructions.
-        """
+    def test_every_host_searches_the_rules_instead_of_a_card(self):
+        """#656: rules are looked up when relevant, not injected as a card."""
         go = (PLUGINS.parent / "cmd" / "memcue" / "session.go").read_text(encoding="utf-8")
         hermes = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
         hermes = re.sub(r'"\s*\n\s*"', "", hermes)  # the note is adjacent string literals; read it joined
         dsh = (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8")
         self.assertIn("-kind rule,decision \\\"<words of the task>\\\"", go)
-        self.assertIn("with kind rule,decision and the words of the task", dsh)
+        self.assertIn("with kind rule,decision and terms specific to the task", dsh)
         self.assertIn("search with kind rule,decision and terms specific to the task", hermes)
         self.assertIn("when prior context could change the answer or next action", hermes)
         self.assertIn("Skip memory lookup for self-contained tasks", hermes)
@@ -211,9 +213,7 @@ class NoCardTest(unittest.TestCase):
             with self.subTest(host=name):
                 self.assertIn("No card of rules", text)
                 self.assertNotIn("session card", text)
-                if name != "hermes":
-                    self.assertIn("Before you start a task, and again when it turns to another system", text)
-                    self.assertIn("Skip it when the user's message and the repository's files hold everything", text)
+
 
 class PiNoteTest(unittest.TestCase):
     def test_pi_carries_the_dsh_note_word_for_word(self):
@@ -333,7 +333,8 @@ class CodexDeliveryTest(unittest.TestCase):
             self.assertNotIn("systemMessage",delivered)
             self.assertEqual(delivered["hookSpecificOutput"]["hookEventName"],"SessionStart")
             text = delivered["hookSpecificOutput"]["additionalContext"]
-            for term in ("No card of rules", "Before you start a task", "another system", "-kind rule,decision",
+            for term in ("No card of rules", "when prior context could change the answer or next action",
+                         "Skip memory lookup for self-contained tasks", "prior rules or decisions may apply", "-kind rule,decision",
                          "-in global", "-in shelf:research", "paths or procedures already documented in the repository", "Search first", "English",
                          "legacy-language", "corrected fact content", "verbatim quotations", "user's requested language"):
                 self.assertIn(term,text)

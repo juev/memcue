@@ -8,8 +8,8 @@ fact base:
   synonyms and Russian or another legacy language if English misses, and to skip it when the message and
   the files hold everything.
 - **No card of rules** (#656). The user's rules and decisions stay in the base: the section tells the model to search
-  them (`kind rule,decision`, the words of the task) at the start of a task and when it turns to another system, as
-  measured on Claude Code in #647. At the first prompt and after every compaction `memcue session-card` supplies only
+  them (`kind rule,decision`, the words of the task) when prior context could change the answer or next action.
+  At the first prompt and after every compaction `memcue session-card` supplies only
   its hints (an upgrade this machine owes), often none, as a user-role notice. A failed call is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
 - **The model keeps its memory itself** (#494). Before writing, it asks what a later session would do differently
@@ -20,8 +20,8 @@ fact base:
   `user_confirmed` for a conclusion the user confirmed. Choosing `rule` or `decision` alone does not establish that
   the user said it. The model requires a verified cause and fix before storing a pitfall, and memcue refuses
   installation state from agent or tool sources (#475).
-- **An empty search falls back to the history** (#630). A line of this plugin's own, beside the note every native
-  host shares, tells the model to call `memcue_sessions` with the same words when `memcue_search` finds nothing. The
+- **History fallback** (#630). A line of this plugin's own, beside the note every native host shares, tells the
+  model to call `memcue_sessions` with the same words when search finds nothing useful and the history still matters. The
   command reads this harness's journal under `$DSH_HOME/sessions` (else `~/.dsh/sessions`) beside the other hosts'
   transcripts, so a dsh session searches its own history too.
 - **A system-prompt section** says the memory is memcue, when to search and write it and which tools fix it.

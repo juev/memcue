@@ -53,7 +53,7 @@ scope when no project exists; do not invent a repository. `-origin` is for delib
 ## When search finds nothing
 
 The agent of an earlier session may have forgotten to store what you need, and it is often still in that session's
-transcript. Run `sessions "<words>"` with the words of the empty search, through the same launcher: it reads the text
+transcript. If the history still matters, run `sessions "<words>"` with the words of the empty search, through the same launcher: it reads the text
 of this machine's earlier sessions, with no index, and prints the newest passages that hold the words, each with its
 date and session. Pass `-session <current session id>` to leave the current session out. A passage is history, not a
 fact: check it against the current state, and store what holds with `add` so the next session finds it by search.

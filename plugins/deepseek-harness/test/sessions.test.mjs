@@ -84,7 +84,7 @@ test('memcue_sessions reads the harness journal through the real binary', async 
 
 		// The note tells the model to fall back to the history, and the shared part of it stays the other hosts' text.
 		const text = sections.find((section) => section.name === 'memcue').text
-		assert.match(text, /When memcue_search finds nothing, search the history of earlier sessions with memcue_sessions/)
+		assert.match(text, /If memcue_search finds nothing useful and the history still matters, search the history of earlier sessions with memcue_sessions/)
 		assert.match(text, /history, not a fact/)
 
 		// Nothing holds the words: the command's own empty answer, not an error.
