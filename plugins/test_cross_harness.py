@@ -105,8 +105,7 @@ class ShelfTextTest(unittest.TestCase):
 
 
 class PitfallLineTest(unittest.TestCase):
-    """#566: every host carries the pitfall line measured there word for word. The Claude Code note is checked by a Go
-    test against the same file."""
+    """Retain the #566 wording where it has not been replaced by measured guidance."""
 
     def measured(self, name: str) -> str:
         path = PLUGINS.parent / "docs" / "research" / "scripts" / "pitfall566" / "candidate" / name
@@ -116,12 +115,8 @@ class PitfallLineTest(unittest.TestCase):
         skill = (PLUGINS / "claude-code" / "skills" / "memcue" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("\n\n" + self.measured("cc-skill.md") + "\n", skill)
 
-    def test_hermes_and_dsh_carry_the_line(self):
+    def test_dsh_carries_the_line(self):
         line = self.measured("hermes-block.md")
-        source = (PLUGINS / "hermes" / "memcue" / "__init__.py").read_text(encoding="utf-8")
-        assign = next(n for n in ast.parse(source).body if isinstance(n, ast.Assign)
-                      and getattr(n.targets[0], "id", "") == "_FAILURE_NOTE")
-        self.assertEqual(ast.literal_eval(assign.value), line)
         self.assertIn("- " + line + "\n", (PLUGINS / "deepseek-harness" / "src" / "index.mjs").read_text(encoding="utf-8"))
 
 
@@ -152,7 +147,11 @@ class CaptureReuseTest(unittest.TestCase):
                      PLUGINS / 'qwen-code' / 'skills' / 'memcue' / 'SKILL.md'):
             with self.subTest(host=path.name):
                 flat = ' '.join(path.read_text(encoding='utf-8').split())
-                self.assertIn(' '.join(self.FILTER.split()), flat)
+                expected = self.FILTER
+                if path.parent.name == 'memcue' and path.name == '__init__.py':
+                    expected = expected.replace('a verified cause and fix or workaround',
+                                                'a verified failure condition and effective fix or workaround')
+                self.assertIn(expected, flat)
         hermes = (PLUGINS / 'hermes' / 'memcue' / '__init__.py').read_text(encoding='utf-8')
         self.assertGreaterEqual(hermes.count('_PITFALL_FILTER_NOTE'), 2)
 
@@ -183,8 +182,8 @@ class CaptureReuseTest(unittest.TestCase):
             'For pitfalls, require a verified cause and fix plus fresh-checkout reuse; '
             'exclude one-off and already resolved incidents.'
         )
-        for path in (PLUGINS / 'hermes' / 'memcue' / '__init__.py',
-                     PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs',
+        # Hermes exercises its measured add description through the provider's real schema.
+        for path in (PLUGINS / 'deepseek-harness' / 'src' / 'index.mjs',
                      PLUGINS / 'pi' / 'src' / 'tools.ts',
                      PLUGINS / 'opencode' / 'src' / 'tools.ts'):
             with self.subTest(host=path.name):

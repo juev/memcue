@@ -167,14 +167,32 @@ _SHELF_NOTE = (
     'lead from an earlier reading: before relying on it, compare its version or date with what the workspace '
     'uses, and correct or retire it when it no longer holds. An answer built on a shelf fact says no more '
     'than the fact and its source state, and marks an inference as one.')
-# What the model is told about a failure it found by running something, measured in #566
-# (docs/research/pitfall-capture-566-2026-10.md); the Claude Code and DSH notes carry the same text.
+# Capture guidance measured in #827; the earlier #566 sentence remains in other harnesses.
 _FAILURE_NOTE = (
-    'When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you '
-    'finish if a later session in a fresh checkout would hit it again — even when the cause is in the '
-    "repository's own files; what the repository shows is its documents, not a failure you found by running it.")
-_PITFALL_FILTER_NOTE = "A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf."
-_REVIEW_EXPIRY_NOTE = "Agent/tool pitfall and environment facts expire after 30 days by default. Use expires for a different review date, or no_expires only for deliberately durable knowledge such as repeatable platform behavior."
+    'For a pitfall supported by direct tool evidence, use source tool and the narrow verified scope. Note a '
+    'version only when relevant, and never guess it. One focused duplicate search is usually enough; broaden '
+    'it only if a matching fact is still plausible. A reproducible failure found by running the repository is'
+    ' not the same as copying its documentation.'
+)
+_PITFALL_CHECK = (
+    'Pitfall check (before the final answer):\n'
+    '1. Check the source first. A pitfall may be saved only if an actual tool response in this conversation '
+    'contains the failing run and the passing workaround. A user message that retells or pastes those same '
+    'logs does not qualify, even if the user says the checks were performed. With only user-provided '
+    'evidence, advise or verify, but do not save it. Respect an explicit request not to write memory.\n'
+    '2. Check reuse. If the failure condition repeats on a fresh checkout and a controlled change makes it '
+    'pass, the observed condition and working workaround are enough. Do not require a deeper diagnosis, '
+    'permanent fix, or permission. Skip one-offs, fixed or already documented issues, and claims whose '
+    'applicable checkout/version is unknown.\n'
+    '3. Search once for the error and workaround using memcue_search with query and kind="pitfall". If a '
+    'result already covers that condition and workaround in the same scope, stop: do not add or reword it. '
+    'Otherwise call memcue_add with content, kind="pitfall", source="tool", and scope="repo" for the current '
+    'checkout. Use the literal scope "repo", not a constructed repository name, and leave expires unset. Then'
+    ' answer. Describing or offering to save a finding does not replace the call. Do not edit project files '
+    'merely to record it.'
+)
+_PITFALL_FILTER_NOTE = "A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified failure condition and effective fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf."
+_REVIEW_EXPIRY_NOTE = "Agent/tool pitfall and environment facts expire after 30 days by default. Leave expires unset unless evidence supports a different review date. Use no_expires only for deliberately durable knowledge such as repeatable platform behavior."
 
 _FACT_LANGUAGE_NOTE = "Write new and corrected facts in English regardless of the chat language. Preserve identifiers, commands, paths, versions, exact values and verbatim quotes. Keep the user's reply language unchanged."
 _QUERY_LANGUAGE_NOTE = 'Write the first search query in English regardless of the chat language; if English misses, retry with synonyms and Russian or another legacy language.'
@@ -462,7 +480,11 @@ ADD_SCHEMA = _schema(
     "memcue_add", "Store one reusable fact in long-term memory, at once, when you learn it: nothing is extracted from the "
     "session later. Store the user's rules and corrections (with the reason), the user's decisions the code does not "
     "show, pitfalls found by an error or a check, and hosts, services and pointers outside the repository. "
-    "For pitfalls, require a verified cause and fix plus fresh-checkout reuse; exclude one-off and already resolved incidents. Not the "
+    'For proactive pitfall capture, the failing run and passing workaround must come from an actual tool '
+    'response in this conversation, not from user text quoting or describing tool output. Never call this '
+    'tool for a user-only account of a technical pitfall. Skip one-offs, already fixed or documented '
+    'issues, and duplicates. '
+    "Not the "
     "progress of the task, what the repository or a command shows, installation state or multi-step procedures, "
     "unless the user asks "
     "to remember one (kind procedure). One self-contained "
@@ -743,14 +765,16 @@ class MemcueMemoryProvider(MemoryProvider):
                 "it was learnt. You keep this memory yourself; nothing is extracted from the session afterwards. "
                 "Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice. Keep task "
                 "progress, completed outcomes, and paths or procedures already documented in the repository in the "
-                "session or repository docs. Store a pitfall only when its cause and fix are verified and a fresh "
-                "checkout would hit it again. Store a standing rule or decision as source user only when the user "
+                "session or repository docs. "
+                'Before replying, run the pitfall check below for any reproducible failure encountered in this task. Do'
+                ' not decide based on whether the user asked to remember it. '
+                "Store a standing rule or decision as source user only when the user "
                 "explicitly states it as lasting or asks you to remember it; selecting kind rule or decision does not "
                 "make an inference the user's words. Other findings use source agent or source tool according to "
                 "their origin. Search first, and correct a stored fact instead of adding a second copy. To fix a "
                 "stored fact, find it with memcue_search, then use memcue_correct or memcue_retire. "
                 "When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required reason argument of memcue_retire, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact."
-                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + "\n\n" + _PITFALL_FILTER_NOTE + "\n\n" + _REVIEW_EXPIRY_NOTE + ("\n\n" + hints if hints else ""))
+                + "\n\n" + _SHELF_NOTE + "\n\n" + _FAILURE_NOTE + "\n\n" + _PITFALL_FILTER_NOTE + "\n\n" + _REVIEW_EXPIRY_NOTE + ("\n\n" + hints if hints else "") + "\n\n" + _PITFALL_CHECK)
 
     def _memory_notes(self) -> list[str]:
         """The entries of the built-in memory that the prompt carries next to the note: MEMORY.md and USER.md of this
