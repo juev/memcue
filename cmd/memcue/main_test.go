@@ -40,20 +40,6 @@ func env(t *testing.T) string {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	// The tests pin the historical layout; the per-base subdirectory has its own test.
 	t.Setenv("MEMCUE_STATE_DIR", filepath.Join(dir, "state", "memcue"))
-	// A dream asks the model to split facts before it groups them; a test that is not about splitting gets no split
-	// and no network call.
-	oldSplit := splitFn
-	splitFn = func(string) (splitReply, error) { return splitReply{}, nil }
-	t.Cleanup(func() { splitFn = oldSplit })
-	// A background dream (#569) has its own tests; elsewhere the machine's claude must not decide whether the session
-	// start says a dream is due, and a session start must not start a process.
-	t.Setenv("MEMCUE_DREAM_BACKGROUND", "")
-	// The gateway sets a long dream interval; inherited, it would make every dream the tests expect not due.
-	t.Setenv("MEMCUE_DREAM_EVERY", "")
-	oldLook, oldSpawn := lookClaude, spawnDream
-	lookClaude = func() bool { return false }
-	spawnDream = func(string) error { return nil }
-	t.Cleanup(func() { lookClaude, spawnDream = oldLook, oldSpawn })
 	return dir
 }
 

@@ -2,7 +2,7 @@
 
 State: target contract for [#714](https://github.com/juev/memcue/issues/714), partly implemented: the merge, the
 server and replica bases (`internal/store/synced.go`), the server (`internal/server`, `memcue server`), the helper's
-sync (`internal/replica`) and the client commands (`cmd/memcue/server_mode.go`), dream on the server and `migrate -server`;
+sync (`internal/replica`) and the client commands (`cmd/memcue/server_mode.go`), and `migrate -server`;
 the plugins and the documentation are not. Sections are marked implemented as the steps land.
 Sources: the #714 discussion and RFC of 2026-11-10 (owner's decisions), the measurements of
 [daemon-703](../research/daemon-703-2026-11.md), the merge method of juev/lists (`docs/specs/sync.md`, S1-S3 there).
@@ -41,18 +41,7 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   the helper rebuilds the replica from the server and keeps the outbox.
 - R10: If session-start or session-card finds no helper socket, it starts the helper detached and answers without
   waiting for it. If it finds a helper of another binary version, it asks that helper to exit and starts a new one.
-- R11: In server mode a client rejects `dream`, starts no background dream and shows no dream hint. The server checks
-  every ten minutes. `MEMCUE_DREAM_EVERY` (24 hours by default) governs when fresh content may start routine
-  maintenance. A fact is fresh when its `content` stamp changed since the previous pass. A due run processes
-  successive bounded batches in bursts of at most four passes. The server checks for more work immediately after
-  each burst. It retries after ten minutes following an error or a pass that made no progress.
-  A separate weekly cycle revisits older fact groups even when no fresh content is due. It records the highest ID of an
-  already-reviewed fact at cycle start and a durable cursor. Fresh batches and the weekly scan alternate when both
-  have work. Restart resumes the cursor. An existing server starts the first scan at its first check after upgrade.
-  A newly initialized server starts its first scan after seven days. Old noise candidates require manual review.
-  With `MEMCUE_MODEL=deepseek-flash` and `MEMCUE_API_URL`, the server screens the bounded fresh batch for noise,
-  including singletons. It compares same-project groups during fresh review and the weekly sweep, and confirms
-  each proposed direct pair retirement. The same version-checked apply path commits the result.
+- R11: No background model runs. A retirement reason travels with the same status stamp. Upgrade the server first.
 - R12: `memcue migrate -server` reads the local base of `MEMCUE_FACTS`, reports what it would send, and with `-apply`
   sends the latest version of every fact to the empty server of `MEMCUE_SERVER` through the helper. Stamps come from
   `created`, with the server's device id. A server that holds any fact refuses and stores nothing.
@@ -100,7 +89,7 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   A custom binary protocol was rejected: payloads are megabytes at most and HTTP is easier to inspect. A push started
   by the server was rejected: a client would have to listen on the tailnet, for no gain in latency over the long poll.
 - **Change number.** `seq` is a signed 64-bit integer the server raises on every write, `max(seq)+1` inside the write
-  transaction. Dream writes through a separate database connection. The long poll notices its commits through
+  transaction. The long poll notices separate writes through
   `PRAGMA data_version`.
 - **Client.** The CLI opens the replica at `$XDG_STATE_HOME/memcue/server-<server name>/replica.db`, derived from
   `MEMCUE_SERVER` alone (R16). Only the helper uses the network: it long-polls, applies rows, and sends the outbox.
@@ -120,7 +109,7 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
   PostgreSQL or one server; a second server on the same machine needs its own `MEMCUE_TAILSCALE_STATE_DIR`. `status`
   reports the binary version, the last sync time, the outbox length and rejected changes. Its `dial` operation also
   reaches the server, which `migrate -server` uses; that admin command has no four-second budget.
-- **Client commands.** Rejected in server mode: `install`, `dream`, `migrate` except `-server`, `merge`, `dump`. Working
+- **Client commands.** Rejected in server mode: `install`, `migrate` except `-server`, `merge`, `dump`. Working
   on the replica: `import`, `notes`, `reindex`. `MEMCUE_SERVER` needs no `MEMCUE_TAILSCALE_MODE`: the helper is the only
   transport there; with `MEMCUE_POSTGRES_DSN` too, every command refuses. A session start asks the helper for its
   status for at most half a second; a helper of an older release, or of a source build that cannot be ordered against
@@ -130,16 +119,6 @@ vector search; an OS service for the helper; the cutover of Mac, loffe and Herme
 - **Migration.** From one base: loffe and Hermes are merged into the Mac base once by the existing git sync, then
   `migrate -server` loads that base. Each fact goes with the text and labels of its latest version and the creation
   time of its first. Implemented in `cmd/memcue/migrate_server.go`.
-- **Dream on the server.** `memcue server` runs dream in a goroutine tied to server shutdown, using the model of
-  `MEMCUE_API_URL` or `claude -p`. `MEMCUE_DREAM_BACKGROUND=0` disables it. The scheduler checks
-  every ten minutes. `MEMCUE_DREAM_EVERY` (24 hours by default) governs routine fresh-content runs. Each run processes
-  bounded batches immediately, up to four passes before checking the queue again. After an error or a pass with no
-  progress it retries at the next ten-minute check. A weekly scan reviews older groups from a fixed high-ID boundary,
-  alternates with fresh work, and resumes from its durable cursor after restart. On upgrade, an initialized server
-  begins that scan at its first check. A new server waits seven days. Progress reports processed and remaining work
-  and why the scheduler stopped. A server row keeps `content_version`, the version at which its text last changed, so
-  new labels alone leave a fact as the last dream saw it. The server refuses to run with `MEMCUE_SERVER` or
-  `MEMCUE_POSTGRES_DSN`, which would send its dream to a client backend.
 
 ## Verification scenarios
 
@@ -161,11 +140,7 @@ Tests are named as the steps land.
   `TestResetReplicaKeepsTheOutbox`); the helper's loop with a fake server follows.
 - R10: test with a built binary (`buildBinary`), as in `cmd/memcue/connect_up_test.go`
   (`TestSessionStartStartsAndReplacesTheRealHelper`, `TestSessionStartReplacesAHelperOfAnotherVersion`).
-- R11: command tests and freshness/scheduling tests (client side: `TestServerModeRefusesLocalCommands`,
-  `TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce`; server side:
-  `TestDreamOnTheServerSeesANewTextAndNotNewLabels`, `TestServerDreamsWhenADreamIsDue`,
-  `TestServerDreamResumesFreshBacklogAfterFailedBatchAndRestart`, `TestServerDreamCompletesWeeklySweepWithoutFreshFacts`,
-  `TestServerDreamAlternatesAndLogsRemainingWorkAtBudget`, `TestServerDreamCancellationKeepsPacketPending`).
+- R11: No background model runs. A retirement reason travels with the same status stamp. Upgrade the server first.
 - R12: `TestImportLoadsAnEmptyBaseOnly`, `TestMigrateServerReportsAndLoadsAnEmptyServerOnly`.
 - R14: `make test-plugins`.
 - R15: command tests with a fake helper (`TestSessionStartReportsLoginAndRefusedChanges`); the helper's status of a new

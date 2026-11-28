@@ -98,10 +98,17 @@ func TestPostgresRecallTracksRetirement(t *testing.T) {
 		}
 	}
 	lookup(1)
-	if _, err = s.Retire(f.ID, f.Version); err != nil {
+	const reason = "The synthetic renderer retired the old color mode."
+	if _, err = s.RetireWithReason(f.ID, reason, f.Version); err != nil {
 		t.Fatal(err)
 	}
 	lookup(0)
+	if got, err := s.History(f.ID); err != nil || len(got) != 1 || got[0].RetirementReason != reason {
+		t.Fatalf("native retirement reason: %+v %v", got, err)
+	}
+	if _, err := s.AddWith(f.Content, f.Origin, "", f.Meta); err == nil || !strings.Contains(err.Error(), reason) {
+		t.Fatalf("native recapture guard: %v", err)
+	}
 	if _, err = s.Restore(f.ID); err != nil {
 		t.Fatal(err)
 	}

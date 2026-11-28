@@ -79,7 +79,7 @@ func TestRepair3SessionCardInvocationBudget(t *testing.T) {
 	t.Setenv("MEMCUE_POSTGRES_DSN", fixture.String())
 	var out bytes.Buffer
 	start := time.Now()
-	e = runSessionCardMode(strings.NewReader(fmt.Sprintf(`{"cwd":%q}`, repo)), &out, false, true)
+	e = runSessionCardMode(strings.NewReader(fmt.Sprintf(`{"cwd":%q}`, repo)), &out, true)
 	elapsed := time.Since(start)
 	_ = ln.Close()
 	<-done

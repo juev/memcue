@@ -35,8 +35,6 @@ and default to the machine's shared base:
 - `binary`: absolute path to the memcue executable (default `~/.local/bin/memcue`).
 - `facts`: absolute path to the fact base (default memcue's own, shared by every agent of the machine).
 - `state_dir`: absolute path to memcue's state directory (default `$XDG_STATE_HOME/memcue`).
-- `dream_every`: a Go duration such as `24h` for the dream schedule.
-- `background_dream`: must be `false` (the default). This adapter uses model-driven dream only.
 
 A given path must be absolute; an empty or relative one is an error, never the default.
 
@@ -54,8 +52,7 @@ Review the hooks with `/hooks` in a session. The extension installs three: `Sess
   only when it changes or after a lifecycle event (deduplicated per session in `qwen-pitfall-snapshots.json`).
   `PreToolUse` honours the shell command's `directory` parameter.
 
-The launcher runs every child with the configured binary/base/state/host, disables background dream and endpoint
-calls, and reports a bounded diagnostic without stopping Qwen Code on failure. A mutation whose response is lost is
+The launcher runs every child with the configured binary/base/state/host, does not pass inference configuration, and reports a bounded diagnostic without stopping Qwen Code on failure. A mutation whose response is lost is
 reported as UNKNOWN OUTCOME; inspect persisted state before retrying, never replay automatically.
 
 ## Commands
@@ -68,12 +65,8 @@ add -kind rule -scope global -source user -- "<fact>"
 correct -expected-version VERSION ID "<corrected fact>"
 retire -expected-version VERSION ID
 sessions "<words>" -session <current session id>
-dream -prepare
-dream -apply /absolute/path/to/answer.json
 ```
 
-`dream` accepts only `-prepare [-all | -since DATE]`, `-list`, or `-apply FILE`. The working model answers the
-packet; no Claude executable, API credentials or second model is needed. See `skills/memcue-dream/SKILL.md`.
 
 ## Hooks disabled
 
@@ -83,8 +76,7 @@ Render the fallback instructions and paste the marked block into `~/.qwen/QWEN.m
 python3 -I /path/to/memcue/plugins/qwen-code/scripts/memcue.py --config ~/.qwen/memcue.json instructions
 ```
 
-The block names the launcher and links the skills; no automatic hints or pitfall snapshots are delivered. The first
-dream then needs `dream -prepare -all` or `dream -prepare -since DATE`.
+The block names the launcher and links the skills; no automatic hints or pitfall snapshots are delivered.
 
 ## Built-in memory
 

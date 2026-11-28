@@ -141,10 +141,10 @@ var cases = []benchCase{
 	},
 	{
 		id: "retired-fact-is-nowhere", stratum: rule,
-		note: "README: `memcue retire ID` — no longer recalled; history keeps it. The widest search does not serve it.",
+		note: "README: `memcue retire -reason REASON ID` — no longer recalled; history keeps it. The widest search does not serve it.",
 		setup: func(t *testing.T, w *world) {
 			seedRelease(t, w)
-			w.b.run(t, "", "retire", w.id(t, "release"))
+			w.b.run(t, "", "retire", "-reason", "The release fixture no longer applies.", w.id(t, "release"))
 		},
 		action: one("релиз виджета ветка release", wide),
 		expect: expect{notFound: []string{"release"}},
@@ -154,7 +154,7 @@ var cases = []benchCase{
 		note: "README: `memcue reopen ID` — undo a retire: back as it was before.",
 		setup: func(t *testing.T, w *world) {
 			seedRelease(t, w)
-			w.b.run(t, "", "retire", w.id(t, "release"))
+			w.b.run(t, "", "retire", "-reason", "The release fixture no longer applies.", w.id(t, "release"))
 			w.b.run(t, "", "reopen", w.id(t, "release"))
 		},
 		action: one("релиз виджета ветка release", searchOpts{}),

@@ -45,7 +45,7 @@ test('SDK + CLI: native CRUD survives a fresh session and refuses stale observed
   const durable = JSON.parse(successful(await fixture.run(['search', '-json', '-min-score', '0', '--', 'concurrency examples'])));
   assert.equal(durable.facts.find((fact: { id: string }) => fact.id === id)?.content, corrected);
   assert.equal(durable.facts.find((fact: { id: string }) => fact.id === id)?.version, 2);
-  await ok(pi, 'memcue_retire', { id, expectedVersion: 2 });
+  await ok(pi, 'memcue_retire', { id, expectedVersion: 2, reason: 'The synthetic rule was superseded.' });
   const after = JSON.parse(successful(await fixture.run(['search', '-json', '-min-score', '0', '--', 'concurrency examples'])));
   assert.equal(after.facts.some((fact: { id: string }) => fact.id === id), false);
 });
@@ -81,7 +81,7 @@ test('SDK + CLI: external pitfall writes refresh on the next prompt and stay rep
   ], true), true).trim();
   await pi.prompt('Read the externally added pitfall.');
   assert.match(currentPrompt(pi.requests.at(-1)!), /LIVE-REPOSITORY-PITFALL/);
-  successful(await fixture.run(['retire', '-expected-version', '1', '--', id], true), true);
+  successful(await fixture.run(['retire', '-expected-version', '1', '-reason', 'The synthetic pitfall was resolved.', '--', id], true), true);
   await pi.prompt('Read the externally retired pitfall.');
   assert.doesNotMatch(currentPrompt(pi.requests.at(-1)!), /LIVE-REPOSITORY-PITFALL/);
   await pi.dispose();
@@ -89,24 +89,6 @@ test('SDK + CLI: external pitfall writes refresh on the next prompt and stay rep
   t.after(() => other.dispose());
   await other.prompt();
   assert.doesNotMatch(currentPrompt(other.requests.at(-1)!), /LIVE-REPOSITORY-PITFALL/);
-});
-
-test('SDK + CLI: current-model dream tools apply the exact packet and reject replay', live, async t => {
-  const fixture = await liveFixture(t);
-  const pi = await openPi(fixture);
-  t.after(() => pi.dispose());
-  const content = 'Prefer concrete architectural examples in explanations.';
-  const id = (await ok(pi, 'memcue_add', { text: content, source: 'user', kind: 'rule', scope: 'global' })).trim();
-  const prepared = await ok(pi, 'memcue_dream_prepare', { all: true });
-  const packet = prepared.match(/"packet":\s*"([^"\n]+)"/)?.[1];
-  assert.ok(packet, 'the actual CLI must supply the packet identifier');
-  assert.ok(prepared.includes(content));
-  const answer = { packet, splits: [], actions: [], scopes: [] };
-  const report = await ok(pi, 'memcue_dream_apply', { answer });
-  assert.match(report, /dream: 0 split, 0 retired or corrected/);
-  assert.equal((await call(pi, 'memcue_dream_apply', { answer })).isError, true);
-  const durable = JSON.parse(successful(await fixture.run(['search', '-json', '-min-score', '0', '--', 'architectural examples'])));
-  assert.equal(durable.facts.find((fact: { id: string }) => fact.id === id)?.content, content);
 });
 
 test('SDK + CLI: a packed standalone package installs and loads via its manifest (#754)', live, async t => {

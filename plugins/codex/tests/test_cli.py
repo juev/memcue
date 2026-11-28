@@ -167,7 +167,7 @@ class RealCLI(unittest.TestCase):
         self.assertNotIn('kind',hit)
         self.cli('correct',fact,'Synthetic orchard reviews require the violet label.')
         self.assertIn('violet',self.search('synthetic orchard')['facts'][0]['content'])
-        self.cli('retire',fact)
+        self.cli('retire', '-reason', 'The synthetic rule was superseded.', fact)
         self.assertEqual(self.search('synthetic orchard')['facts'],[])
         history=[f for f in self.dump() if f['id']==fact]
         self.assertEqual([f['version'] for f in history],[1,2,3])
@@ -201,110 +201,6 @@ class RealCLI(unittest.TestCase):
         hints=self.search('research claim')
         self.assertEqual(hints['facts'],[])
         self.assertTrue(any('shelf' in h.lower() for h in hints.get('hints',[])))
-
-    def test_hook_retrieves_no_facts_and_dream_prepare_apply_rejects_stale_packet(self):
-        fact=self.add('Synthetic orchard reviews require the amber label.','-kind','rule','-source','user','-scope','repo')
-        payload=json.dumps({'hook_event_name':'SessionStart','source':'compact','session_id':'synthetic-session',
-                            'cwd':str(self.nested),'model':'synthetic-model','permission_mode':'default','transcript_path':None})
-        (self.home/'state/dream.at').write_text('2000-01-01T00:00:00Z\n')
-        response=json.loads(self.cli('hook',data=payload).stdout)
-        note=response['hookSpecificOutput']['additionalContext']
-        self.assertEqual(response['hookSpecificOutput']['hookEventName'],'SessionStart')
-        self.assertIn('facts wait for the dream',note)
-        self.assertNotIn('amber label',note)
-        self.assertNotIn('memcue_dream_prepare',note)
-        self.assertFalse((self.home/'state/dream.started').exists())
-        self.cli('dream','-prepare')
-        packet=json.loads((self.home/'state/dream.packet.json').read_text())
-        answer=self.home/'answer.json'
-        answer.write_text(json.dumps({'packet':packet['id'],'splits':[],
-                                      'actions':[],'scopes':[]}))
-        before=self.dump()
-        obsolete=self.home/'obsolete-answer.json'
-        obsolete.write_text(json.dumps({'packet':packet['id'],
-            'splits':[{'id':fact,'parts':['Synthetic orchard reviews require labels.','The label is amber.'],'reason':'fixture'}],
-            'actions':[],'scopes':[],'expansions':[{'id':fact,'queries':['obsolete marker']}]}))
-        refused=self.cli('dream','-apply',str(obsolete),ok=False)
-        self.assertIn('unknown field',refused.stderr)
-        self.assertEqual(self.dump(),before)
-        r=self.cli('dream','-apply',str(answer))
-        self.assertNotIn('queries',[f for f in self.dump() if f['id']==fact][-1])
-        self.add('Synthetic orchard labels remain visible.','-kind','rule','-source','user','-scope','repo')
-        self.cli('dream','-prepare')
-        r=self.cli('dream','-apply',str(answer),ok=False)
-        self.assertIn('run -prepare again',r.stderr)
-        self.assertFalse((self.home/'unexpected').exists())
-
-    def first_dream(self, *initialization, startup=False):
-        self.assertFalse((self.home/'facts').exists())
-        self.assertFalse((self.home/'state').exists())
-        self.cli('instructions')  # Hooks-disabled fallback must need no maintenance hook.
-        if startup:
-            payload=json.dumps({'hook_event_name':'SessionStart','source':'startup','session_id':'synthetic-first',
-                                'cwd':str(self.nested),'model':'synthetic-model','permission_mode':'default',
-                                'transcript_path':None})
-            self.cli('hook',data=payload)
-            self.assertFalse((self.home/'facts').exists())
-        self.assertEqual(self.search('synthetic orchard')['facts'],[])
-        fact=self.add('Synthetic orchard reviews require the amber label.','-kind','rule','-source','user','-scope','repo')
-        schedule=self.home/'state/dream.at'
-        packet_path=self.home/'state/dream.packet.json'
-        self.assertFalse(schedule.exists())
-        for _ in range(2):
-            self.assertIn('no dream yet',self.cli('dream','-prepare',ok=False).stderr)
-        self.assertFalse(packet_path.exists())
-        prepared=self.cli('dream','-prepare',*initialization)
-        packet=json.loads(packet_path.read_text())
-        self.assertIn(packet['id'],prepared.stdout)
-        # First-dream initialization remains independent of removed translation work (#669).
-        self.assertNotIn('"translations"',prepared.stdout)
-        self.assertNotIn('## Данные: перевод',prepared.stdout)
-        self.assertNotIn('translate',packet)
-        self.assertEqual(packet['seen'][fact],1)
-        self.assertEqual(packet['split'][fact],1)
-        self.assertNotIn('expand',packet)
-        self.assertFalse(schedule.exists())  # Prepare keeps a packet; apply completes the native dream.
-        answer=self.home/'first-answer.json'
-        answer.write_text(json.dumps({'packet':packet['id'],'splits':[],
-                                      'actions':[],'scopes':[]}))
-        self.cli('dream','-apply',str(answer))  # Fresh process reads the persisted packet.
-        self.assertTrue(schedule.is_file())
-        latest=[f for f in self.dump() if f['id']==fact][-1]
-        self.assertNotIn('queries',latest)
-        self.assertNotIn('keywords',latest)
-        self.assertEqual(latest['source'],'user')
-        log=[json.loads(line) for line in (self.home/'state/dream.log').read_text().splitlines()]
-        self.assertEqual(log[-1]['packet'],packet['id'])
-        self.assertNotIn('expanded',log[-1])
-        self.add('Synthetic orchard labels remain visible.','-kind','rule','-source','user','-scope','repo')
-        self.cli('dream','-prepare')  # Subsequent dreams need no initialization flag.
-        next_packet=json.loads(packet_path.read_text())
-        self.assertNotEqual(next_packet['id'],packet['id'])
-        history=[p.read_bytes() for p in sorted((self.home/'facts').glob('*/*.jsonl'))]
-        rejected=self.cli('dream','-apply',str(answer),ok=False)
-        self.assertIn('run -prepare again',rejected.stderr)
-        self.assertEqual(history,[p.read_bytes() for p in sorted((self.home/'facts').glob('*/*.jsonl'))])
-        self.assertFalse((self.home/'unexpected').exists())
-
-    def test_fresh_hooks_disabled_first_dream_all(self):
-        self.first_dream('-all')
-
-    def test_fresh_hooks_disabled_first_dream_since_date(self):
-        self.first_dream('-since','2000-01-01')
-
-    def test_startup_before_base_exists_first_dream_since_timestamp(self):
-        self.first_dream('-since','2000-01-01T00:00:00Z',startup=True)
-
-    def test_first_dream_since_validation_remains_native(self):
-        self.add('Synthetic orchard label.','-kind','rule','-source','user','-scope','repo')
-        for date in ('not-a-date','2026-02-30','2000-01-01T25:00:00Z'):
-            with self.subTest(date=date):
-                error=self.cli('dream','-prepare','-since',date,ok=False).stderr
-                self.assertIn('memcue command failed',error)
-                self.assertIn('want YYYY-MM-DD or an RFC 3339 time',error)
-                self.assertFalse((self.home/'state/dream.at').exists())
-                self.assertFalse((self.home/'state/dream.packet.json').exists())
-        self.assertFalse((self.home/'unexpected').exists())
 
     def test_denied_write_is_visible_without_changing_configuration_or_history(self):
         # A regular file where a parent directory is required is deterministic, even as root.

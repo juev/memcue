@@ -77,14 +77,12 @@ looks at this repository, this host and the global facts and leaves out facts bo
 ```bash
 memcue search -in all "<words of the fact>"
 memcue correct -expected-version VERSION ID "<corrected fact>"   # new version
-memcue retire -expected-version VERSION ID                       # no longer recalled; the history keeps it
+memcue retire -expected-version VERSION -reason "REASON" ID                       # no longer recalled; the history keeps it
 memcue reopen ID                       # undo a retire made by mistake
 ```
 
-Correct when the fact changed; retire when it no longer holds and nothing replaces it. Correct or retire a stored fact
-only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise
-is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name
-the conflict, and ask before you correct or retire one. Tell the user which fact you changed.
+When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required `-reason` argument to `retire`, in that same call, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact.
+Tell the user which fact you changed.
 
 ## Findings from outside sources: the research shelf
 
@@ -108,3 +106,5 @@ memcue add -shelf research -source tool -- "<finding>. Source: <document, versio
   says no more than the fact and its source state, and marks an inference as one.
 
 Read `version` from the earlier `search -json` result and pass that caller-observed version to correct/retire. On conflict, read again and make a new decision; never fetch latest immediately before writing to conceal a stale decision, and never replay automatically. PostgreSQL requires the version; old local CLI calls remain compatible.
+
+Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice.

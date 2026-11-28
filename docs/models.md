@@ -3,7 +3,7 @@
 Status: **accepted 2026-10-21 and implemented in 0.4.0; superseded.** The old opt-in endpoint names are removed.
 The dated notes below say what the code does now; the sections after them record the decision as it was made, and
 the README is the current contract.
-**Unreleased #678:** add/correct no longer request search queries or translations. The main model serves only explicit note migration and dream maintenance; search and direct writes make no model calls. Historical decisions and measurements below remain unchanged.
+**Current (#820):** only explicit note migration invokes a model from the binary. Search and CRUD do not. The rest of this document is historical.
 
 Implementation: [#62](https://github.com/juev/memcue/issues/62).
 

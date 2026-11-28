@@ -54,8 +54,7 @@ optional:
 
 ## What the model gets
 
-- Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire`, and `memcue_dream_prepare` /
-  `memcue_dream_apply` for maintenance with the session's own model.
+- Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` (with a required evidence-based reason).
 - A `memcue` system-prompt section with the instruction every memcue host carries.
 - A `memcue_pitfalls` section with the current repository's pitfalls from `memcue session-card -pitfalls-json`, read
   before every agent prompt. External writes from the shell or another session and expiry rollover apply on the next
@@ -72,7 +71,6 @@ Each write checks memcue's outcome receipt. A write whose outcome is unknown is 
 | `/memcue status` | Show whether memory is on, the role and the binary, without running memcue |
 | `/memcue off` | Turn memory off for this session and preserve that choice across `/reload`; facts already seen stay in the conversation |
 | `/memcue on` | Turn it back on, if the settings allow it; repeating it does not interrupt active work |
-| `/memcue dream` | Ask the current model to maintain the base, queued after active work if needed |
 
 Starting, resuming or forking a session uses current settings rather than reinstating an old session-local off marker.
 

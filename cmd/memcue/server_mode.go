@@ -33,7 +33,7 @@ func openReplica() (*store.Store, error) {
 }
 
 // serverCommandAllowed refuses in server mode the commands that work on a local base or on git: the replica belongs to
-// the server, and dream runs there (R11).
+// the server.
 func serverCommandAllowed(args []string) error {
 	if serverName() == "" || len(args) == 0 {
 		return nil
@@ -42,8 +42,6 @@ func serverCommandAllowed(args []string) error {
 		return errors.New("set MEMCUE_SERVER or MEMCUE_POSTGRES_DSN, not both")
 	}
 	switch args[0] {
-	case "dream":
-		return errors.New("dream runs on the server in server mode (MEMCUE_SERVER); this machine does not dream")
 	case "install", "merge", "dump":
 		return fmt.Errorf("%s works on a base in git and is unavailable in server mode (MEMCUE_SERVER)", args[0])
 	case "migrate":

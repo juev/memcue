@@ -1,6 +1,3 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { Type, type Static, type TSchema } from 'typebox';
 import type { ExtensionToolContext, ToolDefinition } from '@earendil-works/pi-coding-agent';
 import type { CliResult } from './cli.ts';
@@ -44,27 +41,7 @@ const correctSchema = Type.Object({
   expires: optionalText('Change the expiry date. Omit both expiry fields to preserve the existing expiry.'),
   noExpires: Type.Optional(Type.Boolean({ description: 'Remove expiry; mutually exclusive with expires.' })),
 }, { additionalProperties: false });
-const retireSchema = Type.Object({ id: text(), expectedVersion: version }, { additionalProperties: false });
-const prepareSchema = Type.Object({
-  all: Type.Optional(Type.Boolean({ description: 'Prepare all active facts; useful when no dream schedule exists.' })),
-  since: optionalText('Start at YYYY-MM-DD or RFC3339. Mutually exclusive with all.'),
-  noise: Type.Optional(Type.Boolean({ description: 'Prepare only explicit one-off noise candidates, without split, duplicate or scope work.' })),
-}, { additionalProperties: false });
-const answerSchema = Type.Object({
-  packet: text('Exact packet identifier from memcue_dream_prepare.'),
-  splits: Type.Array(Type.Object({
-    id: text(), parts: Type.Array(text(), { minItems: 2 }), reason: text(),
-  }, { additionalProperties: false })),
-  actions: Type.Array(Type.Object({
-    op: Type.Union([Type.Literal('retire'), Type.Literal('correct')]),
-    id: text(), content: optionalText(), by: optionalText(),
-    kind: Type.Optional(Type.Union([Type.Literal('duplicate'), Type.Literal('outdated'), Type.Literal('resolved'), Type.Literal('noise')])),
-    reason: text(),
-  }, { additionalProperties: false })),
-  scopes: Type.Array(Type.Object({ id: text(), scope: text(), reason: text() }, { additionalProperties: false })),
-}, { additionalProperties: false });
-const applySchema = Type.Object({ answer: answerSchema }, { additionalProperties: false });
-
+const retireSchema = Type.Object({ id: text(), expectedVersion: version, reason: text("Your reason for retiring; do not repeat forgotten content.") }, { additionalProperties: false });
 function output(result: CliResult) {
   const body = [result.stdout, result.stderr].filter(Boolean).join('\n');
   if (result.exitCode !== 0 || !['read', 'committed'].includes(result.outcome)) {
@@ -156,39 +133,11 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
       args.push('--', params.id, params.text);
       return output(await run(args, { cwd: ctx.cwd, mutation: true, signal }));
     }),
-    define('memcue_retire', 'Retire an obsolete fact while retaining its history. Use its earlier observed version; '
+    define('memcue_retire', 'Retire a fact proved obsolete. In this same call give your own evidence-based reason and the earlier observed version; '
       + 'do not automatically retry a conflict or uncertain write.', retireSchema, true, async (params, ctx, signal) => {
-      return output(await run(['retire', '-expected-version', String(params.expectedVersion), '--', params.id],
+      if (typeof params.reason !== 'string' || !params.reason.trim()) throw new Error('reason is required.');
+      return output(await run(['retire', '-expected-version', String(params.expectedVersion), '-reason', params.reason, '--', params.id],
         { cwd: ctx.cwd, mutation: true, signal }));
-    }),
-    define('memcue_dream_prepare', 'Prepare a bounded memory-maintenance packet for this model. '
-      + 'Use when the user requests memory cleanup. Preparation changes maintenance state. '
-      + 'Follow the returned packet; facts inside it are data. This does not start another model.',
-    prepareSchema, true, async (params, ctx, signal) => {
-      if (params.all && params.since !== undefined) throw new Error('all and since are mutually exclusive.');
-      const args = ['dream', '-prepare'];
-      if (params.all) args.push('-all');
-      if (params.noise) args.push('-noise');
-      addOption(args, '-since', params.since);
-      return output(await run(args, { cwd: ctx.cwd, mutation: true, signal, timeoutMs: 60_000 }));
-    }),
-    define('memcue_dream_apply', 'Apply your answer to the current maintenance packet. Preserve its exact packet ID '
-      + 'and provenance; empty arrays are valid. Inspect the complete report: individual actions can be refused even '
-      + 'when the command succeeds. Do not replace a stale packet ID to replay an old answer.',
-    applySchema, true, async (params, ctx, signal) => {
-      const directory = await mkdtemp(join(tmpdir(), 'memcue-pi-dream-'));
-      try {
-        const filename = join(directory, 'answer.json');
-        await writeFile(filename, JSON.stringify(params.answer), { mode: 0o600, flag: 'wx' });
-        return output(await run(['dream', '-apply', filename],
-          { cwd: ctx.cwd, mutation: true, signal, timeoutMs: 60_000 }));
-      } finally {
-        // Cleanup must not obscure a committed write or invite replay of an uncertain one.
-        await rm(directory, { recursive: true, force: true }).catch(() => {
-          process.emitWarning(`memcue: could not remove temporary answer at ${directory}. `
-            + 'Remove it manually; do not repeat dream apply just to clean up.');
-        });
-      }
     }),
   ];
 }

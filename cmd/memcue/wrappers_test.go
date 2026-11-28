@@ -2,29 +2,16 @@ package main
 
 import (
 	"io"
-
-	"github.com/juev/memcue/internal/store"
 )
 
-// The short forms the tests call; the binary always passes the part, the dream flag or the stated room itself.
+// The short forms the tests call; the binary always passes the part or the stated room itself.
 
 // runSessionStart is the whole session-start text in one block, part 0.
 func runSessionStart(in io.Reader, out io.Writer) error {
 	return runSessionStartPart(in, out, 0)
 }
 
-// runSessionCard is the card without the dream hint.
+// runSessionCard includes repository pitfalls.
 func runSessionCard(in io.Reader, out io.Writer) error {
-	return runSessionCardWith(in, out, false)
-}
-
-// groupFacts joins each fresh fact with its neighbours; groups that share a fact become one.
-func groupFacts(s *store.Store, active, fresh []store.Fact) ([][]store.Fact, error) {
-	gr := newGrouper(active)
-	for _, f := range fresh {
-		if err := gr.add(s, f); err != nil {
-			return nil, err
-		}
-	}
-	return gr.groups(), nil
+	return runSessionCardMode(in, out, true)
 }

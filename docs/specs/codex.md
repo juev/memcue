@@ -1,7 +1,7 @@
 # Codex CLI pull-mode integration
 
 Implemented contract for [#670](https://github.com/juev/memcue/issues/670). The owner will check authenticated Codex
-CRUD, dream, lifecycle and sandbox behavior locally after merge; those checks remain unverified. Independent review,
+CRUD, lifecycle and sandbox behavior locally after merge; those checks remain unverified. Independent review,
 regression tests and CI remain required before merge. Keep #670 open pending the owner's result.
 Setup and limitations live in [the integration guide](../../plugins/codex/README.md).
 
@@ -14,15 +14,10 @@ Setup and limitations live in [the integration guide](../../plugins/codex/README
 - R3: The working model searches rules/decisions at task start and system switches, searches before writing, and
   chooses add/correct/retire. English-first instructions cover initial queries and new/corrected content, preserve
   exact identifiers/quotations and user-facing language, and allow legacy-language fallback. They do not enforce a language in storage.
-- R4: The launcher clears inherited MEMCUE_* settings, sets the configured base/state/host and disables background
-  dream. It uses no endpoint/model subprocess. Dream is prepare/list/apply only; the working model answers a packet.
-  Without a first-dream schedule, explicit `dream -prepare -all` or `dream -prepare -since DATE` initializes a packet
-  through the same configured launcher, including with hooks disabled or startup before the base existed. DATE is a
-  native-validated date or RFC 3339 time. Preparation accepts only `-prepare` and these two initialization forms;
-  mixed/duplicate/extra flags are rejected.
-  The merged #669/#671 shared contract removes translation tasks and translation-only maintenance debt.
-  Existing facts and indexed translations remain as stored; language alone is no reason to correct a fact.
-  Stale packet checks remain in the native CLI.
+- R4: The launcher clears inherited MEMCUE_* settings except explicit backend transport settings and uses the
+  configured base/state/host. It does not launch a background model. The working model gives a reason in each
+  retirement call; native `history` reads the reason. Existing content stays as stored; language alone is no reason
+  to correct a fact.
 - R5: Invalid hook input/config/response and failed commands produce bounded visible diagnostics without a blocking
   decision. Normal CLI errors exit nonzero. Input size, child time and output reads are bounded; a failed write may
   still have persisted, so callers check before retrying. Native maintenance checks can silently suppress their own errors.
@@ -31,6 +26,6 @@ Setup and limitations live in [the integration guide](../../plugins/codex/README
   The integration does not alter sandbox policy; outside-workspace access requires scoped permission.
 
 Tests: `plugins/codex/tests/test_adapter.py` verifies R1–R6 at adapter boundaries, including delivered text;
-`test_cli.py` verifies fresh-process persistence, scopes, history, shelves, expiry, maintenance and stale dream packets;
+`test_cli.py` verifies fresh-process persistence, scopes, history, shelves, expiry, retirement reasons;
 `plugins/test_cross_harness.py` checks delivered Codex instructions alongside the existing integration contracts.
 Actual Codex hook trust/lifecycle and model-driven behavior require the separate synthetic runtime procedure in the guide.

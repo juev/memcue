@@ -92,19 +92,18 @@ const usage = `usage: memcue <command>
 
 commands:
   session-start   SessionStart hook: repository pitfalls, memory instructions and hints: memcue session-start [-part N] (part 1 carries the text; 2 and 3 print nothing, for an older plugin)
-  session-card    session-start without the note: repository pitfalls and maintenance hints: memcue session-card [-dream-tools] [-pitfalls-only | -pitfalls-json | -hints-only]
+  session-card    session-start without the note: repository pitfalls and maintenance hints: memcue session-card [-pitfalls-only | -pitfalls-json | -hints-only]
   search    find the facts that fit the words, with their IDs: memcue search [-n N] [-min-score F] [-in WHERE] [-kind K] [-since DAY] [-expired] [-all-words] [-json] [-cwd DIR] [-session ID] TEXT
   sessions  passages of earlier Claude Code, Qwen Code, OpenCode and DSH sessions that hold the words, newest first, when search finds nothing: memcue sessions [-n N] [-before TIME] [-cwd DIR] [-session IDS] [-json] TEXT
   add       store a fact, indexed at once: memcue add [-cwd DIR] [-origin O] [-expires YYYY-MM-DD|-no-expires] [-source S] [-kind K] [-scope S | -shelf SLUG] -- TEXT
   # add -batch FILE [-force] atomically adds a content-only JSON FactInput array
   correct   new version of a fact: memcue correct [-expires YYYY-MM-DD|-no-expires] ID [--] TEXT
-  retire    take a fact out of recall: memcue retire ID
+  retire    take a fact out of recall: memcue retire -reason REASON ID
   reopen    bring a retired fact back as it was before the retire: memcue reopen ID
   connect   explicit tailnet lifecycle: up [-bootstrap] | status | serve [-bootstrap] [-log path] | login | off
   history   immutable fact versions: memcue history [-json] ID
   facts     list the active facts
   reindex   rebuild the search index from the live facts: memcue reindex [-dry-run] [-json]
-  dream     the work of a dream for the session's model, and its answer: memcue dream -prepare [-since DATE|-all] [-noise] | -list | -apply FILE | -run [-all|-background] [-noise] [-j N]
   notes     which entries of the built-in memory note files are already facts, read-only: memcue notes [-dir DIR] [-json] [-min-share F]
   migrate   turn built-in memory notes into facts: memcue migrate [-dry-run] [-list] [-all] [-j N] [NOTE.md...]; move facts onto project keys: memcue migrate -repos [-apply] [-root DIR]... [OLD=NEW...]; move the base to a text history: memcue migrate -text; copy the whole history into an empty PostgreSQL base: memcue migrate -postgres [-apply]; load the base into an empty memcue server: memcue migrate -server [-apply]
   import    store the facts of migrate -dry-run output: memcue import FILE.json...
@@ -121,8 +120,8 @@ environment:
   MEMCUE_FACTS    fact base (default $XDG_STATE_HOME/memcue/memory/facts.db, shared by every agent of the machine; a
                   base still at the old default $CLAUDE_CONFIG_DIR/memory/facts.db stays in use until it is moved)
   MEMCUE_STATE_DIR  state directory; default $XDG_STATE_HOME/memcue, with a per-base subdirectory for a non-default base
-  MEMCUE_MODEL    model of migrate and dream -run (default claude-opus-5-5)
-  MEMCUE_API_URL  OpenAI-compatible endpoint for migrate and dream instead of claude -p (with MEMCUE_API_KEY)
+  MEMCUE_MODEL    model of migrate (default claude-opus-5-5)
+  MEMCUE_API_URL  OpenAI-compatible endpoint for migrate instead of claude -p (with MEMCUE_API_KEY)
   MEMCUE_API_KEY  key for MEMCUE_API_URL
   MEMCUE_CLAUDE_TOKEN_FILE  file of a Claude Code OAuth token (claude setup-token) claude -p runs with; ~/ is the
                   home directory, and a missing file leaves claude -p on its own login
@@ -130,9 +129,6 @@ environment:
   MEMCUE_CALLER   name of the hook or plugin that runs a search, recorded in search.log
   MEMCUE_NUMBER_TERMS  versions, dates, ports and addresses are exact search terms by default; 0 turns that off
   MEMCUE_EVENT_TTL_DAYS  days a fact of kind event stays recalled (default 7; 0 keeps it without an expiry)
-  MEMCUE_DREAM_EVERY  how long after a dream the next one is due (default 24h; dream.log in the state directory)
-  MEMCUE_DREAM_BACKGROUND  0 keeps the session start from running a due dream in the background, on the endpoint
-                  or on claude -p; it then says the dream is due instead
   MEMCUE_MEMORY_DIR  directory of the built-in memory notes memcue notes reads by default
 `
 
@@ -185,14 +181,14 @@ func runMain() (code int) {
 		hintsOnly := fs.Bool("hints-only", false, "maintenance hints without automatic pitfall context")
 		pitfallsJSON := fs.Bool("pitfalls-json", false, "whole-fact repository snapshot for native function hooks")
 		pitfallsOnly := fs.Bool("pitfalls-only", false, "only automatic repository pitfalls, without instructions or maintenance hints")
-		dreamTools := fs.Bool("dream-tools", false, "also say when a dream is due, naming the memcue_dream_* tools")
+		fs.Bool("dream-tools", false, "ignored compatibility flag for older plugins")
 		if err = fs.Parse(os.Args[2:]); err == nil {
 			if *pitfallsJSON {
 				err = inv.runSessionPitfallsJSON(os.Stdin, out)
 			} else if *pitfallsOnly {
 				err = inv.runSessionPitfalls(os.Stdin, out)
 			} else {
-				err = inv.runSessionCardMode(os.Stdin, out, *dreamTools, !*hintsOnly)
+				err = inv.runSessionCardMode(os.Stdin, out, !*hintsOnly)
 			}
 		}
 	case "hook-extract", "extract-session", "extract-messages":
@@ -219,8 +215,6 @@ func runMain() (code int) {
 		err = inv.runFacts(out)
 	case "reindex":
 		err = inv.runReindex(os.Args[2:], out)
-	case "dream":
-		err = inv.runDream(os.Args[2:], out)
 	case "notes":
 		err = inv.runNotes(os.Args[2:], out)
 	case "migrate":

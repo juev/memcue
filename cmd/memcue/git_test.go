@@ -282,7 +282,7 @@ func TestGitMergesTextHistories(t *testing.T) {
 	server.git(t, "commit", "-q", "-m", "server facts")
 	server.git(t, "push", "-q", "origin", "main")
 	mac.memcue(t, bin, "add", "Caddy-private монтирует файл, после замены пересоздать контейнер")
-	mac.memcue(t, bin, "retire", seedID)
+	mac.memcue(t, bin, "retire", "-reason", "The fixture no longer applies.", seedID)
 	mac.git(t, "add", "memory")
 	mac.git(t, "commit", "-q", "-m", "mac facts")
 	mac.git(t, "pull", "-q", "--no-rebase", "origin", "main")

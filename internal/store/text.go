@@ -20,22 +20,24 @@ import (
 // textLine is one version of a fact as a line of its file. The field order is the order of the line, so every
 // machine writes the same bytes for the same version.
 type textLine struct {
-	ID            string `json:"id"`
-	Version       int    `json:"version"`
-	Created       string `json:"created"`
-	Status        string `json:"status"`
-	Author        string `json:"author,omitempty"`
-	Content       string `json:"content"`
-	Origin        string `json:"origin,omitempty"`
-	Expires       string `json:"expires,omitempty"`
-	Kind          string `json:"kind,omitempty"`
-	Scope         string `json:"scope,omitempty"`
-	Source        string `json:"source,omitempty"`
-	Evidence      string `json:"evidence,omitempty"`
-	Review        string `json:"review,omitempty"`
-	PromptVersion int    `json:"prompt_version,omitempty"`
-	Channel       string `json:"channel,omitempty"`
-	WriteID       string `json:"write_id,omitempty"`
+	ID               string `json:"id"`
+	Version          int    `json:"version"`
+	Created          string `json:"created"`
+	Status           string `json:"status"`
+	Author           string `json:"author,omitempty"`
+	Content          string `json:"content"`
+	Origin           string `json:"origin,omitempty"`
+	Expires          string `json:"expires,omitempty"`
+	Kind             string `json:"kind,omitempty"`
+	Scope            string `json:"scope,omitempty"`
+	Source           string `json:"source,omitempty"`
+	Evidence         string `json:"evidence,omitempty"`
+	Review           string `json:"review,omitempty"`
+	PromptVersion    int    `json:"prompt_version,omitempty"`
+	Channel          string `json:"channel,omitempty"`
+	WriteID          string `json:"write_id,omitempty"`
+	RetirementReason string `json:"retirement_reason,omitempty"`
+	RetirementKey    string `json:"retirement_key,omitempty"`
 }
 
 // FactPath is the file of the fact id in the text history at dir.
@@ -48,7 +50,7 @@ func encodeLine(f Fact) ([]byte, error) {
 	l := textLine{ID: f.ID, Version: f.Version, Created: f.Created.UTC().Format(time.RFC3339Nano), Status: f.Status,
 		Author: f.Author, Content: f.Content, Origin: f.Origin, Expires: f.Expires,
 		Kind: f.Kind, Scope: f.Scope, Source: f.Source, Evidence: f.Evidence, Review: f.Review,
-		PromptVersion: f.PromptVersion, Channel: f.Channel, WriteID: f.WriteID}
+		PromptVersion: f.PromptVersion, Channel: f.Channel, WriteID: f.WriteID, RetirementReason: f.RetirementReason, RetirementKey: f.RetirementKey}
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
@@ -83,7 +85,7 @@ func decodeLine(b []byte) (decodedVersion, error) {
 		return decodedVersion{}, fmt.Errorf("created %q: %w", l.Created, err)
 	}
 	f := Fact{ID: l.ID, Version: l.Version, Content: l.Content, Origin: l.Origin,
-		Created: created.UTC(), Status: l.Status, Author: l.Author, Expires: l.Expires,
+		Created: created.UTC(), Status: l.Status, Author: l.Author, Expires: l.Expires, RetirementReason: l.RetirementReason, RetirementKey: l.RetirementKey,
 		Meta: Meta{Kind: l.Kind, Scope: l.Scope, Source: l.Source, Evidence: l.Evidence, Review: l.Review,
 			PromptVersion: l.PromptVersion, Channel: l.Channel}, WriteID: l.WriteID}
 	auxValue := func(raw json.RawMessage) (string, error) {

@@ -36,6 +36,15 @@ func (inv *invocation) runHistory(args []string, out io.Writer) error {
 			if _, err := fmt.Fprintf(out, "%s v%d %s\n%s\n", f.ID, f.Version, f.Status, f.Content); err != nil {
 				return err
 			}
+			if f.Status == store.Retired {
+				reason := f.RetirementReason
+				if reason == "" {
+					reason = "unavailable"
+				}
+				if _, err := fmt.Fprintf(out, "Retirement reason: %s\n", reason); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})

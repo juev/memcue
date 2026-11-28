@@ -12,7 +12,7 @@ memcue fact base:
   Hermes's `session_search` only if the historical context is still needed; a transcript is not current evidence (#621).
   This is guidance for the model, not a search that runs automatically. Automatic repository pitfall delivery is separate.
 - **No card of rules** (#656). User rules and decisions stay in the base. The system prompt also carries the hints of
-  `memcue session-card` (an upgrade this machine owes, a due dream), asked again at every rebuild after a compression
+  `memcue session-card` (an upgrade this machine owes), asked again at every rebuild after a compression
   or a reset; a cron run gets none. A
   failed call leaves the block without the hints until the next rebuild and is reported to the log at most every ten
   minutes. The old settings `session_card` and `session_card_chars` are ignored.
@@ -34,7 +34,8 @@ memcue fact base:
   after Hermes has ended the old one; a reset forgets what the old session's searches returned.
 - **Writes of the built-in memory tool are mirrored.** A new `MEMORY.md` or `USER.md` entry becomes an approved
   global fact (source `memory`, origin `hermes-memory`; #440). When the agent edits that entry the fact gets a new
-  version, when it removes it the fact is retired. Which fact an entry became is kept in
+  version. On removal, the mirror records that the built-in tool removed the note; that legacy hook does not pass a
+  reason from the model, so it does not claim a user requested forgetting. Which fact an entry became is kept in
   `$HERMES_HOME/memcue/written.json`. The built-in memory is a second memory next to memcue: turn it off once the
   model writes to memcue, with `hermes config set memory.memory_enabled false` and
   `hermes config set memory.user_profile_enabled false`. memcue does not change Hermes's settings. While Hermes still
@@ -47,18 +48,12 @@ memcue fact base:
   says otherwise (on a live base ten doubled the characters and reached no prompt five did not), and only those that
   fit the query: a fact far below the best one is left out, so one fitting fact comes alone (#407). `search_facts`
   (default 5, 1–50) sets the most.
-  Subagents, cron and flush runs get only `memcue_search` and do not write facts; a cron run also gets the dream
-  tools below.
-- **Dream tools** `memcue_dream_prepare` and `memcue_dream_apply` let the model tidy the base: the first returns the
-  instructions and the facts to split, review in groups and check the scope of (`since: all` for the first
-  dream on a base), the second takes the JSON answer and reports what
-  memcue applied and refused. See [Dream](#dream).
+  Subagents, cron and flush runs get only `memcue_search`. Supply your own `reason` in the same `memcue_retire` call; the binary records it with the status change.
 
 The delivered prompt and tool schemas request new and corrected fact content in English regardless of chat language.
 They preserve identifiers, commands, paths, versions, exact values and verbatim quotes and leave the user's reply
 language unchanged. English misses may be retried in Russian or another legacy language. The binary and built-in
-memory mirror keep accepting non-English input unchanged. Dreams do not translate facts or create translation debt;
-auxiliary fields are removed during upgrade, and old auxiliary answers are refused.
+memory mirror keep accepting non-English input unchanged. Existing fact text is not translated.
 
 ## Candidates
 
@@ -70,34 +65,6 @@ version. Nothing waits for approval: `memcue add -candidate`, `memcue candidates
 Hermes runs one external memory provider at a time, so memcue replaces the one you have (holographic, byterover,
 …). The built-in `MEMORY.md`/`USER.md` is not a provider and stays on until `memory.memory_enabled` and
 `memory.user_profile_enabled` turn it off.
-
-## Dream
-
-A dream is due once `MEMCUE_DREAM_EVERY` (default `24h`, #665) has passed since the last one and some fact is fresh or lacks
-maintenance review. With an endpoint configured, the `session-card` call that builds the system prompt starts one
-`memcue dream -run` pass in the background and the hints say nothing of the dream (#569):
-
-```bash
-hermes config set memory.memcue.api_url https://api.deepseek.com
-hermes config set memory.memcue.model deepseek-flash
-hermes config set memory.memcue.api_key_env DEEPSEEK_API_KEY
-```
-
-`api_url`, `model` and `api_key_env` reach the binary as `MEMCUE_API_URL`, `MEMCUE_MODEL` and `MEMCUE_API_KEY`, the
-key read from the named environment variable of the gateway, so it stays out of `config.yaml`. They also give
-the background dream its endpoint. Without them the gateway's own `MEMCUE_API_URL` decides, and a
-`claude` on the gateway's `PATH` runs the dream on `claude -p`.
-
-Without either, the system prompt ends with one line that says a dream is due and names the tools (the
-provider asks `memcue session-card -dream-tools`, a binary 0.19.0 or newer; #494). The model runs
-`memcue_dream_prepare`, answers the packet and hands the answer to `memcue_dream_apply` when the user's task allows;
-it never interrupts the user's work for it. Hermes builds the system prompt once and again after a compression or a
-reset, so the line is as fresh as the last rebuild. `dream: false` in `memory.memcue` turns off both the background
-dream and the line; the tools stay.
-
-The first dream on a base needs `since: all` (the whole base) or a date: ask the agent to call
-`memcue_dream_prepare` with `since: all`, or run `memcue dream -prepare -all` by hand. `memcue dream -run` still runs
-a dream through an endpoint when you start it yourself; the rules are in [Dream](../../README.md#dream).
 
 ## Install
 
@@ -142,7 +109,7 @@ a dream through an endpoint when you start it yourself; the rules are in [Dream]
 5. Restart Hermes (the gateway, if you run one).
 
 The provider asks the binary for its version when the hints first run: 0.4.0 or newer is required, and an older one
-turns the hints off with a warning in the log while search keeps working; the dream line needs 0.19.0. A build from source
+turns the hints off with a warning in the log while search keeps working. A build from source
 reports a suffixed version and counts as the current tree.
 
 Check: `hermes memory status` should list `memcue` as available. Run the plugin's tests with the binary you
@@ -155,15 +122,15 @@ MEMCUE_BIN="$HERMES_HOME/bin/memcue" python3 "$HERMES_HOME/plugins/memcue/tests/
 ## The fact base
 
 In server mode (`MEMCUE_SERVER` in Hermes' environment) memcue works on the container's replica of the server, not on
-the file below: the hints come without a local base file, and only the server dreams. Run the tailnet helper inside
+the file below: the hints come without a local base file. Run the tailnet helper inside
 the container; see [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
 
 By default the base is `$HERMES_HOME/memcue/facts.db`, inside Hermes' home, so `hermes backup` covers it. Set
 `memory.memcue.facts` (or `MEMCUE_FACTS` in Hermes' environment) to use another file, for example one shared with
 Claude Code. A leading `~/` or `$HOME/` is expanded; the path must be absolute, so the value names one file rather
 than one per process working directory. A shared base can be synced through git like the Claude Code one: run `memcue install` once in the
-repository that holds it. The binary's logs, locks and dream schedule follow the base: the default Hermes base gets
-its own `$XDG_STATE_HOME/memcue/<hash>` directory, so it does not share a dream clock with a Claude Code/DSH base.
+repository that holds it. The binary's logs and locks follow the base: the default Hermes base gets
+its own `$XDG_STATE_HOME/memcue/<hash>` directory, separate from a Claude Code/DSH base.
 After `memcue migrate -text` the base is the text history `$HERMES_HOME/memcue/facts`, which `hermes backup` still
 covers, and its SQLite cache sits in that state directory. The provider opens the text from the next start and keeps
 the mirror of the built-in memory, since `facts.db` and `facts` are one base (see the main README, "Moving to the text

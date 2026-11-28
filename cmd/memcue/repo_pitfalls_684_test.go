@@ -19,7 +19,7 @@ func TestSessionStartAutomaticallyDeliversRepositoryPitfall684(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(dir, "empty-global.gitconfig"))
 	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(dir, "empty-system.gitconfig"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("MEMCUE_DREAM_BACKGROUND", "0")
+
 	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "facts")) // synthetic text history, not a live base
 	if out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").CombinedOutput(); err == nil {
 		t.Fatalf("fixture must start outside git: %s", out)

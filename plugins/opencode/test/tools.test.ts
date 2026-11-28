@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { access, readFile, stat } from 'node:fs/promises';
 import { test } from 'node:test';
 import { memoryTools, type RunMemcue } from '../src/tools.ts';
 
@@ -61,15 +60,15 @@ test('add is a mutation, preserves literal text and native diagnostics', async (
   assert.match((result.content[0] as { text: string }).text, /native warning/);
 });
 
-test('conflicting metadata and dream ranges fail without invoking the CLI', async () => {
+test('invalid writes fail without invoking the CLI', async () => {
   const never: RunMemcue = async () => { assert.fail('CLI must not run'); };
   for (const [name, args] of [
     ['memcue_add', { text: 'fact', source: 'agent', scope: 'repo', shelf: 'research' }],
     ['memcue_add', { text: 'fact', source: 'agent', expires: '2027-01-01', noExpires: true }],
     ['memcue_correct', { id: 'id', text: 'fact', expectedVersion: 2, expires: '2027-01-01', noExpires: true }],
-    ['memcue_dream_prepare', { all: true, since: '2026-01-01' }],
+    ['memcue_retire', { id: 'id', expectedVersion: 2, reason: ' ' }],
   ] as const) {
-    await assert.rejects(tool(name, never).execute(args, context), /cannot|exclusive/i);
+    await assert.rejects(tool(name, never).execute(args, context), name === 'memcue_retire' ? /reason is required/ : /cannot|exclusive/i);
   }
 });
 
@@ -84,10 +83,10 @@ test('corrections and retirements carry the caller-observed version', async () =
     return committed();
   }).execute({ id: 'id', text: 'Fact.', expectedVersion: 6, noExpires: true }, context);
   await tool('memcue_retire', async (args, options) => {
-    assert.deepEqual(args, ['retire', '-expected-version', '2', '--', 'id']);
+    assert.deepEqual(args, ['retire', '-expected-version', '2', '-reason', 'Current guide changed.', '--', 'id']);
     assert.equal(options.mutation, true);
     return committed('id v3 retired\n');
-  }).execute({ id: 'id', expectedVersion: 2 }, context);
+  }).execute({ id: 'id', expectedVersion: 2, reason: 'Current guide changed.' }, context);
 });
 
 test('every tool checks policy before any CLI invocation', async () => {
@@ -95,39 +94,6 @@ test('every tool checks policy before any CLI invocation', async () => {
   const never: RunMemcue = async () => { assert.fail('disabled tool invoked CLI'); };
   for (const item of memoryTools(never, deny)) {
     await assert.rejects(item.execute({}, { sessionID: 'session-123' }), /memory disabled/);
-  }
-});
-
-test('dream prepare returns the full packet and is treated as a mutation', async () => {
-  const packet = '# Full instructions\n\n{"packet":"p-123"}\n';
-  const result = await tool('memcue_dream_prepare', async (args, options) => {
-    assert.deepEqual(args, ['dream', '-prepare', '-all']);
-    assert.equal(options.mutation, true);
-    assert.equal(options.timeoutMs, 60_000);
-    return committed(packet);
-  }).execute({ all: true }, context);
-  assert.match((result.content[0] as { text: string }).text, /# Full instructions/);
-});
-
-test('dream apply creates a private temporary answer and removes it on every outcome', async () => {
-  const answer = { packet: 'p-123', splits: [], actions: [], scopes: [] };
-  for (const fail of [false, true]) {
-    let filename = '';
-    const apply = tool('memcue_dream_apply', async (args, options) => {
-      assert.deepEqual(args.slice(0, 2), ['dream', '-apply']);
-      filename = args[2];
-      assert.deepEqual(JSON.parse(await readFile(filename, 'utf8')), answer);
-      assert.equal((await stat(filename)).mode & 0o777, 0o600);
-      assert.equal(options.mutation, true);
-      assert.equal(options.timeoutMs, 60_000);
-      if (fail) throw new Error('transport failure');
-      return committed('0 changed, 1 refused\n');
-    });
-    const result = apply.execute({ answer }, context);
-    if (fail) await assert.rejects(result, /transport failure/);
-    else assert.match(((await result).content[0] as { text: string }).text, /1 refused/);
-    assert.notEqual(filename, '');
-    await assert.rejects(access(filename), { code: 'ENOENT' });
   }
 });
 
@@ -156,14 +122,8 @@ test('schemas carry the native constraints the model must respect', () => {
   assert.equal(schema('memcue_search').properties.limit.minimum, 1);
   assert.deepEqual(schema('memcue_add').required, ['text', 'source']);
   assert.deepEqual(schema('memcue_add').properties.source.enum, ['user', 'user_confirmed', 'tool', 'agent']);
-  assert.deepEqual(schema('memcue_retire').required, ['id', 'expectedVersion']);
+  assert.deepEqual(schema('memcue_retire').required, ['id', 'expectedVersion', 'reason']);
   assert.equal(schema('memcue_retire').properties.expectedVersion.minimum, 1);
   assert.deepEqual(schema('memcue_correct').required, ['id', 'text', 'expectedVersion']);
-  assert.equal(schema('memcue_dream_apply').required?.includes('answer'), true);
-  const answer = schema('memcue_dream_apply').properties.answer as unknown as {
-    properties: Record<string, { items?: { properties: Record<string, { enum?: string[] }> } }>; required?: string[];
-  };
-  assert.deepEqual(answer.required, ['packet', 'splits', 'actions', 'scopes']);
-  assert.deepEqual(answer.properties.actions.items?.properties.op.enum, ['retire', 'correct']);
-  assert.deepEqual(answer.properties.actions.items?.properties.kind.enum, ['duplicate', 'outdated', 'resolved', 'noise']);
+
 });

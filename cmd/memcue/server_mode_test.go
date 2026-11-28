@@ -166,7 +166,7 @@ func TestServerModeKeepsOneReplicaPerMachine(t *testing.T) {
 
 func TestServerModeRefusesLocalCommands(t *testing.T) {
 	serverEnv(t)
-	for _, args := range [][]string{{"dream", "-run"}, {"install"}, {"merge", "a", "b", "c"}, {"dump", "f"},
+	for _, args := range [][]string{{"install"}, {"merge", "a", "b", "c"}, {"dump", "f"},
 		{"migrate", "-text"}, {"migrate", "-repos"}} {
 		if err := serverCommandAllowed(args); err == nil {
 			t.Errorf("%v allowed in server mode", args)
@@ -186,10 +186,6 @@ func TestServerModeRefusesLocalCommands(t *testing.T) {
 
 func TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce(t *testing.T) {
 	_, starts := serverEnv(t)
-	t.Setenv("MEMCUE_DREAM_BACKGROUND", "1")
-	lookClaude = func() bool { return true } // a dream could run here: server mode must still not start one
-	spawned := false
-	spawnDream = func(string) error { spawned = true; return nil }
 	for _, card := range []bool{false, true} {
 		text, took := sessionContext(t, card)
 		if took > time.Second {
@@ -204,9 +200,6 @@ func TestSessionStartWithoutAHelperStartsOneAndAnswersAtOnce(t *testing.T) {
 	}
 	if got := starts(); got != 2 {
 		t.Fatalf("helper started %d times, want 2", got)
-	}
-	if spawned {
-		t.Fatal("a client started a background dream in server mode")
 	}
 }
 

@@ -57,7 +57,7 @@ func TestMutationReceiptLoss(t *testing.T) {
 					return i.runCorrect([]string{"-expected-version", "1", "--", f.ID, "Prefer examples and concise explanations."}, w)
 				}},
 				{"retire", 3, func(i *invocation, w io.Writer) error {
-					return i.runRetire([]string{"-expected-version", "2", "--", f.ID}, w)
+					return i.runRetire([]string{"-expected-version", "2", "-reason", "The user withdrew the synthetic preference.", "--", f.ID}, w)
 				}},
 				{"reopen", 4, func(i *invocation, w io.Writer) error { return i.runReopen([]string{f.ID}, w) }},
 			}

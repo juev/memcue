@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -448,17 +449,26 @@ func (inv *invocation) runRetire(args []string, out io.Writer) error {
 	out = inv.writer(out)
 	fs := flag.NewFlagSet("retire", flag.ContinueOnError)
 	expected := fs.Int("expected-version", 0, "version observed by the caller; required for PostgreSQL")
+	reason := fs.String("reason", "", "required: why the fact was retired (one line, no secrets)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("usage: memcue retire ID")
+		return errors.New("usage: memcue retire -reason REASON ID")
+	}
+	if strings.TrimSpace(*reason) == "" || len(*reason) > 512 || strings.ContainsAny(*reason, "\r\n\x00") || hasSecret(*reason) {
+		return errors.New("retirement reason must be a nonblank single line of at most 512 bytes")
 	}
 	if *expected < 0 || (os.Getenv("MEMCUE_POSTGRES_DSN") != "" && *expected == 0) {
 		return store.ErrExpectedVersion
 	}
 	return inv.withStore(func(s *store.Store) error {
-		f, err := retireObserved(s, fs.Arg(0), *expected)
+		id := fs.Arg(0)
+		var observed []int
+		if *expected != 0 {
+			observed = append(observed, *expected)
+		}
+		f, err := s.RetireWithReason(id, *reason, observed...)
 		if err != nil {
 			return err
 		}
@@ -1116,12 +1126,6 @@ func refuseAuxiliaryFlags(args []string) error {
 	return nil
 }
 
-func retireObserved(s *store.Store, id string, version int) (store.Fact, error) {
-	if version == 0 {
-		return s.Retire(id)
-	}
-	return s.Retire(id, version)
-}
 func runRetire(args []string, out io.Writer) error {
 	inv := newInvocation()
 	defer inv.close()
@@ -1172,4 +1176,21 @@ func defaultOriginAt(dir string) string {
 	inv := newInvocation()
 	defer inv.close()
 	return inv.defaultOriginAt(dir)
+}
+
+func appendJSON(path string, v any) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	_, err = f.Write(append(b, '\n'))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }

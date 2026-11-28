@@ -12,7 +12,7 @@ import (
 )
 
 func TestContentOnlyExtractionContracts(t *testing.T) {
-	for _, v := range []any{Fact{}, Action{}} {
+	for _, v := range []any{Fact{}} {
 		typ := reflect.TypeOf(v)
 		for _, name := range []string{"Keywords", "Queries", "Translation"} {
 			if _, ok := typ.FieldByName(name); ok {
@@ -20,7 +20,7 @@ func TestContentOnlyExtractionContracts(t *testing.T) {
 			}
 		}
 	}
-	for name, raw := range map[string]string{"note": schema, "dream": dreamSchema} {
+	for name, raw := range map[string]string{"note": schema} {
 		var value any
 		if err := json.Unmarshal([]byte(raw), &value); err != nil {
 			t.Fatal(err)

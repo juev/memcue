@@ -48,7 +48,6 @@ func TestSyncServerOverTheTailnet(t *testing.T) {
 		"MEMCUE_TAILSCALE_CONTROL_URL=" + control,
 		"MEMCUE_TAILSCALE_ALLOW_LOOPBACK_CONTROL=1",
 		"MEMCUE_TAILSCALE_AUTH_KEY_FILE=" + keyfile,
-		"MEMCUE_DREAM_BACKGROUND=0",
 		// A first login on this fixture takes about five seconds, the default limit of connect up.
 		"MEMCUE_TAILSCALE_CONNECT_TIMEOUT=20s",
 		"GIT_CEILING_DIRECTORIES=" + root,
@@ -152,21 +151,27 @@ func TestSyncServerOverTheTailnet(t *testing.T) {
 	}
 
 	// 5. Retire against a correction: the fact stays retired, and reopen brings back the corrected text (R7).
-	retired := a.add("Prefer lumenhare fixtures for retire conflicts.")
+	const retiredText = "Prefer lumenhare fixtures for retire conflicts."
+	const reason = "The user withdrew the synthetic fixture preference."
+	retired := a.add(retiredText)
 	syncUntil(t, ctx, "B has the retire fact", 15*time.Second, func() bool { return b.finds("lumenhare") })
 	a.off()
 	b.off()
-	a.must("retire", retired)
+	a.must("retire", "-expected-version", "1", "-reason", reason, retired)
 	b.must("correct", retired, "Prefer lumenhare fixtures with reasons for retire conflicts.")
 	a.up()
 	b.up()
-	syncUntil(t, ctx, "the fact is retired on both replicas", 30*time.Second, func() bool {
-		return a.fact(retired).Status == store.Retired && b.fact(retired).Status == store.Retired
+	syncUntil(t, ctx, "the fact is retired with its reason on both replicas", 30*time.Second, func() bool {
+		x, y := a.fact(retired), b.fact(retired)
+		return x.Status == store.Retired && y.Status == store.Retired && x.RetirementReason == reason && y.RetirementReason == reason
 	})
+	if out, err := b.run("add", "-scope", "global", "-source", "user", "--", retiredText); err == nil || !strings.Contains(out, reason) {
+		t.Fatalf("B failed to guard the retired claim with the synced reason: %v\n%s", err, out)
+	}
 	a.must("reopen", retired)
 	syncUntil(t, ctx, "B sees the reopened, corrected fact", 15*time.Second, func() bool {
 		f := b.fact(retired)
-		return f.Status == store.Active && f.Content == "Prefer lumenhare fixtures with reasons for retire conflicts."
+		return f.Status == store.Active && f.RetirementReason == "" && f.Content == "Prefer lumenhare fixtures with reasons for retire conflicts."
 	})
 
 	// 6. session-start without a helper starts one and answers without waiting for the network (R1, R10).

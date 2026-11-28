@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { access, readFile, stat } from 'node:fs/promises';
 import { test } from 'node:test';
 import type { ExtensionToolContext } from '@earendil-works/pi-coding-agent';
 import { Check } from 'typebox/value';
@@ -66,15 +65,15 @@ test('add is a mutation, preserves literal text and native diagnostics', async (
   assert.match((result.content[0] as { text: string }).text, /native warning/);
 });
 
-test('conflicting metadata and dream ranges fail without invoking the CLI', async () => {
+test('invalid writes fail without invoking the CLI', async () => {
   const never: RunMemcue = async () => { assert.fail('CLI must not run'); };
   for (const [name, args] of [
     ['memcue_add', { text: 'fact', source: 'agent', scope: 'repo', shelf: 'research' }],
     ['memcue_add', { text: 'fact', source: 'agent', expires: '2027-01-01', noExpires: true }],
     ['memcue_correct', { id: 'id', text: 'fact', expectedVersion: 2, expires: '2027-01-01', noExpires: true }],
-    ['memcue_dream_prepare', { all: true, since: '2026-01-01' }],
+    ['memcue_retire', { id: 'id', expectedVersion: 2, reason: ' ' }],
   ] as const) {
-    await assert.rejects(tool(name, never).execute('call', args, undefined, undefined, ctx), /cannot|exclusive/i);
+    await assert.rejects(tool(name, never).execute('call', args, undefined, undefined, ctx), name === 'memcue_retire' ? /reason is required/ : /cannot|exclusive/i);
   }
 });
 
@@ -89,10 +88,10 @@ test('corrections and retirements carry the caller-observed version', async () =
     return committed();
   }).execute('call', { id: 'id', text: 'Fact.', expectedVersion: 6, noExpires: true }, undefined, undefined, ctx);
   await tool('memcue_retire', async (args, options) => {
-    assert.deepEqual(args, ['retire', '-expected-version', '2', '--', 'id']);
+    assert.deepEqual(args, ['retire', '-expected-version', '2', '-reason', 'Current guide changed.', '--', 'id']);
     assert.equal(options.mutation, true);
     return committed('id v3 retired\n');
-  }).execute('call', { id: 'id', expectedVersion: 2 }, undefined, undefined, ctx);
+  }).execute('call', { id: 'id', expectedVersion: 2, reason: 'Current guide changed.' }, undefined, undefined, ctx);
 });
 
 test('every tool checks policy before any CLI invocation', async () => {
@@ -100,39 +99,6 @@ test('every tool checks policy before any CLI invocation', async () => {
   const never: RunMemcue = async () => { assert.fail('disabled tool invoked CLI'); };
   for (const item of memoryTools(never, deny)) {
     await assert.rejects(item.execute('call', {}, undefined, undefined, ctx), /memory disabled/);
-  }
-});
-
-test('dream prepare returns the full packet and is treated as a mutation', async () => {
-  const packet = '# Full instructions\n\n{"packet":"p-123"}\n';
-  const result = await tool('memcue_dream_prepare', async (args, options) => {
-    assert.deepEqual(args, ['dream', '-prepare', '-all']);
-    assert.equal(options.mutation, true);
-    assert.equal(options.timeoutMs, 60_000);
-    return committed(packet);
-  }).execute('call', { all: true }, undefined, undefined, ctx);
-  assert.match((result.content[0] as { text: string }).text, /# Full instructions/);
-});
-
-test('dream apply creates a private temporary answer and removes it on every outcome', async () => {
-  const answer = { packet: 'p-123', splits: [], actions: [], scopes: [] };
-  for (const fail of [false, true]) {
-    let filename = '';
-    const apply = tool('memcue_dream_apply', async (args, options) => {
-      assert.deepEqual(args.slice(0, 2), ['dream', '-apply']);
-      filename = args[2];
-      assert.deepEqual(JSON.parse(await readFile(filename, 'utf8')), answer);
-      assert.equal((await stat(filename)).mode & 0o777, 0o600);
-      assert.equal(options.mutation, true);
-      assert.equal(options.timeoutMs, 60_000);
-      if (fail) throw new Error('transport failure');
-      return committed('0 changed, 1 refused\n');
-    });
-    const result = apply.execute('call', { answer }, undefined, undefined, ctx);
-    if (fail) await assert.rejects(result, /transport failure/);
-    else assert.match(((await result).content[0] as { text: string }).text, /1 refused/);
-    assert.notEqual(filename, '');
-    await assert.rejects(access(filename), { code: 'ENOENT' });
   }
 });
 
@@ -156,13 +122,5 @@ test('schemas reject unsafe shapes and require observed versions', () => {
   assert.equal(Check(tool('memcue_correct', noop).parameters, { id: 'id', text: 'fact' }), false);
   assert.equal(Check(tool('memcue_retire', noop).parameters, { id: 'id', expectedVersion: 0 }), false);
   assert.equal(Check(tool('memcue_add', noop).parameters, { text: 'fact', source: 'agent', force: true }), false);
-  assert.equal(Check(tool('memcue_dream_apply', noop).parameters, {
-    answer: { packet: 'p', splits: [], actions: [], scopes: [], translations: [] },
-  }), false);
-  assert.equal(Check(tool('memcue_dream_apply', noop).parameters, {
-    answer: { packet: 'p', splits: [], actions: [{ op: 'retire', id: 'id', kind: 'duplicate', by: 'another', reason: 'same fact' }], scopes: [] },
-  }), true);
-  assert.equal(Check(tool('memcue_dream_apply', noop).parameters, {
-    answer: { packet: 'p', splits: [], actions: [{ op: 'retire', id: 'id', kind: 'resolved', reason: 'the fact records its fix' }], scopes: [] },
-  }), true);
+
 });

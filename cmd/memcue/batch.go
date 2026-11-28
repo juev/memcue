@@ -52,6 +52,7 @@ func (inv *invocation) runAddBatch(path string, force bool, out io.Writer) error
 		if err := validateCapture("add -batch", in.Content, in.Meta); err != nil {
 			return err
 		}
+		in.Scope = defaultScope(in.Scope, in.Origin)
 		in.Expires = captureExpires(in.Kind, in.Source, in.Scope, in.Expires, false)
 	}
 	if len(inputs) == 0 {

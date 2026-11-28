@@ -41,10 +41,10 @@ Hook child environment does not propagate to later shell calls. Run commands fro
   Ordinary search excludes shelves. Before storing an external finding, search there first and use `add -shelf research
   -source tool -- "<finding>. Source: <document, version or date>."`. Store the source's claim and limits;
   mark inference, verify dates/versions before relying on old findings, and correct or retire stale ones.
-- When maintenance hints say a dream is due, use the memcue-dream skill at a natural pause. The working model answers
-  `dream -prepare` and applies its answer with `dream -apply FILE`; the launcher starts no background model.
-  If prepare reports "no dream yet on this machine", use the same launcher with `dream -prepare -all` for all active
-  facts, or `dream -prepare -since DATE` for a chosen starting date (`YYYY-MM-DD` or RFC 3339).
 - If memory fails or the sandbox denies a write, report the bounded diagnostic and continue unrelated work. Do not claim
   a failed or timed-out write succeeded; inspect persisted state before retrying. Ask for narrowly scoped directory approval
   when needed, keeping the selected sandbox policy. Never request blanket full access for memory.
+
+Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice.
+
+When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required `-reason` argument to `retire`, in that same call, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact.

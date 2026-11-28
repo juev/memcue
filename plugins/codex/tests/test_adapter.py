@@ -26,7 +26,7 @@ from pathlib import Path
 p=Path(os.environ['MEMCUE_STATE_DIR']);p.mkdir(exist_ok=True)
 with (p/'calls').open('a') as f:f.write(json.dumps({'args':sys.argv[1:],'cwd':os.getcwd(),'env':{k:v for k,v in os.environ.items() if k.startswith('MEMCUE_')}})+'\\n')
 if sys.argv[1]=='session-card':
- print(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionCard','additionalContext':'memcue: 2 facts wait for the dream. call memcue_dream_prepare and answer its packet with memcue_dream_apply'}}))
+ print(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionCard','additionalContext':'Verify the current tool version.'}}))
 elif sys.argv[1]=='search':print(json.dumps({'facts':[],'hints':['No facts; try -in all.']}))
 if os.environ.get('MEMCUE_OUTCOME_NONCE'):
  import hashlib
@@ -66,8 +66,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
                 self.assertEqual(h['hookEventName'], 'SessionStart')
                 text = h['additionalContext']
                 for term in ('-kind rule,decision', '-in global', '-in shelf:research', 'Search first',
-                             'English', 'correct', 'retire', 'source', 'expiry', 'facts wait for the dream',
-                             'dream -prepare -all', 'dream -prepare -since DATE', 'no dream yet on this machine'):
+                             'English', 'correct', 'retire', 'source', 'expiry', '-reason', 'Verify the current tool version.'):
                     self.assertIn(term, text)
                 for forbidden in ('memcue sessions', 'built-in memory', 'memcue_dream_prepare', 'claude -p'):
                     self.assertNotIn(forbidden, text)
@@ -81,8 +80,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         note=json.loads(hook.stdout)['hookSpecificOutput']['additionalContext']
         fallback=self.run_adapter('instructions')
         self.assertEqual(fallback.returncode,0,fallback.stderr)
-        for text in (note,fallback.stdout,(ROOT/'skills/memcue/SKILL.md').read_text(),
-                     (ROOT/'skills/memcue-dream/SKILL.md').read_text()):
+        for text in (note,fallback.stdout,(ROOT/'skills/memcue/SKILL.md').read_text()):
             with self.subTest(text=text[:60]):
                 self.assertIn('Never correct a fact solely to change its language.',text)
                 self.assertIn('Existing fact content remains as stored.',text)
@@ -190,7 +188,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
     def test_invalid_config_never_selects_default_base(self):
         valid = json.loads(self.config.read_text())
         for change in ({'facts':''},{'facts':'relative'}, {'state_dir':'relative'}, {'binary':'memcue'},
-                       {'host':''}, {'background_dream': True}, {'unknown':True}):
+                       {'host':''}, {'unknown':True}):
             self.config.write_text(json.dumps(valid | change))
             r = self.run_adapter('hook',data=self.payload())
             self.assertEqual(r.returncode,0,r.stderr)
@@ -208,35 +206,6 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             self.assertNotEqual(r.returncode,0)
             self.assertFalse((self.home/'state').exists())
 
-    def test_dream_allowlist_passes_only_documented_packet_commands(self):
-        for args in (('-prepare',),('-prepare','-all'),('-prepare','-all','-noise'),('-list','-all','-noise'),('-prepare','-since','2000-01-01'),
-                     ('-prepare','-since','2000-01-01T00:00:00Z'),('-list',),('-apply','/synthetic/answer.json'),
-                     ('--','-prepare','-all')):
-            with self.subTest(args=args):
-                r=self.run_adapter('dream',*args)
-                self.assertEqual(r.returncode,0,r.stderr)
-                # argparse consumes a leading option terminator before the remainder.
-                forwarded=args[1:] if args[0]=='--' else args
-                self.assertEqual(self.calls()[-1]['args'],['dream',*forwarded])
-                self.assertEqual(self.calls()[-1]['env']['MEMCUE_DREAM_BACKGROUND'],'0')
-                self.assertNotIn('MEMCUE_API_URL',self.calls()[-1]['env'])
-
-    def test_dream_rejects_extra_duplicate_and_malformed_flags_before_any_child(self):
-        for args in ((),('-all',),('-since','2000-01-01'),('-prepare','-prepare'),
-                     ('-prepare','-all','-all'),('-prepare','-all','-since','2000-01-01'),
-                     ('-prepare','-since','2000-01-01','-since','2001-01-01'),
-                     ('-prepare','-since'),('-prepare','-since',''),('-prepare','-since','-run'),
-                     ('-prepare','-since','2000-01-01','extra'),('-prepare','-all','extra'),
-                     ('-prepare','-all=true'),('-prepare','-since=2000-01-01'),('-all','-prepare'),
-                     ('-prepare','-run'),('-prepare','-background'),('-prepare','-j','2'),
-                     ('-run','-all'),('-run','-background'),('-list','-all'),('-list','-prepare'),
-                     ('-apply',),('-apply','/synthetic/answer.json','-all'),('--','-prepare','-run')):
-            with self.subTest(args=args):
-                r=self.run_adapter('dream',*args)
-                self.assertNotEqual(r.returncode,0,r.stdout)
-                self.assertIn('dream accepts only',r.stderr)
-                self.assertFalse((self.home/'state').exists())
-
     def test_empty_maintenance_response_still_delivers_policy(self):
         self.binary.write_text('#!/usr/bin/env python3\n')
         r=self.run_adapter('hook',data=self.payload())
@@ -253,8 +222,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.assertEqual(r.returncode,0,r.stderr)
         self.assertEqual(agents.read_bytes(),original)
         for term in ('-kind rule,decision','-in global','-in shelf:research','English',str(self.config),
-                     'Search first','memcue-dream','expiry','source','kind','scope',
-                     'dream -prepare -all','dream -prepare -since DATE','no dream yet on this machine'):
+                     'Search first','expiry','source','kind','scope','-reason'):
             self.assertIn(term,r.stdout)
         self.assertNotIn('@MEMCUE@',r.stdout)
         self.assertFalse((self.home/'state').exists())
@@ -270,7 +238,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.assertIn('memcue.py',handler['command'])
         self.assertIn('hook',handler['command'])
         self.assertLessEqual(handler['timeout'],30)
-        for name in ('memcue','memcue-dream'):
+        for name in ('memcue',):
             skill=(ROOT/'skills'/name/'SKILL.md').read_text()
             self.assertIn('configured launcher',skill)
             self.assertNotIn('memcue sessions',skill)

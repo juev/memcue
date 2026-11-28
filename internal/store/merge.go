@@ -252,7 +252,7 @@ func byID(rows []Fact) map[string][]Fact {
 func same(a, b Fact) bool {
 	return a.WriteID == b.WriteID && a.Content == b.Content &&
 		a.Origin == b.Origin && a.Created.Equal(b.Created) && a.Status == b.Status && a.Author == b.Author &&
-		a.Expires == b.Expires && a.Meta == b.Meta
+		a.Expires == b.Expires && a.RetirementReason == b.RetirementReason && a.RetirementKey == b.RetirementKey && a.Meta == b.Meta
 }
 
 // Dump writes every version of every fact, one per line, for git diff.

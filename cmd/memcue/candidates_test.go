@@ -52,60 +52,6 @@ func legacyRow(t *testing.T, id, content, kind, scope, source, review, expires s
 	}
 }
 
-// The dream reads every active fact, expired ones included, as it always read an expired approved fact: a legacy
-// candidate or provisional fact is read on the same terms whatever its review state, and a correction, which drops
-// that state, changes nothing about whether the dream reads it (#514).
-func TestDreamReadsExpiredFactsWhateverTheirReview(t *testing.T) {
-	env(t)
-	past := time.Now().AddDate(0, -1, 0).Format(time.DateOnly)
-	future := time.Now().AddDate(0, 1, 0).Format(time.DateOnly)
-	const (
-		liveCand    = "01JDREAMLEGACY000000000001"
-		expiredCand = "01JDREAMLEGACY000000000002"
-		liveProv    = "01JDREAMLEGACY000000000003"
-		expiredProv = "01JDREAMLEGACY000000000004"
-	)
-	legacyRow(t, liveCand, "Кандидат про порт nginx 8080.", "environment", "", "tool", store.Candidate, future)
-	legacyRow(t, expiredCand, "Кандидат про порт redis 6380.", "environment", "", "tool", store.Candidate, past)
-	legacyRow(t, liveProv, "Provisional про порт webforge 3000.", "environment", "", "tool", store.Provisional, future)
-	legacyRow(t, expiredProv, "Provisional про порт minio 9000.", "environment", "", "tool", store.Provisional, past)
-	s, err := store.Open(factsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	expiredApproved, err := s.AddWith("Одобренный факт про порт grafana 3001.", "x 2026-10-19", past, store.Meta{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = s.Close()
-	all := []string{liveCand, expiredCand, liveProv, expiredProv, expiredApproved.ID}
-	read := func(when string) {
-		t.Helper()
-		var out bytes.Buffer
-		if err := runDream([]string{"-prepare", "-all"}, &out); err != nil {
-			t.Fatal(err)
-		}
-		for _, id := range all {
-			if !strings.Contains(out.String(), id) {
-				t.Errorf("%s: the dream lacks %s:\n%s", when, id, out.String())
-			}
-		}
-
-	}
-	read("before a correction")
-
-	s, err = store.Open(factsPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := s.Correct(expiredCand, "Кандидат про порт redis 6381.")
-	_ = s.Close()
-	if err != nil || f.Review != "" || f.Expires != past {
-		t.Fatalf("corrected %+v %v", f, err)
-	}
-	read("after a correction")
-}
-
 // A fact add writes is searchable at once, whatever its source (#514); add has no -candidate any more, and the
 // commands of the approval workflow say they are gone.
 func TestAddIsSearchableAtOnce(t *testing.T) {
@@ -178,7 +124,7 @@ func TestLegacyCandidateIsSearchedAndListed(t *testing.T) {
 // passes (#514).
 func TestLegacyProvisionalIsSearchedAndListed(t *testing.T) {
 	env(t)
-	day := future()
+	day := time.Now().AddDate(0, 1, 0).Format(time.DateOnly)
 	legacyRow(t, "01JLEGACYCMD00000000000011", "Provisional правило: писать тесты первыми quebec.", "rule", "global",
 		"tool", store.Provisional, day)
 	legacyRow(t, "01JLEGACYCMD00000000000012", "Provisional правило: просроченное romeo.", "rule", "global",

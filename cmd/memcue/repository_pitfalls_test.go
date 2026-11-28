@@ -20,7 +20,7 @@ func pitfallFixture(t *testing.T) (string, string) {
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(dir, "global"))
 	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(dir, "system"))
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("MEMCUE_DREAM_BACKGROUND", "0")
+
 	t.Setenv("MEMCUE_FACTS", filepath.Join(dir, "facts"))
 	repo := filepath.Join(dir, "repo")
 	for _, args := range [][]string{{"init", "-q", repo}, {"-C", repo, "remote", "add", "origin", "https://example.invalid/team/repo.git"}} {
@@ -51,7 +51,7 @@ func lifecycleContext(t *testing.T, cwd, source string, card bool) string {
 	var out bytes.Buffer
 	var err error
 	if card {
-		err = runSessionCardWith(bytes.NewReader(in), &out, false)
+		err = runSessionCard(bytes.NewReader(in), &out)
 	} else {
 		err = runSessionStartPart(bytes.NewReader(in), &out, 1)
 	}

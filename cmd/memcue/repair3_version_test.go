@@ -30,7 +30,7 @@ func TestRepair3CLIObservedVersion(t *testing.T) {
 	if e = runCorrect([]string{"-expected-version", "1", f.ID, "Synthetic stale orchard"}, &out); !errors.Is(e, store.ErrChanged) {
 		t.Errorf("stale CLI correct: %v", e)
 	}
-	if e = runRetire([]string{"-expected-version", "1", f.ID}, &out); !errors.Is(e, store.ErrChanged) {
+	if e = runRetire([]string{"-expected-version", "1", "-reason", "The fixture no longer applies.", f.ID}, &out); !errors.Is(e, store.ErrChanged) {
 		t.Errorf("stale CLI retire: %v", e)
 	}
 	h, e := s.History(f.ID)

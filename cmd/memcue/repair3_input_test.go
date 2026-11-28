@@ -24,7 +24,7 @@ func TestRepair3HookInputCancellation(t *testing.T) {
 	go func() { time.Sleep(350 * time.Millisecond); _ = w.Close(); close(done) }()
 	var out bytes.Buffer
 	start := time.Now()
-	e = inv.runSessionCardMode(r, &out, false, true)
+	e = inv.runSessionCardMode(r, &out, true)
 	elapsed := time.Since(start)
 	<-done
 	if !errors.Is(e, context.DeadlineExceeded) || elapsed > 250*time.Millisecond {

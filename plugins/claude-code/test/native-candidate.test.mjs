@@ -30,7 +30,7 @@ test('native candidate: Claude launcher stores content only and refuses obsolete
   assert.equal(facts[0].content, 'Native cobalt PROJ-1234 port 7432.')
   assert.equal(Object.hasOwn(facts[0], 'keywords'), false)
   assert.equal(Object.hasOwn(facts[0], 'queries'), false)
-  r = run('retire', id)
+  r = run('retire', '-reason', 'The synthetic rule was superseded.', id)
   assert.equal(r.status, 0, r.stderr)
   r = run('search', '-json', '-min-score', '0', '--', 'PROJ-1234')
   assert.equal(r.status, 0, r.stderr)

@@ -40,7 +40,7 @@ test('native candidate: DSH content-only add/search/correct/retire and obsolete 
   assert.equal((await call('memcue_correct', { id, expected_version: result.facts[0].version, text: corrected })).stored, true)
   result = await call('memcue_search', { query: 'PROJ-1234', min_score: 0 })
   assert.equal(result.facts[0].content, corrected)
-  assert.equal((await call('memcue_retire', { id, expected_version: result.facts[0].version })).stored, true)
+  assert.equal((await call('memcue_retire', { id, expected_version: result.facts[0].version, reason: 'The synthetic rule was superseded.' })).stored, true)
   assert.equal((await call('memcue_search', { query: 'PROJ-1234', min_score: 0 })).facts.length, 0)
   const history = []
   for (const entry of await readdir(join(root, 'facts'), { withFileTypes: true })) {

@@ -10,7 +10,7 @@ fact base:
 - **No card of rules** (#656). The user's rules and decisions stay in the base: the section tells the model to search
   them (`kind rule,decision`, the words of the task) at the start of a task and when it turns to another system, as
   measured on Claude Code in #647. At the first prompt and after every compaction `memcue session-card` supplies only
-  its hints (an upgrade this machine owes, a due dream), often none, as a user-role notice. A failed call is not
+  its hints (an upgrade this machine owes), often none, as a user-role notice. A failed call is not
   treated as delivered, so the next step retries it (with one report per session), and the step still runs.
 - **The model keeps its memory itself** (#494). Before writing, it asks what a later session would do differently
   because it knows the fact. Task progress, completed outcomes, and paths already documented in the repository stay
@@ -41,8 +41,7 @@ Hermes.
 The delivered prompt and tool schemas request new and corrected fact content in English regardless of chat language.
 They preserve identifiers, commands, paths, versions, exact values and verbatim quotes and leave the user's reply
 language unchanged. English misses may be retried in Russian or another legacy language. The binary and built-in
-memory mirror keep accepting non-English input unchanged. Dreams do not translate facts or create translation debt;
-auxiliary fields are removed during upgrade, and old auxiliary answers are refused.
+memory mirror keep accepting non-English input unchanged. Existing fact text is not translated.
 
 ## Candidates
 
@@ -112,10 +111,6 @@ Node refuses to strip TypeScript types, so a `.ts` entry cannot be loaded from a
 
 `memcue add` and `memcue correct` store content immediately without model calls, even with an endpoint configured.
 
-The same settings carry the dream (#569). When a dream is due, the `session-card` call starts one `memcue dream -run`
-pass in the background, on `apiUrl` when it is set and on `claude -p` when dsh sees `claude` on `PATH`; with neither,
-the base gets no dream from dsh. `MEMCUE_DREAM_BACKGROUND=0` in the environment that launches dsh turns it off.
-
 ## Configuration
 
 Server mode needs no field: with `MEMCUE_SERVER` in dsh's environment memcue works on this machine's replica of the
@@ -129,9 +124,6 @@ A configured field wins over the environment.
   leading `~/` is expanded; a relative path is rejected at load, so the value cannot name a different file for each
   host.
 - `searchLimit` — default for `memcue_search` (default `5`).
-- `model` — model of migration and dream maintenance; forwarded as `MEMCUE_MODEL` (default: memcue's own).
-- `apiUrl` — OpenAI-compatible base URL; forwarded as `MEMCUE_API_URL` (default: unset, so `add` calls no model).
-- `apiKey` — key for `apiUrl`; forwarded as `MEMCUE_API_KEY` (default: unset, so the ambient value or no key is used).
 
 Bad values are rejected at load time with the field name, so a typo does not silently fall back to a default. The
 `extract`, `minNewChars`, `stateDir` and `maxToolResultChars` fields of the extraction are gone (#494); a profile that
