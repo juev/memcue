@@ -18,6 +18,8 @@ Private fact databases, transcripts, personal session lists and local-only exper
 When a report's input, runner or patch is unavailable, its result is an archived claim with that limitation;
 a source link is not a downloadable copy of the private evidence.
 
+- [OpenClaw Memcue tool plugin (#838)](openclaw-plugin-838.md): adapter contract and remaining Gateway validation.
+
 ## Decision sequence and superseded work
 
 - The [#636 ordering decision](https://github.com/juev/memcue/issues/636#issuecomment-6679383966) put the system

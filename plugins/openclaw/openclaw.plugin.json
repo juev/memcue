@@ -1,0 +1,17 @@
+{
+  "id": "memcue-tools",
+  "name": "Memcue tools",
+  "description": "Owner-private Memcue tools for a dedicated local database",
+  "activation": { "onStartup": true },
+  "contracts": {
+    "tools": ["memcue_search", "memcue_add", "memcue_correct", "memcue_retire"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "binary": { "type": "string" },
+      "dataDir": { "type": "string" }
+    }
+  }
+}

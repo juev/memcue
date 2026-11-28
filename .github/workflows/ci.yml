@@ -151,6 +151,22 @@ jobs:
       - name: typecheck and test the OpenCode plugin
         run: make test-opencode
 
+  openclaw:
+    name: OpenClaw Memcue adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - run: make build
+      - run: MEMCUE_BIN="$PWD/bin/memcue" node --test --test-concurrency=1 plugins/openclaw/test.mjs
+      - run: npm pack --ignore-scripts
+        working-directory: plugins/openclaw
+
   card-research:
     name: card research contracts
     runs-on: ubuntu-latest

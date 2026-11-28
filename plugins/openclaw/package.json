@@ -1,0 +1,7 @@
+{
+  "name": "@juev/memcue-openclaw",
+  "version": "0.1.0",
+  "type": "module",
+  "files": ["index.js", "openclaw.plugin.json", "README.md"],
+  "openclaw": { "extensions": ["./index.js"] }
+}
