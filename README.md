@@ -58,16 +58,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-For the next upgrade, see [Removing Dream](#removing-dream).
-
-This release candidate is `0.40.11`; the fact-base schema is **9**. Content-only storage is an incompatible
-upgrade: stop every consumer on every sharing machine and pause sync before opening a base. Make a full verified
-backup and test isolated copies first. Old JSONL consumers are not blocked by the SQLite schema number.
-See [Upgrade](#upgrade) for coordinated rollout and rollback data risks. All versioned plugin manifests carry
-the same release version. Publication and live deployment are separate steps; neither is claimed here.
+This release candidate is `0.41.0`; the fact-base schema is **9**. Upgrading from 0.40.11 keeps existing fact history,
+but older writers can lose the new retirement reason. Stop external Dream schedules, back up the base, and update
+the sync server before replicas and writers. See [Removing Dream](#removing-dream) for rollout and rollback risks.
+All versioned plugin manifests carry the same release version.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.41.0 | 9 | 0.41.0 | 0.41.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.41.0 (`hermes-agent` >=0.17.0) |
 | 0.40.11 | 9 | 0.40.11 | 0.40.11 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.11 (`hermes-agent` >=0.17.0) |
 | 0.40.10 | 9 | 0.40.10 | 0.40.10 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.10 (`hermes-agent` >=0.17.0) |
 | 0.40.9 | 9 | 0.40.9 | 0.40.9 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.9 (`hermes-agent` >=0.17.0) |
@@ -338,6 +336,15 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.41.0: working-model memory replaces Dream (#823)
+
+- Dream, its scheduler and its tools are removed. The working model decides what to save and reviews facts when
+  new evidence matters to its current work. Cold or unused facts are no longer swept automatically.
+- `retire` requires `-reason`; the reason travels with the status. A repeated exact claim in the same scope is
+  refused at save time. Retired facts stay out of ordinary recall; paraphrases are not blocked.
+- Follow [Removing Dream](#removing-dream) before allowing new retirement writes. See [the local model trial](https://github.com/juev/memcue/issues/826)
+  and [the verified-pitfall capture follow-up](https://github.com/juev/memcue/issues/827) for the measured limits.
 
 ### 0.40.11: resumable full-base dreams (#815, #816)
 
