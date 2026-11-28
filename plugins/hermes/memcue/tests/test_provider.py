@@ -460,14 +460,27 @@ class ProviderTest(unittest.TestCase):
         self.assertLess(note, shelf)
 
     def test_the_pitfall_line_follows_the_shelf_text(self):
-        """#566 stays verbatim; #802 adds the reuse filter and narrows the add-tool description."""
+        """Keep the pitfall guidance next to the reuse and expiry filters."""
         block = self.p.system_prompt_block()
         shelf = block.index(memcue_provider._SHELF_NOTE)
         pitfall = block.index(memcue_provider._FAILURE_NOTE)
         pitfall_filter = block.index(memcue_provider._PITFALL_FILTER_NOTE)
         self.assertLess(shelf, pitfall)
         self.assertLess(pitfall, pitfall_filter)
-        self.assertIn("fresh-checkout reuse", memcue_provider.ADD_SCHEMA["description"])
+
+    def test_pitfall_capture_requires_direct_results_and_a_real_memory_action(self):
+        note = self.p.system_prompt_block()
+        add = next(s["description"] for s in self.p.get_tool_schemas() if s["name"] == "memcue_add")
+        for phrase in (
+            "an actual tool response in this conversation contains the failing run and the passing workaround",
+            "If a result already covers that condition and workaround in the same scope, stop",
+            'kind="pitfall", source="tool", and scope="repo"',
+            "Respect an explicit request not to write memory",
+            "Leave expires unset unless evidence supports a different review date",
+        ):
+            self.assertIn(phrase, note)
+        self.assertIn("Never call this tool for a user-only account of a technical pitfall", add)
+        self.assertIn("Skip one-offs, already fixed or documented issues, and duplicates", add)
 
     def test_search_guidance_is_conditional_in_the_note_and_the_tool(self):
         for text in (self.p.system_prompt_block(), memcue_provider.SEARCH_SCHEMA["description"]):
@@ -673,7 +686,7 @@ class ProviderTest(unittest.TestCase):
         self.assertNotIn("Всегда пиши коммиты", prompt)
         self.assertIn("what a later session would do differently", prompt)
         self.assertIn("completed outcomes", prompt)
-        self.assertIn("fresh checkout would hit it again", prompt)
+        self.assertIn("the failure condition repeats on a fresh checkout", prompt)
         self.assertIn("does not make an inference the user's words", prompt)
         added = json.loads(self.p.handle_tool_call("memcue_add", {
             "content": "Пользователь попросил запомнить это правило.", "kind": "rule", "source": "user"}))
