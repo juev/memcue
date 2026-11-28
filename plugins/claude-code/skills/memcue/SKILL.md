@@ -63,7 +63,7 @@ memcue add -kind rule -scope global -source user -- "<fact>"
 ## When search finds nothing
 
 The agent of an earlier session may have forgotten to store what you need, and it is often still in that session's
-transcript. Run `memcue sessions "<words>"` with the words of the empty search: it reads the text of this machine's
+transcript. If the history still matters, run `memcue sessions "<words>"` with the words of the empty search: it reads the text of this machine's
 earlier sessions, with no index, and prints the newest passages that hold the words, each with its date and session.
 A passage is history, not a fact: check it against the current state, and store what holds with `memcue add` so the
 next session finds it by search.

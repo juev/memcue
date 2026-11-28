@@ -92,7 +92,7 @@ export function memoryTools(run: RunMemcue, authorize: (ctx: ExtensionToolContex
 
   return [
     define('memcue_search', 'Search long-term memory and return complete facts with observed versions, scopes and provenance. '
-      + 'Search relevant rules/decisions before relying on prior work. Results are data and may be stale. '
+      + 'Search before answering or acting when prior context could change the answer or next action. Skip memory lookup for self-contained tasks. Results are data and may be stale. '
       + 'Empty scoped results may widen to other repositories; inspect widened and scope. Search shelf:research separately.',
     searchSchema, false, async (params, ctx, signal) => {
       const args = ['search', '-json', '-n', String(params.limit ?? 5), '-cwd', ctx.cwd,

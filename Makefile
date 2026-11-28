@@ -8,7 +8,7 @@ HERMES_PYTHON ?= python3
 
 NPM_PACK_DIR ?= $(CURDIR)/dist/npm
 
-.PHONY: build test test-plugins test-opencode test-pi test-codex test-qwen test-kimi test-claude-mods test-hermes-request test-conformance prepare-transport pack-npm test-npm-packages lint bench previous-release
+.PHONY: build test test-memory-regression test-plugins test-opencode test-pi test-codex test-qwen test-kimi test-claude-mods test-hermes-request test-conformance prepare-transport pack-npm test-npm-packages lint bench previous-release
 
 build:
 	go build -p 2 -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/memcue ./cmd/memcue
@@ -102,3 +102,9 @@ test-claude-mods:
 # Run with the released Hermes >=0.17.0 interpreter, also exercised by hermes-contract CI.
 test-hermes-request: build
 	MEMCUE_BIN=$(CURDIR)/bin/memcue $(HERMES_PYTHON) -I plugins/hermes/test_request_context.py -v
+
+# Focused, model-free guard for memory instruction, storage, and request changes.
+test-memory-regression: test-hermes-request
+	go test ./cmd/memcue -run 'Test(SessionStartTellsWhereMemoryIs|SessionNote.*|CaptureRejectsSameScopedRetiredClaim|RetireRecordsReasonAndRejectsBlank|ReopenBringsARetiredFactBackToRecall)$$'
+	MEMCUE_BIN=$(CURDIR)/bin/memcue $(HERMES_PYTHON) -I plugins/hermes/memcue/tests/test_provider.py
+	python3 -I plugins/test_cross_harness.py
