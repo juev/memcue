@@ -67,6 +67,7 @@ a source link is not a downloadable copy of the private evidence.
 | [How other agent memories work, and what memcue should take, October 2026](other-memories-2026-10.md) |
 | [A pitfall found by running something: S06 and one more line, October 2026 (#566)](pitfall-capture-566-2026-10.md) |
 | [Capture a verified pitfall before replying (#827)](pitfall-capture-827.md) |
+| [Hermes pitfall capture: Codex smoke after #834](pitfall-capture-codex-834.md) |
 | [0.20.0 after the upgrade: the post-release check, October 2026](post-release-020-2026-10.md) |
 | [An acknowledged preference: one more line in the session note, November 2026 (#601)](preference-capture-601-2026-11.md) |
 | [A response preference is a rule: the line measured, November 2026 (#613)](preference-capture-613-2026-11.md) |
