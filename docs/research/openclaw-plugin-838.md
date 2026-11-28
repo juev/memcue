@@ -18,3 +18,13 @@ Gateway invocation or show a recall-quality improvement.
 Decision: keep the package experimental. Before deployment, install the tarball
 on an isolated Gateway and confirm the owner and group behavior and tool
 guidance. Do not connect the production corpus to this prototype.
+
+Follow-up: merged upstream `0b5d2af`. The original base already contained
+Hermes conditional-search PR #837; the newer commits added snapshot measurements
+and prepared a release. Aligned the prototype descriptions with the conditional
+lookup guidance, including unexpected errors and a qualified history fallback.
+On OpenClaw 2026.11.10, the packed archive installed into a temporary profile
+with explicit capability consent; runtime inspection reported loaded and all four
+tools registered. Both adapter tests passed with the checksum-verified Memcue
+0.41.0 release binary. Registration and injected-context contract tests are not
+end-to-end proof of live session admission; that remains pending.
