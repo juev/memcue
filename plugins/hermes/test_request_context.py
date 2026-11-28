@@ -153,6 +153,27 @@ class RequestContext(unittest.TestCase):
       self.assertEqual(bare(ordinary_sent,key)[key],history,'ordinary identical text was mistaken for owned transient context')
       self.assertIn('Failure-0 cause;',card(ordinary_sent,key),'the current-turn user message did not get the card')
       self.assertEqual(ordinary_request,ordinary_before)
+
+      # A user can quote even an exact frame at the end of their own message.
+      assert isinstance(ordinary,str)
+      literal='Please quote this literal:\n\n'+ordinary
+      first={key:[{'role':'user','content':literal}]}
+      transformed=apply_llm_request_middleware(first,session_id='owned-session',api_mode=mode).payload
+      self.assertEqual(bare(transformed,key),first,'first dispatch removed user-authored text')
+      self.assertEqual(apply_llm_request_middleware(transformed,session_id='owned-session',api_mode=mode).payload,transformed)
+      self.assertEqual(bare(json.loads(json.dumps(transformed)),key),first)
+      set_session_cwd(str(repos[1]))
+      try:
+       replaced=apply_llm_request_middleware(transformed,session_id='owned-session',api_mode=mode).payload
+       current=card(replaced,key)
+       assert isinstance(current,str)
+       self.assertIn('Failure-1 cause;',current)
+       self.assertEqual(bare(replaced,key),first)
+       with patch.object(provider,'_run',return_value=(False,'synthetic read failure')):
+        failed=apply_llm_request_middleware(replaced,session_id='owned-session',api_mode=mode).payload
+       self.assertEqual(bare(failed,key),first)
+       self.assertNotIn('Failure-1 cause;',json.dumps(failed))
+      finally:clear_session_cwd()
      finally:clear_session_cwd()
      unrelated=apply_llm_request_middleware(request,session_id='unrelated',api_mode=mode)
      self.assertEqual(unrelated.payload,request)

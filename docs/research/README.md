@@ -59,6 +59,7 @@ a source link is not a downloadable copy of the private evidence.
 | [memcue against the old file memory, end to end, October 2026](e2e-files-2026-10.md) |
 | [Facts about a file when the agent reads it: the count before a model call, November 2026 (#598)](file-context-598-2026-11.md) |
 | [Facts that name a file, at the moment of a Read: the Mac stage, November 2026 (#598)](file-context-598-mac-2026-11.md) |
+| [Hermes: preserve literal memcue frames in string messages (#829)](hermes-context-ownership-829.md) |
 | [The Hermes plugin on a live installation: adoption, the price of an answer, and the thin-answer hint, October 2026](hermes-plugin-2026-10.md) |
 | [Raw session history after an empty memcue search: a local first stage, November 2026 (#602)](history-fallback-602-2026-11.md) |
 | [Raw session history after an empty memcue search: the Mac stage, November 2026 (#602)](history-fallback-602-mac-2026-11.md) |

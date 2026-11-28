@@ -20,23 +20,14 @@ _TEXT_KEY = 'text'
 
 class _TransientContext(dict):
     """Dict-only wire format; deepcopy preserves the weak, non-serialized owner."""
-    def __init__(self, payload, owner):
+    def __init__(self, payload, owner, original_text=None):
         super().__init__(payload)
         self._owner = weakref.ref(owner)
+        self._original_text = original_text
 
 
 def _framed(text):
     return f'{_FRAME_OPEN}\n{text}\n{_FRAME_CLOSE}'
-
-
-def _without_trailing_frame(content):
-    """Drop a frame this plugin appended to a string, matched on the exact form it writes."""
-    if not content.endswith('\n' + _FRAME_CLOSE):
-        return content
-    start = content.rfind(_SEPARATOR + _FRAME_OPEN + '\n')
-    if start >= 0:
-        return content[:start]
-    return '' if content.startswith(_FRAME_OPEN + '\n') else content
 
 
 def _is_text_part(part):
@@ -60,9 +51,7 @@ def _owned(part, owner):
 def _with_card(content, text, owner):
     """The content with the card at its end, in the shape that content already has."""
     if isinstance(content, str):
-        # A string carries no provenance, so only a frame at its very end is ours to replace.
-        kept = _without_trailing_frame(content)
-        return f'{kept}{_SEPARATOR}{_framed(text)}' if kept else _framed(text)
+        return f'{content}{_SEPARATOR}{_framed(text)}' if content else _framed(text)
     # The shape comes from the whole list: an earlier card part may be the only text part it has.
     shape = next(part for part in reversed(content) if _is_text_part(part))
     kept = [part for part in content if not _owned(part, owner)]
@@ -120,11 +109,12 @@ def request_context(request, session_id='', **kwargs):
                 text = (snapshot.get('context') or 'No current repository pitfalls; this supersedes earlier snapshots.') + '\n\n' + '\n\n'.join(facts)
         except (ValueError, KeyError, TypeError):
             pass
-    # The released dispatcher deep-copies requests. A weak owner attribute on an appended part survives
-    # those copies, while dict/JSON serialization emits only provider-recognized keys.
+    # A string has no ownership metadata; keep its original value on the outgoing message instead.
     messages = list(request[key])
     message = messages[target]
-    messages[target] = {**message, 'content': _with_card(message['content'], text, owner)}
+    content = message._original_text if _owned(message, owner) else message['content']
+    updated = {**message, 'content': _with_card(content, text, owner)}
+    messages[target] = _TransientContext(updated, owner, content) if isinstance(content, str) else updated
     return {'request': {**request, key: messages}, 'source': 'memcue-context'}
 
 
