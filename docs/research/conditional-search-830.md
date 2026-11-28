@@ -13,6 +13,8 @@ The policy inputs at `bc27627` sometimes tell the model both to skip lookup when
 | First full cross-harness run | One old test still required DSH not to mention unexpected errors. The new shared contract supersedes that expectation. |
 | First targeted Go run | Old text expectations failed; the long temporary path also exceeded the Unix-domain socket path limit for helper tests. |
 | Updated tests and shorter path to the same scratch directory | All 18 cross-harness tests and the targeted Go session-start/card tests passed. |
+| CLI adapter tests with the shortened `/proc/.../fd` alias | Codex's standalone installation test compared the alias to a resolved path and failed; the alias is only useful for the Unix-socket tests. |
+| CLI adapter tests with canonical scratch paths | Codex: 27 passed, 7 opt-in skips; Qwen: 26 passed; Kimi: 24 passed. |
 
 Reproduce on the candidate with `python3 plugins/test_cross_harness.py` and `go test ./cmd/memcue -run 'SessionStart|SessionCard'`. The first runner reads the delivered source inputs and executes the Codex startup adapter. The second exercises the native startup/card output. The DSH history test exercises the registered prompt. Existing tests preserve identical shared text for DSH, Pi and OpenCode and keep CLI instructions-only fallbacks separate. The history mechanism is unchanged; only the recommendation to use it is narrowed.
 
