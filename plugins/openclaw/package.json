@@ -1,0 +1,26 @@
+{
+  "name": "@juev/memcue-openclaw",
+  "version": "0.2.0",
+  "type": "module",
+  "files": [
+    "index.js",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.11.10"
+    },
+    "build": {
+      "openclawVersion": "2026.11.10"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juev/memcue.git",
+    "directory": "plugins/openclaw"
+  }
+}
