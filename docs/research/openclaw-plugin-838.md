@@ -28,3 +28,15 @@ with explicit capability consent; runtime inspection reported loaded and all fou
 tools registered. Both adapter tests passed with the checksum-verified Memcue
 0.41.0 release binary. Registration and injected-context contract tests are not
 end-to-end proof of live session admission; that remains pending.
+
+Host integration smoke on OpenClaw 2026.11.10: installed tarball, isolated
+profile, temporary native session store, Memcue 0.41.0, no model or network.
+Created two direct session rows and a group row using OpenClaw's session store.
+The host memory resolver granted owner-private audiences to the direct rows
+and a conversation audience to the group, even with senderIsOwner set. The
+installed entry rejected all four tools for the group. One direct session
+saved a synthetic rule, the other found and corrected it, and retirement
+removed it from ordinary recall. Releasing the first session's audience also
+blocked a retained write tool. This exercises the real host audience resolver
+and Memcue CLI, with a local tool registration harness; it does not exercise a
+channel, model turn or the Gateway's full invocation router.
