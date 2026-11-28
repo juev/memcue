@@ -68,3 +68,11 @@ per case is not evidence of equivalence or general model compliance. A small
 driver sent synthetic prompts directly to the model and executed tool calls
 through the plugin adapter. This was not a live Gateway/chat test. No reason
 to expand the guidance on this result alone.
+
+Release rehearsal: built the archive using the README recipe from commit
+`23580cd`, installed it into a fresh isolated OpenClaw 2026.11.10 profile,
+validated the config, and inspected all four registered tools. With the
+previously checksum-verified Memcue 0.41.0 binary, both adapter tests passed,
+as did the host-audience integration smoke (two owner contexts, group refusal
+and released-authority refusal). No live channel or model call was used in
+this installation rehearsal.
