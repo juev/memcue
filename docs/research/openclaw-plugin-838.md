@@ -49,3 +49,22 @@ guidance selector returned both rules for owner tools, only recall for the
 search-only set, and neither for the group or empty tool set. The real CLI
 lifecycle test still passed. This tests prompt selection, not model compliance;
 a matched live-turn evaluation with and without guidance remains unrun.
+
+Model smoke A/B at `d8882c2`: DeepSeek Flash via Chat Completions, thinking
+disabled, temperature 0, a fresh synthetic SQLite base per case and arm,
+Memcue 0.41.0, identical tool descriptions and schemas. The only prompt
+difference was appending the two registered guidance strings. Hypothesis:
+guidance improves recall/capture without inducing needless recall. Scored
+tool calls, the answer for recall/arithmetic, and the actual fact for capture.
+
+| Case | Descriptions only | Plus system guidance |
+| --- | --- | --- |
+| Recover the fictional service's agreed port (7419) | search, correct answer | search, correct answer |
+| Answer 17 + 26 | 43, no calls | 43, no calls |
+| Capture an agreed fictional deployment rule without “remember” | search + add, fact present | search + add, fact present |
+
+Both arms passed 3/3: no observed incremental benefit in this smoke. One run
+per case is not evidence of equivalence or general model compliance. A small
+driver sent synthetic prompts directly to the model and executed tool calls
+through the plugin adapter. This was not a live Gateway/chat test. No reason
+to expand the guidance on this result alone.
