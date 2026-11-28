@@ -6,6 +6,24 @@ recall and proactive capture instructions to the system prompt through scoped
 `promptGuidance`, only while the corresponding tools are callable. This does
 not query the database at prompt assembly or replace built-in memory.
 
+## Install from GitHub Releases
+
+Download the ready-to-install archive and its checksum from the
+[OpenClaw adapter release](https://github.com/juev/memcue/releases/tag/openclaw-v0.1.0).
+No repository checkout or npm registry is required. This is an experimental
+release of the adapter, not a new Memcue binary release.
+
+In the download directory on the Gateway host, verify and install the archive:
+
+```sh
+sha256sum -c juev-memcue-openclaw-0.1.0.tgz.sha256
+openclaw plugins install "npm-pack:$PWD/juev-memcue-openclaw-0.1.0.tgz"
+```
+
+Stop if checksum verification fails. Run the installer against your authorized
+profile and review the capability consent. Then follow the binary, configuration,
+and verification steps below, skipping the checkout, packing, and install steps.
+
 ## Agent-assisted installation from a commit
 
 Only proceed when the operator has authorized the target. For a first install,
