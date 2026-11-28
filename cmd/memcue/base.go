@@ -83,7 +83,7 @@ func openBase() (*store.Store, error) {
 	return store.OpenText(b.path, cache)
 }
 
-// openFileBase opens a base of one SQLite file, which on a sync server is the server's base (#714): dream and the
+// openFileBase opens a base of one SQLite file, which on a sync server is the server's base (#714): the
 // reports of the server machine open it as the CLI opens any base.
 func openFileBase(path string) (*store.Store, error) {
 	s, err := store.Open(path)

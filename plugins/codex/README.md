@@ -12,12 +12,11 @@ current repository is saved with repository scope. If a broad lookup for a stand
 fact, search again using the name of the requested artifact by itself.
 
 This is a local CLI integration. It needs Python 3.9+, a memcue binary from 0.30.0 or newer, and Codex CLI 0.167.0.
-No MCP server, Claude installation, memory service, API key or second model is needed for memcue search/write or dream
-prepare/apply. Codex itself needs its normal authenticated model connection for an agent turn.
+No MCP server, Claude installation, memory service, API key or second model is needed for memcue search/write. Codex itself needs its normal authenticated model connection for an agent turn.
 
 Validation platform: Linux x86_64, Python 3.13.5, Go 1.27.0, memcue 0.30.0 built from this checkout, Codex 0.167.0.
 Package installation, native hook review and CLI tests are verified. A local deterministic Responses fixture also checks
-lifecycle delivery; it is not a real model. The owner will verify authenticated Codex CRUD, dream, lifecycle and sandbox
+lifecycle delivery; it is not a real model. The owner will verify authenticated Codex CRUD, lifecycle and sandbox
 behavior locally after merge. These checks remain unverified; independent review, regression tests and CI are still
 required before merge. Keep #670 open pending the owner's result. The installed 0.166.0 was
 only discovered, not validated. macOS, Linux arm64, Windows, remote sessions and cloud use have not been verified.
@@ -48,16 +47,14 @@ that has not been checked. A base of its own takes absolute paths:
   "binary": "/absolute/path/to/memcue",
   "facts": "/absolute/path/to/codex-memory/facts",
   "state_dir": "/absolute/path/to/codex-memory/state",
-  "host": "my-workstation",
-  "background_dream": false
+  "host": "my-workstation"
 }
 ```
 
 Put it at `${CODEX_HOME:-$HOME/.codex}/memcue.json`, or set `MEMCUE_CODEX_CONFIG` to its absolute path in the environment
 that starts Codex. The directory must already exist. Protect it according to your local privacy requirements; do not
-check personal paths or memory into a project. `dream_every` is an optional Go duration such as `24h`; the CLI default
-is one day. Other inherited `MEMCUE_*` variables are deliberately removed for child commands. This includes endpoint,
-API credentials, background dream, log overrides, number-term settings and event TTL overrides. Event TTL therefore
+check personal paths or memory into a project. Other inherited `MEMCUE_*` variables are deliberately removed for child commands. This includes endpoint,
+API credentials, log overrides, number-term settings and event TTL overrides. Event TTL therefore
 uses the CLI default of seven days unless an add explicitly passes `-expires`.
 
 `facts` without a `.db` suffix selects a new text history directory; `*.db` follows the native legacy SQLite rules,
@@ -65,7 +62,7 @@ including a sibling directory after a migration. A path that is given must be ab
 an error and never falls back to the default. To share another existing base, explicitly set `facts` to that base and
 choose its corresponding state directory; back it up first. This setup does
 not migrate or rewrite the base. Native CLI opens may update indexes/cache as usual; inspect compatibility before
-sharing with older binaries. State holds the text cache, the dream schedule and a digest of the last pitfall snapshot each session received; hooks and later calls must use this same file.
+sharing with older binaries. State holds the text cache and a digest of the last pitfall snapshot each session received; hooks and later calls must use this same file.
 
 The hook prints the exact configured launcher command into the model's instructions. Every skill call uses that
 launcher with `--config /absolute/path/to/memcue.json`; it reloads configuration each time. A hook child's exported
@@ -73,8 +70,7 @@ environment does **not** reach later model shell commands. Do not substitute bar
 change PATH. Explicit `--config` wins over `MEMCUE_CODEX_CONFIG`, which wins over the default location.
 
 Server mode: the launcher passes `MEMCUE_SERVER` and the `MEMCUE_TAILSCALE_*` settings to memcue. With them,
-memcue works on this machine's replica of the server and ignores the configured `facts`; the dream runs on the
-server. See [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
+memcue works on this machine's replica of the server and ignores the configured `facts`. See [server mode](../../docs/remote-backends.md#server-mode-a-memcue-server-on-the-tailnet).
 
 ## Install the local plugin
 
@@ -127,8 +123,8 @@ review. Preserve the rest of that file and add the marked block only once. For u
 
 For standalone skill discovery, link the two `skills/` subdirectories into `$HOME/.agents/skills/`, or the project's
 `.agents/skills/`. Create links only when those destination names are unused; do not replace another installed skill.
-The fallback also points directly to both SKILL.md files. Hooks-disabled fallback has standing instructions, but no
-automatic maintenance hints; invoke the dream skill explicitly when needed.
+The fallback also points directly to the capture skill. Hooks-disabled fallback has standing instructions, but no
+automatic maintenance hints.
 
 ## Use and sandbox access
 
@@ -155,34 +151,13 @@ remains a visible error; the adapter does not change approval or sandbox setting
 The hook accepts at most 64 KiB of JSON input and returns `SessionStart` additional context. Invalid input, missing or
 incompatible binary, malformed maintenance output and command errors produce a bounded `systemMessage` plus stderr,
 exit zero and no blocking decision. Ordinary command failures exit nonzero. Hook version and maintenance children time out after 5 and 10 seconds, leaving room within the handler
-limit for diagnostics. Ordinary CLI children time out after 15 seconds (dream prepare/apply: 60 seconds), with a 4 MiB output read limit. A timeout/failure is not evidence a write
+limit for diagnostics. Ordinary CLI children time out after 15 seconds, with a 4 MiB output read limit. A timeout/failure is not evidence a write
 was rolled back: inspect persisted history before retrying. `instructions` only renders text and invokes no binary.
 
-## Dream and English-first memory
+## English-first memory
 
-Use the memcue-dream skill at a natural pause. Prepare the packet, have this session's working model write its answer,
-and apply it through the same launcher. An answer whose packet ID is stale is rejected; prepare again and reconsider.
-No credentials are needed for those CLI mechanics. Facts changed since preparation can be refused individually.
-The first maintenance check initializes a schedule and marks existing facts seen; it does not make an old base due
-immediately. With hooks disabled, or if startup ran before the base existed, no schedule may exist yet. If
-`dream -prepare` reports "no dream yet on this machine", append `dream -prepare -all` to the configured launcher to
-review all active facts, or `dream -prepare -since DATE` for a chosen starting date (`YYYY-MM-DD` or RFC 3339).
-Choose the range to match the requested maintenance. No schedule-file edits or direct native CLI call are needed.
-Preparation persists the native packet for a later apply; it starts no model. Native due timing and packet bounds
-remain unchanged. After applying the first answer, use ordinary `dream -prepare` for later packets.
-
-The launcher always sets `MEMCUE_DREAM_BACKGROUND=0` and removes inherited API configuration, including for add/correct,
-so an installed Claude binary cannot start a surprise model. `background_dream: true` is rejected. The adapter permits
-only `dream -prepare`, `dream -prepare -all`, `dream -prepare -since DATE`, `dream -list` and `dream -apply FILE`.
-Use these argument orders; duplicate flags, mixed `-all`/`-since`, extra arguments and runner flags are rejected. Native validation checks
-the date/time value. The adapter has no autonomous runner. Users who separately choose
-native endpoint/background execution must configure and invoke the native CLI explicitly with their selected
-MEMCUE_FACTS/state/host and credentials. That opt-in path is outside this adapter.
-
-[#669](https://github.com/juev/memcue/issues/669) landed in [#671](https://github.com/juev/memcue/pull/671).
 Shared instructions now use English for initial queries and new/corrected fact content, preserving exact text and
-legacy-language fallback. Native dream packets and maintenance hints no longer request translations or count
-translation-only debt. Existing fact content remains as stored. Auxiliary fields are removed during upgrade. Never correct a fact
+legacy-language fallback. Existing fact content remains as stored. Auxiliary fields are removed during upgrade. Never correct a fact
 solely to change its language. No query expansion or translation task remains. Follow the tasks and schema printed by the installed binary.
 
 ## Update and remove
@@ -209,13 +184,11 @@ python3 -I plugins/test_cross_harness.py
 
 The suites exercise the delivered hook policy, launcher/config boundaries, installed copies, fresh-process CRUD,
 persisted provenance/history, nested Git and non-Git cwd, global/host/repository scopes, shelf exclusion/lookup,
-expiry, fresh first-dream initialization with hooks disabled or startup before a base exists, native date validation,
-allowed/rejected dream arguments, model-free prepare/apply, stale-packet refusal, and bounded failures. They do not measure recall quality
+expiry, retirement reasons, and bounded failures. They do not measure recall quality
 or prove real model behavior. Run with synthetic paths and sanitized inherited MEMCUE_* variables; never use a live base.
 
 For the owner's postmerge local acceptance, use a synthetic project and Codex home with the owner's model connection. Review
-hooks in `/hooks`; observe delivered context on startup/resume/clear/compaction, then repeat CRUD across sessions and
-answer a dream packet with the real working model. Confirm stored history/provenance independently. Repeat with
+hooks in `/hooks`; observe delivered context on startup/resume/clear/compaction, then repeat CRUD across sessions using the real working model. Confirm stored history/provenance independently. Repeat with
 untrusted and disabled hooks plus the fallback, and with denied directory writes. Do not count a successful agent turn
 as a passing test suite. Record exact versions, session IDs, events observed, checks run and any unverified events.
 

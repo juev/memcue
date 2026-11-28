@@ -789,5 +789,11 @@ func sameCacheProjection(cached, file Fact, absent map[string]string, occurrence
 	if _, missing := absent["channel"]; missing {
 		file.Channel = ""
 	}
+	if _, missing := absent["retirement_reason"]; missing {
+		file.RetirementReason = ""
+	}
+	if _, missing := absent["retirement_key"]; missing {
+		file.RetirementKey = ""
+	}
 	return same(cached, file)
 }

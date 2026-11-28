@@ -2,7 +2,7 @@
 
 A plugin for [OpenCode](https://opencode.ai) 2 that gives the coding agent memcue long-term memory. The model
 searches and keeps its facts itself through native tools, the memory instruction and the repository's pitfalls reach
-it in the system prompt, and `/memcue` switches memory off for a session or starts maintenance.
+it in the system prompt, and `/memcue` switches memory off for a session.
 
 ## Requirements
 
@@ -58,8 +58,7 @@ Every field is optional; an unknown field is reported in the plugin log and memo
 
 ## What the model gets
 
-- Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire`, and `memcue_dream_prepare` /
-  `memcue_dream_apply` for maintenance with the session's own model.
+- Tools: `memcue_search`, `memcue_add`, `memcue_correct`, `memcue_retire` (with a required evidence-based reason).
 - The shared memory instruction, as a system-prompt part of every request.
 - A repository-pitfall snapshot, read once per session (`memcue session-card -pitfalls-json`) and again after a
   compaction. It covers the session's directory; a snapshot without pitfalls adds nothing, and a failed read says so
@@ -74,7 +73,6 @@ Each write checks memcue's outcome receipt. A write whose outcome is unknown is 
 | `/memcue status` | Show whether memory is on, the role and the binary, without running memcue |
 | `/memcue off` | Turn memory off for this session; facts already in the conversation stay |
 | `/memcue on` | Turn it back on, if the options allow it |
-| `/memcue dream` | Ask the current model to maintain the base |
 
 The command is registered by the plugin's server part; OpenCode lists it with the other commands. The status notice
 is a transcript message, not a model turn.
@@ -83,7 +81,7 @@ is a transcript message, not a model turn.
 
 The package carries a second entrypoint, `./tui`, that OpenCode loads into its terminal UI. It has two jobs:
 
-- A toast for what `/memcue status`, `on`, `off` and `dream` answer, and for a configuration error, an OpenCode older
+- A toast for what `/memcue status`, `on` and `off` answer, and for a configuration error, an OpenCode older
   than 2.0.0 or a failed binary probe — the things that otherwise only reach the log. A standing problem is toasted
   once per session.
 - A compact memory indicator in the `prompt.footer.status` slot: `memcue on`, `memcue off`, `memcue off · subagent
@@ -91,8 +89,7 @@ The package carries a second entrypoint, `./tui`, that OpenCode loads into its t
 
 Every decision stays in the server part: the TUI part reads `status` over the plugin RPC and renders it, and never
 runs memcue itself. A TUI part that fails to load or an OpenCode without this part leaves the server part, its tools
-and the instruction untouched — memory keeps working, only the toast and the indicator are missing. The indicator
-does not report whether a dream is due: no cheap signal exists for that.
+and the instruction untouched — memory keeps working, only the toast and the indicator are missing.
 
 The part needs the peers OpenCode itself provides, `@opentui/core`, `@opentui/solid`, `solid-js` and
 `@opencode/theme`, so it adds no runtime of its own. CI typechecks it (`tsconfig.tui.json`) but does not run a TUI,

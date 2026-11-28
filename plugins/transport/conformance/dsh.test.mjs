@@ -95,7 +95,7 @@ if (runMemcue) {
     });
   }
 
-  test('dsh: the configured model settings reach the CLI and no caller is invented', async t => {
+  test('dsh: legacy model settings are ignored and no caller is invented', async t => {
     const { dir, binary } = await fixture(t);
     const saved = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith('MEMCUE_')));
     for (const key of Object.keys(saved)) delete process.env[key];
@@ -106,9 +106,10 @@ if (runMemcue) {
     assert.equal(result.code, 0);
     const env = JSON.parse(result.out).env;
     assert.equal(env.MEMCUE_FACTS, join(dir, 'facts.db'));
-    assert.equal(env.MEMCUE_MODEL, 'synthetic-model');
-    assert.equal(env.MEMCUE_API_URL, 'http://127.0.0.1:1');
-    assert.equal(env.MEMCUE_API_KEY, 'synthetic-key');
+    assert.equal(env.MEMCUE_MODEL, undefined);
+    assert.equal(env.MEMCUE_API_URL, undefined);
+    assert.equal(env.MEMCUE_API_KEY, undefined);
+    assert.equal(env.MEMCUE_DREAM_BACKGROUND, '0', 'protect older binaries');
     assert.equal(env.MEMCUE_CALLER, undefined);
     assert.equal(env.MEMCUE_OUTCOME_NONCE, undefined, 'a read gets no nonce');
   });

@@ -10,7 +10,9 @@ package store
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -121,13 +123,15 @@ type Fact struct {
 	ID      string
 	Version int
 	// WriteID preserves legacy write identity across content-only projection and renumbering.
-	WriteID string
-	Content string
-	Origin  string // where it was learnt: "<repository> <date>"
-	Created time.Time
-	Status  string
-	Author  string // machine that wrote the version
-	Expires string // last day the fact is worth recalling, "YYYY-MM-DD"; empty never expires
+	WriteID          string
+	Content          string
+	Origin           string // where it was learnt: "<repository> <date>"
+	Created          time.Time
+	Status           string
+	RetirementReason string `json:"retirement_reason,omitempty"`
+	RetirementKey    string `json:"retirement_key,omitempty"`
+	Author           string // machine that wrote the version
+	Expires          string // last day the fact is worth recalling, "YYYY-MM-DD"; empty never expires
 	Meta
 }
 
@@ -367,6 +371,8 @@ var added = []addedColumn{
 	{"prompt_version", "INTEGER", "0"},
 	{"channel", "TEXT", "''"},
 	{"write_id", "TEXT", "''"},
+	{"retirement_reason", "TEXT", "''"},
+	{"retirement_key", "TEXT", "''"},
 }
 
 // factColumns names the columns the facts table of db has.
@@ -739,6 +745,11 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 		return s.syncWrite(facts)
 	}
 	if s.native != nil {
+		for _, f := range facts {
+			if err := s.native.checkRetiredMatch(f); err != nil {
+				return nil, err
+			}
+		}
 		if err := s.native.append(facts); err != nil {
 			return nil, err
 		}
@@ -750,6 +761,9 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 	for _, f := range facts {
+		if err := checkRetiredMatch(s.context(), tx, f); err != nil {
+			return nil, err
+		}
 		if err := insert(tx, f); err != nil {
 			return nil, err
 		}
@@ -762,6 +776,40 @@ func (s *Store) AddBatch(inputs []FactInput) ([]Fact, error) {
 	}
 	s.textWritten(facts...)
 	return facts, nil
+}
+
+// checkRetiredMatch refuses only exact text in the same explicit scope. Do not expose the retired content.
+func checkRetiredMatch(ctx context.Context, tx *sql.Tx, f Fact) error {
+	if f.Scope == "" {
+		return nil
+	}
+	var id, reason string
+	err := tx.QueryRowContext(ctx, `SELECT id, retirement_reason FROM facts f WHERE status = 'retired'
+  AND (retirement_key = ? OR (retirement_key = '' AND scope = ? AND content = ?))
+  AND version = (SELECT max(version) FROM facts WHERE id = f.id)
+  ORDER BY (trim(retirement_reason) = 'User requested forgetting.') DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return retiredMatch(id, f.Scope, reason)
+}
+
+// retirementKey binds the explanation to the observed scope and text even if a sync correction wins independently.
+func retirementKey(f Fact) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d:%s%s", len(f.Scope), f.Scope, f.Content))))
+}
+
+func retiredMatch(id, scope, reason string) error {
+	if strings.TrimSpace(reason) == "User requested forgetting." {
+		return errors.New("this claim matches a forgotten fact in this scope; do not store it without explicit user authorization")
+	}
+	if !validRetirementReason(reason) {
+		reason = "unavailable"
+	}
+	return fmt.Errorf("claim matches retired fact %s in %q; reason: %q. Do not re-save it; reopen only with new verified evidence", id, scope, reason)
 }
 
 // Correct adds a version with new content; the origin stays.
@@ -811,7 +859,7 @@ func (s *Store) CorrectExpiring(id, content string, expires *string, expected ..
 		}
 		f.Expires = *expires
 	}
-	return s.write(f, expected...)
+	return s.write(f, content != cur.Content, expected...)
 }
 
 // ValidExpiry accepts "" (never expires) or a "YYYY-MM-DD" date.
@@ -875,7 +923,7 @@ func (s *Store) agentSources() ([]Fact, error) {
 		return nil, err
 	}
 	relabelled, err := s.query(`INSERT INTO facts(`+columns+`) SELECT id, version + 1, content, origin,
-		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, channel, ''
+		created, status, author, expires, kind, scope, 'agent', evidence, review, prompt_version, channel, '', retirement_reason, retirement_key
 		FROM facts f
 		WHERE f.source = '' AND f.status = ? AND f.version = (SELECT max(version) FROM facts WHERE id = f.id)
 		RETURNING `+columns, Active)
@@ -913,7 +961,7 @@ func (s *Store) Relabel(id string, version int, kind, scope, expires string) (Fa
 	}
 	f := cur
 	f.Version, f.Author, f.Kind, f.Scope, f.Expires = cur.Version+1, s.author, kind, scope, expires
-	return s.write(f, version)
+	return s.write(f, false, version)
 }
 
 // Retag adds a version of a fact with a new origin and scope; the content and everything else stay, the creation time
@@ -936,7 +984,7 @@ func (s *Store) Retag(id string, version int, origin, scope string) (Fact, error
 	}
 	f := cur
 	f.Version, f.Author, f.Origin, f.Scope = cur.Version+1, s.author, origin, scope
-	return s.write(f, version)
+	return s.write(f, false, version)
 }
 
 // Current returns the latest version of every fact that is not retired, whatever its review state.
@@ -991,16 +1039,41 @@ func (s *Store) Restore(id string) (Fact, error) {
 	}
 	f := cur
 	f.Version, f.Created, f.Author, f.Status = cur.Version+1, s.now().UTC(), s.author, Active
-	return s.write(f)
+	f.RetirementReason, f.RetirementKey = "", ""
+	return s.write(f, false)
 }
 
 // Retire adds a version that takes the fact out of recall; its content stays readable in the history.
 func (s *Store) Retire(id string, expected ...int) (Fact, error) {
+	return s.RetireWithReason(id, "", expected...)
+}
+
+func validRetirementReason(reason string) bool {
+	return len(reason) <= 512 && strings.TrimSpace(reason) != "" && !strings.ContainsAny(reason, "\r\n\x00")
+}
+
+func validRetirementMetadata(status, reason, key string) bool {
+	if reason == "" {
+		return key == "" // legacy clients write a status alone
+	}
+	if status != Retired || !validRetirementReason(reason) || len(key) != sha256.Size*2 {
+		return false
+	}
+	var digest [sha256.Size]byte
+	_, err := hex.Decode(digest[:], []byte(key))
+	return err == nil
+}
+
+// RetireWithReason writes the explanation in the same version as the status change.
+func (s *Store) RetireWithReason(id, reason string, expected ...int) (Fact, error) {
+	if reason != "" && !validRetirementReason(reason) {
+		return Fact{}, errors.New("retirement reason must be a nonblank single line of at most 512 bytes")
+	}
 	if s.remote != nil {
 		if err := requiredVersion(expected); err != nil {
 			return Fact{}, err
 		}
-		return remoteWrite(s, func(local *Store) (Fact, error) { return local.Retire(id, expected...) })
+		return remoteWrite(s, func(local *Store) (Fact, error) { return local.RetireWithReason(id, reason, expected...) })
 	}
 	cur, err := s.Get(id)
 	if err != nil {
@@ -1015,9 +1088,16 @@ func (s *Store) Retire(id string, expected ...int) (Fact, error) {
 		}
 	}
 
+	if cur.Status == Retired && reason != "" {
+		return Fact{}, fmt.Errorf("%w: %s", ErrRetired, id)
+	}
 	f := cur
 	f.Version, f.Created, f.Status, f.Author = cur.Version+1, s.now().UTC(), Retired, s.author
-	return s.write(f, expected...)
+	f.RetirementReason = reason
+	if reason != "" {
+		f.RetirementKey = retirementKey(f)
+	}
+	return s.write(f, false, expected...)
 }
 
 // SplitFact replaces a fact in recall with its parts: they take its place with its origin, expiry and meta, stored
@@ -1089,7 +1169,7 @@ func (s *Store) split(cur Fact, parts []string) ([]Fact, error) {
 }
 
 // write stores a new version of a fact as this memcue writes it, and returns the version as stored.
-func (s *Store) write(f Fact, expected ...int) (Fact, error) {
+func (s *Store) write(f Fact, capture bool, expected ...int) (Fact, error) {
 	f.Meta = approved(f.Meta)
 	if s.sync != nil {
 		stored, err := s.syncWrite([]Fact{f}, expected...)
@@ -1102,6 +1182,11 @@ func (s *Store) write(f Fact, expected ...int) (Fact, error) {
 		f.WriteID = projectedWriteID(f, "", "")
 	}
 	if s.native != nil {
+		if capture {
+			if err := s.native.checkRetiredMatch(f); err != nil {
+				return Fact{}, err
+			}
+		}
 		if err := s.native.append([]Fact{f}); err != nil {
 			return Fact{}, err
 		}
@@ -1112,6 +1197,11 @@ func (s *Store) write(f Fact, expected ...int) (Fact, error) {
 		return Fact{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if capture {
+		if err := checkRetiredMatch(s.context(), tx, f); err != nil {
+			return Fact{}, err
+		}
+	}
 	if err := insert(tx, f); err != nil {
 		return Fact{}, err
 	}
@@ -1128,10 +1218,10 @@ func (s *Store) write(f Fact, expected ...int) (Fact, error) {
 // insert writes one version as it is.
 func insert(tx *sql.Tx, f Fact) error { return insertContext(context.Background(), tx, f) }
 func insertContext(ctx context.Context, tx *sql.Tx, f Fact) error {
-	_, err := tx.ExecContext(ctx, `INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
+	_, err := tx.ExecContext(ctx, `INSERT INTO facts(`+columns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, f.ID, f.Version,
 		f.Content, f.Origin, f.Created.Format(time.RFC3339Nano), f.Status, f.Author,
 		f.Expires, f.Kind, f.Scope, f.Source, f.Evidence, f.Review, f.PromptVersion,
-		f.Channel, f.WriteID)
+		f.Channel, f.WriteID, f.RetirementReason, f.RetirementKey)
 	return err
 }
 
@@ -1231,14 +1321,14 @@ func rebuildContext(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
-const columns = `id, version, content, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version, channel, write_id`
+const columns = `id, version, content, origin, created, status, author, expires, kind, scope, source, evidence, review, prompt_version, channel, write_id, retirement_reason, retirement_key`
 
 func scan(row interface{ Scan(...any) error }, extra ...any) (Fact, error) {
 	var f Fact
 	var created string
 	args := []any{&f.ID, &f.Version, &f.Content, &f.Origin, &created, &f.Status, &f.Author,
 		&f.Expires, &f.Kind, &f.Scope, &f.Source, &f.Evidence, &f.Review, &f.PromptVersion,
-		&f.Channel, &f.WriteID}
+		&f.Channel, &f.WriteID, &f.RetirementReason, &f.RetirementKey}
 	if err := row.Scan(append(args, extra...)...); err != nil {
 		return Fact{}, err
 	}
@@ -1527,7 +1617,7 @@ func (s *Store) SearchFiltered(terms []string, limit int, f Filter) ([]Hit, erro
 		var stems, created, kw, qu string
 		args := []any{&stems, &h.BM25, &h.ID, &h.Version, &h.Content, &h.Origin, &created, &h.Status,
 			&h.Author, &h.Expires, &h.Kind, &h.Scope, &h.Source, &h.Evidence, &h.Review, &h.PromptVersion,
-			&h.Channel, &h.WriteID}
+			&h.Channel, &h.WriteID, &h.RetirementReason, &h.RetirementKey}
 		if s.legacy["keywords"] || s.legacy["queries"] {
 			args = append(args, &kw, &qu)
 		}

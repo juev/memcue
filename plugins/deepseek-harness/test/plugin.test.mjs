@@ -592,60 +592,14 @@ test('memcue_correct and memcue_retire pass the id and text', async () => {
 	let text = await waitForLog('arg: correct ')
 	assert.match(text, /arg: correct -expected-version 1 -expires 2026-10-21 -- f1 Corrected fact\./)
 
-	const retired = await tools.get('memcue_retire').execute({ id: 'f1', expected_version: 1 }, {})
+	const retired = await tools.get('memcue_retire').execute({ id: 'f1', expected_version: 1, reason: 'The synthetic rule was superseded.' }, {})
 	assert.equal(retired.stored, true)
 	text = await waitForLog('arg: retire ')
-	assert.match(text, /arg: retire -expected-version 1 -- f1/)
-})
-
-test('model, endpoint and key from config reach the memcue child', async () => {
-	await resetLog()
-	const { listeners } = mount({
-		model: 'deepseek-flash',
-		apiUrl: 'https://api.deepseek.com',
-		apiKey: 'sk-test',
-	})
-	await preStep(listeners, [userMessage('what is the harness base?')])
-	const text = await waitForLog('env: ')
-	assert.match(text, /env: deepseek-flash\|https:\/\/api\.deepseek\.com\|sk-test/)
-})
-
-test('a configured model wins over the ambient one', async () => {
-	const previous = process.env.MEMCUE_MODEL
-	process.env.MEMCUE_MODEL = 'ambient-model'
-	try {
-		await resetLog()
-		const { listeners } = mount({ model: 'configured-model' })
-		await preStep(listeners, [userMessage('what is the harness base?')])
-		const text = await waitForLog('env: ')
-		assert.match(text, /env: configured-model\|/)
-	} finally {
-		if (previous === undefined) delete process.env.MEMCUE_MODEL
-		else process.env.MEMCUE_MODEL = previous
-	}
-})
-
-test('an absent model leaves the ambient one in place', async () => {
-	const previous = process.env.MEMCUE_MODEL
-	process.env.MEMCUE_MODEL = 'ambient-model'
-	try {
-		await resetLog()
-		const { listeners } = mount()
-		await preStep(listeners, [userMessage('what is the harness base?')])
-		const text = await waitForLog('env: ')
-		assert.match(text, /env: ambient-model\|/)
-	} finally {
-		if (previous === undefined) delete process.env.MEMCUE_MODEL
-		else process.env.MEMCUE_MODEL = previous
-	}
+	assert.match(text, /arg: retire -reason The synthetic rule was superseded\. -expected-version 1 -- f1/)
 })
 
 test('a bad searchLimit names the field instead of falling back', () => {
 	assert.throws(() => mount({ searchLimit: 0 }), /searchLimit/)
-})
-
-test('a non-string model is rejected', () => {
-	assert.throws(() => mount({ model: 42 }), /model/)
 })
 
 test('an incomplete dsh context fails loud', () => {

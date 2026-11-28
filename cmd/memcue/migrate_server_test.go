@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -95,75 +94,6 @@ func TestMigrateServerReportsAndLoadsAnEmptyServerOnly(t *testing.T) {
 	}
 	if rows, _, _ := srv.Changes(0, 10); len(rows) != 2 {
 		t.Fatalf("a refused load changed the server: %d rows", len(rows))
-	}
-}
-
-func TestDreamOnTheServerSeesANewTextAndNotNewLabels(t *testing.T) {
-	env(t)
-	path := filepath.Join(t.TempDir(), "server.db")
-	s, err := store.OpenServer(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = s.Close()
-	// The dream of the server opens its base as the CLI opens any base.
-	s, err = openFileBase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s.Close() }()
-	f, err := s.AddWith("dream runs on the server", "global 2026-11-10", "", store.Meta{Kind: "decision"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	active, _ := s.Active()
-	seen := versions(active)
-	if _, err := s.Relabel(f.ID, 1, "rule", "global", ""); err != nil {
-		t.Fatal(err)
-	}
-	active, _ = s.Active()
-	if fresh, err := freshFacts(s, active, time.Time{}, seen); err != nil || len(fresh) != 0 {
-		t.Fatalf("new labels made a fact fresh: %v %v", fresh, err)
-	}
-	if _, err := s.Correct(f.ID, "dream runs on the server only", 2); err != nil {
-		t.Fatal(err)
-	}
-	active, _ = s.Active()
-	if fresh, err := freshFacts(s, active, time.Time{}, seen); err != nil || len(fresh) != 1 {
-		t.Fatalf("a new text is not fresh: %v %v", fresh, err)
-	}
-}
-
-func TestServerDreamsWhenADreamIsDue(t *testing.T) {
-	old := dreamCheck
-	dreamCheck = 10 * time.Millisecond
-	t.Cleanup(func() { dreamCheck = old })
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var checks, dreams atomic.Int32
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		runDreams(ctx, log.New(io.Discard, "", 0), func(context.Context) (bool, error) {
-			if checks.Add(1) == 1 {
-				return false, nil
-			}
-			dreams.Add(1)
-			// A continuation must run even though the next idle tick would be an hour away.
-			dreamCheck = time.Hour
-			if checks.Load() == 3 {
-				cancel()
-			}
-			return true, nil
-		})
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("runDreams did not stop")
-	}
-	if checks.Load() != 3 || dreams.Load() != 2 {
-		t.Fatalf("%d checks, %d dreams; want two dreams after one idle tick", checks.Load(), dreams.Load())
 	}
 }
 

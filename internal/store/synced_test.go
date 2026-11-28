@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -260,33 +261,40 @@ func TestRetireAgainstACorrectionStaysRetiredAndReopensCorrected(t *testing.T) {
 	srv, _ := openRole(t, OpenServer, syncT0)
 	a, _ := openRole(t, OpenReplica, syncT0.Add(time.Second))
 	b, _ := openRole(t, OpenReplica, syncT0)
-	f, err := a.AddWith("caddy fronts headscale", "global 2026-11-10", "", Meta{})
+	f, err := a.AddWith("caddy fronts headscale", "global 2026-11-10", "", Meta{Scope: "repo:acme"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	push(t, a, srv)
 	pull(t, srv, b)
-	if _, err := a.Retire(f.ID, 1); err != nil {
+	const reason = "The reverse proxy was removed from the documented network topology."
+	if _, err := a.RetireWithReason(f.ID, reason, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := b.Correct(f.ID, "caddy fronts headscale on loffe", 1); err != nil {
+	if _, err := b.Correct(f.ID, "caddy fronts headscale on the fixture host", 1); err != nil {
 		t.Fatal(err)
 	}
 	push(t, b, srv)
 	push(t, a, srv)
 	pull(t, srv, a)
 	got := mustGet(t, a, f.ID)
-	if got.Status != Retired || got.Content != "caddy fronts headscale on loffe" {
+	if got.Status != Retired || got.Content != "caddy fronts headscale on the fixture host" || got.RetirementReason != reason {
 		t.Fatalf("retire against correct: %+v", got)
 	}
 	if _, ok := ids(t, a, "caddy headscale")[f.ID]; ok {
 		t.Fatal("a retired fact is found")
 	}
+	if _, err := a.AddWith(f.Content, f.Origin, "", f.Meta); err == nil || !strings.Contains(err.Error(), reason) {
+		t.Fatalf("the original retired claim was not guarded: %v", err)
+	}
+	if _, err := a.AddWith(got.Content, got.Origin, "", got.Meta); err != nil {
+		t.Fatalf("the concurrent correction inherited an unrelated retirement guard: %v", err)
+	}
 	back, err := a.Restore(f.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if back.Status != Active || back.Content != "caddy fronts headscale on loffe" {
+	if back.Status != Active || back.Content != "caddy fronts headscale on the fixture host" || back.RetirementReason != "" {
 		t.Fatalf("reopen gave %+v", back)
 	}
 }

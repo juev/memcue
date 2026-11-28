@@ -2,12 +2,8 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"errors"
-	"github.com/juev/memcue/internal/extract"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -75,32 +71,5 @@ func TestContentOnlyWritesNeverCallModel(t *testing.T) {
 	}
 	if calls.Load() != 0 {
 		t.Errorf("writes made %d implicit inference calls", calls.Load())
-	}
-}
-
-func TestContentOnlyDreamFailedCallAppliesNothing(t *testing.T) {
-	dir := env(t)
-	_, duplicate, kept, _ := dreamBase(t)
-	addFactForTest(t, "-kind", "rule", "-scope", "global", "Cobalt observatory rules apply everywhere.")
-	before := factHistory(t, duplicate)
-	fakeDream(t, mergeAnswer(duplicate, kept))
-	fakeDreamRun(t, nil)
-	good := dreamRunFn
-	dreamRunFn = func(ctx context.Context, packet string) (extract.DreamReply, error) {
-		if hasFacts(packetBlock(packet, "## Data: scope")) {
-			return extract.DreamReply{}, errModel
-		}
-		return good(ctx, packet)
-	}
-	if err := runDream([]string{"-run", "-all", "-j", "2"}, &bytes.Buffer{}); !errors.Is(err, errModel) {
-		t.Fatalf("failed scope call: %v", err)
-	}
-	after := factHistory(t, duplicate)
-	if !reflect.DeepEqual(before, after) {
-		t.Error("one failed call partially applied another call's answer")
-	}
-	recs := readDreamLog(t, dir)
-	if len(recs) != 1 || len(recs[0].Calls) != 2 {
-		t.Errorf("missing review/scope evidence: %+v", recs)
 	}
 }

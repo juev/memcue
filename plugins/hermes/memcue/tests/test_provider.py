@@ -342,7 +342,7 @@ class ProviderTest(unittest.TestCase):
         new = "Проект demo: база PostgreSQL 18 слушает порт 55433."
         self.p.on_memory_write("add", "memory", old)
         fact_id = self.written()[self.p._key("memory", old)]
-        self.memcue("retire", fact_id)
+        self.memcue("retire", "-reason", "The fixture was superseded.", fact_id)
         # The note is edited after vet or a person retired its mirror: correct must not revive the retired fact.
         self.p.on_memory_write("replace", "memory", new, {"previous_content": old})
         dump = "\n".join(self.memcue("dump", self.p._facts))
@@ -611,36 +611,24 @@ class ProviderTest(unittest.TestCase):
         self.assertIn(f"{fact_id} v1 active", "\n".join(l for l in self.memcue("dump", self.p._facts) if "source=agent" in l))
         corrected = json.loads(self.p.handle_tool_call("memcue_correct", {"id": fact_id, "content": "Новый текст."}))
         self.assertIn("v2", corrected["result"])
-        json.loads(self.p.handle_tool_call("memcue_retire", {"id": fact_id}))
+        denied = json.loads(self.p.handle_tool_call("memcue_retire", {"id": fact_id}))
+        self.assertIn("reason", denied["error"])
+        reason = "The synthetic current guide no longer requires it."
+        retired = json.loads(self.p.handle_tool_call("memcue_retire", {"id": fact_id, "reason": reason}))
+        self.assertIn("result", retired)
+        history = json.loads("\n".join(self.memcue("history", "-json", fact_id)))
+        self.assertEqual(history[-1]["retirement_reason"], reason)
         self.assertEqual(self.facts(), [])
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {})))
         self.assertIn("error", json.loads(self.p.handle_tool_call("nope", {})))
 
-    def test_cron_run_dreams_but_writes_no_facts(self):
+    def test_cron_can_search_but_writes_no_facts(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": BIN})
         p.initialize("c1", hermes_home=self.home, agent_context="cron")
         self.assertEqual([s["name"] for s in p.get_tool_schemas()],
-                         ["memcue_search", "memcue_dream_prepare", "memcue_dream_apply"])
+                         ["memcue_search"])
         self.assertIn("error", json.loads(p.handle_tool_call("memcue_add", {"content": "x"})))
-        self.assertIn("result", json.loads(p.handle_tool_call("memcue_dream_prepare", {"since": "all"})))
-
-    def test_dream_tools_prepare_and_apply(self):
-        ids = []
-        for content in ("Workflow nightly-sync.yml в example/nightly-sync каждую ночь подписывает bot на все репозитории.",
-                        "Репозиторий example/nightly-sync каждую ночь запускает nightly-sync.yml, он подписывает bot на все репозитории."):
-            added = json.loads(self.p.handle_tool_call("memcue_add", {"content": content}))
-            ids.append(added["result"].split()[0])
-        packet = json.loads(self.p.handle_tool_call("memcue_dream_prepare", {"since": "all"}))["result"]
-        self.assertIn("memcue dream -apply", packet)
-        packet_id = re.search(r'"packet": "([^"]+)"', packet).group(1)
-        keep, gone = sorted(ids)
-        answer = json.dumps({"packet": packet_id, "actions": [
-            {"op": "retire", "id": gone, "by": keep, "kind": "duplicate", "reason": "the same workflow"}]})
-        applied = json.loads(self.p.handle_tool_call("memcue_dream_apply", {"answer": answer}))
-        self.assertIn(f"retire {gone}", applied["result"])
-        self.assertEqual([l.split()[0] for l in self.facts() if l.strip()], [keep])
-        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_dream_apply", {"answer": answer})))
-        self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_dream_apply", {})))
+        self.assertIn("Unknown tool", json.loads(p.handle_tool_call("memcue_dream_prepare", {}))["error"])
 
     def test_add_carries_kind_and_scope(self):
         added = json.loads(self.p.handle_tool_call("memcue_add", {
@@ -695,25 +683,6 @@ class ProviderTest(unittest.TestCase):
         line = next(l for l in self.memcue("dump", self.p._facts) if l.startswith(fact_id))
         self.assertIn("source=tool", line)
         self.assertIn("error", json.loads(self.p.handle_tool_call("memcue_add", {"content": "x", "source": "boss"})))
-
-    def test_the_hints_ask_for_the_dream_tools(self):
-        """With no extraction, the hint is what starts a dream in Hermes (#494): session-card asks memcue to name
-        the dream tools, unless dream is off or the binary predates the flag."""
-        for version, config, want in (("0.19.0", {}, True), ("0.18.1", {}, False), ("0.19.0", {"dream": False}, False)):
-            with self.subTest(version=version, config=config):
-                calls = Path(self.home) / f"card-args-{version}-{len(config)}"
-                stub = Path(self.home) / f"card-memcue-{version}-{len(config)}"
-                stub.write_text("#!/bin/sh\n"
-                                f"case \"$1\" in\n  version) printf '{{\"version\":\"{version}\"}}\\n' ;;\n"
-                                f"  session-card) printf '%s\\n' \"$@\" >> {shlex.quote(str(calls))} ;;\nesac\nexit 0\n",
-                                encoding="utf-8")
-                stub.chmod(0o755)
-                base = Path(self.home) / "dream.db"
-                base.write_text("", encoding="utf-8")
-                p = memcue_provider.MemcueMemoryProvider(dict(config, binary=str(stub), facts=str(base)))
-                p.initialize("s1", hermes_home=self.home)
-                p.system_prompt_block()
-                self.assertEqual("-dream-tools" in calls.read_text(encoding="utf-8").splitlines(), want)
 
     def test_server_mode_asks_for_hints_without_a_local_base(self):
         """In server mode the replica stands in for the facts file (#714, R14): session-card is asked although the file
@@ -1217,28 +1186,6 @@ class ProviderTest(unittest.TestCase):
             ok, out = p._run([])
             self.assertTrue(ok)
             self.assertEqual(out, "unset")
-    def test_endpoint_config_is_forwarded_to_memcue(self):
-        """The endpoint of a background dream (#569): the URL and the model as configured, the key from the named
-        environment variable, and dream: false turns the background dream off."""
-        script = Path(self.home) / "endpoint.sh"
-        script.write_text("#!/bin/sh\nprintf '%s|%s|%s|%s' \"${MEMCUE_API_URL-unset}\" \"${MEMCUE_MODEL-unset}\" "
-                          "\"${MEMCUE_API_KEY-unset}\" \"${MEMCUE_DREAM_BACKGROUND-unset}\"\n", encoding="utf-8")
-        script.chmod(0o755)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("MEMCUE_")}
-        env["DEMO_DREAM_KEY"] = "sk-demo"
-        with unittest.mock.patch.dict(os.environ, env, clear=True):
-            for config, want in [
-                ({"api_url": "https://api.example.test", "model": "demo-flash", "api_key_env": "DEMO_DREAM_KEY"},
-                 "https://api.example.test|demo-flash|sk-demo|unset"),
-                ({}, "unset|unset|unset|unset"),
-                ({"dream": False}, "unset|unset|unset|0"),
-            ]:
-                p = memcue_provider.MemcueMemoryProvider(dict(config, binary=str(script)))
-                p.initialize("s1", hermes_home=self.home, agent_context="primary")
-                ok, out = p._run([])
-                self.assertTrue(ok)
-                self.assertEqual(out, want, config)
-
     def test_missing_binary_is_unavailable(self):
         p = memcue_provider.MemcueMemoryProvider({"binary": "/nonexistent/memcue"})
         self.assertFalse(p.is_available())

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,6 +153,23 @@ func createAt(at time.Time, content string) store.Change {
 		Stamp: hlc.Stamp{Millis: at.UnixMilli(), Device: "00000000000000aa"}.String(),
 		Values: map[string]string{store.RegContent: content, store.RegKind: "pitfall", store.RegScope: "global",
 			store.RegExpires: "", store.RegStatus: store.Active, store.RegOrigin: "x 2026-11-10"}}
+}
+
+func TestRetirementReasonRoundTripsThroughWire(t *testing.T) {
+	const reason = "The maintained guide no longer requires the hook."
+	key := strings.Repeat("a", 64)
+	r := WireRow(store.Row{Fact: store.Fact{Status: store.Retired, RetirementReason: reason, RetirementKey: key}})
+	data, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded Row
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if got := decoded.StoreRow(); got.RetirementReason != reason || got.RetirementKey != key {
+		t.Fatalf("retirement metadata after wire round trip = %+v", got)
+	}
 }
 
 func TestRetryAfterALostReplyGetsTheEarlierAnswer(t *testing.T) {

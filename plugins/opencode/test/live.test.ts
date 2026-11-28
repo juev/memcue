@@ -91,7 +91,7 @@ test('the real CLI stores, finds, corrects and retires a fact through the tools'
   const retire = live.fixture.tools.get('memcue_retire');
   assert.ok(retire);
   const version = after.facts.find(item => item.id === id)?.version ?? 2;
-  await retire.execute({ id, expectedVersion: version }, { sessionID: 'live-session' });
+  await retire.execute({ id, expectedVersion: version, reason: "The synthetic rule was superseded." }, { sessionID: 'live-session' });
   const gone = await live.search('cobalt PROJ-9001');
   assert.equal(gone.facts.find(item => item.id === id), undefined, 'a retired fact leaves ordinary search');
 });

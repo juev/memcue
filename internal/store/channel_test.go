@@ -12,5 +12,5 @@ func (s *Store) setChannel(id string, version int, channel string) (Fact, error)
 	}
 	f := cur
 	f.Version, f.Author, f.Channel = cur.Version+1, s.author, channel
-	return s.write(f)
+	return s.write(f, false)
 }

@@ -66,7 +66,7 @@ async function setup(
 test('setup registers the six tools and the command', async (t) => {
   const fixture = await setup(t);
   assert.deepEqual([...fixture.plugin.tools.keys()].sort(),
-    ['memcue_add', 'memcue_correct', 'memcue_dream_apply', 'memcue_dream_prepare', 'memcue_retire', 'memcue_search']);
+    ['memcue_add', 'memcue_correct', 'memcue_retire', 'memcue_search']);
   assert.ok(fixture.plugin.commands.has('memcue'));
   assert.match(await fixture.log(), /loaded for OpenCode 2\.2\.7/);
   for (const tool of fixture.plugin.tools.values()) {
@@ -144,17 +144,6 @@ test('/memcue off stops the instruction in this session and refuses tools', asyn
   );
   await fixture.plugin.commands.get('memcue')?.execute({ sessionID: 'session-1', prompt: { text: 'on' } });
   assert.match(fixture.plugin.notices.at(-1)?.text ?? '', /on for this session/);
-});
-
-test('/memcue status and dream do not need the model to answer status', async (t) => {
-  const fixture = await setup(t);
-  await fixture.plugin.commands.get('memcue')?.execute({ sessionID: 'session-1', prompt: { text: 'status' } });
-  assert.match(fixture.plugin.notices.at(-1)?.text ?? '', /Memcue: on; role: main/);
-  assert.equal(fixture.plugin.notices.at(-1)?.resume, false);
-  await fixture.plugin.commands.get('memcue')?.execute({ sessionID: 'session-1', prompt: { text: 'dream' } });
-  assert.match(fixture.plugin.prompts.at(-1)?.text ?? '', /memcue_dream_prepare/);
-  await fixture.plugin.commands.get('memcue')?.execute({ sessionID: 'session-1', prompt: { text: 'nonsense' } });
-  assert.match(fixture.plugin.notices.at(-1)?.text ?? '', /Usage: \/memcue/);
 });
 
 test('a subagent session gets memory only when its agent role is enabled', async (t) => {

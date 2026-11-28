@@ -307,6 +307,11 @@ func (s *Store) syncWrite(facts []Fact, expected ...int) ([]Fact, error) {
 		if i == 0 && len(expected) != 0 && (!exists || row.Version != expected[0]) {
 			return nil, ErrChanged
 		}
+		if f.Status == Active && (!exists || f.Content != row.Content) {
+			if err := checkRetiredMatch(s.context(), tx, f); err != nil {
+				return nil, err
+			}
+		}
 		ch := Change{OpID: newOpID(s.now()), ID: f.ID}
 		if exists {
 			ch.Values, ch.Base = Diff(row.Fact, f), row.Stamps[RegContent]
@@ -319,6 +324,9 @@ func (s *Store) syncWrite(facts []Fact, expected ...int) ([]Fact, error) {
 			for _, reg := range Registers {
 				ch.Values[reg] = Register(f, reg)
 			}
+		}
+		if ch.Values[RegStatus] == Retired {
+			ch.RetirementReason, ch.RetirementKey = f.RetirementReason, f.RetirementKey
 		}
 		ch.Stamp = clock.Next().String()
 		if _, err := ApplyChange(&row, exists, ch); err != nil {
@@ -647,6 +655,9 @@ func (s *Store) ApplyRows(baseID string, rows []Row) error {
 		return err
 	}
 	for _, row := range rows {
+		if !validRetirementMetadata(row.Status, row.RetirementReason, row.RetirementKey) {
+			return fmt.Errorf("%w: invalid retirement metadata", ErrChange)
+		}
 		for _, v := range row.Stamps {
 			if st, err := hlc.Parse(v); err == nil {
 				clock.Observe(st)
@@ -839,7 +850,7 @@ func (s *Store) Import(facts []Fact) error {
 		st := hlc.Stamp{Millis: f.Created.UnixMilli(), Device: s.sync.device}
 		clock.Observe(st)
 		row := Row{Fact: Fact{ID: f.ID, Version: max(f.Version, 1), Content: strings.TrimSpace(f.Content), Origin: f.Origin,
-			Created: f.Created.UTC(), Status: f.Status, Expires: f.Expires,
+			Created: f.Created.UTC(), Status: f.Status, Expires: f.Expires, RetirementReason: f.RetirementReason, RetirementKey: f.RetirementKey,
 			Meta: approved(Meta{Kind: f.Kind, Scope: f.Scope, Source: f.Source})}, Stamps: Stamps{}, Updated: s.now().UTC()}
 		row.ContentVersion = row.Version
 		for _, reg := range Registers {
@@ -867,6 +878,8 @@ func checkImported(f Fact) error {
 		return fmt.Errorf("%w: fact %s has no content", ErrChange, f.ID)
 	case f.Status != Active && f.Status != Retired:
 		return fmt.Errorf("%w: fact %s has status %q", ErrChange, f.ID, f.Status)
+	case !validRetirementMetadata(f.Status, f.RetirementReason, f.RetirementKey):
+		return fmt.Errorf("%w: fact %s has an invalid retirement reason", ErrChange, f.ID)
 	case f.Created.IsZero() || f.Created.UnixMilli() <= 0:
 		return fmt.Errorf("%w: fact %s has no creation time", ErrChange, f.ID)
 	}

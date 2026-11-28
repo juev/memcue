@@ -116,11 +116,11 @@ class RealCLI(unittest.TestCase):
         for turn in ('one', 'two'):
             self.assertIn(text, self.pitfall_hook('UserPromptSubmit', 'broken-state', prompt='Task'))
 
-    def test_session_start_delivers_note_and_dream_hint_without_facts(self):
+    def test_session_start_delivers_note_without_facts(self):
         fact = self.add('Synthetic orchard reviews require the amber label.', '-kind', 'rule', '-source', 'user', '-scope', 'repo')
         (self.home/'state/dream.at').write_text('2000-01-01T00:00:00Z\n')
         note = self.pitfall_hook('SessionStart', 'synthetic-session', source='compact')
-        self.assertIn('facts wait for the dream', note)
+        self.assertNotIn('facts wait for the dream', note)
         self.assertIn('Run every memory command through this launcher', note)
         self.assertNotIn('amber label', note)
         self.assertNotIn('memcue_dream_prepare', note)
@@ -141,7 +141,7 @@ class RealCLI(unittest.TestCase):
         self.assertNotIn('kind', hit)
         self.cli('correct', fact, 'Synthetic orchard reviews require the violet label.')
         self.assertIn('violet', self.search('synthetic orchard')['facts'][0]['content'])
-        self.cli('retire', fact)
+        self.cli('retire', '-reason', 'The synthetic rule was superseded.', fact)
         self.assertEqual(self.search('synthetic orchard')['facts'], [])
         history = [f for f in self.dump() if f['id'] == fact]
         self.assertEqual([f['version'] for f in history], [1, 2, 3])
@@ -161,28 +161,6 @@ class RealCLI(unittest.TestCase):
         out = self.cli('sessions', '-session', 'current', 'synthetic', 'marzipan').stdout
         self.assertIn('port 7777', out)
         self.assertIn('s-old', out)
-        self.assertFalse((self.home/'unexpected').exists())
-
-    def test_dream_prepare_apply_rejects_stale_packet(self):
-        fact = self.add('Synthetic orchard reviews require the amber label.', '-kind', 'rule', '-source', 'user', '-scope', 'repo')
-        (self.home/'state/dream.at').write_text('2000-01-01T00:00:00Z\n')
-        self.cli('dream', '-prepare')
-        packet = json.loads((self.home/'state/dream.packet.json').read_text())
-        answer = self.home/'answer.json'
-        answer.write_text(json.dumps({'packet': packet['id'], 'splits': [], 'actions': [], 'scopes': []}))
-        before = self.dump()
-        obsolete = self.home/'obsolete-answer.json'
-        obsolete.write_text(json.dumps({'packet': packet['id'],
-            'splits': [{'id': fact, 'parts': ['Synthetic orchard reviews require labels.', 'The label is amber.'], 'reason': 'fixture'}],
-            'actions': [], 'scopes': [], 'expansions': [{'id': fact, 'queries': ['obsolete marker']}]}))
-        refused = self.cli('dream', '-apply', str(obsolete), ok=False)
-        self.assertIn('unknown field', refused.stderr)
-        self.assertEqual(self.dump(), before)
-        self.cli('dream', '-apply', str(answer))
-        self.add('Synthetic orchard labels remain visible.', '-kind', 'rule', '-source', 'user', '-scope', 'repo')
-        self.cli('dream', '-prepare')
-        r = self.cli('dream', '-apply', str(answer), ok=False)
-        self.assertIn('run -prepare again', r.stderr)
         self.assertFalse((self.home/'unexpected').exists())
 
     def test_denied_write_is_visible_without_changing_configuration_or_history(self):

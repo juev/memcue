@@ -39,14 +39,12 @@ are copied to `$KIMI_CODE_HOME/plugins/managed/memcue-kimi/`; reinstall after ch
 - `state_dir`: absolute path to memcue's state directory (default `$XDG_STATE_HOME/memcue`).
 - `server`: server name for server mode, mapped to `MEMCUE_SERVER` on every call.
 - `tailscale_control_url`: tailnet control URL, mapped to `MEMCUE_TAILSCALE_CONTROL_URL` on every call.
-- `dream_every`: a Go duration such as `24h` for the dream schedule.
-- `background_dream`: must be `false` (the default). This adapter uses model-driven dream only.
 
 A given path must be absolute; an empty or relative one is an error, never the default. Explicit inherited remote
 settings such as `MEMCUE_POSTGRES_DSN`, `MEMCUE_SERVER` and the other documented `MEMCUE_TAILSCALE_*` transport values
 remain supported. The JSON `server` and `tailscale_control_url` values win over inherited ones, so hooks and later shell
 calls select the same server. Other inherited `MEMCUE_*` settings are removed, including endpoint credentials and
-background dream configuration.
+obsolete maintenance settings.
 
 For the author's server-mode setup, the configuration is:
 
@@ -63,9 +61,9 @@ For the author's server-mode setup, the configuration is:
 - **System prompt:** the pull-mode policy and the configured launcher in the managed plugin copy. Plugin system-prompt
   contributions participate in prompt rebuilds, including compaction.
 - **Session start:** the `memcue` Skill is loaded into the main agent. Invoke it explicitly as
-  `/skill:memcue-kimi:memcue`; maintenance uses `/skill:memcue-kimi:memcue-dream`.
+  `/skill:memcue-kimi:memcue`.
 - **`SessionStart` (`startup|resume`) and `PostCompact` (`manual|auto`):** maintenance hints from
-  `memcue session-card -hints-only`, with dream instructions rewritten for the configured launcher.
+  `memcue session-card -hints-only`.
 - **Explicit `pitfalls` command:** the complete active, unexpired `kind=pitfall` snapshot for the current repository.
   The agent runs it before a task and again after changing repository or compaction. Rules, decisions, host/global facts
   and research remain ordinary model-driven searches. `UserPromptSubmit` and `PreToolUse` do not inject facts, and no
@@ -87,16 +85,12 @@ add -kind rule -scope global -source user -- "<fact>"
 correct -expected-version VERSION ID "<corrected fact>"
 retire -expected-version VERSION ID
 reopen ID
-dream -prepare
-dream -apply /absolute/path/to/answer.json
 ```
 
-`pitfalls` accepts no arguments and uses the launcher's current working directory. `dream` accepts only
-`-prepare [-all | -since DATE]`, `-list`, or `-apply FILE`. The working model answers the packet; no Claude executable,
-API credentials or second model is needed. In server mode the server dreams on its own.
+`pitfalls` accepts no arguments and uses the launcher's current working directory.
 
 The adapter does not expose `memcue sessions`: native history search does not read Kimi Code transcripts yet. This does
-not affect fact search, writes or dream.
+not affect fact search or writes.
 
 ## Restoring automatic repository pitfalls
 
@@ -134,6 +128,6 @@ make test-kimi   # synthetic adapter + real-CLI suites; requires bin/memcue, nev
 ```
 
 The suites cover Kimi payloads, structured lifecycle output, silent prompt/tool hooks, explicit repository retrieval,
-subprocess environment, fresh-process CRUD, history and provenance, repository scopes, dream prepare/apply, timeout and
+subprocess environment, fresh-process CRUD, history and provenance, repository scopes, retirement reasons, timeout and
 an installed copy without repository files. They do not measure model compliance or recall quality. Real Kimi runtime
 checks and their limits are recorded in the integration PR.

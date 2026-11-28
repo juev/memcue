@@ -249,10 +249,10 @@ class OpenCodeNoteTest(unittest.TestCase):
 
 
 class EvidenceBeforeChangeTest(unittest.TestCase):
-    EVIDENCE = ("Correct or retire a stored fact only when the user says it is wrong or a command or a file of this "
-                "session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in "
-                "the session settles it, answer from the facts and their days, name the conflict, and ask before you "
-                "correct or retire one.")
+    EVIDENCE = ("When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope.",
+                "Only the user can withdraw or replace their standing instructions.",
+                "If evidence is missing, conflicting, or merely newer, leave memory unchanged",
+                "When you retire a fact, write a short concrete reason")
 
     def test_every_host_asks_for_evidence_before_it_changes_a_fact(self):
         """#771: asked only where the CI runs, the model retired the older of two conflicting facts in 5 of 10 sessions
@@ -269,13 +269,16 @@ class EvidenceBeforeChangeTest(unittest.TestCase):
             "qwen-code skill": PLUGINS / "qwen-code" / "skills" / "memcue" / "SKILL.md",
             "AGENTS.md.snippet": PLUGINS / "codex" / "AGENTS.md.snippet",
             "codex skill": PLUGINS / "codex" / "skills" / "memcue" / "SKILL.md",
+            "kimi note": PLUGINS / "kimi-code" / "SYSTEM.md",
+            "kimi skill": PLUGINS / "kimi-code" / "skills" / "memcue" / "SKILL.md",
         }
         for name, path in texts.items():
             with self.subTest(text=name):
                 text = path.read_text(encoding="utf-8")
                 if name == "hermes":
                     text = re.sub(r'"\s*\n\s*"', "", text)  # the note is adjacent string literals; read it joined
-                self.assertIn(self.EVIDENCE, " ".join(text.split()))
+                for requirement in self.EVIDENCE:
+                    self.assertIn(requirement, " ".join(text.split()))
 
 
 class OpenCodePolicyTest(unittest.TestCase):

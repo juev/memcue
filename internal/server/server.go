@@ -37,26 +37,28 @@ const RefusedAhead = "ahead"
 
 // Row is a fact as the wire carries it.
 type Row struct {
-	ID      string            `json:"id"`
-	Version int               `json:"version"`
-	Content string            `json:"content"`
-	Origin  string            `json:"origin,omitempty"`
-	Created time.Time         `json:"created"`
-	Status  string            `json:"status"`
-	Expires string            `json:"expires,omitempty"`
-	Kind    string            `json:"kind,omitempty"`
-	Scope   string            `json:"scope,omitempty"`
-	Source  string            `json:"source,omitempty"`
-	Stamps  map[string]string `json:"stamps,omitempty"`
-	Seq     int64             `json:"seq,omitempty"`
-	Updated time.Time         `json:"updated,omitzero"`
-	LoserOf string            `json:"loser_of,omitempty"`
+	ID               string            `json:"id"`
+	Version          int               `json:"version"`
+	Content          string            `json:"content"`
+	Origin           string            `json:"origin,omitempty"`
+	Created          time.Time         `json:"created"`
+	Status           string            `json:"status"`
+	RetirementReason string            `json:"retirement_reason,omitempty"`
+	RetirementKey    string            `json:"retirement_key,omitempty"`
+	Expires          string            `json:"expires,omitempty"`
+	Kind             string            `json:"kind,omitempty"`
+	Scope            string            `json:"scope,omitempty"`
+	Source           string            `json:"source,omitempty"`
+	Stamps           map[string]string `json:"stamps,omitempty"`
+	Seq              int64             `json:"seq,omitempty"`
+	Updated          time.Time         `json:"updated,omitzero"`
+	LoserOf          string            `json:"loser_of,omitempty"`
 }
 
 // WireRow is r as the wire carries it.
 func WireRow(r store.Row) Row {
 	return Row{ID: r.ID, Version: r.Version, Content: r.Content, Origin: r.Origin, Created: r.Created, Status: r.Status,
-		Expires: r.Expires, Kind: r.Kind, Scope: r.Scope, Source: r.Source, Stamps: r.Stamps, Seq: r.Seq,
+		RetirementReason: r.RetirementReason, RetirementKey: r.RetirementKey, Expires: r.Expires, Kind: r.Kind, Scope: r.Scope, Source: r.Source, Stamps: r.Stamps, Seq: r.Seq,
 		Updated: r.Updated, LoserOf: r.LoserOf}
 }
 
@@ -71,7 +73,7 @@ func (r Row) StoreRow() store.Row {
 
 func (r Row) fact() store.Fact {
 	return store.Fact{ID: r.ID, Version: r.Version, Content: r.Content, Origin: r.Origin, Created: r.Created,
-		Status: r.Status, Expires: r.Expires, Meta: store.Meta{Kind: r.Kind, Scope: r.Scope, Source: r.Source}}
+		Status: r.Status, RetirementReason: r.RetirementReason, RetirementKey: r.RetirementKey, Expires: r.Expires, Meta: store.Meta{Kind: r.Kind, Scope: r.Scope, Source: r.Source}}
 }
 
 // Changes is the answer of GET /v1/changes.

@@ -31,7 +31,7 @@ except Exception:
     pass
 with (p/'calls').open('a') as f:f.write(json.dumps({'args':sys.argv[1:],'cwd':os.getcwd(),'env':{k:v for k,v in os.environ.items() if k.startswith('MEMCUE_')}})+'\\n')
 if sys.argv[1]=='session-card' and '-hints-only' in sys.argv:
-    print(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionCard','additionalContext':'maintenance: call memcue_dream_prepare and answer its packet with memcue_dream_apply'}}))
+    print(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionCard','additionalContext':'Verify the current tool version.'}}))
 elif sys.argv[1]=='session-card':
     print(json.dumps({'hookSpecificOutput':{'hookEventName':inp.get('hook_event_name','SessionCard'),'additionalContext':'Repository pitfalls for synthetic/repo: snapshot.\\n\\nSynthetic pitfall.'}}))
 elif sys.argv[1]=='search':print(json.dumps({'facts':[],'hints':['No facts; try -in all.']}))
@@ -78,8 +78,8 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             with self.subTest(event=event):
                 r = self.run_adapter('hook', data=self.payload(event=event))
                 text = self.context(r, event)
-                self.assertIn('maintenance: run the memcue-dream skill with the configured launcher', text)
-                self.assertEqual(self.calls()[-1]['args'], ['session-card', '-dream-tools', '-hints-only'])
+                self.assertIn('Verify the current tool version.', text)
+                self.assertEqual(self.calls()[-1]['args'], ['session-card', '-hints-only'])
                 self.assertEqual(self.calls()[-1]['cwd'], str(self.cwd.resolve()))
                 self.assertNotIn('MEMCUE_AGENT', self.calls()[-1]['env'])
 
@@ -204,7 +204,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         valid = json.loads(self.config.read_text())
         for change in ({'facts': ''}, {'facts': 'relative'}, {'state_dir': 'relative'}, {'binary': 'memcue'},
                        {'host': ''}, {'server': ''}, {'tailscale_control_url': 'two words'},
-                       {'background_dream': True}, {'unknown': True}):
+                       {'unknown': True}):
             self.config.write_text(json.dumps(valid | change))
             r = self.run_adapter('hook', data=self.payload())
             self.assertEqual(r.returncode, 0, r.stderr)
@@ -221,29 +221,6 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             r = self.run_adapter(*args)
             self.assertNotEqual(r.returncode, 0)
 
-    def test_dream_allowlist_passes_only_documented_packet_commands(self):
-        for args in (('-prepare',), ('-prepare', '-all'), ('-prepare', '-all', '-noise'), ('-list', '-all', '-noise'), ('-prepare', '-since', '2000-01-01'),
-                     ('-prepare', '-since', '2000-01-01T00:00:00Z'), ('-list',), ('-apply', '/synthetic/answer.json'),
-                     ('--', '-prepare', '-all')):
-            with self.subTest(args=args):
-                r = self.run_adapter('dream', *args)
-                self.assertEqual(r.returncode, 0, r.stderr)
-                forwarded = args[1:] if args[0] == '--' else args
-                self.assertEqual(self.calls()[-1]['args'], ['dream', *forwarded])
-                self.assertEqual(self.calls()[-1]['env']['MEMCUE_DREAM_BACKGROUND'], '0')
-                self.assertNotIn('MEMCUE_API_URL', self.calls()[-1]['env'])
-
-    def test_dream_rejects_extra_duplicate_and_malformed_flags_before_any_child(self):
-        for args in ((), ('-all',), ('-since', '2000-01-01'), ('-prepare', '-prepare'),
-                     ('-prepare', '-all', '-all'), ('-prepare', '-all', '-since', '2000-01-01'),
-                     ('-prepare', '-since'), ('-prepare', '-since', ''), ('-prepare', '-since', '-run'),
-                     ('-prepare', '-run'), ('-run', '-all'), ('-list', '-all'),
-                     ('-apply',), ('-apply', '/synthetic/answer.json', '-all'), ('--', '-prepare', '-run')):
-            with self.subTest(args=args):
-                r = self.run_adapter('dream', *args)
-                self.assertNotEqual(r.returncode, 0, r.stdout)
-                self.assertIn('dream accepts only', r.stderr)
-
     def test_fallback_is_rendered_without_overwriting_existing_instructions(self):
         original = b'# Existing instructions\nKeep this exactly.\n'
         agents_md = self.cwd / 'AGENTS.md'
@@ -252,7 +229,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(agents_md.read_bytes(), original)
         for term in ('-kind rule,decision', '-in global', '-in shelf:research', 'English', str(self.config),
-                     'Search first', 'memcue-dream', 'dream -prepare -all', 'no dream yet on this machine'):
+                     'Search first', '-reason'):
             self.assertIn(term, r.stdout)
         self.assertIn(str(ADAPTER), r.stdout)
 
@@ -268,7 +245,7 @@ if os.environ.get('MEMCUE_OUTCOME_NONCE'):
             self.assertIn('./scripts/memcue.py', handler['command'])
             self.assertLessEqual(handler['timeout'], 30)
         self.assertEqual(next(h for h in hooks if h['event'] == 'PostCompact')['matcher'], 'manual|auto')
-        for name in ('memcue', 'memcue-dream'):
+        for name in ('memcue',):
             skill = (ROOT/'skills'/name/'SKILL.md').read_text()
             self.assertIn('configured launcher', skill)
             self.assertNotIn('claude -p', skill)

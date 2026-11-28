@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"unicode/utf8"
 )
 
 type factJSONField struct {
-	name  string
-	index []int
+	name      string
+	index     []int
+	omitEmpty bool
 }
 
 var factJSONFields = func() []factJSONField {
@@ -22,7 +24,11 @@ var factJSONFields = func() []factJSONField {
 			if f.Anonymous {
 				walk(f.Type, idx)
 			} else {
-				out = append(out, factJSONField{f.Name, idx})
+				name, option, _ := strings.Cut(f.Tag.Get("json"), ",")
+				if name == "" {
+					name = f.Name
+				}
+				out = append(out, factJSONField{name, idx, option == "omitempty"})
 			}
 		}
 	}
@@ -33,17 +39,20 @@ var factJSONFields = func() []factJSONField {
 func marshalFact(ctx context.Context, f Fact) ([]byte, error) {
 	out := []byte{'{'}
 	v := reflect.ValueOf(f)
-	for i, field := range factJSONFields {
+	for _, field := range factJSONFields {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if i > 0 {
+		value := v.FieldByIndex(field.index)
+		if field.omitEmpty && value.IsZero() {
+			continue
+		}
+		if len(out) > 1 {
 			out = append(out, ',')
 		}
 		key, _ := json.Marshal(field.name)
 		out = append(out, key...)
 		out = append(out, ':')
-		value := v.FieldByIndex(field.index)
 		if value.Kind() == reflect.String {
 			out = append(out, '"')
 			s := value.String()

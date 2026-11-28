@@ -49,6 +49,9 @@ type Change struct {
 	Source  string            `json:"source,omitempty"`
 	Values  map[string]string `json:"values"`
 	Stamp   string            `json:"stamp"`
+	// RetirementReason belongs to the status update and has the same stamp.
+	RetirementReason string `json:"retirement_reason,omitempty"`
+	RetirementKey    string `json:"retirement_key,omitempty"`
 	// Base is the content stamp the new content was made from; it tells a correction made after the stored content
 	// from one made beside it (R6).
 	Base string `json:"base,omitempty"`
@@ -106,6 +109,9 @@ func ApplyChange(row *Row, exists bool, ch Change) (Merged, error) {
 			continue
 		}
 		setRegister(&row.Fact, reg, v)
+		if reg == RegStatus {
+			row.RetirementReason, row.RetirementKey = ch.RetirementReason, ch.RetirementKey
+		}
 		row.Stamps[reg] = ch.Stamp
 		m.Changed = true
 		content = content || reg == RegContent
@@ -120,6 +126,9 @@ func ApplyChange(row *Row, exists bool, ch Change) (Merged, error) {
 }
 
 func checkChange(ch Change) error {
+	if !validRetirementMetadata(ch.Values[RegStatus], ch.RetirementReason, ch.RetirementKey) {
+		return fmt.Errorf("%w: invalid retirement metadata", ErrChange)
+	}
 	if ch.ID == "" || len(ch.Values) == 0 {
 		return fmt.Errorf("%w: no fact or no values", ErrChange)
 	}

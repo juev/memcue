@@ -27,7 +27,7 @@ func TestReopenBringsARetiredFactBackToRecall(t *testing.T) {
 	if !recalled() {
 		t.Fatal("the fact is not recalled before the retire")
 	}
-	if err := runRetire([]string{id}, &out); err != nil {
+	if err := runRetire([]string{"-reason", "The documented workflow was superseded.", id}, &out); err != nil {
 		t.Fatal(err)
 	}
 	if recalled() {

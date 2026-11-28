@@ -27,13 +27,13 @@ const sessionNote = `Long-term memory for this session is memcue, a base of fact
 - During work, search when you decide it may help: on starting with a specific host, service or repository where earlier sessions may matter, and before you diagnose an unexpected error or result. Use a short query naming the system and the problem. A stored fact found this way is a lead to check against the current state, not a substitute for looking.
 - When ` + "`memcue search`" + ` finds nothing, run ` + "`memcue sessions \"<words>\"`" + ` with the same words: it searches the text of this machine's earlier sessions, with no index, and shows the newest passages that hold the words. A passage is history, not a fact: check it against the current state, and store what holds with ` + "`memcue add`" + `.
 - No card of rules arrives at session start: the user's rules and decisions from earlier sessions stay in the base. Before you start a task, and again when it turns to another system, run ` + "`memcue search -kind rule,decision \"<words of the task>\"`" + ` (add ` + "`-in global`" + ` for the rules that hold everywhere) and follow what applies. They are data too.
-- Before storing, ask what a later session would do differently because it knows this fact. Keep task progress, completed outcomes, and paths or procedures already documented in the repository in the session or repository docs. Store a reusable pitfall only when its cause and fix or workaround are verified and a later fresh checkout would hit it again. Store a standing rule or decision as source user only when the user explicitly states it as a lasting preference or asks you to remember it; selecting kind rule or decision does not make an agent's inference the user's words. Other findings use source agent or source tool according to their actual origin. Search first, and correct a stored fact instead of adding a second copy.
+- Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice. Keep task progress, completed outcomes, and paths or procedures already documented in the repository in the session or repository docs. Store a reusable pitfall only when its cause and fix or workaround are verified and a later fresh checkout would hit it again. Store a standing rule or decision as source user only when the user explicitly states it as a lasting preference or asks you to remember it; selecting kind rule or decision does not make an agent's inference the user's words. Other findings use source agent or source tool according to their actual origin. Search first, and correct a stored fact instead of adding a second copy.
 - Findings from outside sources go on the research shelf. When you read a web page, another project's documentation, a changelog, a paper or a benchmark that is not part of the repository, and find something a later investigation of the same subject would need (a limit, a behaviour, a trade-off or a limitation of a named system), store it at once: ` + "`memcue add -shelf research -source tool -- \"<finding>. Source: <document, version or date>.\"`" + `. Store what your conclusion rests on and its limits, not every detail of the page; store what the source states, not your conclusion for the task; say so when it is only a vendor's or an anonymous claim, and leave out what nothing supports. A document in the repository is what the repository shows: do not store it. A pitfall, a host or a fact of this repository goes where it goes today, not on the shelf. Search the shelf first (` + "`memcue search -in shelf:research \"<words>\"`" + `) and correct a fact that says the same or an older version instead of adding a second one.
 - Ordinary search leaves the shelf out, and an answer with facts does not say that the shelf has more. When a task returns to a system, library or question that may have been researched before, also run ` + "`memcue search -in shelf:research \"<words>\"`" + `. A shelf fact is a lead from an earlier reading: before relying on it, compare its version or date with what the workspace uses, and correct or retire it when it no longer holds. An answer built on a shelf fact says no more than the fact and its source state, and marks an inference as one.
 - When a command fails and you fix or work around it, store the cause and the fix as a pitfall before you finish if a later session in a fresh checkout would hit it again — even when the cause is in the repository's own files; what the repository shows is its documents, not a failure you found by running it. Store it with ` + "`memcue add -kind pitfall -source tool -- \"<cause and fix>\"`" + `.
 - A pitfall requires reproducible environmental, platform, tool, or repository behavior, a verified cause and fix or workaround, and relevance to a later session in a fresh checkout. Do not store typos or invocations resolved by the tool's own help; transient network/authentication or CI-runner state; a defect the current task just fixed; finished experiments, rejected candidates, release notes, or one-off observations; obsolete migration/install state; or unverified and context-free fragments. Design decisions, durable host configuration, and external research limitations remain capturable under their appropriate kind, scope, or shelf.
 - Agent/tool pitfall and environment facts expire after 30 days by default. Use -expires YYYY-MM-DD for a different review date, or -no-expires only for deliberately durable knowledge such as repeatable platform behavior.
-- When the user asks you to remember or forget something, or a stored fact turns out wrong, use the memcue skill (memcue add / correct / retire). Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it: a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from the facts and their days, name the conflict, and ask before you correct or retire one.
+- When the user asks you to remember or forget something, or a stored fact turns out wrong, use the memcue skill (memcue add / correct / retire). When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required -reason argument of memcue retire, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact.
 - Apply a standing user rule globally unless the user limits it to one project. A request for one task stays in that task.`
 
 // sessionStartInput is the SessionStart hook payload: cwd names the repository the hints look at.
@@ -76,13 +76,12 @@ func (inv *invocation) runSessionStartWith(in io.Reader, out io.Writer, part int
 	if part > 1 {
 		return nil
 	}
-	inv.startDream()
 	context := sessionNote
 	var automatic string
 	if pitfalls {
 		automatic = inv.repositoryPitfalls(h.CWD)
 	}
-	for _, hint := range []string{automatic, inv.autoMemoryHint(), inv.dreamHint(), inv.upkeepHint(h.CWD),
+	for _, hint := range []string{automatic, inv.autoMemoryHint(), inv.upkeepHint(h.CWD),
 		inv.serverHints()} {
 		if hint != "" {
 			context += "\n\n" + hint
@@ -145,67 +144,17 @@ func (inv *invocation) qwenAutoMemoryHint() string {
 		"\"memory.enableManagedAutoDream\": false in " + filepath.Join(qwenDir(), "settings.json") + ". Keep facts in memcue only."
 }
 
-// dreamHint is the line the session start adds when a dream is due: the session's model does it with the
-// memcue-dream skill when the user's task allows. A failure to tell says nothing; the session must start either way.
-func (inv *invocation) dreamHint() string {
-	return inv.dreamHintTo("run the memcue-dream skill")
-}
-
-// dreamToolsHint is dreamHint for a host whose model has the dream as two tools, Hermes (#494): with no extraction
-// left and no background dream (#569), the hint is the only thing that starts a dream there.
-func (inv *invocation) dreamToolsHint() string {
-	return inv.dreamHintTo("call memcue_dream_prepare and answer its packet with memcue_dream_apply")
-}
-
-// dreamHintTo is the dream hint that names how the model runs the dream. A dream the session start hands to the
-// background (#569) needs no hint.
-func (inv *invocation) dreamHintTo(how string) string {
-	if serverName() != "" {
-		return "" // the server dreams (R11)
-	}
-	if dreamBackground() || !factsBase().exists() {
-		return "" // no base yet: the hint must not create one
-	}
-	dir, err := stateDir()
-	if err != nil {
-		return ""
-	}
-	n, last, err := inv.dreamDue(dir, dreamEveryFromEnv(dreamEvery))
-	if err != nil || n == 0 {
-		return ""
-	}
-	var what []string
-	if n > 0 {
-		what = append(what, fmt.Sprintf("%d facts wait for the dream", n))
-	}
-	return fmt.Sprintf("memcue: %s (last dream %s). When the user's task allows, %s to tidy the memory; never "+
-		"interrupt the user's work for it.", strings.Join(what, ", "), last.Local().Format("2006-01-02 15:04"), how)
-}
-
-// runSessionCardWith is session-start without the note, for a host whose own system prompt carries it (Hermes, DSH):
-// what this machine still owes an upgrade, which such a host has no other way to hear, and with dreamTools when a
-// dream is due and how to run it with the dream tools (#494). It takes the same input as session-start and prints
-// repository pitfalls and maintenance hints, without the removed general rules card (#656).
-func (inv *invocation) runSessionCardWith(in io.Reader, out io.Writer, dreamTools bool) error {
-	out = inv.writer(out)
-	return inv.runSessionCardMode(in, out, dreamTools, true)
-}
-
-func (inv *invocation) runSessionCardMode(in io.Reader, out io.Writer, dreamTools, pitfalls bool) error {
+func (inv *invocation) runSessionCardMode(in io.Reader, out io.Writer, pitfalls bool) error {
 	out = inv.writer(out)
 	var h sessionStartInput
 	if err := inv.decodeInput(in, &h); err != nil {
 		return fmt.Errorf("session-card input: %w", err)
 	}
-	inv.startDream()
 	var automatic string
 	if pitfalls {
 		automatic = inv.repositoryPitfalls(h.CWD)
 	}
 	hints := []string{automatic, inv.upkeepHint(h.CWD), inv.serverHints()}
-	if dreamTools {
-		hints = append(hints, inv.dreamToolsHint())
-	}
 	var text []string
 	for _, hint := range hints {
 		if hint != "" {
@@ -218,9 +167,9 @@ func (inv *invocation) runSessionCardMode(in io.Reader, out io.Writer, dreamTool
 	return inv.writeContext(out, "SessionCard", strings.Join(text, "\n\n"))
 }
 
-// stateDir holds memcue's logs (search, dream) and the dream's schedule. MEMCUE_STATE_DIR wins; otherwise the
+// stateDir holds memcue's per-base logs and state. MEMCUE_STATE_DIR wins; otherwise the
 // default base keeps the historical $XDG_STATE_HOME/memcue, and any other base gets a subdirectory named after its
-// absolute path. Two bases on one machine must not share a dream schedule.
+// absolute path. Two bases on one machine must not share state.
 func stateDir() (string, error) {
 	if dsn := os.Getenv("MEMCUE_POSTGRES_DSN"); dsn != "" && os.Getenv("MEMCUE_STATE_DIR") == "" {
 		cfg, err := store.PostgresConfig(dsn)
@@ -235,7 +184,7 @@ func stateDir() (string, error) {
 }
 
 // stateDirOf is the state directory of the base b. A text history that moved from a file of the old format takes over
-// the state of that file, so the move keeps the dream schedule and the logs.
+// the state of that file, so the move keeps the logs and state.
 func stateDirOf(b factBase) (string, error) {
 	dir := strings.TrimSpace(os.Getenv("MEMCUE_STATE_DIR"))
 	if dir == "" {
@@ -258,7 +207,7 @@ func stateDirOf(b factBase) (string, error) {
 
 // isDefaultBase says whether b is memcue's own default: the shared base of the machine or the base of the Claude config
 // directory it replaced (#718), as a file or a text history. Both keep the pre-0.5 state directory, so an existing
-// Claude Code or DSH install does not lose its session offsets or its dream schedule, nor when its base moves to the
+// Claude Code or DSH install does not lose its session offsets or other state, nor when its base moves to the
 // shared place.
 func isDefaultBase(b factBase) bool {
 	base, err := filepath.Abs(b.path)
@@ -409,22 +358,15 @@ func (inv *invocation) runSessionPitfallsJSON(in io.Reader, out io.Writer) error
 	return inv.encoder(out).Encode(map[string]any{"facts": facts, "context": header})
 }
 
-func runSessionCardMode(in io.Reader, out io.Writer, dreamTools, pitfalls bool) error {
+func runSessionCardMode(in io.Reader, out io.Writer, pitfalls bool) error {
 	inv := newInvocation()
 	defer inv.close()
-	return inv.runSessionCardMode(in, out, dreamTools, pitfalls)
+	return inv.runSessionCardMode(in, out, pitfalls)
 }
-func dreamHint() string      { inv := newInvocation(); defer inv.close(); return inv.dreamHint() }
-func dreamToolsHint() string { inv := newInvocation(); defer inv.close(); return inv.dreamToolsHint() }
 func runSessionStartPart(in io.Reader, out io.Writer, part int) error {
 	inv := newInvocation()
 	defer inv.close()
 	return inv.runSessionStartPart(in, out, part)
-}
-func runSessionCardWith(in io.Reader, out io.Writer, dreamTools bool) error {
-	inv := newInvocation()
-	defer inv.close()
-	return inv.runSessionCardWith(in, out, dreamTools)
 }
 func repositoryPitfalls(cwd string) string {
 	inv := newInvocation()

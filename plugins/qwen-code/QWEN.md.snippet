@@ -16,10 +16,11 @@ Write new/corrected content and initial queries in English, preserving exact ide
 versions, values and verbatim quotations. Try legacy-language words after an empty search. Keep replies in the user's language.
 Never correct a fact solely to change its language. Existing fact content remains as stored. Auxiliary fields are removed during upgrade.
 Search research explicitly with `search -json -in shelf:research "<words>"`; ordinary searches exclude shelves.
-Read `@ROOT@/skills/memcue/SKILL.md` for writes and `@ROOT@/skills/memcue-dream/SKILL.md` for maintenance.
-Run `dream -prepare` / `dream -apply FILE` yourself at a natural pause; no background model is started.
-If prepare reports "no dream yet on this machine", use this same launcher with `dream -prepare -all` for all active
-facts, or `dream -prepare -since DATE` for a chosen starting date (`YYYY-MM-DD` or RFC 3339).
+Read `@ROOT@/skills/memcue/SKILL.md` for writes.
 Report memory errors and continue unrelated work. Ask only for scoped sandbox access where necessary.
 These instructions do not guarantee model compliance or recall quality.
 <!-- memcue: end -->
+
+Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice.
+
+When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required `-reason` argument to `retire`, in that same call, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact.

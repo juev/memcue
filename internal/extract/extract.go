@@ -1,5 +1,5 @@
 // Package extract holds memcue's model calls: a memory note turned into atomic facts for migrate
-// and the dream run by hand. They go through `claude -p` with structured output, or through an
+// It goes through `claude -p` with structured output, or through an
 // OpenAI-compatible endpoint when one is configured (API). Hooks are switched off for the `claude -p` call, so the
 // model sees no stored memory and cannot copy facts from it. No session is read: the agent writes its facts itself
 // (#494).

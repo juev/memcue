@@ -34,10 +34,7 @@ of versions: such a base is loaded with `migrate -server`.
 Access is the tailnet ACL alone: allow the client machines to reach the server node on TCP port 80, and nothing
 else. The server names each client in its log by its tailnet node name.
 
-The server is the only machine that dreams. Every ten minutes it checks whether a dream is due (`MEMCUE_DREAM_EVERY`,
-24h by default) and runs `memcue dream -run -background` on its base, with `claude -p` or `MEMCUE_API_URL` as on any
-machine; `MEMCUE_DREAM_BACKGROUND=0` turns that off. A change of labels alone does not make a fact fresh for the
-next dream.
+
 
 ### A client
 
@@ -71,9 +68,9 @@ refused changes.
 | Commands | Server mode |
 | --- | --- |
 | `add`, `correct`, `retire`, `reopen`, `facts`, `history`, `search`, `import`, `notes`, `reindex` | The replica. `history` shows the current version only: the server and the replicas keep one row per fact. |
-| `session-start`, `session-card` | The replica, the helper's status and the hints above; no dream hint and no background dream. |
+| `session-start`, `session-card` | The replica, the helper's status and the hints above. |
 | `migrate -server [-apply]` | Loads the local base of `MEMCUE_FACTS` into the empty server; see below. |
-| `dream`, `install`, `merge`, `dump`, `migrate` (other forms) | Refused: they work on a local base or on git. |
+| `install`, `merge`, `dump`, `migrate` (other forms) | Refused: they work on a local base or on git. |
 | `connect`, `version`, `sessions`, help | As without server mode. |
 
 ### Moving to a server
@@ -207,11 +204,11 @@ pgx gets both `LookupFunc` and `DialFunc`; the original DSN hostname and TLS Ser
 | Commands | PostgreSQL selection |
 | --- | --- |
 | `add`, `correct`, `retire`, `reopen`, `facts`, `history`, `search` | Remote authoritative facts. `history -json` exposes the current version using exported Fact field names; PostgreSQL keeps no older ones. |
-| `session-start`, `session-card` | Remote fact reads; local session state. Remote repository failure is unavailable, not an empty snapshot. Background dream maintenance is disabled. |
+| `session-start`, `session-card` | Remote fact reads; local session state. Remote repository failure is unavailable, not an empty snapshot. |
 | `sessions` | Local session history, independent of the fact backend. |
 | `dump FILE`, `merge BASE OURS THEIRS` | Explicit historical/local files; no implicit remote redirection. |
 | `migrate -postgres [-apply]` | Copies the latest version of every local fact into an empty PostgreSQL base; see [Moving a local base](#moving-a-local-base). |
-| `migrate` (other forms), `import`, `install`, `notes`, `dream`, `reindex` | Explicitly rejected before implicit-base maintenance. Unset the DSN for a deliberate local invocation. |
+| `migrate` (other forms), `import`, `install`, `notes`, `reindex` | Explicitly rejected before implicit-base maintenance. Unset the DSN for a deliberate local invocation. |
 | `connect`, `version`, help | Lifecycle/metadata; no implicit local fact migration. |
 
 The store API supports atomic `AddBatch` and expected-version relabeling. `memcue add -batch FILE` accepts one JSON array of content-only FactInput objects (exported field names, embedded metadata flattened), validates the whole input, then writes all facts atomically and prints one ID per fact. Only optional `-force` can accompany `-batch`; other flags/positional text are rejected. The input must be a regular, non-symlink file no larger than 64 MiB. Scope/origin/expiry are explicit per input; auxiliary keywords/queries and unknown fields are rejected. Remote split/retag, historical file import/backup and remote reindex workflows remain explicit unsupported/local maintenance operations. These refusals are the supported maintenance matrix; they do not require a remote implementation. Search JSON retains its existing integration contract. Default session state is namespaced by remote endpoint/database/user/transport, excluding passwords; an explicit `MEMCUE_STATE_DIR` remains the caller's override.
@@ -265,10 +262,10 @@ Repair cycle 2 uses native targeted history/mutations, request-scoped current-ve
 memcue search -json -in all "$QUERY"
 # Copy the selected result's id and version after reviewing its content.
 memcue correct -expected-version "$VERSION" "$FACT_ID" -- "$CORRECTED_TEXT"
-memcue retire -expected-version "$VERSION" "$FACT_ID"
+memcue retire -expected-version "$VERSION" -reason "The current source confirms the previous claim no longer holds." "$FACT_ID"
 ```
 
-Hermes and DSH `memcue_correct`/`memcue_retire` use integer `expected_version`; both expose `version` from search. Claude/Codex CLI adapters forward the same `-expected-version` flag. Codex also preserves the explicit DSN and documented client transport/profile variables across its otherwise filtered subprocess environment; invalid remote selection cannot silently become a local invocation. Its local facts/state/host settings still come from the explicit adapter configuration. Bootstrap keys remain a separate helper-owner action. Library `Correct`, `CorrectExpiring` and `Retire` accept the expected version argument. Comparison happens after acquiring the PostgreSQL write lock, before append. A missing/nonpositive remote version is an actionable error; a stale one returns `fact changed since it was read` without appending. Read and make a new decision on conflict; never fetch latest solely to hide a stale decision or replay automatically. Old local CLI/library calls without a version remain compatible; supplied local versions are checked too. The Hermes built-in note mirror stores the ID and version acknowledged by its own remote add/correct. Stale mirror edits/removals preserve the mapping and report failure without replay. Legacy remote mirror mappings containing only an ID cannot authorize a mutation: they fail with the missing-version message rather than reading latest or silently adding a replacement. Local mirror mappings remain compatible.
+Hermes and DSH `memcue_correct`/`memcue_retire` use integer `expected_version`; both expose `version` from search. Claude/Codex CLI adapters forward the same `-expected-version` flag. Codex also preserves the explicit DSN and documented client transport/profile variables across its otherwise filtered subprocess environment; invalid remote selection cannot silently become a local invocation. Its local facts/state/host settings still come from the explicit adapter configuration. Bootstrap keys remain a separate helper-owner action. Library `Correct`, `CorrectExpiring` and `Retire` accept the expected version argument. Comparison happens after acquiring the PostgreSQL write lock, before append. A missing/nonpositive remote version is an actionable error; a stale one returns `fact changed since it was read` without appending. Read and make a new decision on conflict; never fetch latest solely to hide a stale decision or replay automatically. Local calls can omit the version; supplied versions are checked. All new CLI and tool retire calls require a reason. The Hermes built-in note mirror stores the ID and version acknowledged by its own remote add/correct. Stale mirror edits/removals preserve the mapping and report failure without replay. Legacy remote mirror mappings containing only an ID cannot authorize a mutation: they fail with the missing-version message rather than reading latest or silently adding a replacement. Local mirror mappings remain compatible.
 
 A CLI invocation now owns its context before flags/input/discovery, and shares it across repository-pitfall and upkeep opens, query retries, lexical work, state locks and cleanup. PostgreSQL keeps the existing four-second invocation budget; persistent `connect serve` has its separate explicit owner lifetime. Context cancellation/signals propagate to owned input/output file deadlines and nonblocking state-lock waits. Library `OpenPostgres` retains independent operation calls, while explicit request handles retain their caller context.
 
@@ -292,6 +289,6 @@ The embedded helper's JSON reply acknowledges transport establishment, not a fac
 Coordination/relay outage alone does not revoke an already established, cached direct peer path. An isolated control-plus-relay shutdown can leave cached database access working. ACL denial of the configured database port and loss of the backend listener must still refuse access without opening a local fact base; restoring the ACL permits recovery while the owned control plane is healthy.
 
 
-Supported Hermes, Codex and DSH mutation callers negotiate an opt-in versioned completion frame on stderr with a fresh per-attempt nonce. The frame binds the status to the byte count and SHA-256 of the complete stdout receipt, including every batch ID or a validated empty batch. Ordinary CLI stdout remains unchanged. Missing, truncated, mismatched or unsupported frames mean `UNKNOWN OUTCOME`, even with exit 0 or exit 1; a complete native refusal frame remains a refusal. The callers never replay a mutation. Recovery applies to the entire uncertain batch or local dream plan, which may be partially applied. Inspect durable facts and per-ID history before deciding what to do next. This protocol does not add request-key idempotency or remote dream support.
+Supported Hermes, Codex and DSH mutation callers negotiate an opt-in versioned completion frame on stderr with a fresh per-attempt nonce. The frame binds the status to the byte count and SHA-256 of the complete stdout receipt, including every batch ID or a validated empty batch. Ordinary CLI stdout remains unchanged. Missing, truncated, mismatched or unsupported frames mean `UNKNOWN OUTCOME`, even with exit 0 or exit 1; a complete native refusal frame remains a refusal. The callers never replay a mutation. Recovery applies to the entire uncertain batch. Inspect durable facts and per-ID history before deciding what to do next. This protocol does not add request-key idempotency.
 
 Native diagnostics, including flag errors, share the invocation output deadline. If both output channels fail, bounded termination is possible even when no uncertainty message can be delivered. POSIX Python callers with `waitid`/`WNOWAIT` retain an unreaped session leader while stopping its owned process group; DSH uses an invocation-owned Node supervisor that stops its own group and closes the caller streams within the same deadline. Direct children are reaped; terminated orphan descendants are reaped by their adopting OS parent. Processes that deliberately create a separate session are outside this group, including the separately owned persistent tsnet helper. No global reaper, process-name sweep or shared proxy signalling is used. Platforms without that wait API retain Python direct-child cleanup; Windows retains DSH direct-child cleanup. The demonstrated group-cleanup contract is Linux/POSIX. Native stdout delivery reserves 50 ms of the existing aggregate budget for diagnostics and cleanup; it does not extend the invocation deadline.

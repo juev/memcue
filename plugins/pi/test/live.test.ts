@@ -73,7 +73,7 @@ test('live: mutations persist, stale corrections are refused, and retire removes
   assert.match(stale.stderr, /version|changed|expected/i);
   assert.equal((await search()).facts.find(fact => fact.id === id)?.content, corrected);
 
-  successful(await run(['retire', '-expected-version', '2', '--', id], true), true);
+  successful(await run(['retire', '-expected-version', '2', '-reason', 'The synthetic rule was superseded.', '--', id], true), true);
   assert.equal((await search()).facts.some(fact => fact.id === id), false);
 });
 
@@ -100,31 +100,6 @@ test('live: pitfall snapshots preserve whole facts and respect repository, expir
   assert.deepEqual((await snapshot(other)).facts, []);
   assert.deepEqual((await snapshot(plain)).facts, []);
   assert.deepEqual((await snapshot(repo)).facts, [fact]);
-  successful(await run(['retire', '-expected-version', '1', '--', id], true), true);
+  successful(await run(['retire', '-expected-version', '1', '-reason', 'The synthetic rule was superseded.', '--', id], true), true);
   assert.deepEqual((await snapshot(repo)).facts, []);
-});
-
-test('live: dream prepare and apply work without a model endpoint', live, async t => {
-  const { dir, repo, run } = await fixture(t);
-  const content = 'Prefer concrete examples when explaining architectural trade-offs.';
-  const id = successful(await run([
-    'add', '-cwd', repo, '-source', 'user', '-kind', 'rule', '-scope', 'global', '--', content,
-  ], true), true).trim();
-  const prepared = successful(await run(['dream', '-prepare', '-all'], true), true);
-  assert.match(prepared, /Answer format/);
-  assert.ok(prepared.includes(content));
-  const packet = prepared.match(/"packet":\s*"([^"\n]+)"/)?.[1];
-  assert.ok(packet, 'the CLI must provide an answer packet identifier');
-  const answer = join(dir, 'dream-answer.json');
-  await writeFile(answer, JSON.stringify({ packet, splits: [], actions: [], scopes: [] }), { mode: 0o600 });
-  assert.equal((await stat(answer)).mode & 0o777, 0o600);
-  const report = successful(await run(['dream', '-apply', answer], true), true);
-  assert.match(report, /dream: 0 split, 0 retired or corrected/);
-  const search = JSON.parse(successful(await run([
-    'search', '-json', '-cwd', repo, '-session', 'pi-live-dream', '-min-score', '0', '--', 'architectural trade-offs',
-  ]))) as { facts: Fact[] };
-  assert.equal(search.facts.find(fact => fact.id === id)?.content, content);
-  const replay = await run(['dream', '-apply', answer], true);
-  assert.equal(replay.outcome, 'refused', JSON.stringify(replay));
-  assert.notEqual(replay.exitCode, 0);
 });

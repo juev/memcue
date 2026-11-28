@@ -151,10 +151,6 @@ def load_config(path):
     host = config.get('host')
     if not isinstance(host, str) or not host or any(c.isspace() for c in host):
         raise AdapterError('host must be an explicit nonempty name without whitespace')
-    if config.get('background_dream', False) is not False:
-        raise AdapterError('background_dream must be false; this adapter uses model-driven dream only')
-    if 'dream_every' in config and (not isinstance(config['dream_every'], str) or not config['dream_every']):
-        raise AdapterError('dream_every must be a nonempty Go duration, for example 24h')
     return config
 
 
@@ -172,22 +168,16 @@ def child_env(config):
         if key in config:
             env[name] = config[key]
     env.update(MEMCUE_HOST=config['host'], MEMCUE_DREAM_BACKGROUND='0')
-    if 'dream_every' in config:
-        env['MEMCUE_DREAM_EVERY'] = config['dream_every']
     return env
 
 
 def unknown_mutation(args):
-    dream = bool(args and args[0] == 'dream' and not any(v.lstrip('-').split('=', 1)[0] == 'list' for v in args[1:]))
-    if not args or args[0] not in ('add', 'correct', 'retire', 'reopen') and not dream:
+    if not args or args[0] not in ('add', 'correct', 'retire', 'reopen'):
         return ''
     batch = args[0] == 'add' and any(v.lstrip('-').split('=', 1)[0] == 'batch' for v in args[1:])
     if batch:
         return ('UNKNOWN OUTCOME for the entire batch; response incomplete. Inspect durable facts and history '
                 'for every batch row before deciding whether to retry; do not automatically replay the batch.')
-    if dream:
-        return ('UNKNOWN OUTCOME for the local plan; it may be partially applied. Inspect durable history '
-                'for every affected fact ID before deciding whether to retry; do not automatically replay the plan.')
     fact_id = ''
     if args[0] in ('correct', 'retire', 'reopen'):
         i = 1
@@ -201,7 +191,7 @@ def unknown_mutation(args):
                 target = value
                 break
             flag = value.lstrip('-').split('=', 1)[0]
-            if flag in ('expected-version', 'expires'):
+            if flag in ('expected-version', 'expires', 'reason'):
                 if '=' not in value:
                     i += 1
             elif flag != 'no-expires':
@@ -383,15 +373,13 @@ def main():
             event = data['hook_event_name']
             response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': context(command) if event == 'SessionStart' else ''}
             call(config, ['version', '-minimum', '0.30.1'], data['cwd'], timeout=5)
-            flags = ['-dream-tools'] if event == 'SessionStart' else ['-pitfalls-only']
+            flags = [] if event == 'SessionStart' else ['-pitfalls-only']
             card = call(config, ['session-card', *flags], data['cwd'], json.dumps(data), timeout=10)
             if card.strip():
                 output = json.loads(card)['hookSpecificOutput']
                 if not isinstance(output, dict) or output.get('hookEventName') != ('SessionCard' if event == 'SessionStart' else event) or not isinstance(output.get('additionalContext'), str):
                     raise AdapterError('invalid memcue SessionCard response')
-                hints = output['additionalContext'].replace(
-                    'call memcue_dream_prepare and answer its packet with memcue_dream_apply',
-                    'run the memcue-dream skill with the configured launcher')
+                hints = output['additionalContext']
                 response['hookSpecificOutput']['additionalContext'] += '\n\n' + hints
             elif event != 'SessionStart':
                 response['hookSpecificOutput']['additionalContext'] = 'Repository pitfalls: no git repository. This supersedes earlier repository-pitfall snapshots.'
@@ -403,15 +391,10 @@ def main():
             sys.stdout.write((ROOT / 'AGENTS.md.snippet').read_text(encoding='utf-8').replace(
                 '@MEMCUE@', command).replace('@ROOT@', str(ROOT)))
         else:
-            if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream'):
-                raise AdapterError('unsupported command; use search/add/correct/retire/reopen/facts/dump/version/dream')
-            if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-prepare', '-noise'], ['-prepare', '-all', '-noise'], ['-list'], ['-list', '-all', '-noise']) or
-                                                len(args.args) == 3 and args.args[:2] == ['-prepare', '-since'] and
-                                                args.args[2] and not args.args[2].startswith('-') or
-                                                len(args.args) == 2 and args.args[0] == '-apply'):
-                raise AdapterError('dream accepts only -prepare [-all] [-noise] [-since DATE], -list or -apply FILE; no background runner')
+            if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'history', 'facts', 'dump'):
+                raise AdapterError('unsupported command; use search/add/correct/retire/reopen/history/facts/dump/version')
             call(config, ['version', '-minimum', '0.30.0'], os.getcwd())
-            sys.stdout.write(call(config, [args.command, *args.args], os.getcwd(), timeout=60 if args.command == 'dream' else TIMEOUT))
+            sys.stdout.write(call(config, [args.command, *args.args], os.getcwd(), timeout=TIMEOUT))
     except (AdapterError, OSError, ValueError, KeyError, TypeError) as exc:
         message = 'memcue (Codex): ' + bounded(exc) + '. Other Codex work can continue.'
         print(message, file=sys.stderr)

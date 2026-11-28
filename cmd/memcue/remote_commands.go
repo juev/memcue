@@ -12,7 +12,7 @@ func remoteCommandAllowed(command string) error {
 		return nil
 	}
 	switch command {
-	case "migrate", "import", "install", "notes", "dream", "reindex":
+	case "migrate", "import", "install", "notes", "reindex":
 		return errors.New("command unavailable for PostgreSQL; explicitly unset MEMCUE_POSTGRES_DSN for local maintenance")
 	}
 	return nil

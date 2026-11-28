@@ -80,16 +80,3 @@ test('on alone is idempotent and does not cancel an already enabled mutation', a
   assert.ok(result && result.role === 'toolResult');
   assert.equal(result.isError, false);
 });
-
-test('dream requested during active work is delivered as a follow-up rather than lost', async t => {
-  const fixture = await piFixture({ snapshotDelayMs: 200 });
-  const pi = await openPi(fixture);
-  t.after(async () => { await pi.dispose(); await fixture.dispose(); });
-  const pending = pi.session.prompt('Complete the current synthetic task first.');
-  await waitForCliCall(fixture, 'session-card');
-  await pi.session.prompt('/memcue dream');
-  await pending;
-  await pi.session.waitForIdle();
-  assert.deepEqual(pi.errors, []);
-  assert.match(requestText(pi.requests.flat()), /Maintain memcue memory using memcue_dream_prepare and memcue_dream_apply/);
-});

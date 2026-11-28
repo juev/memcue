@@ -159,14 +159,6 @@ test('a failed binary probe reaches status as a problem', async (t) => {
   assert.match(problemNotice(status ?? assert.fail('no status')) ?? '', /^Memcue: memcue /);
 });
 
-test('a toast for maintenance says the dream was queued', async (t) => {
-  const fixture = await setup(t);
-  await fixture.plugin.commands.get('memcue')?.execute({ sessionID: 'session-1', prompt: { text: 'dream' } });
-  const notice = asNotice(fixture.plugin.rpc.emitted.at(-1)?.data);
-  assert.equal(notice?.variant, 'success');
-  assert.match(notice?.message ?? '', /Maintenance was queued/);
-});
-
 test('the indicator cuts a long reason with an explicit ellipsis', async (t) => {
   const reason = 'configuration error: ' + 'x'.repeat(120);
   const text = indicatorText({ on: false, role: 'main', directory: '/repo', base: 'default', binary: 'memcue', problem: reason });

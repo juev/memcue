@@ -49,7 +49,7 @@ func TestEmbeddedPostgresRequiresExistingHelper(t *testing.T) {
 
 func TestRemoteCommandMatrixProtectsLocalMaintenance(t *testing.T) {
 	t.Setenv("MEMCUE_POSTGRES_DSN", "invalid-explicit-remote")
-	for _, name := range []string{"migrate", "import", "install", "notes", "dream", "reindex"} {
+	for _, name := range []string{"migrate", "import", "install", "notes", "reindex"} {
 		if err := remoteCommandAllowed(name); err == nil {
 			t.Fatalf("%s could touch local state under a remote selection", name)
 		}
@@ -72,17 +72,6 @@ func TestRemoteRepositorySnapshotDoesNotPretendBaseIsAbsent(t *testing.T) {
 	header, _ := repositoryPitfallParts(cwd)
 	if header != repositoryPitfallsUnavailable {
 		t.Fatalf("remote failure became a false empty snapshot: %q", header)
-	}
-}
-
-func TestRemoteHooksNeverStartLocalDreamMaintenance(t *testing.T) {
-	t.Setenv("MEMCUE_POSTGRES_DSN", "explicit-remote")
-	t.Setenv("MEMCUE_DREAM_BACKGROUND", "")
-	previous := lookClaude
-	lookClaude = func() bool { return true }
-	defer func() { lookClaude = previous }()
-	if dreamBackground() {
-		t.Fatal("remote hook could spawn unsupported maintenance against an implicit local base")
 	}
 }
 

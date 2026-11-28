@@ -9,7 +9,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/juev/memcue/internal/store"
 )
@@ -54,13 +53,6 @@ func outcomeMutation(args []string) bool {
 	}
 	switch args[0] {
 	case "add", "correct", "retire", "reopen":
-		return true
-	case "dream":
-		for _, arg := range args[1:] {
-			if strings.SplitN(strings.TrimLeft(arg, "-"), "=", 2)[0] == "list" {
-				return false
-			}
-		}
 		return true
 	}
 	return false

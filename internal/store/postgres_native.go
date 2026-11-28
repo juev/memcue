@@ -23,6 +23,24 @@ type postgresTransaction struct {
 	tx  pgx.Tx
 }
 
+func (p *postgresTransaction) checkRetiredMatch(f Fact) error {
+	if f.Scope == "" {
+		return nil
+	}
+	var id, reason string
+	err := p.tx.QueryRow(p.ctx, `SELECT id, coalesce(payload->>'retirement_reason', '') FROM memcue.facts
+  WHERE NOT active AND (payload->>'retirement_key' = $1 OR (coalesce(payload->>'retirement_key', '') = ''
+  AND scope = $2 AND payload->>'Content' = $3))
+  ORDER BY (trim(coalesce(payload->>'retirement_reason', '')) = 'User requested forgetting.') DESC, created DESC, id LIMIT 1`, retirementKey(f), f.Scope, f.Content).Scan(&id, &reason)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return errRemote
+	}
+	return retiredMatch(id, f.Scope, reason)
+}
+
 func (p *postgresTransaction) get(id string) (Fact, error) {
 	f, err := scanRemote(p.ctx, p.tx.QueryRow(p.ctx, `SELECT version, payload FROM memcue.facts WHERE id=$1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {

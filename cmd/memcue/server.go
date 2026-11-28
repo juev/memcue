@@ -31,7 +31,7 @@ func runServer(args []string) error {
 	if fs.NArg() != 0 {
 		return errors.New("usage: memcue server [-bootstrap]")
 	}
-	// The server's own commands (dream) open its base through MEMCUE_FACTS: a backend of a client would take them
+	// The server opens its base through MEMCUE_FACTS: a client backend would take it
 	// elsewhere.
 	if serverName() != "" || os.Getenv("MEMCUE_POSTGRES_DSN") != "" {
 		return errors.New("memcue server serves MEMCUE_FACTS: unset MEMCUE_SERVER and MEMCUE_POSTGRES_DSN in its environment")
@@ -55,52 +55,9 @@ func runServer(args []string) error {
 	}
 	defer func() { _ = ln.Close() }()
 	logger.Printf("serving %s as tailnet node %s, port %s", path, cfg.Hostname, serverPort)
-	dreams := make(chan struct{})
-	if dreamBackground() {
-		dir, err := stateDir()
-		if err != nil {
-			return err
-		}
-		go func() {
-			defer close(dreams)
-			runDreams(ctx, logger, func(ctx context.Context) (bool, error) {
-				return runServerDreamBatches(ctx, dir, dreamEveryFromEnv(dreamEvery))
-			})
-		}()
-	} else {
-		close(dreams)
-		logger.Printf("dream: off; it needs MEMCUE_API_URL or claude on PATH, and MEMCUE_DREAM_BACKGROUND not 0")
-	}
 	err = serveBase(ctx, st, ln, ln.Who, logger)
 	stop()
-	<-dreams
 	return err
-}
-
-// dreamCheck is how often memcue server looks whether a dream is due.
-var dreamCheck = 10 * time.Minute
-
-// runDreams runs a dream of the server's base whenever one is due, until ctx ends (R11). The server is the only
-// machine that dreams in server mode; the dream's writes reach the replicas like any other change.
-func runDreams(ctx context.Context, logger *log.Logger, dream func(context.Context) (bool, error)) {
-	for ctx.Err() == nil {
-		more, err := dream(ctx)
-		if ctx.Err() != nil {
-			return
-		}
-		if err != nil {
-			logger.Printf("dream: %v", err)
-		} else if more {
-			continue
-		}
-		t := time.NewTimer(dreamCheck)
-		select {
-		case <-ctx.Done():
-			t.Stop()
-			return
-		case <-t.C:
-		}
-	}
 }
 
 // serveBase serves st on ln until ctx ends. A long poll in progress ends with ctx and answers nothing.

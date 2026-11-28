@@ -15,7 +15,7 @@ Run from the session's current working directory, including a nested or non-Git 
 search -json -in all "<words of the fact>"
 add -kind rule -scope global -source user -- "<fact>"
 correct -expected-version VERSION ID "<corrected fact>"
-retire -expected-version VERSION ID
+retire -expected-version VERSION -reason "REASON" ID
 reopen ID
 ```
 
@@ -29,9 +29,7 @@ Read the actual search object: `facts` is an array, `hints` is optional. A fact 
 Inspect the configured base history when persisted provenance is needed. Correct the matching fact instead of adding a duplicate.
 `correct` preserves source, kind, scope and expiry; `-expires YYYY-MM-DD` changes expiry,
 and `-no-expires` removes it. `retire` keeps the history; `reopen` undoes retirement. Tell the user what changed.
-Correct or retire a stored fact only when the user says it is wrong or a command or a file of this session shows it:
-a newer fact that says otherwise is not that evidence on its own. When nothing in the session settles it, answer from
-the facts and their days, name the conflict, and ask before you correct or retire one.
+When a fact matters to the task and current evidence puts it in doubt, verify the authoritative source for that scope. Correct the verified part and preserve useful conditions; retire only when confirmed false or superseded with no still-useful conditions. Only the user can withdraw or replace their standing instructions. If evidence is missing, conflicting, or merely newer, leave memory unchanged and say what is unverified. After a version conflict, read again and reconsider; never replay a stale decision. When you retire a fact, write a short concrete reason in the required `-reason` argument to `retire`, in that same call, citing current evidence when useful. For an explicit request to forget, write only “User requested forgetting.” without repeating the content. A retired match at save time is not current evidence: do not re-add it. Reopen only with new verified evidence, or explicit user authorization for a forgotten fact.
 
 Choose metadata deliberately on add:
 
@@ -75,3 +73,5 @@ On a failure or denied write, report the diagnostic and continue unrelated work.
 before retrying a write. Request access only to the configured base and state directories when the sandbox needs it.
 
 Read `version` from the earlier `search -json` result and pass that caller-observed version to correct/retire. On conflict, read again and make a new decision; never fetch latest immediately before writing to conceal a stale decision, and never replay automatically. PostgreSQL requires the version; old local CLI calls remain compatible.
+
+Before adding or correcting fact text, identify what a later session would do differently, verify the claim is reusable in its scope, and check for an existing fact. Skip hypotheses, volatile state you can check at its source, and one-off outcomes. Keep explicit standing instructions, rare reproducible pitfalls, and qualified research that changes a future choice.

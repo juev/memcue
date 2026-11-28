@@ -10,7 +10,7 @@ packet's time, measures four ways to cut it on saved packets, and ends with one 
   translation removed, the search queries of 3,093 facts removed, no dream state. Its packets have the shape of the
   2026-10-25 run: 40 fresh facts, 30–36 to expand, 40 to translate, 6–21 groups, 70–107 KB.
 - Six passes one after another with the binary of this branch, which now logs `timing` and the `claude -p` usage in
-  `dream.log`. The six packets were saved and sent again with `docs/research/scripts/dreamtime`, the same call as
+  `dream.log`. The six packets were saved and sent again with [`docs/research/scripts/dreamtime`](https://github.com/juev/memcue/tree/3898f453147aeaa87ebda65fd4384929a06b49eb/docs/research/scripts/dreamtime) (on the pre-removal tree), the same call as
   `dream -run`, under other settings. One run per cell.
 
 ## Time of one packet

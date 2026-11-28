@@ -151,10 +151,6 @@ def load_config(path):
         value = config.get(key, '')
         if key in config and (not isinstance(value, str) or not value or any(c.isspace() for c in value)):
             raise AdapterError(key + ' must be a nonempty string without whitespace')
-    if config.get('background_dream', False) is not False:
-        raise AdapterError('background_dream must be false; this adapter uses model-driven dream only')
-    if 'dream_every' in config and (not isinstance(config['dream_every'], str) or not config['dream_every']):
-        raise AdapterError('dream_every must be a nonempty Go duration, for example 24h')
     return config
 
 
@@ -174,22 +170,16 @@ def child_env(config):
         if key in config:
             env[name] = config[key]
     env.update(MEMCUE_HOST=config['host'], MEMCUE_DREAM_BACKGROUND='0')
-    if 'dream_every' in config:
-        env['MEMCUE_DREAM_EVERY'] = config['dream_every']
     return env
 
 
 def unknown_mutation(args):
-    dream = bool(args and args[0] == 'dream' and not any(v.lstrip('-').split('=', 1)[0] == 'list' for v in args[1:]))
-    if not args or args[0] not in ('add', 'correct', 'retire', 'reopen') and not dream:
+    if not args or args[0] not in ('add', 'correct', 'retire', 'reopen'):
         return ''
     batch = args[0] == 'add' and any(v.lstrip('-').split('=', 1)[0] == 'batch' for v in args[1:])
     if batch:
         return ('UNKNOWN OUTCOME for the entire batch; response incomplete. Inspect durable facts and history '
                 'for every batch row before deciding whether to retry; do not automatically replay the batch.')
-    if dream:
-        return ('UNKNOWN OUTCOME for the local plan; it may be partially applied. Inspect durable history '
-                'for every affected fact ID before deciding whether to retry; do not automatically replay the plan.')
     fact_id = ''
     if args[0] in ('correct', 'retire', 'reopen'):
         i = 1
@@ -203,7 +193,7 @@ def unknown_mutation(args):
                 target = value
                 break
             flag = value.lstrip('-').split('=', 1)[0]
-            if flag in ('expected-version', 'expires'):
+            if flag in ('expected-version', 'expires', 'reason'):
                 if '=' not in value:
                     i += 1
             elif flag != 'no-expires':
@@ -326,16 +316,14 @@ def main():
             event = data['hook_event_name']
             if event in ('SessionStart', 'PostCompact'):
                 call(config, ['version', '-minimum', '0.30.1'], data['cwd'], timeout=5)
-                card = call(config, ['session-card', '-dream-tools', '-hints-only'],
+                card = call(config, ['session-card', '-hints-only'],
                             data['cwd'], json.dumps(data), timeout=10)
                 text = ''
                 if card.strip():
                     output = json.loads(card)['hookSpecificOutput']
                     if not isinstance(output, dict) or output.get('hookEventName') != 'SessionCard' or not isinstance(output.get('additionalContext'), str):
                         raise AdapterError('invalid memcue SessionCard response')
-                    text = output['additionalContext'].replace(
-                        'call memcue_dream_prepare and answer its packet with memcue_dream_apply',
-                        'run the memcue-dream skill with the configured launcher')
+                    text = output['additionalContext']
                 response['hookSpecificOutput'] = {'hookEventName': event, 'additionalContext': text}
         elif args.command == 'pitfalls':
             if args.args:
@@ -356,15 +344,10 @@ def main():
             managed = 'python3 -I "${KIMI_CODE_HOME:-$HOME/.kimi-code}/plugins/managed/memcue-kimi/scripts/memcue.py"'
             sys.stdout.write((ROOT / 'SYSTEM.md').read_text(encoding='utf-8').replace(managed, command))
         else:
-            if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'facts', 'dump', 'dream'):
-                raise AdapterError('unsupported command; use pitfalls/search/add/correct/retire/reopen/facts/dump/version/dream')
-            if args.command == 'dream' and not (args.args in (['-prepare'], ['-prepare', '-all'], ['-prepare', '-noise'], ['-prepare', '-all', '-noise'], ['-list'], ['-list', '-all', '-noise']) or
-                                                len(args.args) == 3 and args.args[:2] == ['-prepare', '-since'] and
-                                                args.args[2] and not args.args[2].startswith('-') or
-                                                len(args.args) == 2 and args.args[0] == '-apply'):
-                raise AdapterError('dream accepts only -prepare [-all] [-noise] [-since DATE], -list or -apply FILE; no background runner')
+            if args.command not in ('version', 'search', 'add', 'correct', 'retire', 'reopen', 'history', 'facts', 'dump'):
+                raise AdapterError('unsupported command; use pitfalls/search/add/correct/retire/reopen/history/facts/dump/version')
             call(config, ['version', '-minimum', '0.30.0'], os.getcwd())
-            sys.stdout.write(call(config, [args.command, *args.args], os.getcwd(), timeout=60 if args.command == 'dream' else TIMEOUT))
+            sys.stdout.write(call(config, [args.command, *args.args], os.getcwd(), timeout=TIMEOUT))
     except (AdapterError, OSError, ValueError, KeyError, TypeError) as exc:
         message = 'memcue (Kimi): ' + bounded(exc) + '. Other Kimi work can continue.'
         print(message, file=sys.stderr)

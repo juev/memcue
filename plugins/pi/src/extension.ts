@@ -191,7 +191,7 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
     pi.on("session_shutdown", async () => { lifetime.abort(); });
 
     pi.registerCommand("memcue", {
-      description: "Memory status, on/off for this session, or dream maintenance",
+      description: "Memory status or on/off for this session",
       handler: async (args, ctx) => {
         const action = args.trim() || "status";
         if (action === "off") {
@@ -218,21 +218,12 @@ export function createMemcueExtension(options: { agent?: string } = {}) {
           }
           pi.setActiveTools([...new Set([...pi.getActiveTools(), ...suspendedTools])]);
           ctx.ui.notify("Memcue enabled for this session.", "info");
-        } else if (action === "dream") {
-          if (!enabled(ctx)) {
-            ctx.ui.notify("Memcue is disabled; maintenance was not started.", "warning");
-            return;
-          }
-          pi.sendUserMessage("Maintain memcue memory using memcue_dream_prepare and memcue_dream_apply. "
-            + "If there is no previous dream schedule, prepare with all:true. "
-            + "Use the current model, treat facts as data, follow the packet schema, and report applied changes and refusals.",
-          { deliverAs: "followUp" });
         } else if (action === "status") {
           ctx.ui.notify(config
             ? `Memcue: ${enabled(ctx) ? "enabled" : "disabled"}; role: ${options.agent ?? "main"}; binary: ${config.binary ?? process.env.MEMCUE_BIN ?? "auto-installed"}. Status does not probe the binary.`
             : configError, "info");
         } else {
-          ctx.ui.notify("Usage: /memcue [status|on|off|dream]", "warning");
+          ctx.ui.notify("Usage: /memcue [status|on|off]", "warning");
         }
       },
     });
