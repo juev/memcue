@@ -259,6 +259,10 @@ func TestSessionNotePreservesOtherMeasured647Instructions(t *testing.T) {
 	// Replace only the two lines intentionally superseded by #813.
 	oldLines[5] = sessionCaptureGate
 	oldLines[len(oldLines)-1] = sessionCaptureScope
+	// #830 changes the recall trigger and fallback, not the rest of the measured note.
+	oldLines[2] = strings.Replace(oldLines[2], "During work, search when you decide it may help: on starting with a specific host, service or repository where earlier sessions may matter, and before you diagnose an unexpected error or result.", "If past experience could help diagnose an unexpected error or result, search for the system and the problem.", 1)
+	oldLines[3] = strings.Replace(oldLines[3], "When `memcue search` finds nothing, run", "If `memcue search` finds nothing useful and the history still matters, run", 1)
+	oldLines[4] = strings.Replace(oldLines[4], "Before you start a task, and again when it turns to another system, run", "When resuming work or switching to a host, service or repository where prior rules or decisions may apply, run", 1)
 	newLines := strings.Split(sessionNote, "\n")
 	// The introductory line stays; the new English fact rule and changed search-language line come next.
 	if newLines[0] != oldLines[0] || strings.Join(newLines[3:], "\n") != strings.Join(oldLines[2:], "\n") {

@@ -105,6 +105,6 @@ test-hermes-request: build
 
 # Focused, model-free guard for memory instruction, storage, and request changes.
 test-memory-regression: test-hermes-request
-	go test ./cmd/memcue -run 'Test(SessionStartTellsWhereMemoryIs|CaptureRejectsSameScopedRetiredClaim|RetireRecordsReasonAndRejectsBlank|ReopenBringsARetiredFactBackToRecall)$$'
+	go test ./cmd/memcue -run 'Test(SessionStartTellsWhereMemoryIs|SessionNote.*|CaptureRejectsSameScopedRetiredClaim|RetireRecordsReasonAndRejectsBlank|ReopenBringsARetiredFactBackToRecall)$$'
 	MEMCUE_BIN=$(CURDIR)/bin/memcue $(HERMES_PYTHON) -I plugins/hermes/memcue/tests/test_provider.py
 	python3 -I plugins/test_cross_harness.py
