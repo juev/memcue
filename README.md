@@ -58,13 +58,14 @@ not yet run for long in daily work.
 
 ## Compatibility
 
-This release candidate is `0.41.0`; the fact-base schema is **9**. Upgrading from 0.40.11 keeps existing fact history,
+This release candidate is `0.41.1`; the fact-base schema is **9**. Upgrading from 0.40.11 keeps existing fact history,
 but older writers can lose the new retirement reason. Stop external Dream schedules, back up the base, and update
 the sync server before replicas and writers. See [Removing Dream](#removing-dream) for rollout and rollback risks.
 All versioned plugin manifests carry the same release version.
 
 | memcue | schema | Claude Code plugin | DSH plugin | Hermes plugin |
 |---|---|---|---|---|
+| 0.41.1 | 9 | 0.41.1 | 0.41.1 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.41.1 (`hermes-agent` >=0.17.0) |
 | 0.41.0 | 9 | 0.41.0 | 0.41.0 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.41.0 (`hermes-agent` >=0.17.0) |
 | 0.40.11 | 9 | 0.40.11 | 0.40.11 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.11 (`hermes-agent` >=0.17.0) |
 | 0.40.10 | 9 | 0.40.10 | 0.40.10 (`dsh >=0.2.0-rc.2 <0.3.0`) | 0.40.10 (`hermes-agent` >=0.17.0) |
@@ -336,6 +337,14 @@ fact's `scope`, so a fact from the shelf can be told from the rest, and prints o
 included (#453); the Hermes and DSH plugins read both it and the bare array of an older binary.
 
 ## Upgrade
+
+### 0.41.1: consistent recall and safer Hermes context
+
+- Hermes saves verified, reusable repository pitfalls while it has direct tool evidence (#834).
+- Hermes preserves user-authored text that looks like a context frame (#836).
+- Integrations use a conditional lookup rule: search when earlier context can change the next step (#837).
+- Automatic pitfall delivery remains complete and uncached; see [the benchmark](docs/research/hermes-snapshot-cost-831.md).
+- Upgrading from 0.40.x still requires the [Dream removal rollout order](#removing-dream).
 
 ### 0.41.0: working-model memory replaces Dream (#823)
 
