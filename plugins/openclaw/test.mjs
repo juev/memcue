@@ -23,9 +23,13 @@ if (args.includes("fail")) process.exit(2);
 console.log(args[0] === "search" ? JSON.stringify({facts:[], hints:[]}) : "ok");
 `, { mode: 0o700 });
   const factories = new Map();
-  plugin.register({ pluginConfig: { binary, dataDir }, registerTool: (tool, { name }) => factories.set(name, tool) });
+  const promptGuidance = new Map();
+  plugin.register({ pluginConfig: { binary, dataDir }, registerTool: (tool, { name, promptGuidance: guidance }) => { factories.set(name, tool); promptGuidance.set(name, guidance); } });
   const manifest = JSON.parse(await readFile(new URL("./openclaw.plugin.json", import.meta.url)));
   assert.deepEqual([...factories.keys()], manifest.contracts.tools);
+  assert.match(promptGuidance.get("memcue_search"), /Skip it for self-contained tasks/);
+  assert.match(promptGuidance.get("memcue_add"), /proactively for durable agreed rules/);
+  assert.equal(promptGuidance.get("memcue_retire"), undefined);
   for (const factory of factories.values()) {
     assert.equal(factory.contextVersion, 2);
     for (const ctx of [{}, { ...owner(), sandboxed: true },

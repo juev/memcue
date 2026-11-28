@@ -1,7 +1,10 @@
 # Experimental Memcue tools for OpenClaw (#838)
 
 This additive tool plugin does not select or replace a memory provider. Its tool
-descriptions carry the capture and recall guidance only when the tool is exposed.
+descriptions still explain individual calls. OpenClaw also adds the conditional
+recall and proactive capture instructions to the system prompt through scoped
+`promptGuidance`, only while the corresponding tools are callable. This does
+not query the database at prompt assembly or replace built-in memory.
 
 Pack this directory with `npm pack` and install the tarball on an isolated test
 Gateway with `openclaw plugins install npm-pack:/absolute/path/to/package.tgz`.

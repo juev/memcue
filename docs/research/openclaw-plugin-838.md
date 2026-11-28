@@ -40,3 +40,12 @@ removed it from ordinary recall. Releasing the first session's audience also
 blocked a retained write tool. This exercises the real host audience resolver
 and Memcue CLI, with a local tool registration harness; it does not exercise a
 channel, model turn or the Gateway's full invocation router.
+
+Prompt guidance follow-up: use per-tool OpenClaw promptGuidance rather than
+editing workspace files or adding an unconditional prompt hook. Hypothesis:
+Memcue policy is included even without a request mentioning memory, but only
+when the corresponding tool can be called. On OpenClaw 2026.11.10 its prompt
+guidance selector returned both rules for owner tools, only recall for the
+search-only set, and neither for the group or empty tool set. The real CLI
+lifecycle test still passed. This tests prompt selection, not model compliance;
+a matched live-turn evaluation with and without guidance remains unrun.
