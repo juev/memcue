@@ -78,3 +78,14 @@ production Gateway, select a different memory provider, or connect a sync backen
 From the package source directory, `MEMCUE_BIN=/absolute/path/to/memcue node
 --test --test-concurrency=1 test.mjs` checks the adapter without chat or model
 calls. A timed-out mutation may already have landed; search before retrying.
+
+### Repository pitfalls (0.2.0)
+
+Before prompt assembly, a host-authorized private owner turn with
+`memcue_search` available reads the snapshot for its OpenClaw workspace.
+It adds no context to group or sandboxed turns, never writes a fact,
+and does not reuse a previous snapshot. An empty or unavailable snapshot
+explicitly supersedes earlier results. Use a session bound to the intended
+repository or worktree; a shell command's temporary directory does not
+change the OpenClaw session workspace. The GitHub archive linked above
+installs the older 0.1.0 preview, which does not have this feature.

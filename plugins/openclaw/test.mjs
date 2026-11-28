@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -24,7 +25,7 @@ console.log(args[0] === "search" ? JSON.stringify({facts:[], hints:[]}) : "ok");
 `, { mode: 0o700 });
   const factories = new Map();
   const promptGuidance = new Map();
-  plugin.register({ pluginConfig: { binary, dataDir }, registerTool: (tool, { name, promptGuidance: guidance }) => { factories.set(name, tool); promptGuidance.set(name, guidance); } });
+  plugin.register({ on() {}, pluginConfig: { binary, dataDir }, registerTool: (tool, { name, promptGuidance: guidance }) => { factories.set(name, tool); promptGuidance.set(name, guidance); } });
   const manifest = JSON.parse(await readFile(new URL("./openclaw.plugin.json", import.meta.url)));
   assert.deepEqual([...factories.keys()], manifest.contracts.tools);
   assert.match(promptGuidance.get("memcue_search"), /Skip it for self-contained tasks/);
@@ -55,7 +56,7 @@ test("real CLI: save, recall from a new context, correct, retire", { skip: !proc
   const dataDir = await mkdtemp(join(tmpdir(), "openclaw-memcue-real-"));
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const factories = new Map();
-  plugin.register({
+  plugin.register({ on() {},
     pluginConfig: { binary: resolve(process.env.MEMCUE_BIN), dataDir },
     registerTool: (tool, { name }) => factories.set(name, tool),
   });
@@ -69,4 +70,39 @@ test("real CLI: save, recall from a new context, correct, retire", { skip: !proc
   assert.match(JSON.stringify(await search()), /fixture two/);
   await call("retire", { id: fact.id, reason: "Synthetic policy withdrawn" });
   assert.deepEqual(await search(), []);
+});
+
+test("repository snapshots follow workspace and do not replay retired facts", { skip: !process.env.MEMCUE_BIN }, async (t) => {
+  const dataDir = await mkdtemp(join(tmpdir(), "memcue-pitfalls-"));
+  t.after(() => rm(dataDir, { recursive: true, force: true }));
+  const binary = resolve(process.env.MEMCUE_BIN);
+  const repo = await mkdtemp(join(dataDir, "repo-"));
+  const other = await mkdtemp(join(dataDir, "other-"));
+  for (const [dir, name] of [[repo, "one"], [other, "two"]]) {
+    execFileSync("git", ["init", "-q", dir]);
+    execFileSync("git", ["-C", dir, "remote", "add", "origin", "https://example.invalid/test/" + name]);
+  }
+  execFileSync(binary, ["add", "-kind", "pitfall", "-scope", "repo:example.invalid/test/one", "--",
+    "Synthetic cobalt pitfall: prove the restart completed."], { env: { HOME: dataDir, MEMCUE_FACTS: join(dataDir, "facts.db") } });
+  let hook;
+  const tools = new Map();
+  plugin.register({
+    pluginConfig: { binary, dataDir },
+    registerTool: (factory, { name }) => tools.set(name, factory),
+    on(name, handler, opts) {
+      assert.equal(name, "before_prompt_build");
+      assert.equal(opts.requiresToolAuthority, true);
+      hook = handler;
+    },
+  });
+  const ctx = { ...owner(), workspaceDir: repo, toolAuthority: { allows: () => true, assertActive() {} } };
+  assert.match((await hook({}, ctx)).prependContext, /Synthetic cobalt pitfall/);
+  assert.doesNotMatch((await hook({}, { ...ctx, workspaceDir: other })).prependContext, /Synthetic cobalt/);
+  assert.doesNotMatch((await hook({}, { ...ctx, workspaceDir: dataDir })).prependContext, /Synthetic cobalt/);
+  assert.equal(await hook({}, { ...ctx, memoryAudience: { kind: "conversation" } }), undefined);
+  assert.equal(await hook({}, { ...ctx, toolAuthority: { allows: () => false } }), undefined);
+  const run = (name, params) => tools.get(name).create(owner()).execute("test", params);
+  const [fact] = JSON.parse((await run("memcue_search", { query: "cobalt" })).content[0].text).facts;
+  await run("memcue_retire", { id: fact.id, reason: "fixture rotation" });
+  assert.doesNotMatch((await hook({}, ctx)).prependContext, /Synthetic cobalt/);
 });

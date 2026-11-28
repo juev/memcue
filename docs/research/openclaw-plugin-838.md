@@ -76,3 +76,13 @@ previously checksum-verified Memcue 0.41.0 binary, both adapter tests passed,
 as did the host-audience integration smoke (two owner contexts, group refusal
 and released-authority refusal). No live channel or model call was used in
 this installation rehearsal.
+
+Repository pitfall delivery candidate (0.2.0): hypothesis is that authorized
+prompt enrichment gives repo-scoped pitfalls without an explicit search,
+unlike the 0.1.0 baseline. The local real-CLI hook test passed for a matching
+repository, a different repository, a non-repository workspace, denial in
+group or with search disabled, and retirement without a workspace change.
+The hook rechecks live authorization after the read. It does not cache; on a
+timeout or oversized/invalid response it emits an unavailable marker instead
+of a partial or stale snapshot. This is a hook contract check, not a live
+Gateway or transport-limit benchmark.
